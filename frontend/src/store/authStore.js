@@ -1,0 +1,243 @@
+import { create } from "zustand";
+import axios from "axios";
+import toast from "react-hot-toast";
+
+export const API = axios.create({
+  baseURL: "http://localhost:5000",
+  withCredentials: true,
+});
+
+// ---------------------- ATTACH TOKEN AUTOMATICALLY ----------------------
+API.interceptors.request.use(
+  (config) => {
+    const user = JSON.parse(localStorage.getItem("user")) || null;
+    if (user?.token) {
+      config.headers.Authorization = `Bearer ${user.token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+export const useAuthStore = create((set, get) => ({
+  user: null,
+  tempEmail: null,
+  otpRequired: false,
+  otpType: null,
+  error: null,
+  isLoading: false,
+
+  isAuthenticated: false,
+  isCheckingAuth: true,
+
+  checkAuth: async () => {
+    try {
+      set({ isCheckingAuth: true });
+
+      const { data } = await API.get("/api/auth/check-auth");
+
+      if (data.authenticated) {
+        set({
+          user: data.user,
+          isAuthenticated: true,
+        });
+      } else {
+        set({
+          user: null,
+          isAuthenticated: false,
+        });
+      }
+    } catch (err) {
+      set({
+        user: null,
+        isAuthenticated: false,
+      });
+    } finally {
+      set({ isCheckingAuth: false });
+    }
+  },
+
+  signup: async (name, email, password, confirmPassword) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await API.post("/api/auth/signup", {
+        name,
+        email,
+        password,
+        confirmPassword,
+      });
+
+      set({
+        tempEmail: email,
+        otpRequired: true,
+        otpType: "signup",
+      });
+
+      toast.success(data.message);
+    } catch (err) {
+      set({ error: err.response?.data?.message || err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  login: async (email, password) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await API.post("/api/auth/login", { email, password });
+
+      if (data.requiresOTP) {
+        set({
+          tempEmail: email,
+          otpRequired: true,
+          otpType: "login",
+        });
+        toast.success("OTP sent to your email");
+      } else {
+        // ✅ Save both user info AND token
+        set({
+          user: { ...data.user, token: data.token },
+          isAuthenticated: true,
+        });
+        localStorage.setItem("user", JSON.stringify({ ...data.user, token: data.token }));
+        toast.success("Logged in successfully");
+      }
+    } catch (err) {
+      set({ error: err.response?.data?.message || err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  verifyOTP: async (code) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { tempEmail, otpType } = get();
+      if (!tempEmail) throw new Error("No email found for OTP verification");
+
+      const url =
+        otpType === "signup"
+          ? "/api/auth/verify-email"
+          : "/api/auth/verify-login-otp";
+
+      const { data } = await API.post(url, { email: tempEmail, code });
+
+      if (otpType === "login") {
+        // Only login OTP → set user as authenticated
+        set({
+          user: { ...data.user, token: data.token },
+          isAuthenticated: true,
+          otpRequired: false,
+          tempEmail: null,
+          otpType: null,
+        });
+        localStorage.setItem("user", JSON.stringify({ ...data.user, token: data.token }));
+        toast.success("Login verified!");
+      } else if (otpType === "signup") {
+        set({
+          otpRequired: false,
+          tempEmail: null,
+          otpType: null,
+        });
+        toast.success("Signup verified! You can now login.");
+      }
+    } catch (err) {
+      set({ error: err.response?.data?.message || err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  logout: async () => {
+    try {
+      await API.post("/api/auth/logout");
+      set({
+        user: null,
+        isAuthenticated: false,
+      });
+      localStorage.removeItem("user");
+      toast.success("Logged out successfully");
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message);
+    }
+  },
+
+  resendOTP: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const { tempEmail, otpType } = get();
+      if (!tempEmail) throw new Error("No email found for OTP");
+
+      const url =
+        otpType === "signup"
+          ? "/api/auth/resend-signup-otp"
+          : "/api/auth/resend-login-otp";
+
+      const { data } = await API.post(url, { email: tempEmail });
+
+      toast.success(data.message || "OTP resent successfully");
+    } catch (err) {
+      set({ error: err.response?.data?.message || err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  forgotPassword: async (email) => {
+    set({ isLoading: true, error: null });
+    try {
+      await API.post("/api/auth/forgot-password", { email });
+      set({ tempEmail: email });
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message);
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  verifyForgotPasswordOTP: async (code) => {
+    set({ isLoading: true, error: null });
+    try {
+      const { tempEmail } = get();
+      if (!tempEmail) throw new Error("No email found for OTP verification");
+
+      await API.post("/api/auth/verify-forgot-password-otp", {
+        email: tempEmail,
+        code,
+      });
+
+      set({ otpRequired: false });
+      toast.success("OTP verified! You can now set your new password.");
+    } catch (err) {
+      set({ error: err.response?.data?.message || err.message });
+      toast.error(err.response?.data?.message || err.message);
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  resetPassword: async (newPassword) => {
+    const { tempEmail } = get();
+
+    set({ isLoading: true, error: null });
+    try {
+      await API.post("/api/auth/reset-password", {
+        email: tempEmail,
+        newPassword,
+      });
+
+      toast.success("Password reset successfully");
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message);
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+}));
