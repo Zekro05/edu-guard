@@ -1,7 +1,7 @@
 import Incident from "../models/incidentModel.js";
 import Student from "../models/studentModel.js";
 
-// Get all incidents for a student
+// get student from incident
 export const getIncidents = async (req, res) => {
   try {
     const { studentId } = req.query;
@@ -14,7 +14,7 @@ export const getIncidents = async (req, res) => {
   }
 };
 
-// Create a new incident
+//create a new incident
 export const createIncident = async (req, res) => {
   try {
     const { studentId, title, date, category, action, level } = req.body;
@@ -22,7 +22,7 @@ export const createIncident = async (req, res) => {
 
     const incident = await Incident.create({ studentId, title, date, category, action, level });
 
-    // Update student's totalIncidents and riskLevel
+    // update student's totalIncidents and riskLevel
     const totalIncidents = await Incident.countDocuments({ studentId });
     let riskLevel = "Low";
     const highCount = await Incident.countDocuments({ studentId, level: "High" });
@@ -38,13 +38,13 @@ export const createIncident = async (req, res) => {
   }
 };
 
-// Delete an incident
+// delete an incident
 export const deleteIncident = async (req, res) => {
   try {
     const incident = await Incident.findByIdAndDelete(req.params.id);
     if (!incident) return res.status(404).json({ message: "Incident not found" });
 
-    // Update student summary
+    // update student summary
     const totalIncidents = await Incident.countDocuments({ studentId: incident.studentId });
     let riskLevel = "Low";
     const highCount = await Incident.countDocuments({ studentId: incident.studentId, level: "High" });

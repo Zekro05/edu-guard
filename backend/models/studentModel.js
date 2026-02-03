@@ -22,7 +22,7 @@ const studentSchema = new mongoose.Schema(
     studentId: {
       type: String,
       unique: true,
-      sparse: true, // allows null but enforces uniqueness if present
+      sparse: true, 
     },
 
     email: {
@@ -38,7 +38,7 @@ const studentSchema = new mongoose.Schema(
     gender: {
       type: String,
       enum: ["Male", "Female"],
-      default: "", // can be empty string if not selected
+      default: "", 
     },
 
     riskLevel: {
@@ -58,7 +58,7 @@ const studentSchema = new mongoose.Schema(
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User", // matches your auth system
+      ref: "User", 
     },
   },
   { timestamps: true }

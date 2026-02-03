@@ -8,7 +8,7 @@ import {
   sendResetSuccessEmail,
 } from "../mailer/emails.js";
 
-// ---------------- SIGNUP ----------------
+// SIGNUP 
 export const signup = async (req, res) => {
   const { name, email, password, confirmPassword } = req.body;
 
@@ -25,7 +25,7 @@ export const signup = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 🔐 SIGNUP EMAIL VERIFICATION
+    //  SIGNUP EMAIL VERIFICATION
     const verificationToken = Math.floor(100000 + Math.random() * 900000).toString();
 
     const user = new User({
@@ -52,7 +52,7 @@ export const signup = async (req, res) => {
   }
 };
 
-// ---------------- VERIFY SIGNUP OTP ----------------
+//  VERIFY SIGNUP OTP 
 export const verifyEmail = async (req, res) => {
   const { email, code } = req.body;
 
@@ -89,7 +89,7 @@ export const verifyEmail = async (req, res) => {
 };
 
 
-// ---------------- LOGIN ----------------
+//  LOGIN 
 export const login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -128,7 +128,7 @@ export const login = async (req, res) => {
   }
 };
 
-// ---------------- VERIFY LOGIN OTP ----------------
+// VERIFY LOGIN OTP 
 export const verifyLoginOTP = async (req, res) => {
   const { email, code } = req.body;
 
@@ -184,7 +184,7 @@ export const resendSignupOTP = async (req, res) => {
   }
 };
 
-// ---------------- RESEND LOGIN OTP ----------------
+//resending login 
 export const resendLoginOTP = async (req, res) => {
   try {
     const { email } = req.body;
@@ -196,7 +196,7 @@ export const resendLoginOTP = async (req, res) => {
     if (!user.isVerified)
       return res.status(400).json({ message: "Email not verified. Cannot resend login OTP." });
 
-    // Generate new login OTP
+    
     const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
     user.loginOTP = loginOTP;
     user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
@@ -210,7 +210,7 @@ export const resendLoginOTP = async (req, res) => {
     res.status(500).json({ message: "Failed to resend login OTP" });
   }
 };
-// ---------------- CHECK AUTH ----------------
+// CHECK AUTH 
 export const checkAuth = async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("-password");
@@ -223,13 +223,13 @@ export const checkAuth = async (req, res) => {
   }
 };
 
-// ---------------- LOGOUT ----------------
+//  LOGOUT 
 export const logout = async (req, res) => {
   res.clearCookie("token", { httpOnly: true, sameSite: "lax" });
   res.status(200).json({ success: true, message: "Logged out successfully" });
 };
 
-// ---------------- FORGOT PASSWORD ----------------
+//  FORGOT PASSWORD 
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -239,14 +239,14 @@ export const forgotPassword = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // Generate 6-digit OTP
+    
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     user.resetPasswordToken = otp;
-    user.resetPasswordExpiresAt = Date.now() + 10 * 60 * 1000; // 10 mins
+    user.resetPasswordExpiresAt = Date.now() + 10 * 60 * 1000; 
     await user.save();
 
-    // Send OTP email
+    
     await sendPasswordResetEmail(email, `<h3>Your OTP is:</h3><h2>${otp}</h2>`);
 
     res.json({ message: "OTP sent to your email" });
@@ -264,17 +264,14 @@ export const verifyForgotPasswordOTP = async (req, res) => {
   }
 
   try {
-    // Find the OTP in your database for this email
+    
     const user = await User.findOne({ email, resetPasswordToken: code });
 
     if (!user) {
       return res.status(401).json({ message: "Invalid OTP" });
     }
 
-    // Optionally: check OTP expiration
-    // if (user.otpExpires < Date.now()) return res.status(401).json({ message: "OTP expired" });
-
-    // OTP is valid
+    
     return res.status(200).json({ message: "OTP verified" });
   } catch (err) {
     console.error(err);
@@ -286,15 +283,15 @@ export const verifyForgotPasswordOTP = async (req, res) => {
 
 
 
-// ---------------- RESET PASSWORD ----------------
+//RESET PASSWORD 
 export const resetPassword = async (req, res) => {
   try {
-    const { email, newPassword } = req.body; // only email + newPassword
+    const { email, newPassword } = req.body; 
 
     if (!email || !newPassword)
       return res.status(400).json({ message: "All fields are required" });
 
-    // Find the user by email
+    //finding email
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -305,11 +302,11 @@ export const resetPassword = async (req, res) => {
         .json({ message: "New password cannot be the same as the old password" });
 
 
-    // Hash and update password
+    // hash/update password
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
-    // Optionally send success email
+    
     await sendResetSuccessEmail(email);
 
     res.json({ message: "Password reset successful" });

@@ -1,6 +1,6 @@
 import Student from "../models/studentModel.js";
 
-/* ================= GET ALL STUDENTS ================= */
+/* GET ALL STUDENTS */
 export const getStudents = async (req, res) => {
   try {
     const students = await Student.find()
@@ -12,7 +12,7 @@ export const getStudents = async (req, res) => {
   }
 };
 
-/* ================= CREATE STUDENT ================= */
+/*  CREATE STUDENT  */
 export const createStudent = async (req, res) => {
   try {
     const student = new Student({
@@ -28,7 +28,7 @@ export const createStudent = async (req, res) => {
   }
 };
 
-/* ================= UPDATE STUDENT ================= */
+/*  UPDATE STUDENT  */
 export const updateStudent = async (req, res) => {
   try {
     const updatedStudent = await Student.findByIdAndUpdate(
@@ -47,7 +47,7 @@ export const updateStudent = async (req, res) => {
   }
 };
 
-/* ================= DELETE STUDENT ================= */
+/*  DELETE STUDENT */
 export const deleteStudent = async (req, res) => {
   try {
     const student = await Student.findByIdAndDelete(req.params.id);

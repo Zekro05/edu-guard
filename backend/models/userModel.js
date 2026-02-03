@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     enum: ["admin", "student"],
-    default: "student", // ✅ IMPORTANT
+    default: "student", 
   },
 
   lastLogin: {
@@ -32,18 +32,18 @@ const userSchema = new mongoose.Schema({
     default: false,
   },
 
-  // 🔐 SIGNUP EMAIL VERIFICATION
+  // SIGNUP EMAIL VERIFICATION
   verificationToken: String,
   verificationTokenExpiresAt: Date,
 
-  // 🔐 LOGIN OTP
+  // LOGIN OTP
   loginOTP: String,
   loginOTPExpiresAt: Date,
 
   forgotPasswordOTP: String,
   
 
-  // 🔐 PASSWORD RESET
+  // PASSWORD RESET
   resetPasswordToken: String,
   resetPasswordExpiresAt: Date,
 
