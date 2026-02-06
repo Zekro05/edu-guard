@@ -78,7 +78,12 @@ export const signup = async (req, res) => {
     await student.save();
 
     // Send verification email
-    await sendVerificationEmail(email, verificationToken);
+    try {
+        await sendVerificationEmail(email, verificationToken);
+      } catch (err) {
+        console.error("OTP Email failed:", err);
+  // do NOT throw error — continue
+    }
 
     return res.status(201).json({
       success: true,

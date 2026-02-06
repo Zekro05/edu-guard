@@ -62,7 +62,7 @@ const RedirectAuthenticatedUser = ({ children }) => {
 
   // If user is already logged in and verified → redirect to dashboard
   if (isAuthenticated && user?.isVerified) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
