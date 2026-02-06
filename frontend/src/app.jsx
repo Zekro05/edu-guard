@@ -13,6 +13,7 @@ import { Toaster } from "react-hot-toast";
 import { useAuthStore } from "./store/authStore";
 import { useEffect } from "react";
 import NewPasswordPage from "./pages/NewPasswordPage";
+import ReportPage from "./pages/ReportPage";
 
 // ================== PROTECTED ROUTE ==================
 const ProtectedRoute = ({ children }) => {
@@ -93,7 +94,7 @@ function App() {
       {/* Routes */}
       <Routes>
         <Route
-          path="/"
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <DashboardPage />
@@ -106,6 +107,15 @@ function App() {
   element={
     <ProtectedRoute>
       <StudentPage />
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/reports"
+  element={
+    <ProtectedRoute>
+      <ReportPage/>
     </ProtectedRoute>
   }
 />

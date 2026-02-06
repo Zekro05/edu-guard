@@ -1,4 +1,6 @@
 import { User } from "../models/userModel.js";
+import Student from "../models/studentModel.js";
+import fs from "fs";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
@@ -10,29 +12,50 @@ import {
 
 // SIGNUP 
 export const signup = async (req, res) => {
-  const { name, email, password, confirmPassword } = req.body;
-
   try {
-    if (!name || !email || !password || !confirmPassword)
-      return res.status(400).json({ message: "All fields are required" });
+    const { firstName, middleName, lastName, email, password, confirmPassword, studentId, grade, gender } = req.body;
 
-    if (password !== confirmPassword)
+    // ✅ Validate required fields
+    if (!firstName || !lastName || !email || !studentId || !password || !confirmPassword || !grade || !gender) {
+      return res.status(400).json({ message: "All required fields must be filled" });
+    }
+
+    if (password !== confirmPassword) {
       return res.status(400).json({ message: "Passwords do not match" });
+    }
 
+    // Check if user already exists
     const existingUser = await User.findOne({ email });
-    if (existingUser)
+    if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
+    }
 
+    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    //  SIGNUP EMAIL VERIFICATION
+    // Handle profile photo
+    let profilePhotoPath = "";
+    if (req.file) {
+      profilePhotoPath = `/uploads/${req.file.filename}`;
+    }
+
+    // Generate verification token (6-digit OTP)
     const verificationToken = Math.floor(100000 + Math.random() * 900000).toString();
 
+    // Combine full name for User collection
+    const fullName = `${firstName} ${middleName ? middleName + " " : ""}${lastName}`.trim();
+
+    // ✅ Create User document including studentId, grade, gender (optional)
     const user = new User({
-      name,
+      firstName,
+      middleName: middleName || "",
+      lastName,
+      name: fullName,
       email,
       password: hashedPassword,
+      studentId,
       role: "student",
+      profilePhoto: profilePhotoPath,
       verificationToken,
       verificationTokenExpiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24h
       isVerified: false,
@@ -40,17 +63,36 @@ export const signup = async (req, res) => {
 
     await user.save();
 
+    // ✅ Create Student document (detailed info)
+    const student = new Student({
+      firstName,
+      middleName: middleName || "",
+      lastName,
+      email,
+      studentId,
+      grade,       // required
+      gender,      // required enum
+      createdBy: user._id,
+    });
+
+    await student.save();
+
+    // Send verification email
     await sendVerificationEmail(email, verificationToken);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Signup successful. Verification code sent to your email.",
     });
   } catch (err) {
     console.error("Signup Error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: err.message || "Server error" });
   }
 };
+
+
+
+
 
 //  VERIFY SIGNUP OTP 
 export const verifyEmail = async (req, res) => {

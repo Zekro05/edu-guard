@@ -7,7 +7,7 @@ export const API = axios.create({
   withCredentials: true,
 });
 
-// ---------------------- ATTACH TOKEN AUTOMATICALLY ----------------------
+//  ATTACH TOKEN AUTOMATICALLY 
 API.interceptors.request.use(
   (config) => {
     const user = JSON.parse(localStorage.getItem("user")) || null;
@@ -57,30 +57,26 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  signup: async (name, email, password, confirmPassword) => {
-    set({ isLoading: true, error: null });
-    try {
-      const { data } = await API.post("/api/auth/signup", {
-        name,
-        email,
-        password,
-        confirmPassword,
-      });
+ signup: async (formData) => {
+  set({ isLoading: true, error: null });
+  try {
+    const { data } = await API.post("/api/auth/signup", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    set({
+      tempEmail: formData.get("email"),
+      otpRequired: true,
+      otpType: "signup",
+    });
+    toast.success(data.message);
+  } catch (err) {
+    set({ error: err.response?.data?.message || err.message });
+    throw err;
+  } finally {
+    set({ isLoading: false });
+  }
+},
 
-      set({
-        tempEmail: email,
-        otpRequired: true,
-        otpType: "signup",
-      });
-
-      toast.success(data.message);
-    } catch (err) {
-      set({ error: err.response?.data?.message || err.message });
-      throw err;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
 
   login: async (email, password) => {
     set({ isLoading: true, error: null });

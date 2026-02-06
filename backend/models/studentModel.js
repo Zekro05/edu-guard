@@ -41,6 +41,11 @@ const studentSchema = new mongoose.Schema(
       default: "", 
     },
 
+    profilePhoto: {
+      type: String, // store the path or URL of the uploaded image
+      default: "",  // can be empty if no photo uploaded
+    },
+
     riskLevel: {
       type: String,
       enum: ["Low", "Medium", "High"],

@@ -13,6 +13,7 @@ import {
   resendLoginOTP
 } from "../controllers/authController.js";
 import { verifyToken } from "../middleware/verifyToken.js";
+import { upload } from "../middleware/upload.js";
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ const router = express.Router();
 router.get("/check-auth", verifyToken, checkAuth);
 
 // ---------------- SIGNUP ----------------
-router.post("/signup", signup);
+router.post("/signup", upload.single("profilePhoto"), signup);
 
 // ---------------- LOGIN ----------------
 router.post("/login", login);

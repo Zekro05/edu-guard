@@ -86,7 +86,7 @@ const StudentPage = () => {
         <div className="bg-white rounded-2xl border flex flex-wrap justify-around items-center py-3 gap-3 shadow-sm">
           <button
             className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center"
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/dashboard")}
           >
             Dashboard
           </button>
@@ -99,7 +99,9 @@ const StudentPage = () => {
             Guidance
           </button>
 
-          <button className="px-4 py-2 rounded-lg text-gray-400 cursor-not-allowed flex items-center justify-center">
+          <button 
+          onClick={() => navigate("/reports")}
+          className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
             Reports
           </button>
 

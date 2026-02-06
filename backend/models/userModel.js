@@ -22,6 +22,18 @@ const userSchema = new mongoose.Schema({
     default: "student", 
   },
 
+  profilePhoto: {
+  type: String, 
+  default: "",  
+},
+
+  studentId: {
+    type: String,
+    required: function () {
+      return this.role === "student"; 
+    },
+  },
+
   lastLogin: {
     type: Date,
     default: Date.now,
