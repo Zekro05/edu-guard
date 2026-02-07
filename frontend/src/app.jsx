@@ -14,6 +14,7 @@ import { useAuthStore } from "./store/authStore";
 import { useEffect } from "react";
 import NewPasswordPage from "./pages/NewPasswordPage";
 import ReportPage from "./pages/ReportPage";
+import SettingsPage from "./pages/SettingsPage.jsx";
 
 // ================== PROTECTED ROUTE ==================
 const ProtectedRoute = ({ children }) => {
@@ -116,6 +117,15 @@ function App() {
   element={
     <ProtectedRoute>
       <ReportPage/>
+    </ProtectedRoute>
+  }
+/>
+
+<Route
+  path="/settings"
+  element={
+    <ProtectedRoute>
+      <SettingsPage/>
     </ProtectedRoute>
   }
 />

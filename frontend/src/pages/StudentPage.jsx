@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { ChartNoAxesCombined, Eye, LayoutDashboard, Pencil, Settings, ShieldX, Trash2, Users } from "lucide-react";
 
 import { useAuthStore, API } from "../store/authStore";
 import StudentModal from "../components/StudentModal";
@@ -88,25 +88,27 @@ const StudentPage = () => {
             className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center"
             onClick={() => navigate("/dashboard")}
           >
-            Dashboard
+            <LayoutDashboard className="mr-2" />Dashboard
           </button>
 
           <button className="px-4 py-2 rounded-lg font-semibold bg-green-100 text-green-700 shadow-inner flex items-center justify-center">
-            Students
+           <Users className="mr-2"/> Students
           </button>
 
           <button className="px-4 py-2 rounded-lg text-gray-400 cursor-not-allowed flex items-center justify-center">
-            Guidance
+            <ShieldX className="mr-2" />Guidance
           </button>
 
           <button 
           onClick={() => navigate("/reports")}
           className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
-            Reports
+            <ChartNoAxesCombined className="mr-2"/>Reports
           </button>
 
-          <button className="px-4 py-2 rounded-lg text-gray-400 cursor-not-allowed flex items-center justify-center">
-            Settings
+          <button 
+          onClick={() => navigate("/settings")}
+          className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
+            <Settings className="mr-2"/>Settings
           </button>
         </div>
       </div>

@@ -1,11 +1,13 @@
 // src/components/tabs/MobileReport.jsx
 import React from "react";
+import { Smartphone } from 'lucide-react';
 
 const MobileReport = () => {
   return (
-    <div className="bg-white rounded-xl border p-6 shadow-md">
+    <div className="bg-white rounded-xl border border-black p-6">
+      
       <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-        <span>📱</span> Mobile Report
+        <Smartphone className="text-green-700" size={22} /> Mobile Report
       </h3>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

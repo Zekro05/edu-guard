@@ -1,5 +1,10 @@
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
+import { LayoutDashboard } from 'lucide-react';
+import { Users } from 'lucide-react';
+import { ShieldX } from 'lucide-react';
+import { ChartNoAxesCombined } from 'lucide-react';
+import { Settings } from 'lucide-react';
 
 const DashboardPage = () => {
   const navigate = useNavigate();
@@ -30,30 +35,33 @@ const DashboardPage = () => {
       {/* ===== NAV ===== */}
       <div className="mt-6 px-4 sm:px-8">
   <div className="bg-white rounded-2xl border flex flex-wrap justify-around items-center py-3 gap-3 shadow-sm">
-
+     
     <button className="px-4 py-2 rounded-lg font-semibold bg-green-100 text-green-700 shadow-inner flex items-center justify-center">
-      Dashboard
+     <LayoutDashboard className="mr-2"/> Dashboard
     </button>
 
     <button
       onClick={() => navigate("/students")}
       className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center"
     >
-      Students
+      <Users className="mr-2"/> Students
     </button>
 
     <button className="px-4 py-2 rounded-lg text-gray-400 cursor-not-allowed flex items-center justify-center">
-      Guidance
+       <ShieldX className="mr-2"/> Guidance
     </button>
 
     <button
     onClick={() => navigate("/reports")}
     className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
-      Reports
+      <ChartNoAxesCombined className="mr-2"/> Reports
+      
     </button>
 
-    <button className="px-4 py-2 rounded-lg text-gray-400 cursor-not-allowed flex items-center justify-center">
-      Settings
+    <button 
+    onClick={() => navigate("/settings")}
+    className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
+      <Settings className="mr-2"/>Settings
     </button>
 
   </div>
