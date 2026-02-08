@@ -196,7 +196,7 @@ export const mobileLogin = async (req, res) => {
     if (!user.isVerified)
       return res.status(401).json({ message: "Email not verified", requiresOTP: true });
 
-    // 🔐 LOGIN OTP
+    // 🔐 Generate login OTP
     const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
     user.loginOTP = loginOTP;
     user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000; // 15 min
@@ -206,7 +206,35 @@ export const mobileLogin = async (req, res) => {
 
     res.status(200).json({ success: true, requiresOTP: true, message: "OTP sent to your email" });
   } catch (err) {
-    console.error("Login Error:", err);
+    console.error("Mobile Login Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// MOBILE VERIFY LOGIN OTP (no admin restriction)
+export const verifyMobileLoginOTP = async (req, res) => {
+  const { email, code } = req.body;
+
+  try {
+    const user = await User.findOne({
+      email,
+      loginOTP: code,
+      loginOTPExpiresAt: { $gt: Date.now() }, // check OTP not expired
+    });
+
+    if (!user) return res.status(400).json({ message: "Invalid or expired OTP" });
+
+    // ✅ Remove OTP after verification
+    user.loginOTP = undefined;
+    user.loginOTPExpiresAt = undefined;
+    await user.save();
+
+    // Generate token & send back user info
+    generateTokenAndSetCookie(res, user._id);
+
+    res.status(200).json({ success: true, user: { ...user._doc, password: undefined } });
+  } catch (err) {
+    console.error("Verify Mobile Login OTP Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
