@@ -224,12 +224,6 @@ export const verifyLoginOTP = async (req, res) => {
 
     if (!user) return res.status(400).json({ message: "Invalid or expired OTP" });
 
-    if (user.role !== "admin") {
-    return res.status(403).json({
-      message: "Access denied",
-    });
-  }
-
     user.loginOTP = undefined;
     user.loginOTPExpiresAt = undefined;
     await user.save();
