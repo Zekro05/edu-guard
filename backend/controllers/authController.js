@@ -156,10 +156,6 @@ export const login = async (req, res) => {
     });
   }
 
-  
-
-  
-
     // If email not verified → require signup OTP
     if (!user.isVerified)
       return res.status(401).json({ message: "Email not verified", requiresOTP: true });
@@ -190,23 +186,35 @@ export const mobileLogin = async (req, res) => {
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) return res.status(400).json({ message: "Wrong password" });
+    if (!isPasswordValid)
+      return res.status(400).json({ message: "Wrong password" });
 
     if (!user.isVerified)
-      return res.status(401).json({ message: "Email not verified", requiresOTP: true });
+      return res.status(401).json({ message: "Email not verified" });
 
-    // Generate OTP for login
-    const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
-    user.loginOTP = loginOTP;
-    user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000; // 15 min
-    await user.save();
+    // ✅ Get student info
+    const student = await Student.findOne({ email });
 
-    await sendVerificationEmail(email, loginOTP);
+    // Generate JWT token
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
 
+    // Return merged data
     res.status(200).json({
       success: true,
-      requiresOTP: true,
-      message: "OTP sent to your email",
+      user: {
+        _id: user._id,
+        firstName: user.firstName,
+        middleName: user.middleName || "",
+        lastName: user.lastName,
+        email: user.email,
+        profilePhoto: student?.profilePhoto || user.profilePhoto || "",
+        studentId: student?.studentId || "Not Available",
+        gradeCourse: student?.grade || "Not Available",
+        contactNumber: student?.phone || "Not Available",
+      },
+      token,
     });
   } catch (err) {
     console.error("Mobile login error:", err);
@@ -222,20 +230,39 @@ export const verifyMobileLoginOTP = async (req, res) => {
     const user = await User.findOne({
       email,
       loginOTP: code,
-      loginOTPExpiresAt: { $gt: Date.now() }, // check OTP not expired
+      loginOTPExpiresAt: { $gt: Date.now() },
     });
 
     if (!user) return res.status(400).json({ message: "Invalid or expired OTP" });
 
-    // ✅ Remove OTP after verification
+    // Remove OTP after verification
     user.loginOTP = undefined;
     user.loginOTPExpiresAt = undefined;
     await user.save();
 
-    // Generate token & send back user info
-    generateTokenAndSetCookie(res, user._id);
+    // ✅ Get student info
+    const student = await Student.findOne({ email });
 
-    res.status(200).json({ success: true, user: { ...user._doc, password: undefined } });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    // Return merged data
+    res.status(200).json({
+      success: true,
+      user: {
+        _id: user._id,
+        firstName: user.firstName,
+        middleName: user.middleName,
+        lastName: user.lastName,
+        email: user.email,
+        profilePhoto: student?.profilePhoto || user.profilePhoto || "",
+        studentId: student?.studentId || "Not Available",
+        gradeCourse: student?.grade || "Not Available",
+        contactNumber: student?.phone || "Not Available",
+      },
+      token,
+    });
   } catch (err) {
     console.error("Verify Mobile Login OTP Error:", err);
     res.status(500).json({ message: "Server error" });
