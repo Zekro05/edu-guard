@@ -1,6 +1,7 @@
 import express from "express";
 import {
   login,
+  mobileLogin,
   logout,
   signup,
   verifyEmail,
@@ -25,6 +26,7 @@ router.post("/signup", upload.single("profilePhoto"), signup);
 
 // ---------------- LOGIN ----------------
 router.post("/login", login);
+router.post ("/mobile-login", mobileLogin);
 
 // ---------------- LOGOUT ----------------
 router.post("/logout", logout);

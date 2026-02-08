@@ -192,11 +192,10 @@ export const mobileLogin = async (req, res) => {
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) return res.status(400).json({ message: "Wrong password" });
 
-    // If email not verified → require signup OTP
     if (!user.isVerified)
       return res.status(401).json({ message: "Email not verified", requiresOTP: true });
 
-    // 🔐 Generate login OTP
+    // Generate OTP for login
     const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
     user.loginOTP = loginOTP;
     user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000; // 15 min
@@ -204,9 +203,13 @@ export const mobileLogin = async (req, res) => {
 
     await sendVerificationEmail(email, loginOTP);
 
-    res.status(200).json({ success: true, requiresOTP: true, message: "OTP sent to your email" });
+    res.status(200).json({
+      success: true,
+      requiresOTP: true,
+      message: "OTP sent to your email",
+    });
   } catch (err) {
-    console.error("Mobile Login Error:", err);
+    console.error("Mobile login error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
