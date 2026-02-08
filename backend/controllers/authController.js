@@ -102,6 +102,7 @@ export const signup = async (req, res) => {
 //  VERIFY SIGNUP OTP 
 export const verifyEmail = async (req, res) => {
   const { email, code } = req.body;
+  const client = req.headers["x-client-type"] || req.body.client; // 'web' or 'mobile'
 
   if (!email || !code) {
     return res.status(400).json({ message: "Email and code are required" });
@@ -118,17 +119,43 @@ export const verifyEmail = async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired verification code" });
     }
 
+    // Mark as verified
     user.isVerified = true;
     user.verificationToken = undefined;
     user.verificationTokenExpiresAt = undefined;
     await user.save();
 
-    generateTokenAndSetCookie(res, user._id);
+    if (client === "mobile") {
+      // Mobile: return full user + token (auto-login)
+      const student = await Student.findOne({ email });
 
-    res.status(200).json({
-      success: true,
-      user: { ...user._doc, password: undefined },
-    });
+      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+        expiresIn: "7d",
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Signup verified! You are now logged in.",
+        user: {
+          _id: user._id,
+          firstName: user.firstName,
+          middleName: user.middleName || "",
+          lastName: user.lastName,
+          email: user.email,
+          profilePhoto: student?.profilePhoto || user.profilePhoto || "",
+          studentId: student?.studentId || "Not Available",
+          gradeCourse: student?.grade || "Not Available",
+          contactNumber: student?.phone || "Not Available",
+        },
+        token,
+      });
+    } else {
+      // Web: just success, redirect user to login page
+      return res.status(200).json({
+        success: true,
+        message: "Signup verified! You can now login.",
+      });
+    }
   } catch (error) {
     console.error("Verify Email Error:", error);
     res.status(500).json({ message: "Server error" });
