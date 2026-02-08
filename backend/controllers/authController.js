@@ -156,6 +156,42 @@ export const login = async (req, res) => {
     });
   }
 
+  
+
+  
+
+    // If email not verified → require signup OTP
+    if (!user.isVerified)
+      return res.status(401).json({ message: "Email not verified", requiresOTP: true });
+
+    // 🔐 LOGIN OTP
+    const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
+    user.loginOTP = loginOTP;
+    user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000; // 15 min
+    await user.save();
+
+    await sendVerificationEmail(email, loginOTP);
+
+    res.status(200).json({ success: true, requiresOTP: true, message: "OTP sent to your email" });
+  } catch (err) {
+    console.error("Login Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const mobileLogin = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    if (!email || !password)
+      return res.status(400).json({ message: "All fields are required" });
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) return res.status(400).json({ message: "Wrong password" });
+
     // If email not verified → require signup OTP
     if (!user.isVerified)
       return res.status(401).json({ message: "Email not verified", requiresOTP: true });
