@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import incidentRoutes from "./routes/incidentRoutes.js";
 import reportRoutes from "./routes/reports.js"
+import historyRoutes from "./routes/historyRoutes.js";
 import geminiRoutes from "./routes/gemini.js";
 import path from "path"
 dotenv.config();
@@ -36,6 +37,7 @@ app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/api/students", studentRoutes);
 app.use("/api/incidents", incidentRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/history", historyRoutes);
 app.use("/api/gemini", geminiRoutes);
 
 

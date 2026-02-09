@@ -5,6 +5,8 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
+import { mapRoleForHistory } from "../utils/roleMapper.js";
+import { createHistoryLog } from "../utils/createHistoryLog.js";
 import {
   sendVerificationEmail,
   sendPasswordResetEmail,
@@ -14,39 +16,54 @@ import {
 // SIGNUP 
 export const signup = async (req, res) => {
   try {
-    const { firstName, middleName, lastName, email, password, confirmPassword, studentId, grade, gender } = req.body;
+    const {
+      firstName,
+      middleName,
+      lastName,
+      email,
+      password,
+      confirmPassword,
+      studentId,
+      grade,
+      gender,
+    } = req.body;
 
-    // ✅ Validate required fields
-    if (!firstName || !lastName || !email || !studentId || !password || !confirmPassword || !grade || !gender) {
-      return res.status(400).json({ message: "All required fields must be filled" });
+    if (
+      !firstName ||
+      !lastName ||
+      !email ||
+      !studentId ||
+      !password ||
+      !confirmPassword ||
+      !grade ||
+      !gender
+    ) {
+      return res
+        .status(400)
+        .json({ message: "All required fields must be filled" });
     }
 
     if (password !== confirmPassword) {
       return res.status(400).json({ message: "Passwords do not match" });
     }
 
-    // Check if user already exists
     const existingUser = await User.findOne({ email });
-    if (existingUser) {
+    if (existingUser)
       return res.status(400).json({ message: "User already exists" });
-    }
 
-    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Handle profile photo
     let profilePhotoPath = "";
-    if (req.file) {
-      profilePhotoPath = `/uploads/${req.file.filename}`;
-    }
+    if (req.file) profilePhotoPath = `/uploads/${req.file.filename}`;
 
-    // Generate verification token (6-digit OTP)
-    const verificationToken = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationToken = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
 
-    // Combine full name for User collection
-    const fullName = `${firstName} ${middleName ? middleName + " " : ""}${lastName}`.trim();
+    const fullName = `${firstName} ${
+      middleName ? middleName + " " : ""
+    }${lastName}`.trim();
 
-    // ✅ Create User document including studentId, grade, gender (optional)
     const user = new User({
       firstName,
       middleName: middleName || "",
@@ -58,41 +75,47 @@ export const signup = async (req, res) => {
       role: "student",
       profilePhoto: profilePhotoPath,
       verificationToken,
-      verificationTokenExpiresAt: Date.now() + 24 * 60 * 60 * 1000, // 24h
+      verificationTokenExpiresAt: Date.now() + 24 * 60 * 60 * 1000,
       isVerified: false,
     });
 
     await user.save();
 
-    // ✅ Create Student document (detailed info)
     const student = new Student({
       firstName,
       middleName: middleName || "",
       lastName,
       email,
       studentId,
-      grade,       // required
-      gender,      // required enum
+      grade,
+      gender,
       createdBy: user._id,
     });
 
     await student.save();
 
-    // Send verification email
+    await createHistoryLog({
+      userId: user._id,
+      role: mapRoleForHistory(user.role),
+      action: "Signup",
+      category: "Auth",
+      details: `Student account created (Student ID: ${student.studentId})`,
+      ipAddress: req.ip,
+    });
+
     try {
-        await sendVerificationEmail(email, verificationToken);
-      } catch (err) {
-        console.error("OTP Email failed:", err);
-  // do NOT throw error — continue
+      await sendVerificationEmail(email, verificationToken);
+    } catch (err) {
+      console.error("OTP Email failed:", err);
     }
 
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
       message: "Signup successful. Verification code sent to your email.",
     });
   } catch (err) {
     console.error("Signup Error:", err);
-    return res.status(500).json({ message: err.message || "Server error" });
+    res.status(500).json({ message: err.message || "Server error" });
   }
 };
 
@@ -103,11 +126,10 @@ export const signup = async (req, res) => {
 //  VERIFY SIGNUP OTP 
 export const verifyEmail = async (req, res) => {
   const { email, code } = req.body;
-  const client = req.headers["x-client-type"] || req.body.client; // 'web' or 'mobile'
+  const client = req.headers["x-client-type"] || req.body.client;
 
-  if (!email || !code) {
+  if (!email || !code)
     return res.status(400).json({ message: "Email and code are required" });
-  }
 
   try {
     const user = await User.findOne({
@@ -116,18 +138,26 @@ export const verifyEmail = async (req, res) => {
       verificationTokenExpiresAt: { $gt: Date.now() },
     });
 
-    if (!user) {
-      return res.status(400).json({ message: "Invalid or expired verification code" });
-    }
+    if (!user)
+      return res
+        .status(400)
+        .json({ message: "Invalid or expired verification code" });
 
-    // Mark as verified
     user.isVerified = true;
     user.verificationToken = undefined;
     user.verificationTokenExpiresAt = undefined;
     await user.save();
 
+    await createHistoryLog({
+      userId: user._id,
+      role: mapRoleForHistory(user.role),
+      action: "Email Verification",
+      category: "Auth",
+      details: "Account email verified via OTP",
+      ipAddress: req.ip,
+    });
+
     if (client === "mobile") {
-      // Mobile: return full user + token (auto-login)
       const student = await Student.findOne({ email });
 
       const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
@@ -150,13 +180,12 @@ export const verifyEmail = async (req, res) => {
         },
         token,
       });
-    } else {
-      // Web: just success, redirect user to login page
-      return res.status(200).json({
-        success: true,
-        message: "Signup verified! You can now login.",
-      });
     }
+
+    res.status(200).json({
+      success: true,
+      message: "Signup verified! You can now login.",
+    });
   } catch (error) {
     console.error("Verify Email Error:", error);
     res.status(500).json({ message: "Server error" });
@@ -176,27 +205,38 @@ export const login = async (req, res) => {
     if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) return res.status(400).json({ message: "Wrong password" });
+    if (!isPasswordValid)
+      return res.status(400).json({ message: "Wrong password" });
 
-    if (user.role !== "admin") {
-    return res.status(403).json({
-      message: "Access denied. Only admin accounts are allowed to log in.",
-    });
-  }
+    if (user.role !== "admin")
+      return res.status(403).json({
+        message: "Access denied. Only admin accounts are allowed to log in.",
+      });
 
-    // If email not verified → require signup OTP
     if (!user.isVerified)
-      return res.status(401).json({ message: "Email not verified", requiresOTP: true });
+      return res
+        .status(401)
+        .json({ message: "Email not verified", requiresOTP: true });
 
-    // 🔐 LOGIN OTP
     const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
     user.loginOTP = loginOTP;
-    user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000; // 15 min
+    user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000;
     await user.save();
 
     await sendVerificationEmail(email, loginOTP);
 
-    res.status(200).json({ success: true, requiresOTP: true, message: "OTP sent to your email" });
+    await createHistoryLog({
+      userId: user._id,
+      role: mapRoleForHistory(user.role),
+      action: "Login OTP Sent",
+      category: "Auth",
+      details: "Login OTP sent to email",
+      ipAddress: req.ip,
+    });
+
+    res
+      .status(200)
+      .json({ success: true, requiresOTP: true, message: "OTP sent to your email" });
   } catch (err) {
     console.error("Login Error:", err);
     res.status(500).json({ message: "Server error" });
@@ -220,29 +260,28 @@ export const mobileLogin = async (req, res) => {
     if (!user.isVerified)
       return res.status(401).json({ message: "Email not verified" });
 
-    // ✅ Get student info
-    const student = await Student.findOne({ email });
+    // ✅ ALWAYS GENERATE LOGIN OTP
+    const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
+    user.loginOTP = loginOTP;
+    user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000;
+    await user.save();
 
-    // Generate JWT token
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
+    await sendVerificationEmail(email, loginOTP);
+
+    await createHistoryLog({
+      userId: user._id,
+      role: user.role || "Student",
+      action: "Mobile Login OTP Sent",
+      category: "Auth",
+      details: "Mobile login OTP sent",
+      ipAddress: req.ip,
     });
 
-    // Return merged data
-    res.status(200).json({
+    // 🔑 VERY IMPORTANT
+    return res.status(200).json({
       success: true,
-      user: {
-        _id: user._id,
-        firstName: user.firstName,
-        middleName: user.middleName || "",
-        lastName: user.lastName,
-        email: user.email,
-        profilePhoto: student?.profilePhoto || user.profilePhoto || "",
-        studentId: student?.studentId || "Not Available",
-        gradeCourse: student?.grade || "Not Available",
-        contactNumber: student?.phone || "Not Available",
-      },
-      token,
+      requiresOTP: true,
+      message: "OTP sent to your email",
     });
   } catch (err) {
     console.error("Mobile login error:", err);
@@ -267,6 +306,15 @@ export const verifyMobileLoginOTP = async (req, res) => {
     user.loginOTP = undefined;
     user.loginOTPExpiresAt = undefined;
     await user.save();
+
+    await createHistoryLog({
+        userId: user._id,
+        role: user.role || "Student",
+        action: "Mobile Login",
+        category: "Auth",
+        details: "Mobile login verified via OTP",
+        ipAddress: req.ip,
+      });
 
     // ✅ Get student info
     const student = await Student.findOne({ email });
@@ -308,7 +356,8 @@ export const verifyLoginOTP = async (req, res) => {
       loginOTPExpiresAt: { $gt: Date.now() },
     });
 
-    if (!user) return res.status(400).json({ message: "Invalid or expired OTP" });
+    if (!user)
+      return res.status(400).json({ message: "Invalid or expired OTP" });
 
     user.loginOTP = undefined;
     user.loginOTPExpiresAt = undefined;
@@ -316,7 +365,18 @@ export const verifyLoginOTP = async (req, res) => {
 
     generateTokenAndSetCookie(res, user._id);
 
-    res.status(200).json({ success: true, user: { ...user._doc, password: undefined } });
+    await createHistoryLog({
+      userId: user._id,
+      role: mapRoleForHistory(user.role),
+      action: "Login",
+      category: "Auth",
+      details: "Admin logged in successfully",
+      ipAddress: req.ip,
+    });
+
+    res
+      .status(200)
+      .json({ success: true, user: { ...user._doc, password: undefined } });
   } catch (err) {
     console.error("Verify Login OTP Error:", err);
     res.status(500).json({ message: "Server error" });
@@ -388,6 +448,17 @@ export const checkAuth = async (req, res) => {
 
 //  LOGOUT 
 export const logout = async (req, res) => {
+  if (req.userId) {
+    await createHistoryLog({
+      userId: req.userId,
+      role: "Admin",
+      action: "Logout",
+      category: "Auth",
+      details: "User logged out",
+      ipAddress: req.ip,
+    });
+  }
+
   res.clearCookie("token", { httpOnly: true, sameSite: "lax" });
   res.status(200).json({ success: true, message: "Logged out successfully" });
 };
@@ -409,6 +480,15 @@ export const forgotPassword = async (req, res) => {
     user.resetPasswordExpiresAt = Date.now() + 10 * 60 * 1000; 
     await user.save();
 
+    await createHistoryLog({
+        userId: user._id,
+        role: user.role || "Student",
+        action: "Forgot Password",
+        category: "Auth",
+        details: "Password reset OTP requested",
+        ipAddress: req.ip,
+      });
+
     
     await sendPasswordResetEmail(email, `<h3>Your OTP is:</h3><h2>${otp}</h2>`);
 
@@ -427,14 +507,16 @@ export const verifyForgotPasswordOTP = async (req, res) => {
   }
 
   try {
-    
-    const user = await User.findOne({ email, resetPasswordToken: code });
+    const user = await User.findOne({
+      email,
+      resetPasswordToken: code,
+      resetPasswordExpiresAt: { $gt: Date.now() }, // ✅ expiry check
+    });
 
     if (!user) {
-      return res.status(401).json({ message: "Invalid OTP" });
+      return res.status(401).json({ message: "Invalid or expired OTP" });
     }
 
-    
     return res.status(200).json({ message: "OTP verified" });
   } catch (err) {
     console.error(err);
@@ -449,14 +531,19 @@ export const verifyForgotPasswordOTP = async (req, res) => {
 //RESET PASSWORD 
 export const resetPassword = async (req, res) => {
   try {
-    const { email, newPassword } = req.body; 
+    const { email, newPassword, code } = req.body;
 
-    if (!email || !newPassword)
+    if (!email || !newPassword || !code)
       return res.status(400).json({ message: "All fields are required" });
 
-    //finding email
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const user = await User.findOne({
+      email,
+      resetPasswordToken: code,
+      resetPasswordExpiresAt: { $gt: Date.now() },
+    });
+
+    if (!user)
+      return res.status(400).json({ message: "Invalid or expired OTP" });
 
     const isSameAsOld = await bcrypt.compare(newPassword, user.password);
     if (isSameAsOld)
@@ -464,12 +551,23 @@ export const resetPassword = async (req, res) => {
         .status(400)
         .json({ message: "New password cannot be the same as the old password" });
 
-
-    // hash/update password
     user.password = await bcrypt.hash(newPassword, 10);
+
+    // ✅ clear OTP
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpiresAt = undefined;
+
     await user.save();
 
-    
+    await createHistoryLog({
+      userId: user._id,
+      role: user.role || "Student",
+      action: "Password Reset",
+      category: "Auth",
+      details: "User successfully reset password",
+      ipAddress: req.ip,
+    });
+
     await sendResetSuccessEmail(email);
 
     res.json({ message: "Password reset successful" });
