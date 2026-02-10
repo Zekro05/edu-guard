@@ -1,14 +1,15 @@
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
-import { LayoutDashboard } from 'lucide-react';
-import { Users } from 'lucide-react';
-import { ShieldX } from 'lucide-react';
-import { ChartNoAxesCombined } from 'lucide-react';
-import { Settings } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldX, ChartNoAxesCombined, Settings } from "lucide-react";
 
 const DashboardPage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+
+  // Get countdown safely
+  const countdown = useAuthStore((state) => state.countdown || 0);
+  const minutes = Math.floor(countdown / 60);
+  const seconds = countdown % 60;
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-gray-900 via-green-900 to-emerald-900 flex flex-col">
@@ -32,40 +33,44 @@ const DashboardPage = () => {
         </div>
       </header>
 
+      {/* ===== AUTO-LOGOUT TIMER ===== */}
+      <div className="fixed bottom-4 right-4 bg-gray-800/70 text-white px-4 py-2 rounded-lg shadow-lg">
+        Auto-logout in {minutes.toString().padStart(2, "0")}:{seconds.toString().padStart(2, "0")}
+      </div>
+
       {/* ===== NAV ===== */}
       <div className="mt-6 px-4 sm:px-8">
-  <div className="bg-white rounded-2xl border flex flex-wrap justify-around items-center py-3 gap-3 shadow-sm">
-     
-    <button className="px-4 py-2 rounded-lg font-semibold bg-green-100 text-green-700 shadow-inner flex items-center justify-center">
-     <LayoutDashboard className="mr-2"/> Dashboard
-    </button>
+        <div className="bg-white rounded-2xl border flex flex-wrap justify-around items-center py-3 gap-3 shadow-sm">
+          <button className="px-4 py-2 rounded-lg font-semibold bg-green-100 text-green-700 shadow-inner flex items-center justify-center">
+            <LayoutDashboard className="mr-2"/> Dashboard
+          </button>
 
-    <button
-      onClick={() => navigate("/students")}
-      className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center"
-    >
-      <Users className="mr-2"/> Students
-    </button>
+          <button
+            onClick={() => navigate("/students")}
+            className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center"
+          >
+            <Users className="mr-2"/> Students
+          </button>
 
-    <button className="px-4 py-2 rounded-lg text-gray-400 cursor-not-allowed flex items-center justify-center">
-       <ShieldX className="mr-2"/> Guidance
-    </button>
+          <button className="px-4 py-2 rounded-lg text-gray-400 cursor-not-allowed flex items-center justify-center">
+            <ShieldX className="mr-2"/> Guidance
+          </button>
 
-    <button
-    onClick={() => navigate("/reports")}
-    className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
-      <ChartNoAxesCombined className="mr-2"/> Reports
-      
-    </button>
+          <button
+            onClick={() => navigate("/reports")}
+            className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center"
+          >
+            <ChartNoAxesCombined className="mr-2"/> Reports
+          </button>
 
-    <button 
-    onClick={() => navigate("/settings")}
-    className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
-      <Settings className="mr-2"/>Settings
-    </button>
-
-  </div>
-</div>
+          <button 
+            onClick={() => navigate("/settings")}
+            className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center"
+          >
+            <Settings className="mr-2"/>Settings
+          </button>
+        </div>
+      </div>
 
       {/* ===== MAIN CONTENT ===== */}
       <main className="flex-1 px-4 sm:px-8 py-6 flex flex-col gap-6">
@@ -82,24 +87,9 @@ const DashboardPage = () => {
 
         {/* STATS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <StatCard
-            title="Total Incidents"
-            value="144"
-            trend="-8% from last month"
-            trendColor="text-green-600"
-          />
-          <StatCard
-            title="High-Risk Students"
-            value="12"
-            trend="+3 from last month"
-            trendColor="text-red-500"
-          />
-          <StatCard
-            title="Resolved Cases"
-            value="100"
-            trend="+15% from last month"
-            trendColor="text-orange-500"
-          />
+          <StatCard title="Total Incidents" value="144" trend="-8% from last month" trendColor="text-green-600"/>
+          <StatCard title="High-Risk Students" value="12" trend="+3 from last month" trendColor="text-red-500"/>
+          <StatCard title="Resolved Cases" value="100" trend="+15% from last month" trendColor="text-orange-500"/>
         </div>
 
         {/* LOWER SECTION */}
@@ -109,38 +99,16 @@ const DashboardPage = () => {
           <div className="lg:col-span-2 bg-white rounded-2xl border p-6 shadow-sm">
             <h3 className="font-semibold text-lg mb-4">Recent Incidents</h3>
 
-            <Incident
-              name="Al Horford"
-              description="Disruptive behavior in class"
-              level="Low"
-              color="bg-green-100 text-green-700"
-            />
-
-            <Incident
-              name="Bronny James"
-              description="Verbal altercation"
-              level="Medium"
-              color="bg-orange-100 text-orange-700"
-            />
+            <Incident name="Al Horford" description="Disruptive behavior in class" level="Low" color="bg-green-100 text-green-700"/>
+            <Incident name="Bronny James" description="Verbal altercation" level="Medium" color="bg-orange-100 text-orange-700"/>
           </div>
 
           {/* AI INSIGHTS */}
           <div className="bg-white rounded-2xl border p-6 shadow-sm">
             <h3 className="font-semibold text-lg mb-4">AI Insights</h3>
 
-            <Insight
-              title="Behavioral Pattern Alert"
-              description="Repeated tardiness detected in Grade 10-A"
-              color="border-orange-400 bg-orange-50"
-              badge="Medium"
-            />
-
-            <Insight
-              title="Risk Escalation Detected"
-              description="Escalation from minor to major offense"
-              color="border-red-500 bg-red-50"
-              badge="High"
-            />
+            <Insight title="Behavioral Pattern Alert" description="Repeated tardiness detected in Grade 10-A" color="border-orange-400 bg-orange-50" badge="Medium"/>
+            <Insight title="Risk Escalation Detected" description="Escalation from minor to major offense" color="border-red-500 bg-red-50" badge="High"/>
           </div>
         </div>
       </main>
@@ -151,7 +119,6 @@ const DashboardPage = () => {
 export default DashboardPage;
 
 /* ===== COMPONENTS ===== */
-
 const StatCard = ({ title, value, trend, trendColor }) => (
   <div className="bg-white rounded-2xl border p-6 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-200">
     <p className="text-sm text-gray-400">{title}</p>
@@ -166,9 +133,7 @@ const Incident = ({ name, description, level, color }) => (
       <p className="font-medium">{name}</p>
       <p className="text-sm text-gray-500">{description}</p>
     </div>
-    <span className={`px-3 py-1 rounded text-xs font-semibold ${color}`}>
-      {level}
-    </span>
+    <span className={`px-3 py-1 rounded text-xs font-semibold ${color}`}>{level}</span>
   </div>
 );
 
@@ -176,9 +141,7 @@ const Insight = ({ title, description, color, badge }) => (
   <div className={`border-l-4 ${color} p-4 rounded mb-4 shadow-sm hover:shadow-md transition`}>
     <div className="flex justify-between items-center mb-1">
       <p className="font-medium text-sm">{title}</p>
-      <span className="text-xs px-2 py-1 rounded bg-white font-semibold">
-        {badge}
-      </span>
+      <span className="text-xs px-2 py-1 rounded bg-white font-semibold">{badge}</span>
     </div>
     <p className="text-xs text-gray-600">{description}</p>
   </div>

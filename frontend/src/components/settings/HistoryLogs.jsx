@@ -8,24 +8,26 @@ const HistoryLogs = () => {
   const [role, setRole] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const logsPerPage = 10;
+
+  // Fetch all logs
   const fetchLogs = async () => {
     try {
       setLoading(true);
 
       const res = await API.get("/api/history", {
         params: {
-          // Send only if value exists
           ...(category && { category }),
           ...(role && { role }),
         },
         withCredentials: true,
       });
 
-      console.log("HISTORY RESPONSE:", res.data);
-
-      // Support both cases: { logs: [...] } or [...] directly
-      if (Array.isArray(res.data)) setLogs(res.data);
-      else setLogs(res.data.logs || []);
+      const data = Array.isArray(res.data) ? res.data : res.data.logs || [];
+      setLogs(data);
+      setCurrentPage(1); // Reset to first page when data changes
     } catch (err) {
       console.error("Failed to fetch history logs:", err);
       setLogs([]);
@@ -34,19 +36,30 @@ const HistoryLogs = () => {
     }
   };
 
-  // Fetch logs when filters change
   useEffect(() => {
     fetchLogs();
   }, [category, role]);
+
+  // Pagination logic (client-side)
+  const totalPages = Math.ceil(logs.length / logsPerPage);
+  const currentLogs = logs.slice((currentPage - 1) * logsPerPage, currentPage * logsPerPage);
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+    let start = Math.max(currentPage - 2, 1);
+    let end = Math.min(start + maxPagesToShow - 1, totalPages);
+    if (end - start < maxPagesToShow - 1) start = Math.max(end - maxPagesToShow + 1, 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+    return pages;
+  };
 
   return (
     <div className="bg-white rounded-xl border p-6">
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <Clock className="text-green-700" size={22} />
-        <h2 className="text-lg font-semibold text-gray-800">
-          System History Logs
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-800">System History Logs</h2>
       </div>
 
       <p className="text-sm text-gray-500 mb-6">
@@ -101,34 +114,55 @@ const HistoryLogs = () => {
               <th className="text-left px-4 py-3">Details</th>
             </tr>
           </thead>
-
           <tbody>
-            {logs.map((log) => (
+            {currentLogs.map((log) => (
               <tr key={log._id || log.id} className="border-t hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  {log.createdAt
-                    ? new Date(log.createdAt).toLocaleString()
-                    : "—"}
-                </td>
+                <td className="px-4 py-3">{log.createdAt ? new Date(log.createdAt).toLocaleString() : "—"}</td>
                 <td className="px-4 py-3 font-medium">{log.role || "—"}</td>
                 <td className="px-4 py-3">{log.action || "—"}</td>
-                <td className="px-4 py-3 flex items-center gap-2">
-                  <FileText size={14} />
-                  {log.details || "—"}
-                </td>
+                <td className="px-4 py-3 flex items-center gap-2"><FileText size={14} />{log.details || "—"}</td>
               </tr>
             ))}
 
-            {!loading && logs.length === 0 && (
+            {!loading && currentLogs.length === 0 && (
               <tr>
-                <td colSpan="4" className="text-center py-6 text-gray-400">
-                  No history logs found
-                </td>
+                <td colSpan="4" className="text-center py-6 text-gray-400">No history logs found</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {/* Numbered Pagination */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-4 flex-wrap">
+          <button
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1 border rounded disabled:opacity-50"
+          >
+            Prev
+          </button>
+
+          {getPageNumbers().map((num) => (
+            <button
+              key={num}
+              onClick={() => setCurrentPage(num)}
+              className={`px-3 py-1 border rounded ${num === currentPage ? "bg-green-700 text-white" : "bg-white"}`}
+            >
+              {num}
+            </button>
+          ))}
+
+          <button
+            onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1 border rounded disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   );
 };

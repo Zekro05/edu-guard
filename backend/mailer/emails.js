@@ -31,58 +31,55 @@ const sendEmail = async (to, subject, html) => {
   }
 };
 
-// -------------------- VERIFICATION EMAIL --------------------
-export const sendVerificationEmail = async (email, verificationCode) => {
-  const subject = "Verify your Email";
+// -------------------- VERIFICATION / LOGIN OTP EMAIL --------------------
+export const sendVerificationEmail = async (email, otp) => {
+  const subject = "Your Verification Code";
   const html = `
     <div style="font-family: Arial, sans-serif;">
-      <h2>Welcome to EduGuard!</h2>
+      <h2>EduGuard Verification</h2>
       <p>Your verification code is:</p>
-      <h3 style="letter-spacing: 2px;">${verificationCode}</h3>
-      <p>This code will expire in 24 hours.</p>
+
+      <h1 style="
+        letter-spacing: 4px;
+        background: #f3f4f6;
+        padding: 12px;
+        display: inline-block;
+        border-radius: 8px;
+      ">
+        ${otp}
+      </h1>
+
+      <p>This code will expire soon.</p>
+      <p>If you did not request this, please ignore this email.</p>
     </div>
   `;
 
   await sendEmail(email, subject, html);
 };
 
-// -------------------- WELCOME EMAIL --------------------
-export const sendWelcomeEmail = async (email, name) => {
-  const subject = "Welcome to EduGuard!";
-  const html = `
-    <div style="font-family: Arial, sans-serif;">
-      <h2>Hello ${name},</h2>
-      <p>Your email has been verified successfully.</p>
-      <p>Welcome to <strong>EduGuard</strong> 🎉</p>
-    </div>
-  `;
-
-  await sendEmail(email, subject, html);
-};
-
-// -------------------- PASSWORD RESET REQUEST --------------------
-export const sendPasswordResetEmail = async (email, resetURL) => {
-  const subject = "Reset your Password";
+// -------------------- PASSWORD RESET OTP EMAIL --------------------
+export const sendPasswordResetEmail = async (email, otp) => {
+  const subject = "Reset Your Password";
   const html = `
     <div style="font-family: Arial, sans-serif;">
       <h2>Password Reset Request</h2>
-      <p>Click the button below to reset your password:</p>
-      <a 
-        href="${resetURL}" 
-        target="_blank"
-        style="
-          display:inline-block;
-          padding:10px 16px;
-          background:#2563eb;
-          color:#ffffff;
-          text-decoration:none;
-          border-radius:6px;
-          margin-top:10px;
-        "
-      >
-        Reset Password
-      </a>
-      <p style="margin-top:16px;">This link will expire in 1 hour.</p>
+      <p>Use the OTP below to reset your password:</p>
+
+      <h1 style="
+        letter-spacing: 4px;
+        background: #f3f4f6;
+        padding: 12px;
+        display: inline-block;
+        border-radius: 8px;
+      ">
+        ${otp}
+      </h1>
+
+      <p style="margin-top: 16px;">
+        This OTP will expire in <strong>10 minutes</strong>.
+      </p>
+
+      <p>If you did not request a password reset, you can safely ignore this email.</p>
     </div>
   `;
 

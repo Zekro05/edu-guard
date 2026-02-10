@@ -510,7 +510,7 @@ export const verifyForgotPasswordOTP = async (req, res) => {
     const user = await User.findOne({
       email,
       resetPasswordToken: code,
-      resetPasswordExpiresAt: { $gt: Date.now() }, // ✅ expiry check
+      resetPasswordExpiresAt: { $gt: Date.now() }, 
     });
 
     if (!user) {
@@ -523,9 +523,6 @@ export const verifyForgotPasswordOTP = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
-
-
-
 
 
 //RESET PASSWORD 

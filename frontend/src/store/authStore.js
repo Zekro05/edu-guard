@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import axios from "axios";
-import toast from "react-hot-toast";
+import { toast } from "react-hot-toast";
 
 export const API = axios.create({
   baseURL: "http://localhost:5000",
@@ -29,6 +29,56 @@ export const useAuthStore = create((set, get) => ({
 
   isAuthenticated: false,
   isCheckingAuth: true,
+
+ autoLogoutTimer: null,
+  countdownInterval: null,
+  countdown: 0,
+  warningActive: false, // NEW: signal to React
+
+ startInactivityTimer: (onLogoutCallback) => {
+    clearTimeout(get().inactivityTimer);
+
+    const inactivityMinutes = 1; // 1 minute
+    const warningSeconds = 30;   // show toast when 30 sec left
+    let remaining = inactivityMinutes * 60; // total seconds
+
+    const tick = () => {
+      if (remaining === warningSeconds) {
+        toast("You will be logged out in 30 seconds due to inactivity", {
+          style: { background: "#FBBF24", color: "#000" }
+        });
+      }
+
+      if (remaining <= 0) {
+        get().logout();
+        if (onLogoutCallback) onLogoutCallback();
+        return;
+      }
+
+      set({ countdown: remaining });
+      remaining -= 1;
+      get().inactivityTimer = setTimeout(tick, 1000);
+    };
+
+    tick();
+  },
+
+  resetInactivityTimer: () => {
+    clearTimeout(get().inactivityTimer);
+    get().startInactivityTimer();
+  },
+
+  clearInactivityTimer: () => {
+    const { inactivityInterval } = get();
+    if (inactivityInterval) clearInterval(inactivityInterval);
+  },
+
+  logout: (callback) => {
+    set({ user: null, isAuthenticated: false, countdown: 0, warningActive: false });
+    localStorage.removeItem("user");
+    if (callback) callback(); // navigate after logout
+    toast.success("You have been logged out due to inactivity");
+  },
 
   checkAuth: async () => {
     try {
@@ -197,43 +247,51 @@ export const useAuthStore = create((set, get) => ({
   },
 
   verifyForgotPasswordOTP: async (code) => {
-    set({ isLoading: true, error: null });
-    try {
-      const { tempEmail } = get();
-      if (!tempEmail) throw new Error("No email found for OTP verification");
+  set({ isLoading: true, error: null });
+  try {
+    const { tempEmail } = get();
+    if (!tempEmail) throw new Error("No email found for OTP verification");
 
-      await API.post("/api/auth/verify-forgot-password-otp", {
-        email: tempEmail,
-        code,
-      });
+    await API.post("/api/auth/verify-forgot-password-otp", {
+      email: tempEmail,
+      code,
+    });
 
-      set({ otpRequired: false });
-      toast.success("OTP verified! You can now set your new password.");
-    } catch (err) {
-      set({ error: err.response?.data?.message || err.message });
-      toast.error(err.response?.data?.message || err.message);
-      throw err;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
+    // store OTP temporarily for reset
+    set({ otpRequired: false, otpCode: code });
+
+    toast.success("OTP verified! You can now set your new password.");
+  } catch (err) {
+    set({ error: err.response?.data?.message || err.message });
+    toast.error(err.response?.data?.message || err.message);
+    throw err;
+  } finally {
+    set({ isLoading: false });
+  }
+},
 
   resetPassword: async (newPassword) => {
-    const { tempEmail } = get();
+  const { tempEmail, otpCode } = get();
 
-    set({ isLoading: true, error: null });
-    try {
-      await API.post("/api/auth/reset-password", {
-        email: tempEmail,
-        newPassword,
-      });
+  set({ isLoading: true, error: null });
+  try {
+    if (!otpCode) throw new Error("OTP not found. Please verify OTP first.");
 
-      toast.success("Password reset successfully");
-    } catch (err) {
-      toast.error(err.response?.data?.message || err.message);
-      throw err;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
+    await API.post("/api/auth/reset-password", {
+      email: tempEmail,
+      newPassword,
+      code: otpCode,
+    });
+
+    // Clear temp data after reset
+    set({ tempEmail: null, otpCode: null });
+
+    toast.success("Password reset successfully");
+  } catch (err) {
+    toast.error(err.response?.data?.message || err.message);
+    throw err;
+  } finally {
+    set({ isLoading: false });
+  }
+},
 }));

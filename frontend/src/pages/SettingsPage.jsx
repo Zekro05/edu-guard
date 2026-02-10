@@ -129,8 +129,22 @@ const SettingsPage = () => {
 
         {/* TAB BODY */}
         <div className="bg-white rounded-2xl border p-6 shadow-sm flex-1">
-          {renderTab()}
-        </div>
+  <div className={activeTab === "School Information" ? "" : "hidden"}>
+    <SchoolInformation />
+  </div>
+  <div className={activeTab === "Notifications" ? "" : "hidden"}>
+    <Notifications />
+  </div>
+  <div className={activeTab === "Security" ? "" : "hidden"}>
+    <Security />
+  </div>
+  <div className={activeTab === "History / Logs" ? "" : "hidden"}>
+    <HistoryLogs />
+  </div>
+  <div className={activeTab === "Backup & Recovery" ? "" : "hidden"}>
+    <BackupRecovery />
+  </div>
+</div>
 
       </main>
     </div>

@@ -1,45 +1,34 @@
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import FloatingShape from "./components/FloatingShape";
-import LoginPage from "./pages/LoginPage";
-import SignupPage from "./pages/SignupPage";
-import EmailVerificationPage from "./pages/EmailVerificationPage";
-import DashboardPage from "./pages/DashboardPage";
-import ForgotPasswordPage from "./pages/ForgotPassword";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-import StudentPage from "./pages/StudentPage";
-
-
-import { Toaster } from "react-hot-toast";
-import { useAuthStore } from "./store/authStore";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
-import NewPasswordPage from "./pages/NewPasswordPage";
-import ReportPage from "./pages/ReportPage";
+import { Toaster } from "react-hot-toast";
+
+import FloatingShape from "./components/FloatingShape.jsx";
+import LoginPage from "./pages/LoginPage.jsx";
+import SignupPage from "./pages/SignupPage.jsx";
+import EmailVerificationPage from "./pages/EmailVerificationPage.jsx";
+import DashboardPage from "./pages/DashboardPage.jsx";
+import ForgotPasswordPage from "./pages/ForgotPassword.jsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
+import NewPasswordPage from "./pages/NewPasswordPage.jsx";
+import StudentPage from "./pages/StudentPage.jsx";
+import ReportPage from "./pages/ReportPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
+
+import { useAuthStore } from "./store/authStore.js";
+
+
 
 // ================== PROTECTED ROUTE ==================
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, user, isCheckingAuth } = useAuthStore();
 
-  // Wait until auth check is done
   if (isCheckingAuth) {
-    return (
-      <div className="text-white text-center mt-20">
-        Checking authentication...
-      </div>
-    );
+    return <div className="text-white text-center mt-20">Checking authentication...</div>;
   }
 
-  // Not logged in → redirect to login
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!user?.isVerified) return <Navigate to="/verify-email" replace />;
 
-  // Logged in but email not verified → redirect to verify email
-  if (!user?.isVerified) {
-    return <Navigate to="/verify-email" replace />;
-  }
-
-  // All good → render child page
   return children;
 };
 
@@ -49,34 +38,51 @@ const RedirectAuthenticatedUser = ({ children }) => {
   const location = useLocation();
 
   if (isCheckingAuth) {
-    return (
-      <div className="text-white text-center mt-20">
-        Checking authentication...
-      </div>
-    );
+    return <div className="text-white text-center mt-20">Checking authentication...</div>;
   }
 
-  // If user is on /signup, redirect to login **after signup + OTP**
-  if (location.pathname === "/signup") {
-    return children;
-  }
+  // Allow /signup page to render even if user is authenticated
+  if (location.pathname === "/signup") return children;
 
-  // If user is already logged in and verified → redirect to dashboard
-  if (isAuthenticated && user?.isVerified) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  // Redirect authenticated & verified users away from login/signup
+  if (isAuthenticated && user?.isVerified) return <Navigate to="/dashboard" replace />;
 
   return children;
 };
 
 
 function App() {
-  const { checkAuth, isCheckingAuth } = useAuthStore();
+  const {
+    checkAuth,
+    isCheckingAuth,
+    isAuthenticated,
+    startInactivityTimer,
+    resetInactivityTimer,
+  } = useAuthStore();
 
-  // Check auth on app load
+  const navigate = useNavigate();
+
+  // 1️⃣ Check authentication on app load
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // 2️⃣ Setup inactivity auto-logout only once for authenticated users
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const activityEvents = ["mousemove", "keydown", "click", "scroll", "touchstart"];
+    const handleActivity = () => resetInactivityTimer();
+
+    activityEvents.forEach((event) => window.addEventListener(event, handleActivity));
+
+    // Start inactivity timer with redirect callback
+    startInactivityTimer(() => navigate("/login", { replace: true }));
+
+    return () => {
+      activityEvents.forEach((event) => window.removeEventListener(event, handleActivity));
+    };
+  }, [isAuthenticated, navigate]); // ✅ only runs when auth state changes
 
   // Show loading until auth is confirmed
   if (isCheckingAuth) {
@@ -90,7 +96,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-green-900 to-emerald-900 flex items-center justify-center relative overflow-hidden">
       {/* Floating Shapes */}
-      
+      <FloatingShape />
 
       {/* Routes */}
       <Routes>
@@ -102,36 +108,30 @@ function App() {
             </ProtectedRoute>
           }
         />
-
         <Route
-  path="/students"
-  element={
-    <ProtectedRoute>
-      <StudentPage />
-    </ProtectedRoute>
-  }
-/>
-
-<Route
-  path="/reports"
-  element={
-    <ProtectedRoute>
-      <ReportPage/>
-    </ProtectedRoute>
-  }
-/>
-
-<Route
-  path="/settings"
-  element={
-    <ProtectedRoute>
-      <SettingsPage/>
-    </ProtectedRoute>
-  }
-/>
-
-
-        
+          path="/students"
+          element={
+            <ProtectedRoute>
+              <StudentPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <ReportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/signup"
@@ -141,7 +141,6 @@ function App() {
             </RedirectAuthenticatedUser>
           }
         />
-
         <Route
           path="/login"
           element={
@@ -150,41 +149,32 @@ function App() {
             </RedirectAuthenticatedUser>
           }
         />
-
-          <Route
-            path="/forgot-password"
-            element={
-              <RedirectAuthenticatedUser>
-                <ForgotPasswordPage />
-              </RedirectAuthenticatedUser>
-            }
-          />
-
-          <Route
-  path="/reset-password"
-  element={
-    <RedirectAuthenticatedUser>
-      <ResetPasswordPage />
-    </RedirectAuthenticatedUser>
-  }
-
-  
-/>
-
- <Route
-  path="/reset-password/new"
-  element={
-    <RedirectAuthenticatedUser>
-      <NewPasswordPage/>
-    </RedirectAuthenticatedUser>
-  }
-
-  
-/>
-
+        <Route
+          path="/forgot-password"
+          element={
+            <RedirectAuthenticatedUser>
+              <ForgotPasswordPage />
+            </RedirectAuthenticatedUser>
+          }
+        />
+        <Route
+          path="/reset-password"
+          element={
+            <RedirectAuthenticatedUser>
+              <ResetPasswordPage />
+            </RedirectAuthenticatedUser>
+          }
+        />
+        <Route
+          path="/reset-password/new"
+          element={
+            <RedirectAuthenticatedUser>
+              <NewPasswordPage />
+            </RedirectAuthenticatedUser>
+          }
+        />
         <Route path="/verify-email" element={<EmailVerificationPage />} />
       </Routes>
-
       <Toaster />
     </div>
   );

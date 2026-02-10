@@ -33,21 +33,20 @@ const ResetPasswordOTPPage = () => {
   };
 
   const handleSubmit = async (e) => {
-    if (e) e.preventDefault();
-    const verificationCode = code.join("");
-    if (verificationCode.length < 6) {
-      toast.error("Please enter the 6-digit code");
-      return;
-    }
+  e.preventDefault();
+  const verificationCode = code.join("");
+  if (verificationCode.length < 6) {
+    toast.error("Please enter the 6-digit code");
+    return;
+  }
 
-    try {
-      await verifyForgotPasswordOTP(verificationCode);
-      navigate("/reset-password/new"); // navigate to new password page
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
+  try {
+    await verifyForgotPasswordOTP(verificationCode); // ✅ pass only code
+    navigate("/reset-password/new"); // go to new password page
+  } catch (err) {
+    console.error(err);
+  }
+};
   return (
     <div className="max-w-md w-full bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl mx-auto mt-16 p-8">
       <h2 className="text-3xl font-bold mb-6 text-center bg-gradient-to-r from-green-400 to-emerald-500 text-transparent bg-clip-text">

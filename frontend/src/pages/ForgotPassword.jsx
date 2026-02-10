@@ -15,6 +15,7 @@ const ForgotPasswordPage = () => {
     e.preventDefault();
     try {
       await forgotPassword(email);
+      localStorage.setItem("resetEmail", email);
       toast.success("OTP sent to your email!");
       navigate("/reset-password");
     } catch (err) {
