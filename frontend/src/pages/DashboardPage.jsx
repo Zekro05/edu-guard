@@ -21,7 +21,7 @@ const DashboardPage = () => {
         <div className="flex items-center gap-4">
           <div className="text-right text-sm hidden sm:block">
             <p className="font-semibold">{user?.name || "Admin"}</p>
-            <p className="text-xs opacity-80">San Sebastian College Recoletos de Cavite</p>
+            <p className="text-xs opacity-80">Our Lady of the Holy Rosary - General Trias Cavite</p>
           </div>
 
           <button

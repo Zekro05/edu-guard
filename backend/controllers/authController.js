@@ -270,7 +270,7 @@ export const mobileLogin = async (req, res) => {
 
     await createHistoryLog({
       userId: user._id,
-      role: user.role || "Student",
+      role: mapRoleForHistory(user.role),
       action: "Mobile Login OTP Sent",
       category: "Auth",
       details: "Mobile login OTP sent",
@@ -309,7 +309,7 @@ export const verifyMobileLoginOTP = async (req, res) => {
 
     await createHistoryLog({
         userId: user._id,
-        role: user.role || "Student",
+        role: mapRoleForHistory(user.role),
         action: "Mobile Login",
         category: "Auth",
         details: "Mobile login verified via OTP",
@@ -482,7 +482,7 @@ export const forgotPassword = async (req, res) => {
 
     await createHistoryLog({
         userId: user._id,
-        role: user.role || "Student",
+        role: mapRoleForHistory(user.role),
         action: "Forgot Password",
         category: "Auth",
         details: "Password reset OTP requested",
@@ -558,7 +558,7 @@ export const resetPassword = async (req, res) => {
 
     await createHistoryLog({
       userId: user._id,
-      role: user.role || "Student",
+      role: mapRoleForHistory(user.role),
       action: "Password Reset",
       category: "Auth",
       details: "User successfully reset password",
