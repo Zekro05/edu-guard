@@ -9,7 +9,6 @@ import incidentRoutes from "./routes/incidentRoutes.js";
 import reportRoutes from "./routes/reports.js";
 import historyRoutes from "./routes/historyRoutes.js";
 import geminiRoutes from "./routes/gemini.js";
-import backupRoutes from "./routes/backupRoutes.js";
 import path from "path";
 
 // 🔥 NEW
@@ -156,7 +155,7 @@ app.use("/api/incidents", incidentRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/history", historyRoutes);
 app.use("/api/gemini", geminiRoutes);
-app.use("/api", backupRoutes);
+
 
 // 🔥 ADD THIS (CHAT HISTORY ROUTE)
 import messageRoutes from "./routes/messageRoutes.js";
