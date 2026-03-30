@@ -1,4 +1,7 @@
 import Student from "../models/studentModel.js";
+import { User } from "../models/userModel.js";
+import { createHistoryLog } from "../utils/createHistoryLog.js";
+import { mapRoleForHistory } from "../utils/roleMapper.js";
 
 /* GET ALL STUDENTS */
 export const getStudents = async (req, res) => {
@@ -15,12 +18,18 @@ export const getStudents = async (req, res) => {
 /*  CREATE STUDENT  */
 export const createStudent = async (req, res) => {
   try {
+    const profilePhoto = req.file
+      ? `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`
+      : "";
+
     const student = new Student({
       ...req.body,
-      createdBy: req.userId
+      profilePhoto,
+      createdBy: req.userId,
     });
 
     await student.save();
+
     res.status(201).json(student);
   } catch (error) {
     console.error("CREATE STUDENT ERROR:", error);
@@ -30,31 +39,68 @@ export const createStudent = async (req, res) => {
 
 /*  UPDATE STUDENT  */
 export const updateStudent = async (req, res) => {
+  const user = await User.findById(req.userId);
   try {
-    const updatedStudent = await Student.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
+    const studentId = req.params.id;
 
-    if (!updatedStudent) {
+    // Find the existing student
+    const student = await Student.findById(studentId);
+    if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
 
+    // Handle profile photo
+    let profilePhoto = student.profilePhoto; // keep existing by default
+    if (req.file) {
+      profilePhoto = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    }
+
+    // Prepare updated data
+    const updatedData = {
+      ...req.body,
+      profilePhoto, // either new uploaded photo or existing
+    };
+
+    // Update student
+    const updatedStudent = await Student.findByIdAndUpdate(studentId, updatedData, {
+      new: true,
+      runValidators: true,
+    });
+
+    await createHistoryLog({
+          userId: user._id,
+          role: mapRoleForHistory(user.role),
+          action: "Update Student Details",
+          category: "Student",
+          details: `Student details updated: (Student ID: ${student.studentId})`,
+          ipAddress: req.ip,
+        });
+
     res.status(200).json(updatedStudent);
   } catch (error) {
+    console.error("Failed to update student:", error);
     res.status(400).json({ message: "Failed to update student" });
   }
 };
 
 /*  DELETE STUDENT */
 export const deleteStudent = async (req, res) => {
+  const user = await User.findById(req.userId);
   try {
     const student = await Student.findByIdAndDelete(req.params.id);
 
     if (!student) {
       return res.status(404).json({ message: "Student not found" });
     }
+
+    await createHistoryLog({
+          userId: user._id,
+          role: mapRoleForHistory(user.role),
+          action: "Update Student Details",
+          category: "Student",
+          details: `Student details deleted: (Student ID: ${student.studentId})`,
+          ipAddress: req.ip,
+        });
 
     res.status(200).json({ message: "Student deleted successfully" });
   } catch (error) {

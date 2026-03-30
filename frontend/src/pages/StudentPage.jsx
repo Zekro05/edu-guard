@@ -70,7 +70,7 @@ const StudentPage = () => {
         <div className="flex items-center gap-4">
           <div className="text-right text-sm hidden sm:block">
             <p className="font-semibold">{user?.name || "Admin"}</p>
-            <p className="text-xs opacity-80">San Sebastian College Recoletos de Cavite</p>
+            <p className="text-xs opacity-80">Our Lady of the Holy Rosary - General Trias Cavite</p>
           </div>
           <button
             onClick={logout}
@@ -95,7 +95,9 @@ const StudentPage = () => {
            <Users className="mr-2"/> Students
           </button>
 
-          <button className="px-4 py-2 rounded-lg text-gray-400 cursor-not-allowed flex items-center justify-center">
+          <button 
+          onClick={() => navigate("/guidance")}
+          className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
             <ShieldX className="mr-2" />Guidance
           </button>
 

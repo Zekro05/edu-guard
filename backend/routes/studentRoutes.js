@@ -6,13 +6,15 @@ import {
   updateStudent,
   deleteStudent,
 } from "../controllers/studentController.js";
+import { upload } from "../middleware/upload.js";
 
 const router = express.Router();
 
 // PROTECTED ROUTES
 router.get("/", verifyToken, getStudents);
-router.post("/", verifyToken, createStudent);
-router.put("/:id", verifyToken, updateStudent);
+router.post("/", verifyToken, upload.single("profilePhoto"), createStudent);
+router.put("/:id", verifyToken, upload.single("profilePhoto"), updateStudent);
 router.delete("/:id", verifyToken, deleteStudent);
+
 
 export default router;

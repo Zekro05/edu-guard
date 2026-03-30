@@ -10,6 +10,28 @@ const ResetPasswordOTPPage = () => {
   const navigate = useNavigate();
   const { verifyForgotPasswordOTP, isLoading, resendOTP, error } = useAuthStore();
 
+  const [timer, setTimer] = useState(60); // countdown starts immediately
+
+  // Countdown effect
+  useEffect(() => {
+    let interval;
+    if (timer > 0) {
+      interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [timer]);
+
+  const handleResend = async () => {
+    try {
+      await resendOTP();
+      toast.success("OTP resent!");
+      setTimer(60); // reset 1-minute countdown
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to resend OTP.");
+    }
+  };
+
   const handleChange = (index, value) => {
     const newCode = [...code];
     if (value.length > 1) {
@@ -33,20 +55,29 @@ const ResetPasswordOTPPage = () => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  const verificationCode = code.join("");
-  if (verificationCode.length < 6) {
-    toast.error("Please enter the 6-digit code");
-    return;
-  }
+    e.preventDefault();
+    const verificationCode = code.join("");
+    if (verificationCode.length < 6) {
+      toast.error("Please enter the 6-digit code");
+      return;
+    }
 
-  try {
-    await verifyForgotPasswordOTP(verificationCode); // ✅ pass only code
-    navigate("/reset-password/new"); // go to new password page
-  } catch (err) {
-    console.error(err);
-  }
-};
+    try {
+      await verifyForgotPasswordOTP(verificationCode);
+      navigate("/reset-password/new");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Helper for progress bar color: green → yellow → red
+  const getProgressColor = () => {
+    const percent = (60 - timer) / 60;
+    if (percent < 0.5) return "#22c55e"; // green
+    if (percent < 0.8) return "#facc15"; // yellow
+    return "#ef4444"; // red
+  };
+
   return (
     <div className="max-w-md w-full bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-xl mx-auto mt-16 p-8">
       <h2 className="text-3xl font-bold mb-6 text-center bg-gradient-to-r from-green-400 to-emerald-500 text-transparent bg-clip-text">
@@ -83,13 +114,31 @@ const ResetPasswordOTPPage = () => {
           {isLoading ? "Verifying..." : "Verify OTP"}
         </motion.button>
 
-        <button
-          type="button"
-          onClick={resendOTP}
-          className="w-full mt-2 text-sm text-green-400 hover:underline"
-        >
-          Resend OTP
-        </button>
+        {/* Resend OTP Button with timer and progress bar */}
+        <div className="relative w-full mt-2">
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={timer > 0}
+            className={`w-full py-2 text-sm font-medium rounded-lg ${
+              timer > 0
+                ? "text-gray-500 cursor-not-allowed bg-gray-700"
+                : "text-green-400 hover:underline bg-gray-800"
+            }`}
+          >
+            {timer > 0 ? `Resend OTP in 0:${timer.toString().padStart(2, "0")}` : "Resend OTP"}
+          </button>
+
+          {/* Animated color-changing progress bar */}
+          <div
+            className="absolute bottom-0 left-0 h-1 rounded-full"
+            style={{
+              width: `${((60 - timer) / 60) * 100}%`,
+              backgroundColor: getProgressColor(),
+              transition: "width 1s linear, background-color 0.5s linear",
+            }}
+          />
+        </div>
       </form>
     </div>
   );

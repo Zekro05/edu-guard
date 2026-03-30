@@ -28,6 +28,8 @@ export const signup = async (req, res) => {
       gender,
     } = req.body;
 
+    const normalizedEmail = email.toLowerCase();
+    
     if (
       !firstName ||
       !lastName ||
@@ -47,14 +49,14 @@ export const signup = async (req, res) => {
       return res.status(400).json({ message: "Passwords do not match" });
     }
 
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser)
       return res.status(400).json({ message: "User already exists" });
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     let profilePhotoPath = "";
-    if (req.file) profilePhotoPath = `/uploads/${req.file.filename}`;
+    if (req.file) profilePhotoPath = `http://localhost:5000/uploads/${req.file.filename}`;
 
     const verificationToken = Math.floor(
       100000 + Math.random() * 900000
@@ -66,10 +68,10 @@ export const signup = async (req, res) => {
 
     const user = new User({
       firstName,
-      middleName: middleName || "",
+      middleName: middleName || undefined,
       lastName,
       name: fullName,
-      email,
+      email: normalizedEmail,
       password: hashedPassword,
       studentId,
       role: "student",
@@ -85,7 +87,8 @@ export const signup = async (req, res) => {
       firstName,
       middleName: middleName || "",
       lastName,
-      email,
+      email: normalizedEmail,
+      profilePhoto: profilePhotoPath,
       studentId,
       grade,
       gender,
@@ -521,6 +524,35 @@ export const verifyForgotPasswordOTP = async (req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const resendForgotPasswordOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email)
+      return res.status(400).json({ message: "Email is required" });
+
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(404).json({ message: "User not found" });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    user.resetPasswordToken = otp;
+    user.resetPasswordExpiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+    await user.save();
+
+    await sendPasswordResetEmail(
+      email,
+      `<h3>Your OTP is:</h3><h2>${otp}</h2>`
+    );
+
+    res.status(200).json({ message: "Password reset OTP resent successfully" });
+  } catch (err) {
+    console.error("Resend Forgot OTP Error:", err);
+    res.status(500).json({ message: "Failed to resend OTP" });
   }
 };
 

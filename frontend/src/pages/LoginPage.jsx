@@ -50,12 +50,7 @@ const LoginPage = () => {
   };
 
   if (otpRequired) {
-    return (
-      <EmailVerificationPage
-        onVerify={handleVerifyOTP}
-        title="Enter OTP to Login"
-      />
-    );
+    return <EmailVerificationPage onVerify={handleVerifyOTP} title="Enter OTP to Login" />;
   }
 
   return (

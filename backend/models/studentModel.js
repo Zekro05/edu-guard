@@ -8,6 +8,11 @@ const studentSchema = new mongoose.Schema(
       trim: true,
     },
 
+    middleName: {
+      type: String,
+      trim: true,
+    },
+
     lastName: {
       type: String,
       required: true,
@@ -22,7 +27,7 @@ const studentSchema = new mongoose.Schema(
     studentId: {
       type: String,
       unique: true,
-      sparse: true, 
+      sparse: true,
     },
 
     email: {
@@ -38,12 +43,12 @@ const studentSchema = new mongoose.Schema(
     gender: {
       type: String,
       enum: ["Male", "Female"],
-      default: "", 
+      default: "",
     },
 
     profilePhoto: {
-      type: String, // store the path or URL of the uploaded image
-      default: "",  // can be empty if no photo uploaded
+      type: String,
+      default: "",
     },
 
     riskLevel: {
@@ -63,10 +68,19 @@ const studentSchema = new mongoose.Schema(
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User", 
+      ref: "User",
     },
   },
   { timestamps: true }
 );
 
-export default mongoose.model("Student", studentSchema);
+// ✅ CREATE MODEL
+const Student = mongoose.model("Student", studentSchema);
+
+// ✅ KEEP DEFAULT EXPORT (for your existing system)
+export default Student;
+
+// ✅ ADD THESE FOR BACKUP SYSTEM
+export const find = () => Student.find();
+export const deleteMany = (query) => Student.deleteMany(query);
+export const insertMany = (data) => Student.insertMany(data);

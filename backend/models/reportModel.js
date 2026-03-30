@@ -1,21 +1,16 @@
-// backend/models/Report.js
 import mongoose from "mongoose";
 
-const ReportSchema = new mongoose.Schema({
-  type: {
-    type: String,
-    enum: ["mobile", "incident", "complaint", "overview", "ai"],
-    required: true,
-  },
-  studentName: String,
-  offenseType: String,
-  location: String,
-  description: String,
-  date: Date,
-  time: String,
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+const reportSchema = new mongoose.Schema({
+  studentName: { type: String, required: true },
+  offense: { type: String, required: true },
+  location: { type: String, required: true },
+  date: { type: String, required: true },
+  time: { type: String },
+  description: { type: String, required: true },
+
+  professorId: { type: String, required: true },
+
+  status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" }
 }, { timestamps: true });
 
-const Report = mongoose.model("Report", ReportSchema);
-
-export default Report;
+export default mongoose.model("Report", reportSchema);

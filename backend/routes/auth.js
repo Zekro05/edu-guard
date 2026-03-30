@@ -11,7 +11,8 @@ import {
   checkAuth,
   verifyForgotPasswordOTP,
   resendSignupOTP,
-  resendLoginOTP
+  resendLoginOTP,
+  resendForgotPasswordOTP
 } from "../controllers/authController.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 import { upload } from "../middleware/upload.js";
@@ -48,6 +49,7 @@ router.post("/verify-forgot-password-otp", verifyForgotPasswordOTP);
 
 router.post("/resend-signup-otp", resendSignupOTP);
 router.post("/resend-login-otp", resendLoginOTP);
+router.post("/resend-forgot-password-otp", resendForgotPasswordOTP);
 
 
 

@@ -34,12 +34,9 @@ const IncidentReport = () => {
 
       <FormTextArea label="Incident Description *" name="description" value={form.description} onChange={handleChange} placeholder="Detailed description..." />
 
-      <div className="mt-4">
-        <button
-          onClick={handleSubmit}
-          className="px-4 py-2 bg-blue-500 text-white font-semibold rounded hover:bg-blue-600 transition"
-        >
-          Submit Report
+      <div className="mt-6">
+        <button className="bg-green-700 text-white px-5 py-2 rounded-md text-sm hover:bg-green-800 transition">
+          SUBMIT REPORT
         </button>
       </div>
     </div>

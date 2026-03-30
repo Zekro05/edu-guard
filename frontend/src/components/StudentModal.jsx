@@ -1,37 +1,50 @@
 import { useState, useEffect } from "react";
 import { API } from "../store/authStore";
 import toast from "react-hot-toast";
+import { User } from "lucide-react"; // default avatar icon
 
 const StudentModal = ({ close, refresh, student, isEditing, students }) => {
   const [form, setForm] = useState({
     firstName: "",
+    middleName: "",
     lastName: "",
     grade: "",
-    riskLevel: "Low",
     studentId: "",
-    gender: "",
     email: "",
     phone: "",
+    gender: "",
+    riskLevel: "Low",
     notes: "",
+    profilePhoto: "", // DB URL
+    newPhoto: null,   // newly uploaded photo
   });
 
+  // Populate form if editing
   useEffect(() => {
     if (isEditing && student) {
       setForm({
         firstName: student.firstName || "",
+        middleName: student.middleName || "",
         lastName: student.lastName || "",
         grade: student.grade || "",
-        riskLevel: student.riskLevel || "Low",
         studentId: student.studentId || "",
-        gender: student.gender || "",
         email: student.email || "",
         phone: student.phone || "",
+        gender: student.gender || "",
+        riskLevel: student.riskLevel || "Low",
         notes: student.notes || "",
+        profilePhoto: student.profilePhoto || "",
+        newPhoto: null,
       });
     }
   }, [isEditing, student]);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) setForm({ ...form, newPhoto: file });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,19 +52,32 @@ const StudentModal = ({ close, refresh, student, isEditing, students }) => {
     if (!isEditing) {
       const emailExists = students.some((s) => s.email === form.email);
       const idExists = students.some((s) => s.studentId === form.studentId);
-
       if (emailExists) return toast.error("A student with this email already exists");
       if (idExists) return toast.error("A student with this Student ID already exists");
     }
 
     try {
+      const formData = new FormData();
+      Object.keys(form).forEach((key) => {
+        if (key === "newPhoto" && form.newPhoto) {
+          formData.append("profilePhoto", form.newPhoto);
+        } else if (key !== "newPhoto" && form[key] !== null) {
+          formData.append(key, form[key]);
+        }
+      });
+
       if (isEditing) {
-        await API.put(`/api/students/${student._id}`, form);
+        await API.put(`/api/students/${student._id}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
         toast.success("Student updated successfully");
       } else {
-        await API.post("/api/students", form);
+        await API.post("/api/students", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
         toast.success("Student added successfully");
       }
+
       refresh();
       close();
     } catch (err) {
@@ -75,8 +101,38 @@ const StudentModal = ({ close, refresh, student, isEditing, students }) => {
 
         {/* BODY */}
         <div className="px-6 py-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Avatar Upload */}
+          <div className="col-span-1 sm:col-span-2 flex flex-col items-center mb-4">
+            <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center mb-3 border">
+              {form.newPhoto ? (
+                <img
+                  src={URL.createObjectURL(form.newPhoto)}
+                  alt="preview"
+                  className="w-full h-full object-cover"
+                />
+              ) : form.profilePhoto ? (
+                <img
+                  src={form.profilePhoto}
+                  alt="avatar"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                // Default avatar using Lucide icon
+                <User className="w-12 h-12 text-gray-400" />
+              )}
+            </div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              className="text-sm"
+            />
+          </div>
+
+          {/* Input Fields */}
           {[
             { label: "First Name *", name: "firstName", type: "text" },
+            { label: "Middle Name", name: "middleName", type: "text" },
             { label: "Last Name *", name: "lastName", type: "text" },
             { label: "Grade *", name: "grade", type: "text" },
             { label: "Student ID *", name: "studentId", type: "text" },

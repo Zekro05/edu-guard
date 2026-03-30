@@ -180,7 +180,6 @@ export const useAuthStore = create((set, get) => ({
           otpType: null,
         });
         localStorage.setItem("user", JSON.stringify({ ...data.user, token: data.token }));
-        toast.success("Login verified!");
       } else if (otpType === "signup") {
         set({
           otpRequired: false,
@@ -212,32 +211,48 @@ export const useAuthStore = create((set, get) => ({
   },
 
   resendOTP: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const { tempEmail, otpType } = get();
-      if (!tempEmail) throw new Error("No email found for OTP");
+  set({ isLoading: true, error: null });
+  try {
+    const { tempEmail, otpType } = get();
+    if (!tempEmail) throw new Error("No email found for OTP");
 
-      const url =
-        otpType === "signup"
-          ? "/api/auth/resend-signup-otp"
-          : "/api/auth/resend-login-otp";
+    let url;
 
-      const { data } = await API.post(url, { email: tempEmail });
-
-      toast.success(data.message || "OTP resent successfully");
-    } catch (err) {
-      set({ error: err.response?.data?.message || err.message });
-      throw err;
-    } finally {
-      set({ isLoading: false });
+    switch (otpType) {
+      case "signup":
+        url = "/api/auth/resend-signup-otp";
+        break;
+      case "login":
+        url = "/api/auth/resend-login-otp";
+        break;
+      case "forgot":
+        url = "/api/auth/resend-forgot-password-otp";
+        break;
+      default:
+        throw new Error("Invalid OTP type");
     }
-  },
+
+    const { data } = await API.post(url, { email: tempEmail });
+
+    toast.success(data.message);
+  } catch (err) {
+    set({ error: err.response?.data?.message || err.message });
+    toast.error(err.response?.data?.message || err.message);
+    throw err;
+  } finally {
+    set({ isLoading: false });
+  }
+},
 
   forgotPassword: async (email) => {
     set({ isLoading: true, error: null });
     try {
       await API.post("/api/auth/forgot-password", { email });
-      set({ tempEmail: email });
+      set({ 
+      tempEmail: email,
+      otpRequired: true,
+      otpType: "forgot"   // 🔥 ADD THIS
+    });
     } catch (err) {
       toast.error(err.response?.data?.message || err.message);
       throw err;
