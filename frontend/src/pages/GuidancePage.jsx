@@ -1,10 +1,18 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
-import { LayoutDashboard, Users, ShieldX, ChartNoAxesCombined, Settings } from "lucide-react";
+import {
+  LayoutDashboard,
+  Users,
+  ShieldX,
+  ChartNoAxesCombined,
+  Settings,
+  Bell
+} from "lucide-react";
 import io from "socket.io-client";
 
-const socket = io("http://localhost:5000"); // replace with your backend URL if needed
+const socket = io("http://localhost:5000");
+const notificationSound = new Audio("/notification.mp3");
 
 const GuidancePage = () => {
   const navigate = useNavigate();
@@ -17,27 +25,53 @@ const GuidancePage = () => {
   const [typingUser, setTypingUser] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState([]);
 
+  // 🔔 NEW
+  const [notifications, setNotifications] = useState([]);
+  const [showNotif, setShowNotif] = useState(false);
+
   const chatEndRef = useRef(null);
 
-  // Scroll to bottom on new message
+  // Scroll
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeChat]);
 
-  // Load users from backend
+  // Load users
   useEffect(() => {
     fetch("http://localhost:5000/api/users")
       .then((res) => res.json())
       .then((data) => setConversations(data.filter(u => u._id !== user._id)));
   }, [user]);
 
-  // Register user in socket
+  // SOCKET
   useEffect(() => {
     if (user?._id) socket.emit("register", user._id);
 
     socket.on("receive_message", (msg) => {
-      if (activeChat && msg.chatId === getChatId(activeChat._id)) {
+      const isCurrentChat =
+        activeChat && msg.chatId === getChatId(activeChat._id);
+
+      if (isCurrentChat) {
         setMessages((prev) => [...prev, msg]);
+      }
+
+      // 🔊 SOUND
+      if (msg.sender !== user._id) {
+        notificationSound.play().catch(() => {});
+      }
+
+      // 🔔 STORE NOTIFICATION
+      if (msg.sender !== user._id) {
+        const sender = conversations.find(c => c._id === msg.sender);
+
+        setNotifications(prev => [
+          {
+            ...msg,
+            senderName: sender?.name,
+            senderPhoto: sender?.profilePhoto
+          },
+          ...prev
+        ]);
       }
     });
 
@@ -52,32 +86,47 @@ const GuidancePage = () => {
     socket.on("online_users", (users) => setOnlineUsers(users));
 
     return () => socket.off();
-  }, [activeChat, user]);
+  }, [activeChat, conversations, user]);
 
-  // Helper for unique chat IDs
-  const getChatId = (otherUserId) => [user._id, otherUserId].sort().join("-");
+  const getChatId = (otherUserId) =>
+    [user._id, otherUserId].sort().join("-");
 
-  // Load messages when selecting a conversation
   const loadMessages = async (conv) => {
     setActiveChat(conv);
-    const res = await fetch(`http://localhost:5000/api/messages/${getChatId(conv._id)}`);
+
+    const res = await fetch(
+      `http://localhost:5000/api/messages/${getChatId(conv._id)}`
+    );
     const data = await res.json();
     setMessages(data);
 
-    // Mark messages as seen
-    socket.emit("mark_seen", { chatId: getChatId(conv._id), userId: user._id });
+    socket.emit("mark_seen", {
+      chatId: getChatId(conv._id),
+      userId: user._id,
+    });
+
+    // remove notif for that user
+    setNotifications(prev =>
+      prev.filter(n => n.sender !== conv._id)
+    );
   };
 
-  // Handle typing
   const handleTyping = (e) => {
     setInput(e.target.value);
     if (!activeChat) return;
 
-    socket.emit("typing", { sender: user._id, receiver: activeChat._id });
-    setTimeout(() => socket.emit("stop_typing", { receiver: activeChat._id }), 1000);
+    socket.emit("typing", {
+      sender: user._id,
+      receiver: activeChat._id,
+    });
+
+    setTimeout(() => {
+      socket.emit("stop_typing", {
+        receiver: activeChat._id,
+      });
+    }, 1000);
   };
 
-  // Send message
   const sendMessage = () => {
     if (!input.trim() || !activeChat) return;
 
@@ -90,7 +139,7 @@ const GuidancePage = () => {
     };
 
     socket.emit("send_message", msg);
-    setMessages((prev) => [...prev, msg]);
+    setMessages(prev => [...prev, msg]);
     setInput("");
   };
 
@@ -101,10 +150,64 @@ const GuidancePage = () => {
       <header className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 sm:px-8 py-4 flex justify-between items-center shadow-lg">
         <h1 className="text-2xl font-bold">EduGuard</h1>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 relative">
+
+          {/* 🔔 NOTIFICATION */}
+          <div className="relative">
+            <button onClick={() => setShowNotif(!showNotif)}>
+              <Bell />
+            </button>
+
+            {notifications.length > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-xs px-2 rounded-full">
+                {notifications.length}
+              </span>
+            )}
+
+            {showNotif && (
+              <div className="absolute right-0 mt-2 w-72 bg-white text-black rounded-xl shadow-lg max-h-80 overflow-y-auto z-50">
+                {notifications.length === 0 ? (
+                  <p className="p-3 text-sm">No notifications</p>
+                ) : (
+                  notifications.map((notif, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        const conv = conversations.find(c => c._id === notif.sender);
+                        if (conv) loadMessages(conv);
+                        setShowNotif(false);
+                      }}
+                      className="p-3 border-b cursor-pointer hover:bg-gray-100 flex gap-3"
+                    >
+                      <img
+                        src={
+                          notif.senderPhoto
+                            ? `http://localhost:5000${notif.senderPhoto}`
+                            : "https://i.pravatar.cc/150"
+                        }
+                        className="w-8 h-8 rounded-full"
+                      />
+                      <div>
+                        <p className="text-sm font-semibold">
+                          {notif.senderName}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          {notif.text}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* USER INFO */}
           <div className="text-right text-sm hidden sm:block">
             <p className="font-semibold">{user?.name || "Admin"}</p>
-            <p className="text-xs opacity-80">Our Lady of the Holy Rosary - General Trias Cavite</p>
+            <p className="text-xs opacity-80">
+              Our Lady of the Holy Rosary - General Trias Cavite
+            </p>
           </div>
 
           <button

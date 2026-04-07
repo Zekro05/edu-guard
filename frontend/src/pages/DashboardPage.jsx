@@ -54,7 +54,7 @@ const DashboardPage = () => {
       <header className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 sm:px-8 py-4 flex justify-between items-center shadow-lg">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           EduGuard
-
+          
           {/* 🔔 NOTIFICATION BADGE */}
           {pendingCount > 0 && (
             <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
