@@ -3,6 +3,28 @@ import Message from "../models/message.js";
 
 const router = express.Router();
 
+// =========================
+// ✅ SEND MESSAGE
+// =========================
+router.post("/", async (req, res) => {
+  try {
+    const { chatId, sender, receiver, text, file } = req.body;
+
+    const newMessage = new Message({
+      chatId,
+      sender,
+      receiver,
+      text,
+      file,
+    });
+
+    await newMessage.save();
+
+    res.status(201).json(newMessage);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // =========================
 // ✅ GET CHAT HISTORY
@@ -19,9 +41,8 @@ router.get("/:chatId", async (req, res) => {
   }
 });
 
-
 // =========================
-// ✅ GET CONVERSATIONS (FIX FOR YOUR ERROR)
+// ✅ GET CONVERSATIONS
 // =========================
 router.get("/conversations/:userId", async (req, res) => {
   try {
@@ -30,22 +51,17 @@ router.get("/conversations/:userId", async (req, res) => {
     const conversations = await Message.aggregate([
       {
         $match: {
-          $or: [
-            { senderId: userId },
-            { receiverId: userId },
-          ],
+          $or: [{ sender: userId }, { receiver: userId }],
         },
       },
-      {
-        $sort: { createdAt: -1 },
-      },
+      { $sort: { createdAt: -1 } },
       {
         $group: {
           _id: "$chatId",
-          lastMessage: { $first: "$message" },
+          lastMessage: { $first: "$text" },
           lastTime: { $first: "$createdAt" },
-          senderId: { $first: "$senderId" },
-          receiverId: { $first: "$receiverId" },
+          sender: { $first: "$sender" },
+          receiver: { $first: "$receiver" },
         },
       },
       {
@@ -53,8 +69,8 @@ router.get("/conversations/:userId", async (req, res) => {
           conversationId: "$_id",
           lastMessage: 1,
           lastTime: 1,
-          senderId: 1,
-          receiverId: 1,
+          sender: 1,
+          receiver: 1,
           _id: 0,
         },
       },

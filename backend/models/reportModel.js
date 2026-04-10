@@ -7,8 +7,10 @@ const reportSchema = new mongoose.Schema({
   date: { type: String, required: true },
   time: { type: String },
   description: { type: String, required: true },
+  reporter: { type: String, required: true },
+  reporterId: { type: String, required: true },
 
-  professorId: { type: String, required: true },
+  
 
   status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" }
 }, { timestamps: true });

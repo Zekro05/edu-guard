@@ -11,12 +11,14 @@ import {
 } from "lucide-react";
 import io from "socket.io-client";
 
-const socket = io("http://localhost:5000");
+// ❌ removed direct socket (fix duplication)
 const notificationSound = new Audio("/notification.mp3");
 
 const GuidancePage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+
+  const socketRef = useRef(null); // ✅ FIX
 
   const [activeChat, setActiveChat] = useState(null);
   const [conversations, setConversations] = useState([]);
@@ -29,7 +31,14 @@ const GuidancePage = () => {
   const [notifications, setNotifications] = useState([]);
   const [showNotif, setShowNotif] = useState(false);
 
+  // ✅ NEW unread system
+  const [unreadCounts, setUnreadCounts] = useState({});
+
   const chatEndRef = useRef(null);
+  const typingTimeoutRef = useRef(null); // ✅ FIX
+
+  const getChatId = (otherUserId) =>
+    [user._id, otherUserId].sort().join("-");
 
   // Scroll
   useEffect(() => {
@@ -40,19 +49,36 @@ const GuidancePage = () => {
   useEffect(() => {
     fetch("http://localhost:5000/api/users")
       .then((res) => res.json())
-      .then((data) => setConversations(data.filter(u => u._id !== user._id)));
+      .then((data) =>
+        setConversations(
+          Array.isArray(data)
+            ? data.filter((u) => u._id !== user._id)
+            : []
+        )
+      );
   }, [user]);
 
-  // SOCKET
+  // SOCKET ✅ FIXED
   useEffect(() => {
-    if (user?._id) socket.emit("register", user._id);
+    if (!user?._id) return;
 
-    socket.on("receive_message", (msg) => {
+    socketRef.current = io("http://localhost:5000");
+    socketRef.current.emit("register", user._id);
+
+    socketRef.current.on("receive_message", (msg) => {
       const isCurrentChat =
         activeChat && msg.chatId === getChatId(activeChat._id);
 
       if (isCurrentChat) {
-        setMessages((prev) => [...prev, msg]);
+        setMessages((prev) =>
+          Array.isArray(prev) ? [...prev, msg] : [msg]
+        );
+      } else {
+        // ✅ unread badge
+        setUnreadCounts((prev) => ({
+          ...prev,
+          [msg.sender]: (prev[msg.sender] || 0) + 1,
+        }));
       }
 
       // 🔊 SOUND
@@ -75,53 +101,73 @@ const GuidancePage = () => {
       }
     });
 
-    socket.on("typing", (senderId) => {
+    socketRef.current.on("typing", (senderId) => {
       if (activeChat && senderId === activeChat._id) setTypingUser(true);
     });
 
-    socket.on("stop_typing", (senderId) => {
+    socketRef.current.on("stop_typing", (senderId) => {
       if (activeChat && senderId === activeChat._id) setTypingUser(false);
     });
 
-    socket.on("online_users", (users) => setOnlineUsers(users));
+    socketRef.current.on("online_users", (users) => setOnlineUsers(users));
 
-    return () => socket.off();
-  }, [activeChat, conversations, user]);
-
-  const getChatId = (otherUserId) =>
-    [user._id, otherUserId].sort().join("-");
+    return () => socketRef.current.disconnect();
+  }, [user?._id, activeChat, conversations]);
 
   const loadMessages = async (conv) => {
     setActiveChat(conv);
 
-    const res = await fetch(
-      `http://localhost:5000/api/messages/${getChatId(conv._id)}`
-    );
-    const data = await res.json();
-    setMessages(data);
+    try {
+      const res = await fetch(
+        `http://localhost:5000/api/messages/${getChatId(conv._id)}`
+      );
+      const data = await res.json();
 
-    socket.emit("mark_seen", {
-      chatId: getChatId(conv._id),
-      userId: user._id,
-    });
+      // ✅ FIX messages crash
+      if (Array.isArray(data)) {
+        setMessages(data);
+      } else if (Array.isArray(data.messages)) {
+        setMessages(data.messages);
+      } else {
+        setMessages([]);
+      }
 
-    // remove notif for that user
-    setNotifications(prev =>
-      prev.filter(n => n.sender !== conv._id)
-    );
+      socketRef.current.emit("mark_seen", {
+        chatId: getChatId(conv._id),
+        userId: user._id,
+      });
+
+      // remove notif
+      setNotifications(prev =>
+        prev.filter(n => n.sender !== conv._id)
+      );
+
+      // ✅ reset unread
+      setUnreadCounts(prev => ({
+        ...prev,
+        [conv._id]: 0
+      }));
+
+    } catch (err) {
+      setMessages([]);
+    }
   };
 
   const handleTyping = (e) => {
     setInput(e.target.value);
     if (!activeChat) return;
 
-    socket.emit("typing", {
+    socketRef.current.emit("typing", {
       sender: user._id,
       receiver: activeChat._id,
     });
 
-    setTimeout(() => {
-      socket.emit("stop_typing", {
+    // ✅ FIX debounce
+    clearTimeout(typingTimeoutRef.current);
+
+    typingTimeoutRef.current = setTimeout(() => {
+      socketRef.current.emit("stop_typing", {
+        sender: user._id,
         receiver: activeChat._id,
       });
     }, 1000);
@@ -138,8 +184,12 @@ const GuidancePage = () => {
       seen: false,
     };
 
-    socket.emit("send_message", msg);
-    setMessages(prev => [...prev, msg]);
+    socketRef.current.emit("send_message", msg);
+
+    setMessages(prev =>
+      Array.isArray(prev) ? [...prev, msg] : [msg]
+    );
+
     setInput("");
   };
 
@@ -202,7 +252,6 @@ const GuidancePage = () => {
             )}
           </div>
 
-          {/* USER INFO */}
           <div className="text-right text-sm hidden sm:block">
             <p className="font-semibold">{user?.name || "Admin"}</p>
             <p className="text-xs opacity-80">
@@ -222,11 +271,11 @@ const GuidancePage = () => {
       {/* ===== NAV ===== */}
       <div className="mt-6 px-4 sm:px-8">
         <div className="bg-white rounded-2xl border flex flex-wrap justify-around items-center py-3 gap-3 shadow-sm">
-          <button onClick={() => navigate("/dashboard")} className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
+          <button className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 flex items-center justify-center">
             <LayoutDashboard className="mr-2"/> Dashboard
           </button>
 
-          <button onClick={() => navigate("/students")} className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
+          <button onClick={() => navigate("/students")} className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 flex items-center justify-center">
             <Users className="mr-2"/> Students
           </button>
 
@@ -234,11 +283,11 @@ const GuidancePage = () => {
             <ShieldX className="mr-2"/> Guidance
           </button>
 
-          <button onClick={() => navigate("/reports")} className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
+          <button onClick={() => navigate("/reports")} className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 flex items-center justify-center">
             <ChartNoAxesCombined className="mr-2"/> Reports
           </button>
 
-          <button onClick={() => navigate("/settings")} className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
+          <button onClick={() => navigate("/settings")} className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 flex items-center justify-center">
             <Settings className="mr-2"/>Settings
           </button>
         </div>
@@ -247,74 +296,94 @@ const GuidancePage = () => {
       {/* ===== MAIN CONTENT ===== */}
       <main className="flex-1 px-6 py-6 flex gap-6 flex-col md:flex-row">
 
-        {/* LEFT PANEL - Conversations */}
-        <div className="w-full md:w-1/3 bg-white rounded-2xl border p-4 shadow-sm mb-4 md:mb-0">
+        {/* LEFT PANEL */}
+        <div className="w-full md:w-1/3 bg-white rounded-2xl border p-4 shadow-sm">
           <h2 className="font-semibold mb-4 text-lg">Active Conversations</h2>
+
           {conversations.map((conv, idx) => (
             <div
               key={idx}
               onClick={() => loadMessages(conv)}
               className={`flex items-center justify-between p-3 mb-2 rounded-lg cursor-pointer hover:bg-green-50 transition ${
-                activeChat?.name === conv.name ? "bg-green-100" : ""
+                activeChat?._id === conv._id ? "bg-green-100" : ""
               }`}
             >
               <div className="flex items-center gap-3">
                 <img
-                  src={conv.profilePhoto ? `http://localhost:5000${conv.profilePhoto}` : "https://i.pravatar.cc/150?img=65"}
-                  alt={conv.name}
-                  className="w-10 h-10 rounded-full border-2 border-green-300"
+                  src={conv.profilePhoto ? `http://localhost:5000${conv.profilePhoto}` : "https://i.pravatar.cc/150"}
+                  className="w-10 h-10 rounded-full"
                 />
-                <span className="font-medium">{conv.name}</span>
+                <span>{conv.name}</span>
               </div>
-              <span className={`text-xs ${onlineUsers.includes(conv._id) ? "text-green-500" : "text-gray-400"}`}>●</span>
+
+              <div className="flex items-center gap-2">
+                {/* ✅ unread badge */}
+                {unreadCounts[conv._id] > 0 && (
+                  <span className="bg-red-500 text-white text-xs px-2 rounded-full">
+                    {unreadCounts[conv._id]}
+                  </span>
+                )}
+
+                <span className={`text-xs ${onlineUsers.includes(conv._id) ? "text-green-500" : "text-gray-400"}`}>
+                  ●
+                </span>
+              </div>
             </div>
           ))}
         </div>
 
-        {/* RIGHT PANEL - Chat Box */}
+        {/* RIGHT PANEL */}
         <div className="flex-1 bg-white rounded-2xl border p-4 shadow-sm flex flex-col">
-          <h2 className="font-semibold mb-4 text-lg">{activeChat?.name || "Select a conversation"}</h2>
+          <h2 className="font-semibold mb-4 text-lg">
+            {activeChat?.name || "Select a conversation"}
+          </h2>
 
-          <div className="flex-1 overflow-y-auto mb-4 flex flex-col gap-3 px-2">
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`flex items-end gap-2 ${msg.sender === user._id ? "justify-end" : "justify-start"}`}
-              >
-                {msg.sender !== user._id && (
-                  <img
-                    src={activeChat?.profilePhoto ? `http://localhost:5000${activeChat.profilePhoto}` : "https://i.pravatar.cc/150?img=8"}
-                    alt={activeChat?.name}
-                    className="w-8 h-8 rounded-full"
-                  />
-                )}
-                <div className={`p-3 rounded-2xl shadow max-w-[70%] break-words ${msg.sender === user._id ? "bg-green-200 text-green-900 rounded-br-none" : "bg-gray-200 text-gray-900 rounded-bl-none"}`}>
-                  {msg.text}
+          <div className="flex-1 overflow-y-auto flex flex-col gap-3">
+            {Array.isArray(messages) &&
+              messages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`flex ${
+                    msg.sender === user._id ? "justify-end" : "justify-start"
+                  }`}
+                >
+                  <div
+                    className={`p-3 rounded-2xl max-w-xs ${
+                      msg.sender === user._id
+                        ? "bg-green-500 text-white"
+                        : "bg-gray-200"
+                    }`}
+                  >
+                    {msg.text}
+
+                    {/* ✅ seen/delivered */}
+                    {msg.sender === user._id && (
+                      <div className="text-[10px] text-right mt-1 opacity-70">
+                        {msg.seen ? "✔✔ Seen" : "✔ Sent"}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                {msg.sender === user._id && (
-                  <img
-                    src={user.profilePhoto ? `http://localhost:5000${user.profilePhoto}` : "https://i.pravatar.cc/150?img=65"}
-                    alt="Admin"
-                    className="w-8 h-8 rounded-full"
-                  />
-                )}
-              </div>
-            ))}
-            {typingUser && <p className="text-sm italic text-gray-400">{`${activeChat?.name} is typing...`}</p>}
+              ))}
+
+            {typingUser && (
+              <p className="text-sm italic text-gray-400">
+                {activeChat?.name} is typing...
+              </p>
+            )}
+
             <div ref={chatEndRef}></div>
           </div>
 
-          <div className="flex">
+          <div className="flex mt-3">
             <input
-              type="text"
-              placeholder="Type your message here..."
               value={input}
               onChange={handleTyping}
-              className="flex-1 border rounded-l-2xl p-3 focus:outline-none"
+              className="flex-1 border p-2 rounded-l-xl"
             />
             <button
               onClick={sendMessage}
-              className="bg-green-500 hover:bg-green-600 text-white px-4 rounded-r-2xl transition"
+              className="bg-green-500 text-white px-4 rounded-r-xl"
             >
               Send
             </button>
