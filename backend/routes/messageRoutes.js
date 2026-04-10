@@ -24,7 +24,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-/* GET CHAT HISTORY (FIXED RELIABLE QUERY) */
+/* GET CHAT HISTORY */
 router.get("/:chatId", async (req, res) => {
   try {
     const messages = await Message.find({
@@ -45,10 +45,7 @@ router.get("/conversations/:userId", async (req, res) => {
     const conversations = await Message.aggregate([
       {
         $match: {
-          $or: [
-            { sender: userId },
-            { receiver: userId }
-          ],
+          $or: [{ sender: userId }, { receiver: userId }],
         },
       },
       { $sort: { createdAt: -1 } },

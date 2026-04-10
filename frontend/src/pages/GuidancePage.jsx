@@ -55,39 +55,28 @@ const GuidancePage = () => {
   useEffect(() => {
     if (!user?._id) return;
 
-    socketRef.current = io("http://localhost:5000");
+    socketRef.current = io("https://edu-guard-backend.onrender.com", {
+  transports: ["websocket", "polling"],
+});
     socketRef.current.emit("register", user._id);
 
     socketRef.current.on("receive_message", (msg) => {
-      const isCurrent =
-        activeChat && msg.chatId === getChatId(activeChat._id);
+  const isCurrent =
+    activeChat && msg.chatId === getChatId(activeChat._id);
 
-      if (isCurrent) {
-        setMessages(prev => [...prev, msg]);
-      } else {
-        setUnreadCounts(prev => ({
-          ...prev,
-          [msg.sender]: (prev[msg.sender] || 0) + 1,
-        }));
-      }
+  if (isCurrent) {
+    setMessages((prev) => [...prev, msg]);
+  } else {
+    setUnreadCounts((prev) => ({
+      ...prev,
+      [msg.sender]: (prev[msg.sender] || 0) + 1,
+    }));
+  }
 
-      if (msg.sender !== user._id) {
-        notificationSound.play().catch(() => {});
-      }
-
-      if (msg.sender !== user._id) {
-        const sender = conversations.find(c => c._id === msg.sender);
-
-        setNotifications(prev => [
-          {
-            ...msg,
-            senderName: sender?.name,
-            senderPhoto: sender?.profilePhoto
-          },
-          ...prev
-        ]);
-      }
-    });
+  if (msg.sender !== user._id) {
+    notificationSound.play().catch(() => {});
+  }
+});
 
     socketRef.current.on("typing", (senderId) => {
       if (activeChat && senderId === activeChat._id) {
@@ -108,31 +97,26 @@ const GuidancePage = () => {
 
   // LOAD MESSAGES (UNCHANGED LOGIC FIX ONLY)
   const loadMessages = async (conv) => {
-    setActiveChat(conv);
+  setActiveChat(conv);
 
-    const res = await fetch(
-      `http://localhost:5000/api/messages/${getChatId(conv._id)}`
-    );
+  const res = await fetch(
+    `https://edu-guard-backend.onrender.com/api/messages/${getChatId(conv._id)}`
+  );
 
-    const data = await res.json();
+  const data = await res.json();
 
-    // supports both backend shapes
-    setMessages(Array.isArray(data) ? data : (data.messages || []));
+  setMessages(data?.messages || []);
 
-    socketRef.current.emit("mark_seen", {
-      chatId: getChatId(conv._id),
-      userId: user._id,
-    });
+  socketRef.current.emit("mark_seen", {
+    chatId: getChatId(conv._id),
+    userId: user._id,
+  });
 
-    setNotifications(prev =>
-      prev.filter(n => n.sender !== conv._id)
-    );
-
-    setUnreadCounts(prev => ({
-      ...prev,
-      [conv._id]: 0
-    }));
-  };
+  setUnreadCounts((prev) => ({
+    ...prev,
+    [conv._id]: 0,
+  }));
+};
 
   // typing FIX ONLY
   const handleTyping = (e) => {
@@ -157,24 +141,22 @@ const GuidancePage = () => {
 
   // send FIX ONLY (KEEP YOUR STRUCTURE)
   const sendMessage = () => {
-    if (!input.trim() || !activeChat) return;
+  if (!input.trim() || !activeChat) return;
 
-    const msg = {
-      chatId: getChatId(activeChat._id),
-      sender: user._id,
-      receiver: activeChat._id,
-      text: input,
-      seen: false,
-    };
-
-    socketRef.current.emit("send_message", msg);
-
-    setMessages(prev =>
-      Array.isArray(prev) ? [...prev, msg] : [msg]
-    );
-
-    setInput("");
+  const msg = {
+    chatId: getChatId(activeChat._id),
+    sender: user._id,
+    receiver: activeChat._id,
+    text: input,
+    seen: false,
   };
+
+  socketRef.current.emit("send_message", msg);
+
+  setMessages((prev) => [...prev, msg]);
+
+  setInput("");
+};
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-gray-900 via-green-900 to-emerald-900 flex flex-col">

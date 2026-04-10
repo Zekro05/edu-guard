@@ -43,138 +43,75 @@ const messageQueue = new Map();     // userId → pending messages
 
 /* ================= SOCKET LOGIC ================= */
 
-io.on("connection", (socket) => {
-  console.log("⚡ Connected:", socket.id);
+export const socketHandler = (io) => {
+  io.on("connection", (socket) => {
+    console.log("User connected:", socket.id);
 
-  socket.isReady = false;
+    /* REGISTER USER */
+    socket.on("register", (userId) => {
+      onlineUsers.set(userId, socket.id);
+      io.emit("online_users", Array.from(onlineUsers.keys()));
+    });
 
-  /* ================= REGISTER ================= */
-  socket.on("register", async (userId, callback) => {
-    if (!userId) return;
+    /* SEND MESSAGE */
+    socket.on("send_message", async (msg) => {
+      try {
+        const saved = await Message.create(msg);
 
-    const id = String(userId);
+        const receiverSocket = onlineUsers.get(msg.receiver);
 
-    socket.userId = id;
-    socket.isReady = true;
-
-    onlineUsers.set(id, socket.id);
-    socketToUser.set(socket.id, id);
-
-    console.log("👤 REGISTERED:", id);
-
-    /* 🔥 DELIVER OFFLINE MESSAGES */
-    if (messageQueue.has(id)) {
-      const queued = messageQueue.get(id);
-
-      queued.forEach((msg) => {
-        socket.emit("receive_message", msg);
-      });
-
-      messageQueue.delete(id);
-    }
-
-    io.emit("online_users", Array.from(onlineUsers.keys()));
-
-    if (callback) callback({ success: true, socketId: socket.id });
-  });
-
-  /* ================= SEND MESSAGE ================= */
-  socket.on("send_message", async (data) => {
-    try {
-      const { sender, receiver, text, file } = data;
-
-      if (!socket.isReady) return;
-
-      const chatId = [String(sender), String(receiver)].sort().join("-");
-
-      const newMessage = await Message.create({
-        chatId,
-        sender: String(sender),
-        receiver: String(receiver),
-        text,
-        file,
-        seen: false,
-        delivered: false,
-      });
-
-      const receiverSocketId = onlineUsers.get(String(receiver));
-      const senderSocketId = onlineUsers.get(String(sender));
-
-      const payload = newMessage;
-
-      /* ================= DELIVER ================= */
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit("receive_message", payload);
-
-        await Message.findByIdAndUpdate(newMessage._id, {
-          delivered: true,
-        });
-      } else {
-        /* OFFLINE QUEUE */
-        if (!messageQueue.has(String(receiver))) {
-          messageQueue.set(String(receiver), []);
+        if (receiverSocket) {
+          io.to(receiverSocket).emit("receive_message", saved);
         }
 
-        messageQueue.get(String(receiver)).push(payload);
+        socket.emit("receive_message", saved);
+      } catch (err) {
+        console.log(err);
+      }
+    });
+
+    /* TYPING */
+    socket.on("typing", ({ receiver }) => {
+      const receiverSocket = onlineUsers.get(receiver);
+      if (receiverSocket) {
+        io.to(receiverSocket).emit("typing");
+      }
+    });
+
+    socket.on("stop_typing", ({ receiver }) => {
+      const receiverSocket = onlineUsers.get(receiver);
+      if (receiverSocket) {
+        io.to(receiverSocket).emit("stop_typing");
+      }
+    });
+
+    /* MARK SEEN (FIXED) */
+    socket.on("mark_seen", async ({ chatId, userId }) => {
+      try {
+        await Message.updateMany(
+          { chatId, receiver: userId, seen: false },
+          { $set: { seen: true } }
+        );
+
+        io.emit("messages_seen", { chatId, userId });
+      } catch (err) {
+        console.log(err);
+      }
+    });
+
+    /* DISCONNECT */
+    socket.on("disconnect", () => {
+      for (const [userId, sockId] of onlineUsers.entries()) {
+        if (sockId === socket.id) {
+          onlineUsers.delete(userId);
+          break;
+        }
       }
 
-      /* SYNC SENDER */
-      if (senderSocketId) {
-        io.to(senderSocketId).emit("receive_message", payload);
-      }
-    } catch (err) {
-      console.error("❌ send_message error:", err);
-    }
+      io.emit("online_users", Array.from(onlineUsers.keys()));
+    });
   });
-
-  /* ================= TYPING ================= */
-  socket.on("typing", ({ sender, receiver }) => {
-    const receiverSocketId = onlineUsers.get(String(receiver));
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("typing", sender);
-    }
-  });
-
-  socket.on("stop_typing", ({ receiver }) => {
-    const receiverSocketId = onlineUsers.get(String(receiver));
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("stop_typing");
-    }
-  });
-
-  /* ================= MESSAGE SEEN ================= */
-  socket.on("message_seen", async ({ messageId, userId }) => {
-    try {
-      await Message.findByIdAndUpdate(messageId, {
-        seen: true,
-      });
-
-      const senderSocketId = onlineUsers.get(String(userId));
-
-      if (senderSocketId) {
-        io.to(senderSocketId).emit("message_seen", {
-          messageId,
-        });
-      }
-    } catch (err) {
-      console.error("❌ seen error:", err);
-    }
-  });
-
-  /* ================= DISCONNECT ================= */
-  socket.on("disconnect", () => {
-    const userId = socketToUser.get(socket.id);
-
-    if (userId) {
-      onlineUsers.delete(userId);
-      socketToUser.delete(socket.id);
-    }
-
-    io.emit("online_users", Array.from(onlineUsers.keys()));
-
-    console.log("❌ Disconnected:", socket.id);
-  });
-});
+};
 
 /* ================= MIDDLEWARE ================= */
 
