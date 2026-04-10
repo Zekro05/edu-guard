@@ -26,24 +26,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-// =========================
-// ✅ GET CHAT HISTORY
-// =========================
-router.get("/:chatId", async (req, res) => {
-  try {
-    const messages = await Message.find({
-      chatId: req.params.chatId,
-    }).sort({ createdAt: 1 });
-
-    res.json({ messages });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// =========================
-// ✅ GET CONVERSATIONS
-// =========================
 router.get("/conversations/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -82,5 +64,25 @@ router.get("/conversations/:userId", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+// =========================
+// ✅ GET CHAT HISTORY
+// =========================
+router.get("/:chatId", async (req, res) => {
+  try {
+    const messages = await Message.find({
+      chatId: req.params.chatId,
+    }).sort({ createdAt: 1 });
+
+    res.json({ messages });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// =========================
+// ✅ GET CONVERSATIONS
+// =========================
+
 
 export default router;
