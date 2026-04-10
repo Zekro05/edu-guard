@@ -3,14 +3,14 @@ import Message from "../models/message.js";
 
 const router = express.Router();
 
-// =========================
-// ✅ SEND MESSAGE
-// =========================
+/* SEND MESSAGE (REST fallback) */
 router.post("/", async (req, res) => {
   try {
-    const { chatId, sender, receiver, text, file } = req.body;
+    const { sender, receiver, text, file } = req.body;
 
-    const newMessage = new Message({
+    const chatId = [sender, receiver].sort().join("-");
+
+    const message = await Message.create({
       chatId,
       sender,
       receiver,
@@ -18,56 +18,13 @@ router.post("/", async (req, res) => {
       file,
     });
 
-    await newMessage.save();
-
-    res.status(201).json(newMessage);
+    res.status(201).json(message);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-router.get("/conversations/:userId", async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    const conversations = await Message.aggregate([
-      {
-        $match: {
-          $or: [{ sender: userId }, { receiver: userId }],
-        },
-      },
-      { $sort: { createdAt: -1 } },
-      {
-        $group: {
-          _id: "$chatId",
-          lastMessage: { $first: "$text" },
-          lastTime: { $first: "$createdAt" },
-          sender: { $first: "$sender" },
-          receiver: { $first: "$receiver" },
-        },
-      },
-      {
-        $project: {
-          conversationId: "$_id",
-          lastMessage: 1,
-          lastTime: 1,
-          sender: 1,
-          receiver: 1,
-          _id: 0,
-        },
-      },
-    ]);
-
-    res.json({ conversations });
-  } catch (err) {
-    console.log("Conversation Error:", err.message);
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// =========================
-// ✅ GET CHAT HISTORY
-// =========================
+/* GET CHAT HISTORY (FIXED RELIABLE QUERY) */
 router.get("/:chatId", async (req, res) => {
   try {
     const messages = await Message.find({
@@ -80,9 +37,42 @@ router.get("/:chatId", async (req, res) => {
   }
 });
 
-// =========================
-// ✅ GET CONVERSATIONS
-// =========================
+/* GET CONVERSATIONS */
+router.get("/conversations/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
 
+    const conversations = await Message.aggregate([
+      {
+        $match: {
+          $or: [
+            { sender: userId },
+            { receiver: userId }
+          ],
+        },
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: "$chatId",
+          lastMessage: { $first: "$text" },
+          lastTime: { $first: "$createdAt" },
+        },
+      },
+      {
+        $project: {
+          conversationId: "$_id",
+          lastMessage: 1,
+          lastTime: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    res.json({ conversations });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 export default router;
