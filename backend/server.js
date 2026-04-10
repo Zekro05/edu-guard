@@ -30,27 +30,60 @@ export const io = new Server(server, {
     origin: "*",
     methods: ["GET", "POST"],
   },
+  transports: ["websocket", "polling"],
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
-// 🔥 FIXED ONLINE USERS (SAFE MAP)
-const onlineUsers = new Map();
+/* ================= PRODUCTION SOCKET STORAGE ================= */
+
+const onlineUsers = new Map();      // userId → socketId
+const socketToUser = new Map();     // socketId → userId
+const messageQueue = new Map();     // userId → pending messages
+
+/* ================= SOCKET LOGIC ================= */
 
 io.on("connection", (socket) => {
   console.log("⚡ Connected:", socket.id);
 
-  /* REGISTER USER */
-  socket.on("register", (userId) => {
+  socket.isReady = false;
+
+  /* ================= REGISTER ================= */
+  socket.on("register", async (userId, callback) => {
     if (!userId) return;
 
-    onlineUsers.set(String(userId), socket.id);
+    const id = String(userId);
+
+    socket.userId = id;
+    socket.isReady = true;
+
+    onlineUsers.set(id, socket.id);
+    socketToUser.set(socket.id, id);
+
+    console.log("👤 REGISTERED:", id);
+
+    /* 🔥 DELIVER OFFLINE MESSAGES */
+    if (messageQueue.has(id)) {
+      const queued = messageQueue.get(id);
+
+      queued.forEach((msg) => {
+        socket.emit("receive_message", msg);
+      });
+
+      messageQueue.delete(id);
+    }
 
     io.emit("online_users", Array.from(onlineUsers.keys()));
+
+    if (callback) callback({ success: true, socketId: socket.id });
   });
 
-  /* SEND MESSAGE (FIXED REALTIME + DB SYNC) */
+  /* ================= SEND MESSAGE ================= */
   socket.on("send_message", async (data) => {
     try {
       const { sender, receiver, text, file } = data;
+
+      if (!socket.isReady) return;
 
       const chatId = [String(sender), String(receiver)].sort().join("-");
 
@@ -61,50 +94,84 @@ io.on("connection", (socket) => {
         text,
         file,
         seen: false,
+        delivered: false,
       });
 
-      const receiverSocket = onlineUsers.get(String(receiver));
-      const senderSocket = onlineUsers.get(String(sender));
+      const receiverSocketId = onlineUsers.get(String(receiver));
+      const senderSocketId = onlineUsers.get(String(sender));
 
-      // send to receiver
-      if (receiverSocket) {
-        io.to(receiverSocket).emit("receive_message", newMessage);
+      const payload = newMessage;
+
+      /* ================= DELIVER ================= */
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("receive_message", payload);
+
+        await Message.findByIdAndUpdate(newMessage._id, {
+          delivered: true,
+        });
+      } else {
+        /* OFFLINE QUEUE */
+        if (!messageQueue.has(String(receiver))) {
+          messageQueue.set(String(receiver), []);
+        }
+
+        messageQueue.get(String(receiver)).push(payload);
       }
 
-      // send to sender (sync)
-      if (senderSocket) {
-        io.to(senderSocket).emit("receive_message", newMessage);
+      /* SYNC SENDER */
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("receive_message", payload);
       }
     } catch (err) {
       console.error("❌ send_message error:", err);
     }
   });
 
-  /* TYPING */
+  /* ================= TYPING ================= */
   socket.on("typing", ({ sender, receiver }) => {
-    const receiverSocket = onlineUsers.get(String(receiver));
-    if (receiverSocket) {
-      io.to(receiverSocket).emit("typing", sender);
+    const receiverSocketId = onlineUsers.get(String(receiver));
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("typing", sender);
     }
   });
 
   socket.on("stop_typing", ({ receiver }) => {
-    const receiverSocket = onlineUsers.get(String(receiver));
-    if (receiverSocket) {
-      io.to(receiverSocket).emit("stop_typing");
+    const receiverSocketId = onlineUsers.get(String(receiver));
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("stop_typing");
     }
   });
 
-  /* DISCONNECT FIX */
-  socket.on("disconnect", () => {
-    for (let [userId, sockId] of onlineUsers.entries()) {
-      if (sockId === socket.id) {
-        onlineUsers.delete(userId);
-        break;
+  /* ================= MESSAGE SEEN ================= */
+  socket.on("message_seen", async ({ messageId, userId }) => {
+    try {
+      await Message.findByIdAndUpdate(messageId, {
+        seen: true,
+      });
+
+      const senderSocketId = onlineUsers.get(String(userId));
+
+      if (senderSocketId) {
+        io.to(senderSocketId).emit("message_seen", {
+          messageId,
+        });
       }
+    } catch (err) {
+      console.error("❌ seen error:", err);
+    }
+  });
+
+  /* ================= DISCONNECT ================= */
+  socket.on("disconnect", () => {
+    const userId = socketToUser.get(socket.id);
+
+    if (userId) {
+      onlineUsers.delete(userId);
+      socketToUser.delete(socket.id);
     }
 
     io.emit("online_users", Array.from(onlineUsers.keys()));
+
     console.log("❌ Disconnected:", socket.id);
   });
 });
@@ -122,6 +189,7 @@ app.use(
       "http://localhost:5174",
       "http://localhost:8081",
       "exp://localhost:8081",
+      "https://edu-guard-backend.onrender.com",
     ],
     credentials: true,
   })
