@@ -9,6 +9,7 @@ import incidentRoutes from "./routes/incidentRoutes.js";
 import reportRoutes from "./routes/reports.js";
 import historyRoutes from "./routes/historyRoutes.js";
 import geminiRoutes from "./routes/gemini.js";
+import userRoutes from "./routes/userRoutes.js";
 import path from "path";
 
 // 🔥 NEW
@@ -154,6 +155,7 @@ app.use("/api/students", studentRoutes);
 app.use("/api/incidents", incidentRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/history", historyRoutes);
+app.use("/api/users", userRoutes);
 app.use("/api/gemini", geminiRoutes);
 
 
