@@ -68,4 +68,16 @@ router.put("/:id/reject", async (req, res) => {
   res.json(report);
 });
 
+router.get("/my", async (req, res) => {
+  try {
+    const reports = await Report.find({
+      reporterId: req.user._id,
+    }).sort({ createdAt: -1 });
+
+    res.json(reports);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 export default router;

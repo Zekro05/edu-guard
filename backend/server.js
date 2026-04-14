@@ -17,6 +17,8 @@ import geminiRoutes from "./routes/gemini.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import { User } from "./models/userModel.js";
 
+
+
 dotenv.config();
 
 const app = express();
@@ -31,6 +33,7 @@ export const io = new Server(server, {
     methods: ["GET", "POST"],
   },
   transports: ["websocket", "polling"],
+  allowEIO3: true,
   pingTimeout: 60000,
   pingInterval: 25000,
 });
@@ -55,20 +58,28 @@ export const socketHandler = (io) => {
 
     /* SEND MESSAGE */
     socket.on("send_message", async (msg) => {
-      try {
-        const saved = await Message.create(msg);
-
-        const receiverSocket = onlineUsers.get(msg.receiver);
-
-        if (receiverSocket) {
-          io.to(receiverSocket).emit("receive_message", saved);
-        }
-
-        socket.emit("receive_message", saved);
-      } catch (err) {
-        console.log(err);
-      }
+      console.log("MSG RECEIVED:", msg);
+  try {
+    const saved = await Message.create({
+      chatId: msg.chatId,
+      sender: msg.sender,
+      receiver: msg.receiver,
+      text: msg.text,
+      file: msg.file || null,
+      seen: false,
     });
+
+    const receiverSocket = onlineUsers.get(msg.receiver);
+
+    if (receiverSocket) {
+      io.to(receiverSocket).emit("receive_message", saved);
+    }
+
+    socket.emit("receive_message", saved);
+  } catch (err) {
+    console.log("SEND MESSAGE ERROR:", err);
+  }
+});
 
     /* TYPING */
     socket.on("typing", ({ receiver }) => {
