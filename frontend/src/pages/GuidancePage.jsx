@@ -44,7 +44,7 @@ const GuidancePage = () => {
 
   // load users
   useEffect(() => {
-    fetch("http://localhost:5000/api/users")
+    fetch("https://edu-guard-backend.onrender.com/api/users")
       .then(res => res.json())
       .then(data =>
         setConversations(Array.isArray(data) ? data.filter(u => u._id !== user._id) : [])
