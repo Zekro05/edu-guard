@@ -56,6 +56,7 @@ const GuidancePage = () => {
     if (!user?._id) return;
 
     socketRef.current = io("https://edu-guard-backend.onrender.com", {
+  path: "/socket.io",
   transports: ["websocket", "polling"],
 });
     socketRef.current.emit("register", user._id);
@@ -99,23 +100,15 @@ const GuidancePage = () => {
   const loadMessages = async (conv) => {
   setActiveChat(conv);
 
+  const chatId = [user._id, conv._id].sort().join("-");
+
   const res = await fetch(
-    `https://edu-guard-backend.onrender.com/api/messages/${getChatId(conv._id)}`
+    `https://edu-guard-backend.onrender.com/api/messages/${chatId}`
   );
 
   const data = await res.json();
 
-  setMessages(data?.messages || []);
-
-  socketRef.current.emit("mark_seen", {
-    chatId: getChatId(conv._id),
-    userId: user._id,
-  });
-
-  setUnreadCounts((prev) => ({
-    ...prev,
-    [conv._id]: 0,
-  }));
+  setMessages(data.messages || []);
 };
 
   // typing FIX ONLY
@@ -144,16 +137,17 @@ const GuidancePage = () => {
   if (!input.trim() || !activeChat) return;
 
   const msg = {
-    chatId: getChatId(activeChat._id),
     sender: user._id,
     receiver: activeChat._id,
     text: input,
-    seen: false,
   };
 
-  socketRef.current.emit("send_message", msg);
 
-  setMessages((prev) => [...prev, msg]);
+  socketRef.current.emit("send_message", msg, (savedMsg) => {
+    // THIS is the REAL saved DB message
+    setMessages((prev) => [...prev, savedMsg]);
+    console.log("💾 SAVED MESSAGE:", saved);
+  });
 
   setInput("");
 };

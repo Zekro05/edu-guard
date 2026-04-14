@@ -32,6 +32,8 @@ export const io = new Server(server, {
     origin: "*",
     methods: ["GET", "POST"],
   },
+
+  path: "/socket.io",
   transports: ["websocket", "polling"],
   pingTimeout: 60000,
   pingInterval: 25000,
@@ -50,6 +52,7 @@ io.on("connection", (socket) => {
 
   /* REGISTER USER */
   socket.on("register", (userId) => {
+    
     if (!userId) return;
 
     onlineUsers.set(userId, socket.id);
@@ -60,7 +63,7 @@ io.on("connection", (socket) => {
   });
 
   /* SEND MESSAGE (REALTIME + DB SAVE) */
-  socket.on("send_message", async (msg) => {
+ socket.on("send_message", async (msg, callback) => {
   try {
     const chatId = [msg.sender, msg.receiver].sort().join("-");
 
@@ -69,31 +72,24 @@ io.on("connection", (socket) => {
       sender: msg.sender,
       receiver: msg.receiver,
       text: msg.text,
-      status: "sent",
       seen: false,
     });
 
-    const formatted = saved.toObject();
-
     const receiverSocket = onlineUsers.get(msg.receiver);
 
-    // 👉 DELIVERED (receiver online)
+    // send to receiver in real-time
     if (receiverSocket) {
-      formatted.status = "delivered";
-
-      io.to(receiverSocket).emit("receive_message", formatted);
-
-      // also update DB
-      await Message.findByIdAndUpdate(saved._id, {
-        status: "delivered",
-      });
+      io.to(receiverSocket).emit("receive_message", saved);
     }
 
-    // 👉 send back to sender (sent/delivered update)
-    socket.emit("receive_message", formatted);
+    // also send back to sender
+    socket.emit("receive_message", saved);
+
+    // IMPORTANT: return saved message to frontend callback
+    if (callback) callback(saved);
 
   } catch (err) {
-    console.log(err.message);
+    console.log("SEND MESSAGE ERROR:", err);
   }
 });
 
@@ -178,6 +174,17 @@ app.get("/api/users", async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+});
+
+app.get("/test-db", async (req, res) => {
+  const msg = await Message.create({
+    chatId: "test",
+    sender: "a",
+    receiver: "b",
+    text: "hello",
+  });
+
+  res.json(msg);
 });
 
 /* ================= START SERVER ================= */
