@@ -52,6 +52,7 @@ export const socketHandler = (io) => {
 
     /* REGISTER USER */
     socket.on("register", (userId) => {
+      console.log("Registered:", userId);
       onlineUsers.set(userId, socket.id);
       io.emit("online_users", Array.from(onlineUsers.keys()));
     });

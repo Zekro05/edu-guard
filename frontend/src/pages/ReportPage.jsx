@@ -9,14 +9,20 @@ import IncidentReport from "../components/tabs/IncidentReport";
 import ComplaintReport from "../components/tabs/ComplaintReport";
 import Overview from "../components/tabs/Overview";
 import AIPredictions from "../components/tabs/AIPredictions";
-import { ChartNoAxesCombined, LayoutDashboard, Settings, ShieldX, Users } from "lucide-react";
+import {
+  ChartNoAxesCombined,
+  LayoutDashboard,
+  Settings,
+  ShieldX,
+  Users,
+} from "lucide-react";
 
-// Socket.io
 const socket = io("http://localhost:5000");
 
 const ReportPage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+
   const [activeTab, setActiveTab] = useState("mobile");
 
   const [reports, setReports] = useState([]);
@@ -25,11 +31,12 @@ const ReportPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  const fetchReports = async () => {
+  // ===== FETCH REPORTS (STABLE) =====
+  const fetchReports = async (customSearch = search, customPage = page) => {
     setLoading(true);
     try {
       const res = await axios.get(
-        `http://localhost:5000/api/reports?status=pending&page=${page}&limit=5&search=${search}`
+        `http://localhost:5000/api/reports?status=pending&page=${customPage}&limit=5&search=${customSearch}`
       );
       setReports(res.data.reports);
       setTotalPages(res.data.totalPages);
@@ -40,22 +47,40 @@ const ReportPage = () => {
     }
   };
 
+  // fetch only when page changes
   useEffect(() => {
     fetchReports();
-  }, [page, search]);
+  }, [page]);
 
+  // debounce search (prevents UI reset spam)
   useEffect(() => {
-    socket.on("new-report", fetchReports);
-    socket.on("update-report", fetchReports);
+    const delay = setTimeout(() => {
+      setPage(1);
+      fetchReports(search, 1);
+    }, 300);
+
+    return () => clearTimeout(delay);
+  }, [search]);
+
+  // socket (stable)
+  useEffect(() => {
+    const handler = () => fetchReports();
+
+    socket.on("new-report", handler);
+    socket.on("update-report", handler);
+
     return () => {
-      socket.off("new-report");
-      socket.off("update-report");
+      socket.off("new-report", handler);
+      socket.off("update-report", handler);
     };
   }, []);
 
+  // ===== ACTIONS =====
   const handleAccept = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/reports/${id}/accept`);
+      await axios.put(
+        `http://localhost:5000/api/reports/${id}/accept`
+      );
       fetchReports();
     } catch (err) {
       console.error(err);
@@ -64,7 +89,9 @@ const ReportPage = () => {
 
   const handleReject = async (id) => {
     try {
-      await axios.put(`http://localhost:5000/api/reports/${id}/reject`);
+      await axios.put(
+        `http://localhost:5000/api/reports/${id}/reject`
+      );
       fetchReports();
     } catch (err) {
       console.error(err);
@@ -73,9 +100,11 @@ const ReportPage = () => {
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-gray-900 via-green-900 to-emerald-900 flex flex-col">
+
       {/* TOP BAR */}
       <header className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 sm:px-8 py-4 flex justify-between items-center shadow-lg">
         <h1 className="text-2xl font-bold">EduGuard</h1>
+
         <div className="flex items-center gap-4">
           <div className="text-right text-sm hidden sm:block">
             <p className="font-semibold">{user?.name || "Admin"}</p>
@@ -83,9 +112,10 @@ const ReportPage = () => {
               Our Lady of the Holy Rosary - General Trias Cavite
             </p>
           </div>
+
           <button
             onClick={logout}
-            className="bg-white text-green-700 px-4 py-2 rounded-md shadow hover:bg-gray-100 hover:scale-105 transition-all duration-200"
+            className="bg-white text-green-700 px-4 py-2 rounded-md shadow hover:bg-gray-100"
           >
             Logout
           </button>
@@ -95,48 +125,46 @@ const ReportPage = () => {
       {/* MAIN NAV */}
       <div className="mt-6 px-4 sm:px-8">
         <div className="bg-white rounded-2xl border flex flex-wrap justify-around items-center py-3 gap-3 shadow-sm">
-          <button onClick={() => navigate("/dashboard")} className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 flex items-center justify-center">
-            <LayoutDashboard className="mr-2" />Dashboard
-          </button>
-          <button onClick={() => navigate("/students")} className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 flex items-center justify-center">
-            <Users className="mr-2"/>Students
-          </button>
-          <button onClick={() => navigate("/guidance")} className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 flex items-center justify-center">
-            <ShieldX className="mr-2" />Guidance
-          </button>
-          <button className="px-4 py-2 rounded-lg font-semibold bg-green-100 text-green-700 flex items-center justify-center">
-            <ChartNoAxesCombined className="mr-2"/> Reports
-          </button>
-          <button onClick={() => navigate("/settings")} className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 flex items-center justify-center">
-           <Settings className="mr-2"/> Settings
-          </button>
-        </div>
-      </div>
 
-      {/* HEADER CARD */}
-      <div className="mt-6 px-4 sm:px-8">
-        <div className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-2xl p-6 shadow-md">
-          <h2 className="text-2xl sm:text-3xl font-semibold">Reports & Analytics</h2>
-          <p className="text-sm opacity-90 mt-1">
-            Document student discipline incidents, analyze trends, and AI predictions.
-          </p>
+          <button onClick={() => navigate("/dashboard")} className="flex items-center px-4 py-2 hover:bg-gray-100 rounded-lg">
+            <LayoutDashboard className="mr-2" /> Dashboard
+          </button>
+
+          <button onClick={() => navigate("/students")} className="flex items-center px-4 py-2 hover:bg-gray-100 rounded-lg">
+            <Users className="mr-2" /> Students
+          </button>
+
+          <button onClick={() => navigate("/guidance")} className="flex items-center px-4 py-2 hover:bg-gray-100 rounded-lg">
+            <ShieldX className="mr-2" /> Guidance
+          </button>
+
+          <button className="flex items-center px-4 py-2 bg-green-100 text-green-700 rounded-lg font-semibold">
+            <ChartNoAxesCombined className="mr-2" /> Reports
+          </button>
+
+          <button onClick={() => navigate("/settings")} className="flex items-center px-4 py-2 hover:bg-gray-100 rounded-lg">
+            <Settings className="mr-2" /> Settings
+          </button>
         </div>
       </div>
 
       {/* SUB NAV */}
       <div className="mt-6 px-4 sm:px-8">
         <div className="bg-white rounded-2xl border p-2 flex flex-wrap gap-2 shadow-sm">
+
           <SubTab label="Mobile Pending" active={activeTab === "mobile"} onClick={() => setActiveTab("mobile")} />
           <SubTab label="Incident Reports" active={activeTab === "incident"} onClick={() => setActiveTab("incident")} />
           <SubTab label="Complaint Reports" active={activeTab === "complaint"} onClick={() => setActiveTab("complaint")} />
           <SubTab label="Overview" active={activeTab === "overview"} onClick={() => setActiveTab("overview")} />
           <SubTab label="AI Predictions" active={activeTab === "ai"} onClick={() => setActiveTab("ai")} />
+
         </div>
       </div>
 
-      {/* TAB CONTENT */}
-      <main className="flex-1 px-4 sm:px-8 py-6 flex flex-col gap-6">
-        <div className="bg-white rounded-2xl border p-6 shadow-sm flex-1">
+      {/* CONTENT */}
+      <main className="flex-1 px-4 sm:px-8 py-6">
+        <div className="bg-white rounded-2xl border p-6 shadow-sm">
+
           {activeTab === "mobile" && (
             <>
               <input
@@ -146,30 +174,52 @@ const ReportPage = () => {
                 onChange={(e) => setSearch(e.target.value)}
                 className="border p-2 rounded w-full mb-4"
               />
+
               {loading ? (
                 <p>Loading...</p>
               ) : reports.length ? (
                 <div className="grid gap-4">
                   {reports.map((report) => (
-                    <MobileReport key={report._id} report={report} onAccept={handleAccept} onReject={handleReject} />
+                    <MobileReport
+                      key={report._id}
+                      report={report}
+                      onAccept={handleAccept}
+                      onReject={handleReject}
+                    />
                   ))}
                 </div>
               ) : (
-                <p className="text-center text-gray-500">No reports found</p>
+                <p className="text-center text-gray-500">
+                  No reports found
+                </p>
               )}
 
               {/* PAGINATION */}
               <div className="flex gap-3 mt-6">
-                <button onClick={() => setPage(page - 1)} disabled={page === 1}>Prev</button>
+                <button
+                  onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                  disabled={page === 1}
+                >
+                  Prev
+                </button>
+
                 <span>{page} / {totalPages}</span>
-                <button onClick={() => setPage(page + 1)} disabled={page === totalPages}>Next</button>
+
+                <button
+                  onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+                  disabled={page === totalPages}
+                >
+                  Next
+                </button>
               </div>
             </>
           )}
+
           {activeTab === "incident" && <IncidentReport />}
           {activeTab === "complaint" && <ComplaintReport />}
           {activeTab === "overview" && <Overview />}
           {activeTab === "ai" && <AIPredictions />}
+
         </div>
       </main>
     </div>
@@ -178,10 +228,15 @@ const ReportPage = () => {
 
 export default ReportPage;
 
+// ===== SUB TAB =====
 const SubTab = ({ label, active, onClick }) => (
   <button
     onClick={onClick}
-    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${active ? "bg-green-100 text-green-700 shadow-inner" : "text-gray-600 hover:bg-gray-100"}`}
+    className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+      active
+        ? "bg-green-100 text-green-700 shadow-inner"
+        : "text-gray-600 hover:bg-gray-100"
+    }`}
   >
     {label}
   </button>

@@ -5,6 +5,7 @@ import {
   createStudent,
   updateStudent,
   deleteStudent,
+  searchStudents,
 } from "../controllers/studentController.js";
 import { upload } from "../middleware/upload.js";
 
@@ -15,6 +16,7 @@ router.get("/", verifyToken, getStudents);
 router.post("/", verifyToken, upload.single("profilePhoto"), createStudent);
 router.put("/:id", verifyToken, upload.single("profilePhoto"), updateStudent);
 router.delete("/:id", verifyToken, deleteStudent);
+router.get("/search", searchStudents);
 
 
 export default router;

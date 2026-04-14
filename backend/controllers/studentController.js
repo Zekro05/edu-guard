@@ -107,3 +107,21 @@ export const deleteStudent = async (req, res) => {
     res.status(500).json({ message: "Failed to delete student" });
   }
 };
+
+export const searchStudents = async (req, res) => {
+  try {
+    const { query } = req.query;
+
+    if (!query) return res.json([]);
+
+    const students = await Student.find({
+      fullname: { $regex: query, $options: "i" },
+    })
+      .select("_id fullname")
+      .limit(10);
+
+    res.json(students);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
