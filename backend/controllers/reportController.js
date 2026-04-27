@@ -14,18 +14,30 @@ export const getReportsByType = async (req, res) => {
 
 // CREATE a new report
 export const createReport = async (req, res) => {
-  const { type, studentName, offenseType, location, description, date, time } = req.body;
   try {
-    const newReport = new Report({
-      type,
+    const {
+      studentId,
       studentName,
-      offenseType,
+      offense,
       location,
       description,
       date,
       time,
-      createdBy: req.user?._id || null, // use null if no auth middleware yet
+      reporter,
+    } = req.body;
+
+    const newReport = new Report({
+      studentId,
+      studentName,
+      offense,
+      location,
+      description,
+      date,
+      time,
+      reporter,
+      reporterId: req.userId,
     });
+
     const savedReport = await newReport.save();
     res.status(201).json(savedReport);
   } catch (err) {
@@ -47,22 +59,21 @@ export const deleteReport = async (req, res) => {
 export const getMyReports = async (req, res) => {
   try {
     const userId = req.userId;
-    const role = req.role;
 
-    if (!userId) {
-      return res.status(401).json({ message: "Unauthorized" });
+    const student = await Student.findOne({ createdBy: userId });
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
     }
 
-    if (role !== "student") {
-      return res.status(403).json({ message: "Access denied" });
-    }
-
-    const reports = await Report.find({ studentId: userId })
-      .sort({ createdAt: -1 });
+    const reports = await Report.find({
+      studentId: student._id,
+    }).sort({ createdAt: -1 });
 
     res.status(200).json(reports);
   } catch (err) {
     console.error("Get My Reports Error:", err);
     res.status(500).json({ message: "Server error" });
   }
+
 };

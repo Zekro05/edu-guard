@@ -68,10 +68,12 @@ router.put("/:id/reject", async (req, res) => {
   res.json(report);
 });
 
-router.get("/my", protect, async (req, res) => {
+router.get("/my", verifyToken, async (req, res) => {
   try {
+    const student = await Student.findOne({ email: req.user.email });
+
     const reports = await Report.find({
-      reporterId: req.user._id,
+      studentId: student._id,
     }).sort({ createdAt: -1 });
 
     res.json(reports);
