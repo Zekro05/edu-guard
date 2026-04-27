@@ -30,6 +30,12 @@ export const createStudent = async (req, res) => {
 
     await student.save();
 
+    io.emit("activity_feed", {
+  type: "student",
+  message: `👤 New student added: ${student.name}`,
+  time: new Date(),
+});
+
     res.status(201).json(student);
   } catch (error) {
     console.error("CREATE STUDENT ERROR:", error);

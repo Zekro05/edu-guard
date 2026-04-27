@@ -16,6 +16,7 @@ import reportRoutes from "./routes/reports.js";
 import historyRoutes from "./routes/historyRoutes.js";
 import geminiRoutes from "./routes/gemini.js";
 import messageRoutes from "./routes/messageRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 import { User } from "./models/userModel.js";
 
@@ -25,132 +26,33 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 
-/* ================= SOCKET.IO ================= */
-
-export const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"],
-  },
-
-  path: "/socket.io",
-  transports: ["websocket", "polling"],
-  pingTimeout: 60000,
-  pingInterval: 25000,
-});
-
-/* ================= ONLINE USERS ================= */
-
-const onlineUsers = new Map(); // userId -> socketId
-
-const getChatId = (a, b) => [a, b].sort().join("-");
-
-/* ================= SOCKET LOGIC ================= */
-
-io.on("connection", (socket) => {
-  console.log("🟢 Connected:", socket.id);
-
-  /* REGISTER USER */
-  socket.on("register", (userId) => {
-    
-    if (!userId) return;
-
-    onlineUsers.set(userId, socket.id);
-
-    console.log("👤 REGISTER:", userId);
-
-    io.emit("online_users", Array.from(onlineUsers.keys()));
-  });
-
-  /* SEND MESSAGE (REALTIME + DB SAVE) */
- socket.on("send_message", async (msg, callback) => {
-  try {
-    const chatId = [msg.sender, msg.receiver].sort().join("-");
-
-    const saved = await Message.create({
-      chatId,
-      sender: msg.sender,
-      receiver: msg.receiver,
-      text: msg.text,
-      seen: false,
-    });
-
-    const receiverSocket = onlineUsers.get(msg.receiver);
-
-    // send to receiver in real-time
-    if (receiverSocket) {
-      io.to(receiverSocket).emit("receive_message", saved);
-    }
-
-    // also send back to sender
-    socket.emit("receive_message", saved);
-
-    // IMPORTANT: return saved message to frontend callback
-    if (callback) callback(saved);
-
-  } catch (err) {
-    console.log("SEND MESSAGE ERROR:", err);
-  }
-});
-
-  /* TYPING */
-  socket.on("typing", ({ sender, receiver }) => {
-    const receiverSocket = onlineUsers.get(receiver);
-
-    if (receiverSocket) {
-      io.to(receiverSocket).emit("typing", { sender });
-    }
-  });
-
-  socket.on("stop_typing", ({ sender, receiver }) => {
-    const receiverSocket = onlineUsers.get(receiver);
-
-    if (receiverSocket) {
-      io.to(receiverSocket).emit("stop_typing", { sender });
-    }
-  });
-
-  /* SEEN MESSAGES */
-  socket.on("mark_seen", async ({ chatId, userId }) => {
-  await Message.updateMany(
-    { chatId, receiver: userId },
-    { status: "seen", seen: true }
-  );
-
-  io.emit("messages_seen", { chatId, userId });
-});
-
-  /* DISCONNECT */
-  socket.on("disconnect", () => {
-    for (const [userId, sockId] of onlineUsers.entries()) {
-      if (sockId === socket.id) {
-        onlineUsers.delete(userId);
-        break;
-      }
-    }
-
-    io.emit("online_users", Array.from(onlineUsers.keys()));
-
-    console.log("🔴 Disconnected:", socket.id);
-  });
-});
-
 /* ================= MIDDLEWARE ================= */
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:8081",
+  "exp://localhost:8081",
+  "https://edu-guard-backend.onrender.com",
+];
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:5174",
-      "http://localhost:8081",
-      "exp://localhost:8081",
-      "https://edu-guard-backend.onrender.com",
-    ],
-    credentials: true,
+    origin: function (origin, callback) {
+      // allow requests with no origin (like mobile apps / postman)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true, // 🔥 REQUIRED FOR COOKIES
   })
 );
 
@@ -163,6 +65,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/history", historyRoutes);
 app.use("/api/gemini", geminiRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
@@ -176,16 +79,93 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
-app.get("/test-db", async (req, res) => {
-  const msg = await Message.create({
-    chatId: "test",
-    sender: "a",
-    receiver: "b",
-    text: "hello",
+/* ================= SOCKET.IO ================= */
+
+export const io = new Server(server, {
+  cors: {
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:5174",
+    ],
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
+
+/* ================= ONLINE USERS ================= */
+
+const onlineUsers = new Map();
+
+/* ================= SOCKET LOGIC ================= */
+
+io.on("connection", (socket) => {
+  console.log("🟢 Connected:", socket.id);
+
+  socket.onAny((event, data) => {
+    console.log("📥 EVENT:", event, data);
   });
 
-  res.json(msg);
+
+  socket.on("register", (userId) => {
+    if (!userId) return;
+    onlineUsers.set(userId, socket.id);
+    io.emit("online_users", Array.from(onlineUsers.keys()));
+  });
+
+  socket.on("send_message", async (msg, callback) => {
+  try {
+    const chatId = [msg.sender, msg.receiver].sort().join("-");
+
+    const saved = await Message.create({
+      chatId,
+      sender: msg.sender,
+      receiver: msg.receiver,
+      text: msg.text,
+      seen: false,
+    });
+
+    const receiverSocket = onlineUsers.get(msg.receiver);
+
+    if (receiverSocket) {
+      io.to(receiverSocket).emit("receive_message", saved);
+    }
+
+    socket.emit("receive_message", saved);
+
+    console.log("📩 SOCKET send_message HIT:", msg);
+
+
+    /* 🔥 THIS IS WHAT YOU ARE MISSING */
+    io.emit("activity_feed", {
+      type: "message",
+      message: `💬 New message from ${msg.sender}`,
+      time: new Date(),
+    });
+
+    console.log("🚀 activity_feed EMITTED");
+
+    if (callback) callback(saved);
+  } catch (err) {
+    console.log(err);
+  }
 });
+
+  
+
+  socket.on("disconnect", () => {
+    for (const [userId, sockId] of onlineUsers.entries()) {
+      if (sockId === socket.id) {
+        onlineUsers.delete(userId);
+        break;
+      }
+    }
+
+    io.emit("online_users", Array.from(onlineUsers.keys()));
+    console.log("🔴 Disconnected:", socket.id);
+  });
+});
+
+
 
 /* ================= START SERVER ================= */
 

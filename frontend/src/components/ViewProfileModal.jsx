@@ -1,235 +1,308 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
 import RiskBadge from "./RiskBadge";
 import { API } from "../store/authStore";
 
 const ViewProfileModal = ({ student, close }) => {
   const [tab, setTab] = useState("history");
   const [incidents, setIncidents] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [ai, setAi] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // AI states
-  const [aiAnalysis, setAiAnalysis] = useState(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState(null);
-  const aiGeneratedRef = useRef(false);
+  /* ESC CLOSE */
+  useEffect(() => {
+    const esc = (e) => e.key === "Escape" && close();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [close]);
 
-  /* ---------------- FETCH INCIDENTS ---------------- */
+  /* FETCH INCIDENTS */
   useEffect(() => {
     if (!student) return;
-    setLoading(true);
+
     API.get(`/api/incidents?studentId=${student._id}`)
       .then((res) => setIncidents(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch(console.error);
   }, [student]);
 
-  /* ---------------- GEMINI AI ANALYSIS ---------------- */
+  /* AI ANALYSIS (DEEP VERSION) */
   useEffect(() => {
-    if (tab !== "analysis" || aiGeneratedRef.current || !student || loading)
+    if (tab !== "analysis") return;
+
+    setAi(null);
+
+    if (!incidents.length) {
+      setAi({
+        summary:
+          "No recorded behavioral incidents. Student is currently stable with no disciplinary concerns.",
+        pattern:
+          "No observable negative or positive behavioral patterns detected due to lack of data.",
+        risk: "Low risk profile due to absence of incidents.",
+        prediction:
+          "Student is expected to maintain stable behavior if current conditions remain unchanged.",
+        interventions: [
+          "Continue standard monitoring",
+          "Encourage positive reinforcement",
+          "Maintain regular check-ins",
+          "No intervention required at this time",
+          "Promote engagement in academic activities",
+        ],
+        notes:
+          "Student currently does not require intervention. Maintain preventive guidance approach.",
+      });
       return;
+    }
 
-    aiGeneratedRef.current = true;
-    setAiLoading(true);
-    setAiError(null);
-
-    const fetchAI = async () => {
+    const runAI = async () => {
       try {
+        setLoading(true);
+
         const prompt = `
-You are an AI-assisted school behavioral analysis system.
-Analyze the student's behavior using the provided incidents.
-Return your response strictly in the following format:
+You are an advanced School Behavioral Intelligence AI.
 
-Pattern Recognition:
-<short paragraph>
+Return ONLY valid JSON.
 
-Repeat Offense Prediction:
-<percentage likelihood + explanation>
+{
+  "summary": "2-4 sentence overview",
+  "pattern": "deep behavioral pattern analysis",
+  "risk": "risk assessment with reasoning",
+  "prediction": "future behavior outlook",
+  "interventions": ["step 1", "step 2", "step 3", "step 4", "step 5"],
+  "notes": "professional counselor guidance"
+}
 
-Recommended Interventions:
-- <bullet 1>
-- <bullet 2>
-- <bullet 3>
-- <bullet 4>
-
-Student Information:
-Name: ${student.firstName} ${student.lastName}
+Student:
+${student.firstName} ${student.lastName}
 Grade: ${student.grade}
+Risk: ${student.riskLevel}
 
-Incident Records:
-${JSON.stringify(incidents, null, 2)}
-        `;
+Incidents:
+${incidents.map(i => `- ${i.title} | ${i.level} | ${i.date}`).join("\n")}
+`;
+
         const res = await API.post("/api/gemini/generate", { prompt });
-        const text = res.data.text;
-        if (!text) throw new Error("No AI output received");
 
-        const extractSection = (label) => {
-          const regex = new RegExp(
-            `${label}:([\\s\\S]*?)(?=\\n[A-Z][A-Za-z ]+:|$)`
-          );
-          return text.match(regex)?.[1]?.trim() || "N/A";
-        };
+        let raw = res.data.text || "";
 
-        setAiAnalysis({
-          pattern: extractSection("Pattern Recognition"),
-          prediction: extractSection("Repeat Offense Prediction"),
-          interventions: extractSection("Recommended Interventions"),
+        // clean markdown if Gemini adds it
+        raw = raw.replace(/```json/g, "").replace(/```/g, "").trim();
+
+        const parsed = JSON.parse(raw);
+
+        setAi({
+          summary: parsed.summary || "",
+          pattern: parsed.pattern || "",
+          risk: parsed.risk || "",
+          prediction: parsed.prediction || "",
+          interventions: parsed.interventions || [],
+          notes: parsed.notes || "",
         });
       } catch (err) {
-        console.error("AI Analysis Error:", err);
-        setAiError("Failed to generate AI analysis.");
+        console.error("AI Error:", err);
+
+        setAi({
+          summary: "AI analysis failed to generate properly.",
+          pattern: "Unable to analyze patterns.",
+          risk: "Unknown risk level due to system error.",
+          prediction: "Unavailable.",
+          interventions: [
+            "Check backend Gemini API",
+            "Ensure valid JSON response format",
+          ],
+          notes: "System error occurred during AI processing.",
+        });
       } finally {
-        setAiLoading(false);
+        setLoading(false);
       }
     };
 
-    fetchAI();
-  }, [tab, student, incidents, loading]);
-
-  useEffect(() => {
-    aiGeneratedRef.current = false;
-    setAiAnalysis(null);
-    setAiError(null);
-  }, [student]);
+    runAI();
+  }, [tab, student, incidents]);
 
   if (!student) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/20 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden">
+    <AnimatePresence>
+      {/* BACKDROP */}
+      <motion.div
+        onClick={close}
+        className="fixed inset-0 bg-black/70 backdrop-blur-xl flex items-center justify-center p-4 z-50"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        {/* MODAL */}
+        <motion.div
+          onClick={(e) => e.stopPropagation()}
+          initial={{ scale: 0.9, y: 40 }}
+          animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.9 }}
+          className="relative w-full max-w-5xl bg-white/10 border border-white/10 rounded-3xl overflow-hidden text-white shadow-2xl"
+        >
+          {/* CLOSE */}
+          <button
+            onClick={close}
+            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-red-500/30 rounded-full"
+          >
+            <X size={18} />
+          </button>
 
-        {/* HEADER */}
-        <div className="px-6 py-5 bg-gradient-to-r from-green-800 to-green-900 flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-semibold text-white">
-              {student.firstName} {student.lastName}
-            </h2>
-            <p className="text-sm text-white/80">{student.grade || "Grade N/A"}</p>
-          </div>
-          <button onClick={close} className="text-white text-2xl">✕</button>
-        </div>
-
-        {/* TABS */}
-        <div className="flex border-b bg-gray-50">
-          {["history", "analysis"].map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`flex-1 py-3 font-medium ${
-                tab === t
-                  ? "border-b-2 border-green-600 text-green-700"
-                  : "text-gray-500 hover:text-green-600"
-              }`}
-            >
-              {t === "history" ? "Incident History" : "AI Analysis"}
-            </button>
-          ))}
-        </div>
-
-        {/* CONTENT */}
-        <div className="px-6 py-6 max-h-[70vh] overflow-y-auto">
-          {tab === "history" ? (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-                {[{
-                  label: "Total Incidents",
-                  value: student.totalIncidents || incidents.length,
-                }, {
-                  label: "Risk Level",
-                  value: student.riskLevel || "Low",
-                  isBadge: true,
-                }, {
-                  label: "Status", value: "Active"
-                }].map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-white rounded-2xl shadow hover:shadow-md transition-shadow p-5 text-center"
-                  >
-                    <p className="text-sm text-gray-500">{item.label}</p>
-                    {item.isBadge ? (
-                      <div className="mt-2 flex justify-center">
-                        <RiskBadge level={item.value} />
-                      </div>
-                    ) : (
-                      <p className="text-xl font-semibold mt-2">{item.value}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {loading ? (
-                <p className="text-center text-gray-400">Loading incidents...</p>
-              ) : incidents.length === 0 ? (
-                <p className="text-center text-gray-400">No incidents recorded.</p>
+          {/* HEADER */}
+          <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-6 flex items-center gap-5">
+            <div className="w-20 h-20 rounded-full overflow-hidden bg-white/20 border border-white/30 flex items-center justify-center">
+              {student.profilePhoto ? (
+                <img
+                  src={student.profilePhoto}
+                  className="w-full h-full object-cover"
+                />
               ) : (
-                <div className="space-y-4">
-                  {incidents.map((i, idx) => (
-                    <div
-                      key={idx}
-                      className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white border border-gray-100 rounded-2xl shadow hover:shadow-md transition-shadow p-5"
-                    >
-                      <div className="flex-1">
-                        <p className="text-lg font-semibold text-gray-800 mb-1">{i.title}</p>
-                        <p className="text-sm text-gray-500">{i.date} • {i.category}</p>
-                      </div>
-                      <span
-                        className={`mt-3 sm:mt-0 inline-block px-4 py-1.5 text-sm font-medium rounded-full ${
-                          i.level === "High"
-                            ? "bg-red-100 text-red-700"
-                            : i.level === "Medium"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-green-100 text-green-700"
-                        }`}
-                      >
-                        {i.level}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <span className="text-2xl font-bold">
+                  {student.firstName?.[0]}
+                </span>
               )}
-            </>
-          ) : (
-            <>
-              {aiLoading && <p className="text-center text-gray-400">Generating AI analysis...</p>}
-              {aiError && <p className="text-center text-red-500">{aiError}</p>}
-              {aiAnalysis && (
-                <div className="space-y-4">
-                  <div className="border rounded-xl p-4 bg-pink-50 border-pink-200">
-                    <h3 className="font-semibold mb-3">AI-Assisted Behavioral Analysis</h3>
+            </div>
 
-                    <div className="mb-3">
-                      <p className="font-medium">Pattern Recognition</p>
-                      <p className="text-sm text-gray-700">{aiAnalysis.pattern}</p>
-                    </div>
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold">
+                {student.firstName} {student.lastName}
+              </h2>
+              <p className="text-white/80 text-sm">
+                Grade {student.grade} • {student.studentId}
+              </p>
+            </div>
 
-                    <div className="mb-3">
-                      <p className="font-medium">Repeat Offense Prediction</p>
-                      <p className="text-sm text-gray-700">{aiAnalysis.prediction}</p>
-                    </div>
+            <div className="bg-white/10 px-4 py-2 rounded-xl">
+              <RiskBadge level={student.riskLevel} />
+            </div>
+          </div>
 
-                    <div>
-                      <p className="font-medium">Recommended Interventions</p>
-                      <ul className="list-disc ml-5 text-sm text-gray-700">
-                        {aiAnalysis.interventions.split("\n").filter(i => i.trim()).map((item, idx) => (
-                          <li key={idx}>{item.replace(/^[-\d.]+/, "").trim()}</li>
-                        ))}
-                      </ul>
-                    </div>
+          {/* TABS */}
+          <div className="flex border-b border-white/10">
+            {["history", "analysis"].map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`flex-1 py-3 ${
+                  tab === t
+                    ? "text-green-400 border-b border-green-400"
+                    : "text-gray-400"
+                }`}
+              >
+                {t.toUpperCase()}
+              </button>
+            ))}
+          </div>
+
+          {/* CONTENT */}
+          <div className="p-6 max-h-[70vh] overflow-y-auto">
+
+            {/* HISTORY */}
+            {tab === "history" && (
+              <div className="space-y-4">
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-white/5 p-4 rounded-xl">
+                    Incidents: {incidents.length}
                   </div>
 
-                  <div className="border rounded-xl p-4 bg-orange-50 border-orange-200 text-orange-700 text-sm">
-                    <strong>⚠ Advisory Notice</strong>
-                    <p className="mt-1">
-                      AI predictions are advisory only and should be combined
-                      with professional judgment and personal knowledge of the student’s circumstances.
+                  <div className="bg-white/5 p-4 rounded-xl">
+                    Risk: <RiskBadge level={student.riskLevel} />
+                  </div>
+
+                  <div className="bg-white/5 p-4 rounded-xl">
+                    Status: Active
+                  </div>
+                </div>
+
+                {incidents.map((i, idx) => (
+                  <div key={idx} className="bg-white/5 p-4 rounded-xl">
+                    <p className="font-semibold">{i.title}</p>
+                    <p className="text-sm text-gray-400">
+                      {i.date} • {i.category}
                     </p>
                   </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+                ))}
+
+              </div>
+            )}
+
+            {/* AI ANALYSIS */}
+            {tab === "analysis" && (
+              <div className="space-y-4">
+
+                {loading && (
+                  <div className="text-center text-green-400 animate-pulse">
+                    AI analyzing behavioral patterns...
+                  </div>
+                )}
+
+                {ai && (
+                  <>
+                    {/* HEADER */}
+                    <div className="bg-green-500/10 border border-green-400/20 rounded-2xl p-4">
+                      <h3 className="font-bold">
+                        AI Behavioral Intelligence Report
+                      </h3>
+                      <p className="text-xs text-gray-400">
+                        Deep multi-layer student behavioral analysis
+                      </p>
+                    </div>
+
+                    {/* SUMMARY */}
+                    <div className="bg-white/5 p-4 rounded-2xl">
+                      <p className="text-xs text-gray-400">Summary</p>
+                      <p className="text-sm mt-1">{ai.summary}</p>
+                    </div>
+
+                    {/* PATTERN */}
+                    <div className="bg-white/5 p-4 rounded-2xl">
+                      <p className="text-xs text-gray-400">Pattern Analysis</p>
+                      <p className="text-sm mt-1">{ai.pattern}</p>
+                    </div>
+
+                    {/* RISK */}
+                    <div className="bg-yellow-500/10 border border-yellow-400/20 p-4 rounded-2xl">
+                      <p className="text-xs text-yellow-300">Risk Assessment</p>
+                      <p className="text-sm mt-1">{ai.risk}</p>
+                    </div>
+
+                    {/* PREDICTION */}
+                    <div className="bg-red-500/10 border border-red-400/20 p-4 rounded-2xl">
+                      <p className="text-xs text-red-300">Prediction</p>
+                      <p className="text-sm mt-1">{ai.prediction}</p>
+                    </div>
+
+                    {/* INTERVENTIONS */}
+                    <div className="bg-white/5 p-4 rounded-2xl">
+                      <p className="text-xs text-gray-400 mb-2">
+                        Intervention Plan
+                      </p>
+
+                      <ol className="space-y-2 text-sm">
+                        {ai.interventions.map((i, idx) => (
+                          <li key={idx}>
+                            <span className="text-green-400">{idx + 1}.</span>{" "}
+                            {i}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+
+                    {/* NOTES */}
+                    <div className="bg-blue-500/10 border border-blue-400/20 p-4 rounded-2xl">
+                      <p className="text-xs text-blue-300">Counselor Notes</p>
+                      <p className="text-sm mt-1">{ai.notes}</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 };
 

@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import axios from "axios";
+import { Search } from "lucide-react";
 
+/* ================= MAIN ================= */
 const IncidentReport = () => {
   const [form, setForm] = useState({
     student: "",
@@ -17,22 +19,26 @@ const IncidentReport = () => {
   const [loading, setLoading] = useState(false);
 
   const abortRef = useRef(null);
+  const debounceRef = useRef(null);
 
-  // ===== DEBOUNCED SEARCH =====
+  /* ================= DEBOUNCED SEARCH ================= */
   useEffect(() => {
     if (!search.trim()) {
       setResults([]);
       return;
     }
 
-    const delay = setTimeout(() => {
+    clearTimeout(debounceRef.current);
+
+    debounceRef.current = setTimeout(() => {
       fetchStudents(search);
     }, 300);
 
-    return () => clearTimeout(delay);
+    return () => clearTimeout(debounceRef.current);
   }, [search]);
 
-  const fetchStudents = async (value) => {
+  /* ================= FETCH STUDENTS (SAFE) ================= */
+  const fetchStudents = useCallback(async (value) => {
     try {
       setLoading(true);
 
@@ -48,7 +54,7 @@ const IncidentReport = () => {
         { signal: controller.signal }
       );
 
-      setResults(res.data);
+      setResults(res.data || []);
     } catch (err) {
       if (err.name !== "CanceledError") {
         console.log(err);
@@ -56,9 +62,9 @@ const IncidentReport = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // ===== SELECT STUDENT =====
+  /* ================= SELECT STUDENT ================= */
   const handleSelectStudent = (student) => {
     setSearch(student.fullname);
 
@@ -71,22 +77,11 @@ const IncidentReport = () => {
     setResults([]);
   };
 
-  // ===== FORM INPUT HANDLER =====
+  /* ================= FORM ================= */
   const handleChange = (e) => {
     setForm((prev) => ({
       ...prev,
       [e.target.name]: e.target.value,
-    }));
-  };
-
-  // ===== SEARCH INPUT HANDLER =====
-  const handleSearchChange = (value) => {
-    setSearch(value);
-
-    setForm((prev) => ({
-      ...prev,
-      student: value,
-      studentId: "",
     }));
   };
 
@@ -95,34 +90,40 @@ const IncidentReport = () => {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-black shadow-md p-6">
+    <div className="bg-white/5 border border-white/10 backdrop-blur-xl rounded-2xl p-6 text-white">
 
-      <h3 className="font-semibold text-lg mb-4">
+      {/* TITLE */}
+      <h3 className="text-lg font-semibold text-green-400 mb-6">
         Incident Report
       </h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      {/* GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         {/* ===== STUDENT SEARCH ===== */}
-        <div className="flex flex-col relative z-50">
-          <label className="text-sm font-medium mb-1">
+        <div className="relative z-50">
+
+          <label className="text-sm text-gray-300 mb-1 block">
             Student Name *
           </label>
 
-          <input
-            type="text"
-            value={search}
-            placeholder="Search student..."
-            onChange={(e) => handleSearchChange(e.target.value)}
-            autoComplete="off"
-            className="w-full p-2 bg-gray-50 rounded border border-gray-300 focus:ring-1 focus:ring-green-600 focus:outline-none"
-          />
+          <div className="flex items-center bg-white/10 px-3 py-2 rounded-xl border border-white/10">
+            <Search size={16} className="text-gray-400" />
+            <input
+              value={search}
+              placeholder="Search student..."
+              onChange={(e) => setSearch(e.target.value)}
+              className="bg-transparent ml-2 w-full outline-none text-white"
+              autoComplete="off"
+            />
+          </div>
 
-          {(search && (results.length > 0 || loading)) && (
-            <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded shadow-lg z-[9999] max-h-48 overflow-y-auto">
+          {/* DROPDOWN */}
+          {search && (results.length > 0 || loading) && (
+            <div className="absolute mt-2 w-full bg-gray-900 border border-white/10 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50">
 
               {loading && (
-                <div className="p-2 text-sm text-gray-500">
+                <div className="p-3 text-sm text-gray-400">
                   Searching...
                 </div>
               )}
@@ -132,14 +133,14 @@ const IncidentReport = () => {
                   <div
                     key={student._id}
                     onClick={() => handleSelectStudent(student)}
-                    className="p-2 hover:bg-gray-100 cursor-pointer"
+                    className="p-3 hover:bg-white/10 cursor-pointer text-sm"
                   >
                     {student.fullname}
                   </div>
                 ))}
 
               {!loading && results.length === 0 && (
-                <div className="p-2 text-sm text-gray-500">
+                <div className="p-3 text-sm text-gray-500">
                   No students found
                 </div>
               )}
@@ -147,92 +148,81 @@ const IncidentReport = () => {
           )}
         </div>
 
-        {/* ===== OFFENSE ===== */}
-        <FormRow
+        {/* OFFENSE */}
+        <Input
           label="Offense Type *"
           name="offense"
           value={form.offense}
           onChange={handleChange}
-          placeholder="Offense"
         />
 
-        {/* ===== LOCATION ===== */}
-        <FormRow
+        {/* LOCATION */}
+        <Input
           label="Location *"
           name="location"
           value={form.location}
           onChange={handleChange}
-          placeholder="e.g., Room 711"
         />
 
-        {/* ===== DATE ===== */}
-        <FormRow
+        {/* DATE */}
+        <Input
           label="Date Incident *"
           name="date"
           value={form.date}
           onChange={handleChange}
-          placeholder="DD/MM/YY"
         />
 
-        {/* ===== TIME ===== */}
-        <FormRow
+        {/* TIME */}
+        <Input
           label="Time"
           name="time"
           value={form.time}
           onChange={handleChange}
-          placeholder="HH:MM AM/PM"
+        />
+
+      </div>
+
+      {/* DESCRIPTION */}
+      <div className="mt-4">
+        <label className="text-sm text-gray-300 mb-1 block">
+          Incident Description *
+        </label>
+
+        <textarea
+          name="description"
+          value={form.description}
+          onChange={handleChange}
+          placeholder="Detailed description..."
+          className="w-full bg-white/10 border border-white/10 rounded-xl p-3 h-28 outline-none text-white"
         />
       </div>
 
-      {/* ===== DESCRIPTION ===== */}
-      <FormTextArea
-        label="Incident Description *"
-        name="description"
-        value={form.description}
-        onChange={handleChange}
-        placeholder="Detailed description..."
-      />
-
-      {/* ===== SUBMIT ===== */}
-      <div className="mt-6">
+      {/* SUBMIT */}
+      <div className="mt-6 flex justify-end">
         <button
           onClick={handleSubmit}
-          className="bg-green-700 text-white px-5 py-2 rounded-md text-sm hover:bg-green-800 transition"
+          className="px-5 py-2 bg-green-500 hover:bg-green-600 rounded-xl text-white font-medium transition"
         >
-          SUBMIT REPORT
+          Submit Report
         </button>
       </div>
+
     </div>
   );
 };
 
-export default IncidentReport;
+export default memo(IncidentReport);
 
-/* ===== FORM COMPONENTS ===== */
+/* ================= INPUT COMPONENT ================= */
+const Input = memo(({ label, name, value, onChange }) => (
+  <div>
+    <label className="text-sm text-gray-300 mb-1 block">{label}</label>
 
-const FormRow = ({ label, name, value, onChange, placeholder }) => (
-  <div className="flex flex-col">
-    <label className="text-sm font-medium mb-1">{label}</label>
     <input
-      type="text"
       name={name}
       value={value}
       onChange={onChange}
-      placeholder={placeholder}
-      className="w-full p-2 bg-gray-50 rounded border border-gray-300 focus:ring-1 focus:ring-green-600 focus:outline-none"
+      className="w-full bg-white/10 border border-white/10 rounded-xl px-3 py-2 outline-none text-white"
     />
   </div>
-);
-
-const FormTextArea = ({ label, name, value, onChange, placeholder }) => (
-  <div className="flex flex-col mt-2">
-    <label className="text-sm font-medium mb-1">{label}</label>
-    <textarea
-      name={name}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      className="w-full p-2 bg-gray-50 rounded border border-gray-300 focus:ring-1 focus:ring-green-600 focus:outline-none h-24"
-    />
-  </div>
-);
+));

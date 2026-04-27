@@ -11,6 +11,13 @@ router.post("/", async (req, res) => {
 
     io.emit("new-report", report); // 🔥 REAL-TIME
 
+    io.emit("activity_feed", {
+      type: "report",
+      message: `📌 ${report.studentName} reported ${report.offense}`,
+      time: new Date(),
+    });
+
+
     res.json(report);
   } catch (err) {
     res.status(500).json({ error: err.message });

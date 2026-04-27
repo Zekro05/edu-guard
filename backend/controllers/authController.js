@@ -254,7 +254,8 @@ export const mobileLogin = async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    if (!user)
+      return res.status(400).json({ message: "Invalid credentials" });
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid)
@@ -263,7 +264,7 @@ export const mobileLogin = async (req, res) => {
     if (!user.isVerified)
       return res.status(401).json({ message: "Email not verified" });
 
-    // ✅ ALWAYS GENERATE LOGIN OTP
+    
     const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
     user.loginOTP = loginOTP;
     user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000;
@@ -280,10 +281,11 @@ export const mobileLogin = async (req, res) => {
       ipAddress: req.ip,
     });
 
-    // 🔑 VERY IMPORTANT
+    
     return res.status(200).json({
       success: true,
       requiresOTP: true,
+      role: user.role, 
       message: "OTP sent to your email",
     });
   } catch (err) {
@@ -292,7 +294,6 @@ export const mobileLogin = async (req, res) => {
   }
 };
 
-// MOBILE VERIFY LOGIN OTP (no admin restriction)
 export const verifyMobileLoginOTP = async (req, res) => {
   const { email, code } = req.body;
 
@@ -303,30 +304,36 @@ export const verifyMobileLoginOTP = async (req, res) => {
       loginOTPExpiresAt: { $gt: Date.now() },
     });
 
-    if (!user) return res.status(400).json({ message: "Invalid or expired OTP" });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
 
-    // Remove OTP after verification
+    
     user.loginOTP = undefined;
     user.loginOTPExpiresAt = undefined;
     await user.save();
 
     await createHistoryLog({
-        userId: user._id,
-        role: mapRoleForHistory(user.role),
-        action: "Mobile Login",
-        category: "Auth",
-        details: "Mobile login verified via OTP",
-        ipAddress: req.ip,
-      });
-
-    // ✅ Get student info
-    const student = await Student.findOne({ email });
-
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
+      userId: user._id,
+      role: mapRoleForHistory(user.role),
+      action: "Mobile Login",
+      category: "Auth",
+      details: "Mobile login verified via OTP",
+      ipAddress: req.ip,
     });
 
-    // Return merged data
+    // 🔥 ONLY fetch student if needed
+    let student = null;
+    if (user.role === "student") {
+      student = await Student.findOne({ email });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role }, 
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
     res.status(200).json({
       success: true,
       user: {
@@ -335,10 +342,15 @@ export const verifyMobileLoginOTP = async (req, res) => {
         middleName: user.middleName,
         lastName: user.lastName,
         email: user.email,
+
+        role: user.role, // ✅ 🔥 THIS FIXES EVERYTHING
+
         profilePhoto: student?.profilePhoto || user.profilePhoto || "",
-        studentId: student?.studentId || "Not Available",
-        gradeCourse: student?.grade || "Not Available",
-        contactNumber: student?.phone || "Not Available",
+
+        // only meaningful for students
+        studentId: student?.studentId || null,
+        gradeCourse: student?.grade || null,
+        contactNumber: student?.phone || null,
       },
       token,
     });
@@ -606,6 +618,31 @@ export const resetPassword = async (req, res) => {
   }
 };
 
+export const changePassword = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { oldPassword, newPassword } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    if (!isMatch)
+      return res.status(400).json({ message: "Old password is incorrect" });
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Password updated successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 export const getChatUsers = async (req, res) => {
   try {
     const { userId } = req.query;
@@ -627,5 +664,29 @@ export const getChatUsers = async (req, res) => {
   }
 };
 
+export const searchUsers = async (req, res) => {
+  try {
+    const { query } = req.query;
 
+    if (!query) {
+      return res.status(400).json({ message: "Query is required" });
+    }
+
+    const users = await User.find({
+      $or: [
+        { firstName: { $regex: query, $options: "i" } },
+        { lastName: { $regex: query, $options: "i" } },
+        { name: { $regex: query, $options: "i" } },
+        { email: { $regex: query, $options: "i" } }
+      ]
+    })
+      .select("firstName lastName name email profilePhoto role")
+      .limit(10);
+
+    res.status(200).json(users);
+  } catch (err) {
+    console.error("SEARCH USERS ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 

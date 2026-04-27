@@ -1,4 +1,6 @@
 import Message from "../models/message.js";
+import { io } from "../server.js"; // ✅ IMPORT SOCKET
+import { User } from "../models/userModel.js";
 
 /* CREATE CHAT ID */
 const createChatId = (a, b) => [a, b].sort().join("-");
@@ -19,6 +21,18 @@ export const sendMessage = async (req, res) => {
       receiver,
       text,
     });
+
+    /* 🔥 GET SENDER NAME (OPTIONAL BUT BETTER) */
+    const senderUser = await User.findById(sender);
+
+    /* 🔥 EMIT LIVE FEED */
+    io.emit("activity_feed", {
+      type: "message",
+      message: `💬 ${senderUser?.name || "User"}: ${text}`,
+      time: new Date(),
+    });
+
+    console.log("🔥 ACTIVITY FEED EMITTED FROM CONTROLLER");
 
     res.status(201).json(message);
   } catch (err) {

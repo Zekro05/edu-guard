@@ -1,105 +1,126 @@
-import React from "react";
+import React, { memo } from "react";
 
+/* STATIC DATA OUTSIDE COMPONENT (IMPORTANT PERF FIX) */
+const monthlyIncidents = [
+  { month: "January", change: "up", count: 10 },
+  { month: "February", change: "down", count: 7 },
+  { month: "March", change: "down", count: 5 },
+  { month: "April", change: "up", count: 12 },
+];
+
+const offenseStats = [
+  { label: "Minor Offenses", count: 57, percentage: 45, color: "green" },
+  { label: "Moderate Offenses", count: 29, percentage: 30, color: "yellow" },
+  { label: "Major Offenses", count: 15, percentage: 25, color: "red" },
+];
+
+const riskDistribution = [
+  { risk: "High Risk", count: 12, color: "red" },
+  { risk: "Medium Risk", count: 28, color: "yellow" },
+  { risk: "Low Risk", count: 50, color: "green" },
+];
+
+/* ================= MAIN ================= */
 const Overview = () => {
-  // Example data
-  const monthlyIncidents = [
-    { month: "January", change: "up", count: 10 },
-    { month: "February", change: "down", count: 7 },
-    { month: "March", change: "down", count: 5 },
-    { month: "April", change: "up", count: 12 },
-  ];
-
-  const offenseStats = [
-    { label: "Minor Offenses", count: 57, percentage: 45, color: "green" },
-    { label: "Moderate Offenses", count: 29, percentage: 30, color: "yellow" },
-    { label: "Major Offenses", count: 15, percentage: 25, color: "red" },
-  ];
-
-  const riskDistribution = [
-    { risk: "High Risk", count: 12, color: "red" },
-    { risk: "Medium Risk", count: 28, color: "yellow" },
-    { risk: "Low Risk", count: 50, color: "green" },
-  ];
-
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 text-white">
 
-      {/* Monthly Incidents */}
-      <div className="bg-white rounded-xl border border-gray-300 shadow-md p-6">
-        <h3 className="font-semibold text-lg mb-4">Monthly Incidents</h3>
+      {/* HEADER */}
+      <div>
+        <h2 className="text-xl font-semibold">Overview Analytics</h2>
+        <p className="text-sm text-gray-400">
+          System insights and risk breakdown
+        </p>
+      </div>
+
+      {/* MONTHLY INCIDENTS */}
+      <Card title="Monthly Incidents">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {monthlyIncidents.map((item) => (
             <div
               key={item.month}
-              className="flex justify-between items-center border border-gray-200 rounded-lg px-4 py-3 bg-gray-50 shadow-sm"
+              className="flex justify-between items-center bg-white/5 border border-white/10 rounded-xl px-4 py-3"
             >
-              <span className="font-medium">{item.month}</span>
+              <span className="text-sm font-medium">{item.month}</span>
+
               <span
                 className={`text-sm font-semibold ${
-                  item.change === "up" ? "text-red-600" : "text-green-600"
+                  item.change === "up"
+                    ? "text-red-400"
+                    : "text-green-400"
                 }`}
               >
-                {item.change === "up" ? "↑" : "↓"} {item.count} incidents
+                {item.change === "up" ? "↑" : "↓"} {item.count}
               </span>
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
-      {/* Offense Distribution */}
-      <div className="bg-white rounded-xl border border-gray-300 shadow-md p-6">
-        <h3 className="font-semibold text-lg mb-4">Offense Statistics</h3>
-        <div className="space-y-3">
-          {offenseStats.map((offense) => (
-            <div key={offense.label} className="flex flex-col">
-              <div className="flex justify-between mb-1">
-                <span className="text-sm font-medium">{offense.label}</span>
-                <span className="text-sm font-medium">{offense.count} incidents</span>
+      {/* OFFENSE STATS */}
+      <Card title="Offense Breakdown">
+        <div className="space-y-4">
+          {offenseStats.map((o) => (
+            <div key={o.label}>
+              <div className="flex justify-between text-xs text-gray-300 mb-1">
+                <span>{o.label}</span>
+                <span>{o.count}</span>
               </div>
-              <div className="w-full h-3 bg-gray-200 rounded-full">
+
+              <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
                 <div
-                  className={`h-3 rounded-full ${
-                    offense.color === "green"
+                  className={`h-2 rounded-full ${
+                    o.color === "green"
                       ? "bg-green-500"
-                      : offense.color === "yellow"
+                      : o.color === "yellow"
                       ? "bg-yellow-400"
                       : "bg-red-500"
                   }`}
-                  style={{ width: `${offense.percentage}%` }}
-                ></div>
+                  style={{ width: `${o.percentage}%` }}
+                />
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </Card>
 
-      {/* Risk Distribution */}
-      <div className="bg-white rounded-xl border border-gray-300 shadow-md p-6">
-        <h3 className="font-semibold text-lg mb-4">Student Risk Distribution</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {riskDistribution.map((risk) => (
+      {/* RISK DISTRIBUTION */}
+      <Card title="Risk Distribution">
+        <div className="grid grid-cols-3 gap-3">
+          {riskDistribution.map((r) => (
             <div
-              key={risk.risk}
-              className="flex flex-col items-center justify-center p-6 rounded-lg border border-gray-200 shadow-sm bg-white"
+              key={r.risk}
+              className="bg-white/5 border border-white/10 rounded-xl p-4 text-center"
             >
               <div
-                className={`text-white text-2xl font-bold mb-2 w-12 h-12 flex items-center justify-center rounded-full ${
-                  risk.color === "red"
-                    ? "bg-red-500"
-                    : risk.color === "yellow"
-                    ? "bg-yellow-400"
-                    : "bg-green-500"
+                className={`w-10 h-10 mx-auto mb-2 rounded-full flex items-center justify-center font-bold ${
+                  r.color === "red"
+                    ? "bg-red-500/20 text-red-400"
+                    : r.color === "yellow"
+                    ? "bg-yellow-500/20 text-yellow-300"
+                    : "bg-green-500/20 text-green-400"
                 }`}
               >
-                {risk.count}
+                {r.count}
               </div>
-              <span className="text-gray-700 font-medium">{risk.risk}</span>
+
+              <p className="text-xs text-gray-300">{r.risk}</p>
             </div>
           ))}
         </div>
-      </div>
+      </Card>
     </div>
   );
 };
 
-export default Overview;
+export default memo(Overview);
+
+/* ================= CARD ================= */
+const Card = memo(({ title, children }) => (
+  <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md">
+    <h3 className="text-sm font-semibold text-green-400 mb-4">
+      {title}
+    </h3>
+    {children}
+  </div>
+));

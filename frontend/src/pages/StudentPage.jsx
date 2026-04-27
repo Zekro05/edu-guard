@@ -1,12 +1,26 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { ChartNoAxesCombined, Eye, LayoutDashboard, Pencil, Settings, ShieldX, Trash2, Users } from "lucide-react";
+import { motion } from "framer-motion";
+import { io } from "socket.io-client";
+
+import {
+  LayoutDashboard,
+  Users,
+  ShieldX,
+  ChartNoAxesCombined,
+  Settings,
+  Eye,
+  Pencil,
+  Trash2
+} from "lucide-react";
 
 import { useAuthStore, API } from "../store/authStore";
 import StudentModal from "../components/StudentModal";
 import RiskBadge from "../components/RiskBadge";
 import ViewProfileModal from "../components/ViewProfileModal";
+
+const socket = io("http://localhost:5000");
 
 const ITEMS_PER_PAGE = 5;
 
@@ -22,215 +36,243 @@ const StudentPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [hovered, setHovered] = useState(null);
 
-  // Fetch students
+  // FETCH
   const fetchStudents = async () => {
-    try {
-      const res = await API.get("/api/students");
-      setStudents(res.data);
-    } catch (err) {
-      console.error(err.response?.data?.message || err.message);
-    }
+    const res = await API.get("/api/students");
+    setStudents(res.data);
   };
 
+  // REAL-TIME SOCKET
   useEffect(() => {
-    if (user) fetchStudents();
+    if (!user) return;
+
+    fetchStudents();
+
+    socket.on("student-created", () => {
+      toast.success("New student added");
+      fetchStudents();
+    });
+
+    socket.on("student-updated", () => {
+      toast.success("Student updated");
+      fetchStudents();
+    });
+
+    socket.on("student-deleted", () => {
+      toast.error("Student removed");
+      fetchStudents();
+    });
+
+    return () => {
+      socket.off("student-created");
+      socket.off("student-updated");
+      socket.off("student-deleted");
+    };
   }, [user]);
 
-  // Pagination
+  // FILTER
   const filteredStudents = students.filter((s) =>
     `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase())
   );
+
   const totalPages = Math.ceil(filteredStudents.length / ITEMS_PER_PAGE);
-  const paginatedStudents = filteredStudents.slice(
+
+  const paginated = filteredStudents.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+
   useEffect(() => setCurrentPage(1), [search]);
 
-  // Delete student
+  // ANALYTICS
+  const total = students.length;
+  const high = students.filter(s => s.riskLevel === "High").length;
+  const med = students.filter(s => s.riskLevel === "Medium").length;
+  const low = students.filter(s => s.riskLevel === "Low").length;
+
   const confirmDelete = async () => {
-    try {
-      await API.delete(`/api/students/${deleteTarget._id}`);
-      setDeleteTarget(null);
-      toast.success("Student deleted successfully");
-      fetchStudents();
-    } catch (err) {
-      console.error(err.response?.data?.message || err.message);
-      toast.error("Failed to delete student");
-    }
+    await API.delete(`/api/students/${deleteTarget._id}`);
+    toast.success("Deleted");
+    setDeleteTarget(null);
+    fetchStudents();
+  };
+
+  // NAV ITEM
+  const Nav = ({ icon, label, onClick, active }) => (
+    <button
+      onClick={onClick}
+      className={`flex gap-3 items-center px-4 py-3 rounded-xl transition ${
+        active ? "bg-green-500 text-white" : "hover:bg-white/10 text-gray-300"
+      }`}
+    >
+      {icon} {label}
+    </button>
+  );
+
+  // ANALYTICS CARD
+  const Stat = ({ title, value, color }) => (
+    <motion.div
+      whileHover={{ scale: 1.05 }}
+      className="bg-white/5 border border-white/10 p-4 rounded-xl"
+    >
+      <p className="text-gray-400 text-sm">{title}</p>
+      <h2 className={`text-2xl font-bold ${color}`}>{value}</h2>
+    </motion.div>
+  );
+
+  // RISK PULSE INDICATOR
+  const RiskPulse = ({ level }) => {
+    const color =
+      level === "High"
+        ? "bg-red-500"
+        : level === "Medium"
+        ? "bg-yellow-400"
+        : "bg-green-400";
+
+    const animate =
+      level === "High"
+        ? "animate-ping"
+        : "animate-pulse";
+
+    return (
+      <div className="flex items-center gap-2 justify-center">
+        <span className={`relative flex h-3 w-3`}>
+          <span className={`absolute inline-flex h-full w-full rounded-full ${color} ${animate} opacity-75`} />
+          <span className={`relative inline-flex rounded-full h-3 w-3 ${color}`} />
+        </span>
+        <RiskBadge level={level} />
+      </div>
+    );
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-gray-900 via-green-900 to-emerald-900">
-      {/* ===== TOP BAR ===== */}
-      <header className="bg-gradient-to-r from-green-600 to-green-700 text-white px-4 sm:px-8 py-4 flex justify-between items-center shadow-lg">
-        <h1 className="text-2xl font-bold">EduGuard</h1>
-        <div className="flex items-center gap-4">
-          <div className="text-right text-sm hidden sm:block">
-            <p className="font-semibold">{user?.name || "Admin"}</p>
-            <p className="text-xs opacity-80">Our Lady of the Holy Rosary - General Trias Cavite</p>
-          </div>
-          <button
-            onClick={logout}
-            className="bg-white text-green-700 px-4 py-2 rounded-md shadow hover:bg-gray-100 hover:scale-105 transition-all duration-200"
-          >
-            Logout
-          </button>
-        </div>
-      </header>
+    <div className="h-screen w-screen flex bg-gradient-to-br from-gray-950 via-green-950 to-emerald-950 text-white overflow-hidden">
 
-      {/* ===== NAV ===== */}
-      <div className="mt-6 px-4 sm:px-8">
-        <div className="bg-white rounded-2xl border flex flex-wrap justify-around items-center py-3 gap-3 shadow-sm">
-          <button
-            className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center"
-            onClick={() => navigate("/dashboard")}
-          >
-            <LayoutDashboard className="mr-2" />Dashboard
-          </button>
+      {/* SIDEBAR */}
+      <aside className="w-72 h-full bg-white/5 backdrop-blur-xl border-r border-white/10 p-6 flex flex-col justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-green-400">EduGuard</h1>
 
-          <button className="px-4 py-2 rounded-lg font-semibold bg-green-100 text-green-700 shadow-inner flex items-center justify-center">
-           <Users className="mr-2"/> Students
-          </button>
-
-          <button 
-          onClick={() => navigate("/guidance")}
-          className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
-            <ShieldX className="mr-2" />Guidance
-          </button>
-
-          <button 
-          onClick={() => navigate("/reports")}
-          className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
-            <ChartNoAxesCombined className="mr-2"/>Reports
-          </button>
-
-          <button 
-          onClick={() => navigate("/settings")}
-          className="px-4 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition flex items-center justify-center">
-            <Settings className="mr-2"/>Settings
-          </button>
-        </div>
-      </div>
-
-      {/* ===== CONTENT ===== */}
-      <main className="px-4 sm:px-8 py-6 flex flex-col gap-6">
-        <div className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-2xl p-6 shadow-md">
-          <h2 className="text-3xl font-semibold">Student Discipline Profile</h2>
-          <p className="text-sm opacity-90">
-            View comprehensive student records and risk levels.
+          {/* 🏫 SCHOOL NAME ADDED BACK */}
+          <p className="text-xs text-gray-400 mb-6">
+            Our Lady of the Holy Rosary - General Trias Cavite
           </p>
+
+          <Nav icon={<LayoutDashboard />} label="Dashboard" onClick={() => navigate("/dashboard")} />
+          <Nav icon={<Users />} label="Students" active />
+          <Nav icon={<ShieldX />} label="Guidance" onClick={() => navigate("/guidance")} />
+          <Nav icon={<ChartNoAxesCombined />} label="Reports" onClick={() => navigate("/reports")} />
+          <Nav icon={<Settings />} label="Settings" onClick={() => navigate("/settings")} />
         </div>
 
-        <div className="bg-white rounded-2xl border p-6 shadow-sm">
-          <div className="flex flex-col sm:flex-row justify-between gap-4 mb-4">
-            <input
-              placeholder="Search student..."
-              className="border px-4 py-2 rounded-lg w-full sm:w-1/3 focus:ring-2 focus:ring-green-400 outline-none"
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <button
-              onClick={() => {
-                setIsEditing(false);
-                setSelectedStudent(null);
-                setShowModal(true);
-              }}
-              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition"
-            >
-              + Add Student
-            </button>
-          </div>
+        <button onClick={logout} className="bg-green-500 py-2 rounded-xl">
+          Logout
+        </button>
+      </aside>
 
-          {/* TABLE */}
-          <div className="overflow-x-auto rounded-xl border">
-            <table className="w-full min-w-[600px] text-sm">
-              <thead className="bg-green-100 text-green-800 uppercase text-xs">
-                <tr>
-                  <th className="text-left py-3 px-4">Name</th>
-                  <th className="text-center py-3 px-4">Grade</th>
-                  <th className="text-center py-3 px-4">Risk</th>
-                  <th className="text-right py-3 px-4">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {paginatedStudents.map((s) => (
-                  <tr key={s._id} className="hover:bg-gray-50">
-                    <td className="py-3 px-4 font-medium">
-                      {s.firstName} {s.lastName}
-                    </td>
-                    <td className="py-3 px-4 text-center">{s.grade}</td>
-                    <td className="py-3 px-4 text-center">
-                      <RiskBadge level={s.riskLevel} />
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex justify-end gap-2 relative">
-                        {/* VIEW */}
-                        <button
-                          onClick={() => {
-                            setSelectedStudent(s);
-                            setShowProfile(true);
-                            setIsEditing(false);
-                          }}
-                          className="p-2 border rounded-md hover:bg-gray-100"
-                        >
-                          <Eye size={16} />
-                        </button>
+      {/* MAIN */}
+      <main className="flex-1 p-6 overflow-y-auto flex flex-col gap-6">
 
-                        {/* EDIT */}
-                        <button
-                          onClick={() => {
-                            setSelectedStudent(s);
-                            setIsEditing(true);
-                            setShowModal(true);
-                          }}
-                          className="p-2 border rounded-md hover:bg-gray-100"
-                        >
-                          <Pencil size={16} />
-                        </button>
+        <div>
+          <h2 className="text-3xl font-bold">Student Analytics (Live)</h2>
+          <p className="text-gray-400 text-sm">Real-time discipline monitoring system</p>
+        </div>
 
-                        {/* DELETE */}
-                        <button
-                          onClick={() => setDeleteTarget(s)}
-                          className="p-2 border border-red-400 text-red-600 rounded-md hover:bg-red-50"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {/* ANALYTICS */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Stat title="Total Students" value={total} color="text-white" />
+          <Stat title="High Risk" value={high} color="text-red-400" />
+          <Stat title="Medium Risk" value={med} color="text-yellow-400" />
+          <Stat title="Low Risk" value={low} color="text-green-400" />
+        </div>
 
-          {/* PAGINATION */}
-          <div className="flex justify-between items-center mt-4">
-            <span className="text-sm text-gray-500">
-              Page {currentPage} of {totalPages}
-            </span>
-            <div className="flex gap-2">
-              <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((p) => p - 1)}
-                className="px-3 py-1 border rounded disabled:opacity-40"
-              >
-                Prev
-              </button>
-              <button
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage((p) => p + 1)}
-                className="px-3 py-1 border rounded disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
+        {/* SEARCH + ADD */}
+        <div className="flex justify-between gap-4">
+          <input
+            placeholder="Search student..."
+            className="bg-white/10 px-4 py-2 rounded-xl w-full sm:w-1/3 outline-none"
+            onChange={(e) => setSearch(e.target.value)}
+          />
+
+          <button
+            onClick={() => {
+              setSelectedStudent(null);
+              setIsEditing(false);
+              setShowModal(true);
+            }}
+            className="bg-green-500 px-4 py-2 rounded-xl"
+          >
+            + Add Student
+          </button>
+        </div>
+
+        {/* TABLE */}
+        <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+
+          <table className="w-full text-sm">
+            <thead className="bg-white/10 text-gray-300">
+              <tr>
+                <th className="p-3 text-left">Name</th>
+                <th className="p-3 text-center">Grade</th>
+                <th className="p-3 text-center">Risk</th>
+                <th className="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {paginated.map((s, i) => (
+                <motion.tr
+                  key={s._id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.03 }}
+                  className="border-t border-white/10 hover:bg-white/5"
+                >
+                  <td className="p-3">{s.firstName} {s.lastName}</td>
+                  <td className="p-3 text-center">{s.grade}</td>
+
+                  <td className="p-3 text-center">
+                    <RiskPulse level={s.riskLevel} />
+                  </td>
+
+                  <td className="p-3">
+                    <div className="flex justify-end gap-2">
+
+                      <button onClick={() => { setSelectedStudent(s); setShowProfile(true); }} className="p-2 bg-white/10 rounded-lg">
+                        <Eye size={16} />
+                      </button>
+
+                      <button onClick={() => { setSelectedStudent(s); setIsEditing(true); setShowModal(true); }} className="p-2 bg-white/10 rounded-lg">
+                        <Pencil size={16} />
+                      </button>
+
+                      <button onClick={() => setDeleteTarget(s)} className="p-2 bg-red-500/20 text-red-400 rounded-lg">
+                        <Trash2 size={16} />
+                      </button>
+
+                    </div>
+                  </td>
+                </motion.tr>
+              ))}
+            </tbody>
+
+          </table>
+        </div>
+
+        {/* PAGINATION */}
+        <div className="flex justify-between text-gray-400 text-sm">
+          <span>Page {currentPage} / {totalPages}</span>
+
+          <div className="flex gap-2">
+            <button onClick={() => setCurrentPage(p => p - 1)}>Prev</button>
+            <button onClick={() => setCurrentPage(p => p + 1)}>Next</button>
           </div>
         </div>
+
       </main>
 
-      {/* ADD/EDIT MODAL */}
+      {/* MODALS */}
       {showModal && (
         <StudentModal
           close={() => setShowModal(false)}
@@ -243,40 +285,23 @@ const StudentPage = () => {
 
       {showProfile && (
         <ViewProfileModal
-           student={selectedStudent}
-            close={() => setShowProfile(false)}
+          student={selectedStudent}
+          close={() => setShowProfile(false)}
         />
       )}
 
-      {/* DELETE CONFIRMATION MODAL */}
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
-            <h3 className="text-lg font-semibold mb-2">Delete Student</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Are you sure you want to delete{" "}
-              <span className="font-semibold">
-                {deleteTarget.firstName} {deleteTarget.lastName}
-              </span>
-              ?
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 border rounded-md"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-              >
-                Delete
-              </button>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
+          <div className="bg-gray-900 p-6 rounded-xl">
+            <p>Delete {deleteTarget.firstName}?</p>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setDeleteTarget(null)}>Cancel</button>
+              <button onClick={confirmDelete} className="text-red-400">Delete</button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 };

@@ -17,6 +17,7 @@ import {
 import { verifyToken } from "../middleware/verifyToken.js";
 import { upload } from "../middleware/upload.js";
 import { getChatUsers } from "../controllers/authController.js";
+import { searchUsers } from "../controllers/authController.js";
 
 const router = express.Router();
 
@@ -52,6 +53,7 @@ router.post("/resend-signup-otp", resendSignupOTP);
 router.post("/resend-login-otp", resendLoginOTP);
 router.post("/resend-forgot-password-otp", resendForgotPasswordOTP);
 router.get("/users", getChatUsers);
+router.get("/search", searchUsers);
 
 
 

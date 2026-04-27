@@ -64,6 +64,12 @@ export const createIncident = async (req, res) => {
       level,
     });
 
+    io.emit("activity_feed", {
+  type: "incident",
+  message: `⚠️ Incident created for ${incident.studentName}`,
+  time: new Date(),
+});
+
     // Update student's totalIncidents and riskLevel
     const totalIncidents = await Incident.countDocuments({ studentId });
     let riskLevel = "Low";
