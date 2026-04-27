@@ -86,6 +86,8 @@ export const io = new Server(server, {
     origin: [
       "http://localhost:5173",
       "http://localhost:5174",
+      "exp://localhost:19000",
+      "https://edu-guard-backend.onrender.com",
     ],
     methods: ["GET", "POST"],
     credentials: true,
