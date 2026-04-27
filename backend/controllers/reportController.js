@@ -43,3 +43,26 @@ export const deleteReport = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+export const getMyReports = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const role = req.role;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    if (role !== "student") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const reports = await Report.find({ studentId: userId })
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(reports);
+  } catch (err) {
+    console.error("Get My Reports Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};

@@ -8,7 +8,11 @@ const reportSchema = new mongoose.Schema({
   time: { type: String },
   description: { type: String, required: true },
   reporter: { type: String, required: true },
-  reporterId: { type: String, required: true },
+  reporterId: { 
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+   },
 
 
   status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" }
