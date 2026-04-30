@@ -1,6 +1,9 @@
 import jwt from "jsonwebtoken";
 
 export const verifyToken = (req, res, next) => {
+
+  console.log("AUTH HEADER:", req.headers.authorization);
+  console.log("COOKIES:", req.cookies);
   // Token can be in cookie or Authorization header
   const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
 
