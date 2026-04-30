@@ -12,11 +12,12 @@ import { upload } from "../middleware/upload.js";
 const router = express.Router();
 
 // PROTECTED ROUTES
+router.get("/search", searchStudents);
 router.get("/", verifyToken, getStudents);
 router.post("/", verifyToken, upload.single("profilePhoto"), createStudent);
 router.put("/:id", verifyToken, upload.single("profilePhoto"), updateStudent);
 router.delete("/:id", verifyToken, deleteStudent);
-router.get("/search", searchStudents);
+
 
 
 export default router;

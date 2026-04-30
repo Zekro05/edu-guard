@@ -121,9 +121,13 @@ export const searchStudents = async (req, res) => {
     if (!query) return res.json([]);
 
     const students = await Student.find({
-      fullname: { $regex: query, $options: "i" },
+      $or: [
+        { firstName: { $regex: query, $options: "i" } },
+        { lastName: { $regex: query, $options: "i" } },
+        { email: { $regex: query, $options: "i" } },
+      ],
     })
-      .select("_id fullname")
+      .select("_id firstName lastName email")
       .limit(10);
 
     res.json(students);
