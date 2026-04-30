@@ -1,34 +1,56 @@
 import express from "express";
 import Report from "../models/reportModel.js";
-import Student from "../models/studentModel.js"; // ✅ FIX MISSING IMPORT
 import { verifyToken } from "../middleware/verifyToken.js";
 import { io } from "../server.js";
 
 const router = express.Router();
 
-// CREATE REPORT (FIXED)
-router.post("/", async (req, res) => {
+/* ================= CREATE REPORT ================= */
+router.post("/", verifyToken, async (req, res) => {
   try {
-    const { studentId, reporterId } = req.body;
+    const {
+      studentId,
+      studentName,
+      offense,
+      location,
+      description,
+      date,
+      time,
+    } = req.body;
 
-    if (!studentId || !reporterId) {
+    if (!studentId || !studentName || !description || !location) {
       return res.status(400).json({
-        message: "studentId and reporterId are required",
+        message: "Missing required fields",
       });
     }
 
-    const report = await Report.create(req.body);
+    const report = await Report.create({
+      studentId,
+      studentName,
+      offense,
+      location,
+      description,
+      date,
+      time,
+
+      // ✅ FIX: logged-in user is reporter
+      reporter: req.user.name,
+      reporterId: req.userId,
+    });
 
     io.emit("new-report", report);
 
-    res.status(201).json(report);
+    return res.status(201).json(report);
   } catch (err) {
-    console.log(err.message);
-    res.status(400).json({ message: err.message });
+    console.log("REPORT ERROR:", err);
+    return res.status(500).json({
+      message: "Internal Server Error",
+      error: err.message,
+    });
   }
 });
 
-// GET reports
+/* ================= GET REPORTS ================= */
 router.get("/", async (req, res) => {
   try {
     const { page = 1, limit = 5, status, search } = req.query;
@@ -57,60 +79,6 @@ router.get("/", async (req, res) => {
       currentPage: Number(page),
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// ACCEPT
-router.put("/:id/accept", async (req, res) => {
-  try {
-    const report = await Report.findByIdAndUpdate(
-      req.params.id,
-      { status: "accepted" },
-      { new: true }
-    );
-
-    io.emit("update-report", report);
-
-    res.json(report);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// REJECT
-router.put("/:id/reject", async (req, res) => {
-  try {
-    const report = await Report.findByIdAndUpdate(
-      req.params.id,
-      { status: "rejected" },
-      { new: true }
-    );
-
-    io.emit("update-report", report);
-
-    res.json(report);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// MY REPORTS (FIXED)
-router.get("/my", verifyToken, async (req, res) => {
-  try {
-    const student = await Student.findOne({ email: req.user.email });
-
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
-    const reports = await Report.find({
-      studentId: student._id,
-    }).sort({ createdAt: -1 });
-
-    res.json(reports);
-  } catch (err) {
-    console.log("MY REPORT ERROR:", err.message);
     res.status(500).json({ message: err.message });
   }
 });
