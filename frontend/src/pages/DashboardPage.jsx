@@ -5,7 +5,7 @@ import axios from "axios";
 import { io } from "socket.io-client";
 import {
   LayoutDashboard, Users, ShieldX, ChartNoAxesCombined,
-  Settings, Bell, Search
+  Settings, Bell, Search, Gavel
 } from "lucide-react";
 
 import {
@@ -44,11 +44,10 @@ const DashboardPage = () => {
   const [search, setSearch] = useState("");
   const [reports, setReports] = useState([]);
   const [filtered, setFiltered] = useState([]);
-  const [feed, setFeed] = useState([]);
   const [notif, setNotif] = useState([]);
   const [selected, setSelected] = useState(null);
 
-  /* ================= INIT AUDIO ================= */
+  /* ================= AUDIO ================= */
   useEffect(() => {
     soundRef.current = new Audio("/notification.mp3");
   }, []);
@@ -76,22 +75,8 @@ const DashboardPage = () => {
 
     socket.on("connect", () => {
       socket.emit("register", user?._id);
-      console.log("🟢 DASHBOARD CONNECTED:", socket.id);
     });
 
-    socket.on("activity_feed", (data) => {
-    console.log("📡 RECEIVED FEED:", data); // 🔥 ADD THIS
-
-  const newItem = {
-    msg: data.message,
-    time: new Date(),
-  };
-
-  setFeed((prev) => [newItem, ...prev].slice(0, 20));
-  setNotif((prev) => [newItem, ...prev].slice(0, 20));
-
-  soundRef.current?.play().catch(() => {});
-});
     fetchReports();
 
     return () => socket.disconnect();
@@ -108,26 +93,20 @@ const DashboardPage = () => {
     );
   }, [search, reports]);
 
-  /* ================= MEMOIZED CHARTS ================= */
+  /* ================= CHARTS ================= */
   const barData = useMemo(() => ({
     labels: ["Mon", "Tue", "Wed", "Thu", "Fri"],
-    datasets: [
-      { label: "Incidents", data: [5, 8, 3, 6, 4], backgroundColor: "#22c55e" }
-    ]
+    datasets: [{ label: "Incidents", data: [5, 8, 3, 6, 4], backgroundColor: "#22c55e" }]
   }), []);
 
   const pieData = useMemo(() => ({
     labels: ["Low", "Medium", "High"],
-    datasets: [
-      { data: [60, 25, 15], backgroundColor: ["#22c55e", "#facc15", "#ef4444"] }
-    ]
+    datasets: [{ data: [60, 25, 15], backgroundColor: ["#22c55e", "#facc15", "#ef4444"] }]
   }), []);
 
   const lineData = useMemo(() => ({
     labels: ["Mon", "Tue", "Wed", "Thu", "Fri"],
-    datasets: [
-      { label: "Trend", data: [3, 6, 4, 8, 5], borderColor: "#22c55e" }
-    ]
+    datasets: [{ label: "Trend", data: [3, 6, 4, 8, 5], borderColor: "#22c55e" }]
   }), []);
 
   return (
@@ -139,13 +118,14 @@ const DashboardPage = () => {
           <div>
             <h1 className="text-2xl font-bold text-green-400">EduGuard</h1>
             <p className="text-xs text-gray-400 mb-6">
-              Our Lady of The Holy Rosary
+              Our Lady of the Holy Rosary - General Trias Cavite
             </p>
 
             <Nav icon={<LayoutDashboard />} label="Dashboard" />
             <Nav icon={<Users />} label="Students" onClick={() => navigate("/students")} />
             <Nav icon={<ShieldX />} label="Guidance" onClick={() => navigate("/guidance")} />
             <Nav icon={<ChartNoAxesCombined />} label="Reports" onClick={() => navigate("/reports")} />
+            <Nav icon={<Gavel />} label="Interventions" onClick={() => navigate("/interventions")} />
             <Nav icon={<Settings />} label="Settings" onClick={() => navigate("/settings")} />
           </div>
 
@@ -157,7 +137,7 @@ const DashboardPage = () => {
         {/* MAIN */}
         <main className="flex-1 p-6 overflow-y-auto flex flex-col gap-6">
 
-          {/* TOP */}
+          {/* HEADER */}
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-3xl font-bold">EduGuard Dashboard</h2>
@@ -196,36 +176,74 @@ const DashboardPage = () => {
             <div className="bg-white/5 p-4 rounded-xl"><Line data={lineData} /></div>
           </div>
 
-          {/* LIVE FEED */}
+          {/* RISK + ESCALATION PANEL (REPLACEMENT) */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* RISK LIST */}
             <div className="bg-white/5 p-4 rounded-xl">
-              <h3 className="mb-3 font-semibold">Live Activity Feed</h3>
+              <h3 className="mb-3 font-semibold">Top Risk Students</h3>
 
-              {feed.length === 0 ? (
-                <p className="text-gray-400 text-sm">Waiting for activity...</p>
-              ) : (
-                feed.map((f, i) => (
-                  <div key={i} className="text-sm border-b border-white/10 py-2 flex gap-2">
-                    <span>🔴</span>
-                    {f.msg}
+              {reports.slice(0, 5).map((r) => (
+                <div key={r._id} className="p-3 mb-2 bg-white/5 rounded-lg hover:bg-white/10">
+                  <div className="flex justify-between">
+                    <p className="text-sm font-semibold">{r.studentName}</p>
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      r.offense?.toLowerCase().includes("fight")
+                        ? "bg-red-500"
+                        : r.offense?.toLowerCase().includes("bully")
+                        ? "bg-yellow-500"
+                        : "bg-green-500"
+                    }`}>
+                      {r.offense?.toLowerCase().includes("fight")
+                        ? "HIGH"
+                        : r.offense?.toLowerCase().includes("bully")
+                        ? "MED"
+                        : "LOW"}
+                    </span>
                   </div>
-                ))
-              )}
-            </div>
 
-            <div className="lg:col-span-2 bg-white/5 p-4 rounded-xl">
-              <h3 className="mb-3 font-semibold">Pending Reports</h3>
-
-              {filtered.map((r) => (
-                <div
-                  key={r._id}
-                  onClick={() => setSelected(r)}
-                  className="p-3 mb-2 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10"
-                >
-                  {r.studentName} — {r.offense}
+                  <p className="text-xs text-gray-400">{r.offense}</p>
                 </div>
               ))}
             </div>
+
+            {/* ANALYTICS */}
+            <div className="lg:col-span-2 bg-white/5 p-4 rounded-xl">
+              <h3 className="mb-3 font-semibold">Behavior Overview</h3>
+
+              <div className="grid grid-cols-3 gap-4">
+
+                <div className="bg-white/5 p-4 rounded-xl">
+                  <p className="text-xs text-gray-400">High Risk</p>
+                  <h2 className="text-2xl font-bold text-red-400">
+                    {reports.filter(r => r.offense?.toLowerCase().includes("fight")).length}
+                  </h2>
+                </div>
+
+                <div className="bg-white/5 p-4 rounded-xl">
+                  <p className="text-xs text-gray-400">Medium Risk</p>
+                  <h2 className="text-2xl font-bold text-yellow-400">
+                    {reports.filter(r => r.offense?.toLowerCase().includes("bully")).length}
+                  </h2>
+                </div>
+
+                <div className="bg-white/5 p-4 rounded-xl">
+                  <p className="text-xs text-gray-400">Low Risk</p>
+                  <h2 className="text-2xl font-bold text-green-400">
+                    {reports.filter(r =>
+                      !r.offense?.toLowerCase().includes("fight") &&
+                      !r.offense?.toLowerCase().includes("bully")
+                    ).length}
+                  </h2>
+                </div>
+
+              </div>
+
+              <p className="text-xs text-gray-400 mt-4">
+                System auto-classifies student behavior for early intervention.
+              </p>
+            </div>
+
           </div>
 
         </main>
@@ -236,6 +254,7 @@ const DashboardPage = () => {
 
 export default DashboardPage;
 
+/* ================= NAV ================= */
 const Nav = ({ icon, label, onClick }) => (
   <button onClick={onClick} className="flex gap-3 items-center px-4 py-3 rounded-xl hover:bg-white/10">
     {icon} {label}

@@ -14,7 +14,7 @@ import StudentPage from "./pages/StudentPage.jsx";
 import ReportPage from "./pages/ReportPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import GuidancePage from "./pages/GuidancePage.jsx";
-
+import InterventionPage from "./pages/InterventionPage.jsx";
 import { useAuthStore } from "./store/authStore.js";
 
 
@@ -131,6 +131,14 @@ function App() {
           element={
             <ProtectedRoute>
               <ReportPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/interventions"
+          element={
+            <ProtectedRoute>
+              <InterventionPage />
             </ProtectedRoute>
           }
         />

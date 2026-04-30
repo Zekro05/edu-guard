@@ -8,6 +8,7 @@ import {
   ShieldX,
   ChartNoAxesCombined,
   Settings,
+  Gavel
 } from "lucide-react";
 
 import SchoolInformation from "../components/settings/SchoolInformation";
@@ -55,13 +56,14 @@ const SettingsPage = () => {
         <div>
           <h1 className="text-2xl font-bold text-green-400">EduGuard</h1>
           <p className="text-xs text-gray-400 mb-6">
-            Our Lady of The Holy Rosary
+            Our Lady of the Holy Rosary - General Trias Cavite
           </p>
 
           <Nav icon={<LayoutDashboard />} label="Dashboard" onClick={() => navigate("/dashboard")} />
           <Nav icon={<Users />} label="Students" onClick={() => navigate("/students")} />
           <Nav icon={<ShieldX />} label="Guidance" onClick={() => navigate("/guidance")} />
           <Nav icon={<ChartNoAxesCombined />} label="Reports" onClick={() => navigate("/reports")} />
+          <Nav icon={<Gavel />} label="Interventions" onClick={() => navigate("/interventions")} />
           <Nav icon={<Settings />} label="Settings" active />
         </div>
 

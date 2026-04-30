@@ -8,7 +8,8 @@ import {
   ShieldX,
   ChartNoAxesCombined,
   Settings,
-  Bell
+  Bell,
+  Gavel
 } from "lucide-react";
 
 const socket = io("https://edu-guard-backend.onrender.com");
@@ -162,13 +163,14 @@ const GuidancePage = () => {
         <div>
           <h1 className="text-2xl font-bold text-green-400">EduGuard</h1>
           <p className="text-xs text-gray-400 mb-6">
-            Guidance Communication System
+            Our Lady of the Holy Rosary - General Trias Cavite
           </p>
 
           <Nav icon={<LayoutDashboard />} label="Dashboard" onClick={() => navigate("/dashboard")} />
           <Nav icon={<Users />} label="Students" onClick={() => navigate("/students")} />
           <Nav icon={<ShieldX />} label="Guidance" />
           <Nav icon={<ChartNoAxesCombined />} label="Reports" onClick={() => navigate("/reports")} />
+          <Nav icon={<Gavel />} label="Interventions" onClick={() => navigate("/interventions")} />
           <Nav icon={<Settings />} label="Settings" onClick={() => navigate("/settings")} />
         </div>
 

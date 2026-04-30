@@ -12,7 +12,8 @@ import {
   Settings,
   Eye,
   Pencil,
-  Trash2
+  Trash2,
+  Gavel
 } from "lucide-react";
 
 import { useAuthStore, API } from "../store/authStore";
@@ -163,6 +164,7 @@ const StudentPage = () => {
           <Nav icon={<Users />} label="Students" active />
           <Nav icon={<ShieldX />} label="Guidance" onClick={() => navigate("/guidance")} />
           <Nav icon={<ChartNoAxesCombined />} label="Reports" onClick={() => navigate("/reports")} />
+          <Nav icon={<Gavel />} label="Interventions" onClick={() => navigate("/interventions")} />
           <Nav icon={<Settings />} label="Settings" onClick={() => navigate("/settings")} />
         </div>
 

@@ -16,7 +16,8 @@ import {
   ShieldX,
   ChartNoAxesCombined,
   Settings,
-  Search
+  Search,
+  Gavel
 } from "lucide-react";
 
 const socket = io("http://localhost:5000", {
@@ -115,11 +116,15 @@ const ReportPage = () => {
       <aside className="w-72 h-full bg-white/5 backdrop-blur-md border-r border-white/10 p-6 flex flex-col justify-between">
         <div>
           <h1 className="text-2xl font-bold text-green-400">EduGuard</h1>
+          <p className="text-xs text-gray-400 mb-6">
+            Our Lady of the Holy Rosary - General Trias Cavite
+          </p>
 
           <Nav icon={<LayoutDashboard />} label="Dashboard" onClick={() => navigate("/dashboard")} />
           <Nav icon={<Users />} label="Students" onClick={() => navigate("/students")} />
           <Nav icon={<ShieldX />} label="Guidance" onClick={() => navigate("/guidance")} />
           <Nav icon={<ChartNoAxesCombined />} label="Reports" active />
+          <Nav icon={<Gavel />} label="Interventions" onClick={() => navigate("/interventions")} />
           <Nav icon={<Settings />} label="Settings" onClick={() => navigate("/settings")} />
         </div>
 

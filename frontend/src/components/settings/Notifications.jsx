@@ -3,73 +3,89 @@ import { Bell } from "lucide-react";
 const Toggle = () => (
   <input
     type="checkbox"
-    className="w-10 h-5 rounded-full appearance-none bg-gray-300 checked:bg-green-600 cursor-pointer transition relative
+    className="w-10 h-5 rounded-full appearance-none bg-white/10 border border-white/10 checked:bg-green-500 cursor-pointer transition relative
     before:content-[''] before:absolute before:top-0.5 before:left-0.5 before:w-4 before:h-4 before:bg-white before:rounded-full before:transition checked:before:translate-x-5"
   />
 );
 
 const Notifications = () => {
   return (
-    <div className="bg-white rounded-xl border p-6">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-4">
-        <Bell className="text-green-700" size={22} />
-        <h2 className="text-lg font-semibold text-gray-800">
-          Notification Settings
-        </h2>
-      </div>
+    <div className="flex-1 w-full h-full text-white p-6 overflow-y-auto">
 
-      <p className="text-sm text-gray-500 mb-6">
-        Configure alerts and notifications for incidents and system events.
-      </p>
-
-      {/* Toggles */}
-      <div className="space-y-4 mb-8">
-        {[
-          "Email Alerts for New Incidents",
-          "High-Risk Student Alerts",
-          "Report Outcome Prediction",
-          "Platform Warnings",
-        ].map((label) => (
-          <div
-            key={label}
-            className="flex items-center justify-between border rounded-lg px-4 py-3"
-          >
-            <span className="text-sm text-gray-700">{label}</span>
-            <Toggle />
-          </div>
-        ))}
-      </div>
-
-      {/* Recipients */}
-      <div>
-        <h3 className="font-semibold text-gray-800 mb-3">
-          Notification Recipients
-        </h3>
-
-        <div className="grid md:grid-cols-2 gap-6">
-          <div>
-            <label className="text-sm font-medium text-gray-700">
-              Admin Email
-            </label>
-            <input
-              type="email"
-              placeholder="admin@email.com"
-              className="mt-1 w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-green-600 focus:outline-none"
-            />
+      {/* HEADER */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-white/10 border border-white/10 rounded-xl">
+            <Bell className="text-green-400" size={20} />
           </div>
 
           <div>
-            <label className="text-sm font-medium text-gray-700">
-              Guidance Email
-            </label>
-            <input
-              type="email"
-              placeholder="guidance@email.com"
-              className="mt-1 w-full border rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-green-600 focus:outline-none"
-            />
+            <h1 className="text-2xl font-bold">Notification Settings</h1>
+            <p className="text-sm text-gray-400">
+              Configure alerts and system notifications for EduGuard.
+            </p>
           </div>
         </div>
+      </div>
+
+      {/* MAIN CONTAINER */}
+      <div className="bg-white/5 border border-white/10 backdrop-blur-xl rounded-xl p-6">
+
+        {/* TOGGLES */}
+        <div className="space-y-4 mb-8">
+
+          {[
+            "Email Alerts for New Incidents",
+            "High-Risk Student Alerts",
+            "Report Outcome Prediction",
+            "Platform Warnings",
+          ].map((label) => (
+            <div
+              key={label}
+              className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-4 py-3"
+            >
+              <span className="text-sm text-gray-200">{label}</span>
+              <Toggle />
+            </div>
+          ))}
+        </div>
+
+        {/* RECIPIENTS */}
+        <div>
+          <h3 className="text-green-400 font-semibold mb-4">
+            Notification Recipients
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div>
+              <label className="text-sm text-gray-300">Admin Email</label>
+              <input
+                type="email"
+                placeholder="admin@email.com"
+                className="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:ring-1 focus:ring-green-500 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-300">Guidance Email</label>
+              <input
+                type="email"
+                placeholder="guidance@email.com"
+                className="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:ring-1 focus:ring-green-500 outline-none"
+              />
+            </div>
+
+          </div>
+        </div>
+
+        {/* SAVE BUTTON */}
+        <div className="mt-6 flex justify-end">
+          <button className="bg-green-500 hover:bg-green-600 text-black font-semibold px-6 py-2 rounded-lg transition">
+            Save Changes
+          </button>
+        </div>
+
       </div>
     </div>
   );

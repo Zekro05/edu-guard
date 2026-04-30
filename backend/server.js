@@ -84,6 +84,7 @@ app.get("/api/users", async (req, res) => {
 export const io = new Server(server, {
   cors: {
     origin: [
+      "http://localhost:8081",
       "http://localhost:5173",
       "http://localhost:5174",
       "exp://localhost:19000",
@@ -137,7 +138,6 @@ io.on("connection", (socket) => {
     console.log("📩 SOCKET send_message HIT:", msg);
 
 
-    /* 🔥 THIS IS WHAT YOU ARE MISSING */
     io.emit("activity_feed", {
       type: "message",
       message: `💬 New message from ${msg.sender}`,

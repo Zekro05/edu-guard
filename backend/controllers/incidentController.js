@@ -2,30 +2,50 @@ import mongoose from "mongoose";
 import Incident from "../models/incidentModel.js";
 import Student from "../models/studentModel.js";
 
-// Get incidents for a specific student (admin or student)
+/* ================= GET INCIDENTS ================= */
+// Admin → all or filtered
+// Student → only their own
 export const getIncidents = async (req, res) => {
   try {
-    // Make sure the request has a user (from auth middleware)
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { studentId } = req.query;
-    if (!studentId) {
-      return res.status(400).json({ message: "studentId is required" });
-    }
+    let query = {};
 
-    // Build query safely
-    let query;
-    if (mongoose.Types.ObjectId.isValid(studentId)) {
-      query = { studentId: new mongoose.Types.ObjectId(studentId) };
+    if (req.user.role === "admin") {
+      // ✅ ADMIN (WEB)
+      const { studentId } = req.query;
+
+      // optional filter
+      if (studentId) {
+        if (mongoose.Types.ObjectId.isValid(studentId)) {
+          query.studentId = new mongoose.Types.ObjectId(studentId);
+        } else {
+          query.studentId = studentId;
+        }
+      }
+
+      // if no studentId → return ALL (this fixes your issue)
+
+    } else if (req.user.role === "student") {
+      // ✅ STUDENT (MOBILE)
+      const student = await Student.findOne({ userId: req.user._id });
+
+      if (!student) {
+        return res.status(404).json({ message: "Student profile not found" });
+      }
+
+      query.studentId = student._id;
+
     } else {
-      query = { studentId: studentId }; // fallback if stored as string
+      return res.status(403).json({ message: "Forbidden" });
     }
 
-    const incidents = await Incident.find(query).sort({ date: -1 });
+    const incidents = await Incident.find(query).sort({ createdAt: -1 });
 
     res.json(incidents);
+
   } catch (err) {
     console.error("getIncidents error:", err);
     res.status(500).json({ message: err.message });
@@ -33,7 +53,7 @@ export const getIncidents = async (req, res) => {
 };
 
 
-// Create a new incident (student reports themselves OR admin)
+/* ================= CREATE INCIDENT ================= */
 export const createIncident = async (req, res) => {
   try {
     const { title, date, category, action, level, studentId: adminStudentId } = req.body;
@@ -41,19 +61,30 @@ export const createIncident = async (req, res) => {
     let studentId;
 
     if (req.user.role === "student") {
-      // Students can only create incidents for themselves
-      const student = await Student.findOne({ userId: req.userId });
-      if (!student) return res.status(404).json({ message: "Student profile not found" });
+      // Student can only create for themselves
+      const student = await Student.findOne({ userId: req.user._id });
+
+      if (!student) {
+        return res.status(404).json({ message: "Student profile not found" });
+      }
+
       studentId = student._id;
+
     } else if (req.user.role === "admin") {
-      // Admins must provide a studentId
-      if (!adminStudentId) return res.status(400).json({ message: "studentId required" });
+      // Admin must provide studentId
+      if (!adminStudentId) {
+        return res.status(400).json({ message: "studentId required" });
+      }
+
       studentId = adminStudentId;
+
     } else {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    if (!title) return res.status(400).json({ message: "Title is required" });
+    if (!title) {
+      return res.status(400).json({ message: "Title is required" });
+    }
 
     const incident = await Incident.create({
       studentId,
@@ -64,49 +95,64 @@ export const createIncident = async (req, res) => {
       level,
     });
 
-    io.emit("activity_feed", {
-  type: "incident",
-  message: `⚠️ Incident created for ${incident.studentName}`,
-  time: new Date(),
-});
-
-    // Update student's totalIncidents and riskLevel
+    /* ===== AUTO UPDATE STUDENT STATS ===== */
     const totalIncidents = await Incident.countDocuments({ studentId });
+
     let riskLevel = "Low";
     const highCount = await Incident.countDocuments({ studentId, level: "High" });
     const medCount = await Incident.countDocuments({ studentId, level: "Medium" });
+
     if (highCount > 0) riskLevel = "High";
     else if (medCount > 0) riskLevel = "Medium";
 
-    await Student.findByIdAndUpdate(studentId, { totalIncidents, riskLevel });
+    await Student.findByIdAndUpdate(studentId, {
+      totalIncidents,
+      riskLevel,
+    });
 
     res.status(201).json(incident);
+
   } catch (err) {
+    console.error("createIncident error:", err);
     res.status(500).json({ message: err.message });
   }
 };
 
-// Delete incident (only admins)
+
+/* ================= DELETE INCIDENT ================= */
 export const deleteIncident = async (req, res) => {
   try {
-    if (req.user.role !== "admin") return res.status(403).json({ message: "Forbidden" });
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
 
     const incident = await Incident.findByIdAndDelete(req.params.id);
-    if (!incident) return res.status(404).json({ message: "Incident not found" });
 
-    // Update student summary
+    if (!incident) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+
     const studentId = incident.studentId;
+
+    /* ===== UPDATE STUDENT STATS AFTER DELETE ===== */
     const totalIncidents = await Incident.countDocuments({ studentId });
+
     let riskLevel = "Low";
     const highCount = await Incident.countDocuments({ studentId, level: "High" });
     const medCount = await Incident.countDocuments({ studentId, level: "Medium" });
+
     if (highCount > 0) riskLevel = "High";
     else if (medCount > 0) riskLevel = "Medium";
 
-    await Student.findByIdAndUpdate(studentId, { totalIncidents, riskLevel });
+    await Student.findByIdAndUpdate(studentId, {
+      totalIncidents,
+      riskLevel,
+    });
 
     res.json({ message: "Incident deleted" });
+
   } catch (err) {
+    console.error("deleteIncident error:", err);
     res.status(500).json({ message: err.message });
   }
 };
