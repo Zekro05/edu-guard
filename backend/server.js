@@ -12,7 +12,7 @@ import Message from "./models/message.js";
 import authRoutes from "./routes/auth.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import incidentRoutes from "./routes/incidentRoutes.js";
-import reportRoutes from "./routes/reports.js";
+import reportRoutes from "./routes/reportRoutes.js";
 import historyRoutes from "./routes/historyRoutes.js";
 import geminiRoutes from "./routes/gemini.js";
 import messageRoutes from "./routes/messageRoutes.js";
