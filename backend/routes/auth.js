@@ -18,6 +18,7 @@ import { verifyToken } from "../middleware/verifyToken.js";
 import { upload } from "../middleware/upload.js";
 import { getChatUsers } from "../controllers/authController.js";
 import { searchUsers } from "../controllers/authController.js";
+import { verifyMobileLoginOTP } from "../controllers/authController.js";
 
 const router = express.Router();
 
@@ -39,6 +40,7 @@ router.post("/verify-email", verifyEmail);
 
 // ---------------- LOGIN OTP VERIFICATION ----------------
 router.post("/verify-login-otp", verifyLoginOTP);
+router.post("/verify-mobile-login-otp", verifyMobileLoginOTP);
 
 
 // ---------------- FORGOT PASSWORD ----------------
