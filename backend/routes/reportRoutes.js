@@ -2,6 +2,7 @@ import express from "express";
 import Report from "../models/reportModel.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 import { io } from "../server.js";
+import { getMyReports } from "../controllers/reportController.js";
 
 const router = express.Router();
 
@@ -83,5 +84,9 @@ router.get("/", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+
+router.get("/my", verifyToken, getMyReports);
+
 
 export default router;

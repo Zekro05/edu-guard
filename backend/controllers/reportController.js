@@ -1,5 +1,6 @@
 // backend/controllers/reportController.js
 import Report from "../models/reportModel.js"; // make sure your model file is Report.js
+import Student from "../models/studentModel.js";
 
 // GET all reports by type
 export const getReportsByType = async (req, res) => {
