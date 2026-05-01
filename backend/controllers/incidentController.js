@@ -22,7 +22,7 @@ export const getIncidents = async (req, res) => {
         if (mongoose.Types.ObjectId.isValid(studentId)) {
           query.studentId = new mongoose.Types.ObjectId(studentId);
         } else {
-          query.studentId = studentId;
+          query.studentId = studentId.toString();
         }
       }
 
@@ -36,13 +36,28 @@ export const getIncidents = async (req, res) => {
         return res.status(404).json({ message: "Student profile not found" });
       }
 
-      query.studentId = student._id;
+      query.studentId = student._id.toString();
 
     } else {
       return res.status(403).json({ message: "Forbidden" });
     }
 
     const incidents = await Incident.find(query).sort({ createdAt: -1 });
+    const normalized = incidents.map((i) => {
+  let status = "Pending";
+
+  if (i.status === "accepted") status = "Under Review";
+  if (i.status === "Accepted") status = "Under Review";
+  if (i.status === "pending") status = "Pending";
+  if (i.status === "resolved") status = "Resolved";
+
+  return {
+    ...i.toObject(),
+    status,
+  };
+});
+
+    res.json(normalized);
 
     res.json(incidents);
 

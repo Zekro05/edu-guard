@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../store/authStore";
+import { useAuthStore, API } from "../store/authStore";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
@@ -93,13 +93,23 @@ const ReportPage = () => {
   }, [user]);
 
   /* ================= ACTIONS ================= */
-  const handleAccept = async (id) => {
-    await axios.put(`http://localhost:5000/api/reports/${id}/accept`);
-  };
+ const handleAccept = async (id) => {
+  try {
+    await API.put(`/api/reports/${id}/accept`);
+    fetchReports(); // refresh list
+  } catch (err) {
+    console.log("Accept error:", err.response?.data || err.message);
+  }
+};
 
-  const handleReject = async (id) => {
-    await axios.put(`http://localhost:5000/api/reports/${id}/reject`);
-  };
+const handleReject = async (id) => {
+  try {
+    await API.put(`/api/reports/${id}/reject`);
+    fetchReports();
+  } catch (err) {
+    console.log("Reject error:", err.response?.data || err.message);
+  }
+};
 
   /* ================= FILTERED LIST ================= */
   const filteredReports = useMemo(() => {
