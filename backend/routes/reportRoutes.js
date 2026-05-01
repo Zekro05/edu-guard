@@ -1,5 +1,6 @@
 import express from "express";
 import Report from "../models/reportModel.js";
+import Incident from "../models/incidentModel.js"
 import { verifyToken } from "../middleware/verifyToken.js";
 import { io } from "../server.js";
 import { getMyReports } from "../controllers/reportController.js";
@@ -87,19 +88,30 @@ router.get("/", async (req, res) => {
 
 router.put("/:id/accept", verifyToken, async (req, res) => {
   try {
-    const report = await Report.findByIdAndUpdate(
-      req.params.id,
-      { status: "accepted" },
-      { new: true }
-    );
+    const report = await Report.findById(req.params.id);
 
     if (!report) {
       return res.status(404).json({ message: "Report not found" });
     }
 
-    res.json(report);
+    // 1. Update report status
+    report.status = "accepted";
+    await report.save();
+
+    // 2. CREATE INCIDENT (THIS IS WHAT YOU ARE MISSING)
+    await Incident.create({
+      studentId: report.studentId,
+      title: report.offense,
+      date: report.date,
+      category: report.offense,
+      action: "Under Review",
+      level: "Low", // or map from offense if you want
+    });
+
+    return res.json(report);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error(err);
+    return res.status(500).json({ message: err.message });
   }
 });
 
