@@ -34,7 +34,7 @@ router.post("/", verifyToken, async (req, res) => {
       time,
 
       // ✅ FIX: logged-in user is reporter
-      reporter: req.user.name,
+      reporter,
       reporterId: req.userId,
     });
 
