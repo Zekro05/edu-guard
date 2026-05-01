@@ -14,56 +14,41 @@ export const getIncidents = async (req, res) => {
     let query = {};
 
     if (req.user.role === "admin") {
-      // ✅ ADMIN (WEB)
       const { studentId } = req.query;
 
-      // optional filter
       if (studentId) {
         if (mongoose.Types.ObjectId.isValid(studentId)) {
           query.studentId = new mongoose.Types.ObjectId(studentId);
         } else {
-          query.studentId = studentId.toString();
+          query.studentId = studentId;
         }
       }
 
-      // if no studentId → return ALL (this fixes your issue)
-
     } else if (req.user.role === "student") {
-      // ✅ STUDENT (MOBILE)
       const student = await Student.findOne({ userId: req.user._id });
 
       if (!student) {
         return res.status(404).json({ message: "Student profile not found" });
       }
 
-      query.studentId = student._id.toString();
+      query.studentId = student._id;
 
     } else {
       return res.status(403).json({ message: "Forbidden" });
     }
 
     const incidents = await Incident.find(query).sort({ createdAt: -1 });
-    const normalized = incidents.map((i) => {
-  let status = "Pending";
 
-  if (i.status === "accepted") status = "Under Review";
-  if (i.status === "Accepted") status = "Under Review";
-  if (i.status === "pending") status = "Pending";
-  if (i.status === "resolved") status = "Resolved";
-
-  return {
-    ...i.toObject(),
-    status,
-  };
-});
-
-    res.json(normalized);
-
-    res.json(incidents);
+    // ⚠️ IMPORTANT: ONLY ONE RESPONSE EVER
+    return res.status(200).json(incidents);
 
   } catch (err) {
     console.error("getIncidents error:", err);
-    res.status(500).json({ message: err.message });
+
+    // ⚠️ IMPORTANT: prevent double-send safety check
+    if (!res.headersSent) {
+      return res.status(500).json({ message: err.message });
+    }
   }
 };
 
