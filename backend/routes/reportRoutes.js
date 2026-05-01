@@ -16,6 +16,7 @@ router.post("/", verifyToken, async (req, res) => {
       description,
       date,
       time,
+      reporter,
     } = req.body;
 
     if (!studentId || !studentName || !description || !location) {
