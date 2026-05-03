@@ -1,6 +1,8 @@
 import express from "express";
+import mongoose from "mongoose"; 
 import Report from "../models/reportModel.js";
 import Incident from "../models/incidentModel.js"
+import Student from "../models/studentModel.js"; 
 import { verifyToken } from "../middleware/verifyToken.js";
 import { io } from "../server.js";
 import { getMyReports } from "../controllers/reportController.js";
