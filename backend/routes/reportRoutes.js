@@ -98,17 +98,17 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
     report.status = "accepted";
     await report.save();
 
-    // 2. Create incident
+    // 2. Create incident (NOW LINKED PROPERLY)
     await Incident.create({
       studentId: report.studentId,
+      reportId: report._id, // 🔥 FIX ADDED
       title: report.offense,
-      date: report.date,
       category: report.offense,
-      action: "Accepted", // 🔥 IMPORTANT FIX (consistent status)
+      action: "Accepted",
       level: "Low",
     });
 
-    // 3. UPDATE STUDENT STATS (🔥 THIS IS WHAT YOU'RE MISSING)
+    // 3. Recalculate stats
     const totalIncidents = await Incident.countDocuments({
       studentId: report.studentId,
     });
@@ -161,6 +161,28 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
 
 
 router.get("/my", verifyToken, getMyReports);
+
+router.get("/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid report ID" });
+    }
+
+    const report = await Report.findById(id)
+      .populate("studentId", "name grade");
+
+    if (!report) {
+      return res.status(404).json({ message: "Report not found" });
+    }
+
+    res.json(report);
+  } catch (err) {
+    console.error("GET report by ID error:", err);
+    res.status(500).json({ message: err.message });
+  }
+});
 
 
 export default router;
