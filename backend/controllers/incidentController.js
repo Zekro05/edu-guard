@@ -7,49 +7,49 @@ import Student from "../models/studentModel.js";
 // Student → only their own
 export const getIncidents = async (req, res) => {
   try {
-    if (!req.user) {
+    // 🔐 must have userId from token middleware
+    if (!req.userId) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
     let query = {};
 
-    if (req.user.role === "admin") {
+    // ================= ADMIN =================
+    if (req.user?.role === "admin") {
       const { studentId } = req.query;
 
-      if (studentId) {
-        if (mongoose.Types.ObjectId.isValid(studentId)) {
-          query.studentId = new mongoose.Types.ObjectId(studentId);
-        } else {
-          query.studentId = studentId;
-        }
+      if (studentId && mongoose.Types.ObjectId.isValid(studentId)) {
+        query.studentId = new mongoose.Types.ObjectId(studentId);
       }
+    }
 
-    } else if (req.user.role === "student") {
-     const student = await Student.findOne({ createdBy: req.userId });
+    // ================= STUDENT =================
+    else if (req.user?.role === "student") {
+      const student = await Student.findOne({ createdBy: req.userId });
 
       if (!student) {
-        console.log("⚠️ No student linked to this user");
-        return res.status(404).json({ message: "Student profile not found" });
+        return res.status(404).json({
+          message: "Student profile not found",
+        });
       }
 
       query.studentId = student._id;
+    }
 
-    } else {
-      return res.status(403).json({ message: "Forbidden" });
+    // ================= DEFAULT GUARD =================
+    else if (!req.user?.role) {
+      return res.status(403).json({ message: "Forbidden - role missing" });
     }
 
     const incidents = await Incident.find(query).sort({ createdAt: -1 });
 
-    // ⚠️ IMPORTANT: ONLY ONE RESPONSE EVER
     return res.status(200).json(incidents);
-
   } catch (err) {
     console.error("getIncidents error:", err);
 
-    // ⚠️ IMPORTANT: prevent double-send safety check
-    if (!res.headersSent) {
-      return res.status(500).json({ message: err.message });
-    }
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
