@@ -25,7 +25,7 @@ export const getIncidents = async (req, res) => {
       }
 
     } else if (req.user.role === "student") {
-      const student = await Student.findOne({ userId: req.user._id });
+      const student = await Student.findOne({ createdBy: req.user._id });
 
       if (!student) {
         return res.status(404).json({ message: "Student profile not found" });
@@ -62,7 +62,7 @@ export const createIncident = async (req, res) => {
 
     if (req.user.role === "student") {
       // Student can only create for themselves
-      const student = await Student.findOne({ userId: req.user._id });
+      const student = await Student.findOne({ createdBy: req.user._id });
 
       if (!student) {
         return res.status(404).json({ message: "Student profile not found" });

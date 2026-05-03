@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { API } from "../store/authStore"; // ✅ USE YOUR AUTH API
+import { API } from "../store/authStore";
 import { exportInterventionPDF } from "../utils/exportInterventionPDF";
 import {
   LayoutDashboard, Users, ShieldX, ChartNoAxesCombined,
@@ -31,56 +31,60 @@ const InterventionPage = () => {
   }, []);
 
   const fetchData = async () => {
-  try {
-    const [reportRes, incidentRes] = await Promise.all([
-      API.get("/api/reports"),
-      API.get("/api/incidents"), // requires backend fix if strict
-    ]);
+    try {
+      const [reportRes, incidentRes] = await Promise.all([
+        API.get("/api/reports"),
+        API.get("/api/incidents"),
+      ]);
 
-    // ✅ FIXED HERE
-    const reports = reportRes.data.reports.map((r) => ({
-      _id: r._id,
-      studentId: r.studentId,
-      studentName: r.studentName,
-      offense: r.offense,
-    }));
+      /* ================= REPORTS SAFE ================= */
+      const reportsData = Array.isArray(reportRes.data?.reports)
+        ? reportRes.data.reports
+        : Array.isArray(reportRes.data)
+        ? reportRes.data
+        : [];
 
-    setCases(reports);
+      const reports = reportsData.map((r) => ({
+        _id: r._id,
+        studentId: String(r.studentId),
+        studentName: r.studentName || "Unknown",
+        offense: r.offense || "",
+      }));
 
-    // GROUP INCIDENTS
-    const grouped = {};
-    incidentRes.data.forEach((i) => {
-      const key = i.studentId;
+      setCases(reports);
 
-      if (!grouped[key]) grouped[key] = [];
+      /* ================= INCIDENTS SAFE ================= */
+      const incidentsData = Array.isArray(incidentRes.data)
+        ? incidentRes.data
+        : [];
 
-      grouped[key].push({
-        type: i.title,
-        description: i.action,
-        status: "completed",
+      const grouped = {};
+
+      incidentsData.forEach((i) => {
+        const key = String(i.studentId);
+
+        if (!grouped[key]) grouped[key] = [];
+
+        grouped[key].push({
+          type: i.title || "Intervention",
+          description: i.action || "",
+          status: "completed",
+        });
       });
-    });
 
-    setInterventions(grouped);
+      setInterventions(grouped);
 
-  } catch (err) {
-    console.error("FULL ERROR:", err.response?.data || err.message);
-  }
-};
-
-  /* ================= HELPERS ================= */
-  const getInitials = (name) =>
-    name.split(" ").map((n) => n[0]).join("").toUpperCase();
-
-  const getSeverity = (offense) => {
-    const o = offense.toLowerCase();
-    if (["fighting", "assault", "theft"].some((x) => o.includes(x))) return "high";
-    if (["bullying", "vandalism", "disrespect"].some((x) => o.includes(x))) return "medium";
-    return "low";
+    } catch (err) {
+      console.error("FULL ERROR:", err.response?.data || err.message);
+    }
   };
 
+  /* ================= HELPERS ================= */
+  const getInitials = (name = "") =>
+    name.split(" ").filter(Boolean).map((n) => n[0]).join("").toUpperCase();
+
   const getOffenseCount = (studentId) =>
-    interventions[studentId]?.length || 0;
+    interventions[String(studentId)]?.length || 0;
 
   const getOffenderLevel = (studentId) => {
     const c = getOffenseCount(studentId);
@@ -91,7 +95,7 @@ const InterventionPage = () => {
   };
 
   const recommendAction = (offense, studentId) => {
-    const o = offense.toLowerCase();
+    const o = (offense || "").toLowerCase();
 
     if (getOffenderLevel(studentId) === "repeat-offender") {
       return "SUSPENSION (AUTO ESCALATED)";
@@ -105,11 +109,10 @@ const InterventionPage = () => {
   };
 
   const getStatus = (studentId) => {
-    const list = interventions[studentId] || [];
+    const list = interventions[String(studentId)] || [];
     if (list.length === 0) return "none";
     if (list.some((i) => i.status === "active")) return "active";
-    if (list.every((i) => i.status === "completed")) return "completed";
-    return "pending";
+    return "completed";
   };
 
   /* ================= FILTER ================= */
@@ -121,15 +124,13 @@ const InterventionPage = () => {
         tab !== "all" &&
         tab !== status &&
         !(tab === "none" && status === "none")
-      )
-        return false;
+      ) return false;
 
       if (
         search &&
         !c.studentName.toLowerCase().includes(search.toLowerCase()) &&
         !c.offense.toLowerCase().includes(search.toLowerCase())
-      )
-        return false;
+      ) return false;
 
       return true;
     });
@@ -151,19 +152,18 @@ const InterventionPage = () => {
 
       await API.post("/api/incidents", payload);
 
-      await fetchData(); // refresh
+      await fetchData();
 
       setForm({ type: "warning", description: "", status: "pending" });
     } catch (err) {
-      console.error("Submit error:", err);
+      console.error("Submit error:", err.response?.data || err.message);
     }
   };
 
-  /* ================= UI ================= */
+  /* ================= UI (UNCHANGED) ================= */
   return (
     <div className="h-screen w-screen flex bg-gradient-to-br from-gray-950 via-green-950 to-emerald-950 text-white">
 
-      {/* SIDEBAR */}
       <aside className="w-72 bg-white/5 p-6 border-r border-white/10">
         <h1 className="text-2xl font-bold text-green-400">EduGuard</h1>
 
@@ -179,10 +179,8 @@ const InterventionPage = () => {
         <Nav icon={<Settings />} label="Settings" onClick={() => navigate("/settings")} />
       </aside>
 
-      {/* MAIN */}
       <main className="flex-1 p-6 overflow-y-auto">
 
-        {/* HEADER */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold">Intervention System</h2>
 
@@ -196,14 +194,18 @@ const InterventionPage = () => {
           </div>
         </div>
 
-        {/* STATS */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <Stat label="Total Cases" value={cases.length} />
-          <Stat label="Repeat Offenders" value={cases.filter(c => getOffenderLevel(c.studentId) === "repeat-offender").length} />
-          <Stat label="Active Cases" value={cases.filter(c => getStatus(c.studentId) === "active").length} />
+          <Stat
+            label="Repeat Offenders"
+            value={cases.filter(c => getOffenderLevel(c.studentId) === "repeat-offender").length}
+          />
+          <Stat
+            label="Active Cases"
+            value={cases.filter(c => getStatus(c.studentId) === "active").length}
+          />
         </div>
 
-        {/* TABS */}
         <div className="flex gap-3 mb-6">
           {["all", "none", "active", "completed"].map((t) => (
             <button
@@ -216,7 +218,6 @@ const InterventionPage = () => {
           ))}
         </div>
 
-        {/* CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((c) => (
             <div
@@ -245,7 +246,6 @@ const InterventionPage = () => {
         </div>
       </main>
 
-      {/* MODAL */}
       {open && selected && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
           <div className="bg-gray-900 w-[600px] p-6 rounded-2xl relative">
@@ -260,7 +260,6 @@ const InterventionPage = () => {
 
             <p className="text-gray-400">{selected.offense}</p>
 
-            {/* TIMELINE */}
             <div className="mt-4">
               <h3 className="font-semibold mb-2">Timeline</h3>
 
@@ -274,7 +273,6 @@ const InterventionPage = () => {
               </div>
             </div>
 
-            {/* FORM */}
             <div className="mt-4 flex flex-col gap-2">
 
               <select name="type" onChange={handleChange} className="bg-white/10 p-2 rounded">

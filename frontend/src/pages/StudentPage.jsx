@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { motion } from "framer-motion";
@@ -38,10 +38,53 @@ const StudentPage = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // ✅ NEW (bulk import)
+  const fileInputRef = useRef(null);
+  const [importing, setImporting] = useState(false);
+
   // FETCH
   const fetchStudents = async () => {
     const res = await API.get("/api/students");
     setStudents(res.data);
+  };
+
+  // BULK IMPORT HANDLER
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setImporting(true);
+
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!Array.isArray(data)) {
+        toast.error("JSON must be an array of students");
+        return;
+      }
+
+      const validStudents = data.filter(
+        (s) => s.firstName && s.lastName && s.grade
+      );
+
+      if (validStudents.length === 0) {
+        toast.error("No valid student data found");
+        return;
+      }
+
+      await API.post("/api/students/bulk", validStudents);
+
+      toast.success(`Imported ${validStudents.length} students`);
+      fetchStudents();
+
+    } catch (err) {
+      console.error(err);
+      toast.error("Invalid JSON file");
+    } finally {
+      setImporting(false);
+      e.target.value = null;
+    }
   };
 
   // REAL-TIME SOCKET
@@ -155,7 +198,6 @@ const StudentPage = () => {
         <div>
           <h1 className="text-2xl font-bold text-green-400">EduGuard</h1>
 
-          {/* 🏫 SCHOOL NAME ADDED BACK */}
           <p className="text-xs text-gray-400 mb-6">
             Our Lady of the Holy Rosary - General Trias Cavite
           </p>
@@ -189,7 +231,7 @@ const StudentPage = () => {
           <Stat title="Low Risk" value={low} color="text-green-400" />
         </div>
 
-        {/* SEARCH + ADD */}
+        {/* SEARCH + ADD + IMPORT (UNCHANGED UI STYLE) */}
         <div className="flex justify-between gap-4">
           <input
             placeholder="Search student..."
@@ -197,21 +239,39 @@ const StudentPage = () => {
             onChange={(e) => setSearch(e.target.value)}
           />
 
-          <button
-            onClick={() => {
-              setSelectedStudent(null);
-              setIsEditing(false);
-              setShowModal(true);
-            }}
-            className="bg-green-500 px-4 py-2 rounded-xl"
-          >
-            + Add Student
-          </button>
+          <div className="flex gap-2">
+            {/* HIDDEN INPUT */}
+            <input
+              type="file"
+              accept=".json"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+
+            <button
+              onClick={() => fileInputRef.current.click()}
+              className="bg-blue-500 px-4 py-2 rounded-xl"
+              disabled={importing}
+            >
+              {importing ? "Importing..." : "Import JSON"}
+            </button>
+
+            <button
+              onClick={() => {
+                setSelectedStudent(null);
+                setIsEditing(false);
+                setShowModal(true);
+              }}
+              className="bg-green-500 px-4 py-2 rounded-xl"
+            >
+              + Add Student
+            </button>
+          </div>
         </div>
 
         {/* TABLE */}
         <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-
           <table className="w-full text-sm">
             <thead className="bg-white/10 text-gray-300">
               <tr>
@@ -240,7 +300,6 @@ const StudentPage = () => {
 
                   <td className="p-3">
                     <div className="flex justify-end gap-2">
-
                       <button onClick={() => { setSelectedStudent(s); setShowProfile(true); }} className="p-2 bg-white/10 rounded-lg">
                         <Eye size={16} />
                       </button>
@@ -252,13 +311,11 @@ const StudentPage = () => {
                       <button onClick={() => setDeleteTarget(s)} className="p-2 bg-red-500/20 text-red-400 rounded-lg">
                         <Trash2 size={16} />
                       </button>
-
                     </div>
                   </td>
                 </motion.tr>
               ))}
             </tbody>
-
           </table>
         </div>
 

@@ -61,14 +61,8 @@ export const getMyReports = async (req, res) => {
   try {
     const userId = req.userId;
 
-    const student = await Student.findOne({ createdBy: userId });
-
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
-
     const reports = await Report.find({
-      studentId: student._id,
+      reporterId: userId, // ✅ THIS IS THE FIX
     }).sort({ createdAt: -1 });
 
     res.status(200).json(reports);
@@ -76,5 +70,4 @@ export const getMyReports = async (req, res) => {
     console.error("Get My Reports Error:", err);
     res.status(500).json({ message: "Server error" });
   }
-
 };

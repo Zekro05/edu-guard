@@ -89,6 +89,44 @@ export const updateStudent = async (req, res) => {
   }
 };
 
+export const createStudentsBulk = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+
+    const students = req.body;
+
+    if (!Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({ message: "Invalid student data" });
+    }
+
+    // OPTIONAL: sanitize + add createdBy
+    const preparedStudents = students.map((s) => ({
+      ...s,
+      createdBy: req.userId,
+    }));
+
+    const created = await Student.insertMany(preparedStudents);
+
+    await createHistoryLog({
+      userId: user._id,
+      role: mapRoleForHistory(user.role),
+      action: "Bulk Import Students",
+      category: "Student",
+      details: `Imported ${created.length} students`,
+      ipAddress: req.ip,
+    });
+
+    res.status(201).json({
+      message: "Bulk import successful",
+      count: created.length,
+      data: created,
+    });
+  } catch (error) {
+    console.error("BULK IMPORT ERROR:", error);
+    res.status(500).json({ message: "Failed bulk import" });
+  }
+};
+
 /*  DELETE STUDENT */
 export const deleteStudent = async (req, res) => {
   const user = await User.findById(req.userId);

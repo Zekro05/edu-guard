@@ -55,6 +55,7 @@ const MobileReport = ({ report, onAccept, onReject }) => {
         <Info label="Location" value={report.location} />
         <Info label="Date" value={report.date} />
         <Info label="Time" value={report.time} />
+        <Info label="Reporter" value={report.reporter} />
       </div>
 
       {/* DESCRIPTION */}
