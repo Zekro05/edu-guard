@@ -160,8 +160,9 @@ export const deleteIncident = async (req, res) => {
 
 export const getIncidentById = async (req, res) => {
   try {
-    const incident = await Incident.findById(req.params.id)
-      .populate("studentId", "name grade");
+    const incident = await Incident.findOne({
+      reportId: req.params.id,   // 🔥 IMPORTANT FIX
+    });
 
     if (!incident) {
       return res.status(404).json({ message: "Incident not found" });
