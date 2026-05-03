@@ -1,11 +1,9 @@
 import express from "express";
 import Report from "../models/reportModel.js";
-import Incident from "../models/incidentModel.js";
+import Incident from "../models/incidentModel.js"
 import { verifyToken } from "../middleware/verifyToken.js";
 import { io } from "../server.js";
-import {
-  getMyReports,
-} from "../controllers/reportController.js";
+import { getMyReports } from "../controllers/reportController.js";
 
 const router = express.Router();
 
@@ -24,7 +22,9 @@ router.post("/", verifyToken, async (req, res) => {
     } = req.body;
 
     if (!studentId || !studentName || !description || !location) {
-      return res.status(400).json({ message: "Missing required fields" });
+      return res.status(400).json({
+        message: "Missing required fields",
+      });
     }
 
     const report = await Report.create({
@@ -35,22 +35,26 @@ router.post("/", verifyToken, async (req, res) => {
       description,
       date,
       time,
+
+      // ✅ FIX: logged-in user is reporter
       reporter,
       reporterId: req.userId,
-      status: "pending",
     });
 
     io.emit("new-report", report);
 
     return res.status(201).json(report);
   } catch (err) {
-    console.log("CREATE REPORT ERROR:", err);
-    return res.status(500).json({ message: err.message });
+    console.log("REPORT ERROR:", err);
+    return res.status(500).json({
+      message: "Internal Server Error",
+      error: err.message,
+    });
   }
 });
 
 /* ================= GET REPORTS ================= */
-router.get("/", verifyToken, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const { page = 1, limit = 5, status, search } = req.query;
 
@@ -68,21 +72,20 @@ router.get("/", verifyToken, async (req, res) => {
     const reports = await Report.find(query)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
-      .limit(Number(limit));
+      .limit(parseInt(limit));
 
     const total = await Report.countDocuments(query);
 
-    return res.json({
+    res.json({
       reports,
       totalPages: Math.ceil(total / limit),
       currentPage: Number(page),
     });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    res.status(500).json({ message: err.message });
   }
 });
 
-/* ================= ACCEPT REPORT ================= */
 router.put("/:id/accept", verifyToken, async (req, res) => {
   try {
     const report = await Report.findById(req.params.id);
@@ -91,30 +94,53 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Report not found" });
     }
 
+    // 1. Accept report
     report.status = "accepted";
     await report.save();
 
-    // ✅ Create linked incident
-    const incident = await Incident.create({
+    // 2. Create incident
+    await Incident.create({
       studentId: report.studentId,
       title: report.offense,
       date: report.date,
       category: report.offense,
-      action: "Accepted",
+      action: "Accepted", // 🔥 IMPORTANT FIX (consistent status)
       level: "Low",
-      reportId: report._id, // 🔥 IMPORTANT FOR HISTORY LINKING
     });
 
-    io.emit("report-updated", { report, incident });
+    // 3. UPDATE STUDENT STATS (🔥 THIS IS WHAT YOU'RE MISSING)
+    const totalIncidents = await Incident.countDocuments({
+      studentId: report.studentId,
+    });
 
-    return res.json({ report, incident });
+    const highCount = await Incident.countDocuments({
+      studentId: report.studentId,
+      level: "High",
+    });
+
+    const medCount = await Incident.countDocuments({
+      studentId: report.studentId,
+      level: "Medium",
+    });
+
+    let riskLevel = "Low";
+    if (highCount > 0) riskLevel = "High";
+    else if (medCount > 0) riskLevel = "Medium";
+
+    await Student.findByIdAndUpdate(report.studentId, {
+      totalIncidents,
+      riskLevel,
+    });
+
+    return res.json(report);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: err.message });
   }
 });
 
-/* ================= REJECT REPORT ================= */
+
+
 router.put("/:id/reject", verifyToken, async (req, res) => {
   try {
     const report = await Report.findByIdAndUpdate(
@@ -127,15 +153,14 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Report not found" });
     }
 
-    io.emit("report-updated", report);
-
-    return res.json(report);
+    res.json(report);
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    res.status(500).json({ message: err.message });
   }
 });
 
-/* ================= MY REPORTS ================= */
+
 router.get("/my", verifyToken, getMyReports);
+
 
 export default router;
