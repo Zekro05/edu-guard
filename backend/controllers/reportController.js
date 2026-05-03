@@ -71,3 +71,18 @@ export const getMyReports = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+export const getReportById = async (req, res) => {
+  try {
+    const report = await Report.findById(req.params.id)
+      .populate("studentId", "name");
+
+    if (!report) {
+      return res.status(404).json({ message: "Report not found" });
+    }
+
+    res.json(report);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

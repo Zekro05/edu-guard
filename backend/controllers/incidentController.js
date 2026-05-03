@@ -157,3 +157,18 @@ export const deleteIncident = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+export const getIncidentById = async (req, res) => {
+  try {
+    const incident = await Incident.findById(req.params.id)
+      .populate("studentId", "name grade");
+
+    if (!incident) {
+      return res.status(404).json({ message: "Incident not found" });
+    }
+
+    res.json(incident);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

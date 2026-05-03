@@ -1,9 +1,11 @@
 import express from "express";
 import Report from "../models/reportModel.js";
-import Incident from "../models/incidentModel.js"
+import Incident from "../models/incidentModel.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 import { io } from "../server.js";
-import { getMyReports } from "../controllers/reportController.js";
+import {
+  getMyReports,
+} from "../controllers/reportController.js";
 
 const router = express.Router();
 
@@ -22,9 +24,7 @@ router.post("/", verifyToken, async (req, res) => {
     } = req.body;
 
     if (!studentId || !studentName || !description || !location) {
-      return res.status(400).json({
-        message: "Missing required fields",
-      });
+      return res.status(400).json({ message: "Missing required fields" });
     }
 
     const report = await Report.create({
@@ -35,26 +35,22 @@ router.post("/", verifyToken, async (req, res) => {
       description,
       date,
       time,
-
-      // ✅ FIX: logged-in user is reporter
       reporter,
       reporterId: req.userId,
+      status: "pending",
     });
 
     io.emit("new-report", report);
 
     return res.status(201).json(report);
   } catch (err) {
-    console.log("REPORT ERROR:", err);
-    return res.status(500).json({
-      message: "Internal Server Error",
-      error: err.message,
-    });
+    console.log("CREATE REPORT ERROR:", err);
+    return res.status(500).json({ message: err.message });
   }
 });
 
 /* ================= GET REPORTS ================= */
-router.get("/", async (req, res) => {
+router.get("/", verifyToken, async (req, res) => {
   try {
     const { page = 1, limit = 5, status, search } = req.query;
 
@@ -72,20 +68,21 @@ router.get("/", async (req, res) => {
     const reports = await Report.find(query)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
-      .limit(parseInt(limit));
+      .limit(Number(limit));
 
     const total = await Report.countDocuments(query);
 
-    res.json({
+    return res.json({
       reports,
       totalPages: Math.ceil(total / limit),
       currentPage: Number(page),
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 });
 
+/* ================= ACCEPT REPORT ================= */
 router.put("/:id/accept", verifyToken, async (req, res) => {
   try {
     const report = await Report.findById(req.params.id);
@@ -94,29 +91,30 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Report not found" });
     }
 
-    // 1. Update report status
     report.status = "accepted";
     await report.save();
 
-    // 2. CREATE INCIDENT (THIS IS WHAT YOU ARE MISSING)
-    await Incident.create({
+    // ✅ Create linked incident
+    const incident = await Incident.create({
       studentId: report.studentId,
       title: report.offense,
       date: report.date,
       category: report.offense,
-      action: "Under Review",
-      level: "Low", // or map from offense if you want
+      action: "Accepted",
+      level: "Low",
+      reportId: report._id, // 🔥 IMPORTANT FOR HISTORY LINKING
     });
 
-    return res.json(report);
+    io.emit("report-updated", { report, incident });
+
+    return res.json({ report, incident });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: err.message });
   }
 });
 
-
-
+/* ================= REJECT REPORT ================= */
 router.put("/:id/reject", verifyToken, async (req, res) => {
   try {
     const report = await Report.findByIdAndUpdate(
@@ -129,14 +127,15 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Report not found" });
     }
 
-    res.json(report);
+    io.emit("report-updated", report);
+
+    return res.json(report);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 });
 
-
+/* ================= MY REPORTS ================= */
 router.get("/my", verifyToken, getMyReports);
-
 
 export default router;
