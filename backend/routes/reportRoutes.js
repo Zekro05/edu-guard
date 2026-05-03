@@ -1,8 +1,8 @@
 import express from "express";
-import mongoose from "mongoose"; 
+import mongoose from "mongoose";
 import Report from "../models/reportModel.js";
-import Incident from "../models/incidentModel.js"
-import Student from "../models/studentModel.js"; 
+import Incident from "../models/incidentModel.js";
+import Student from "../models/studentModel.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 import { io } from "../server.js";
 import { getMyReports } from "../controllers/reportController.js";
@@ -37,8 +37,6 @@ router.post("/", verifyToken, async (req, res) => {
       description,
       date,
       time,
-
-      // ✅ FIX: logged-in user is reporter
       reporter,
       reporterId: req.userId,
     });
@@ -55,7 +53,10 @@ router.post("/", verifyToken, async (req, res) => {
   }
 });
 
-/* ================= GET REPORTS ================= */
+/* ================= GET MY REPORTS ================= */
+router.get("/my", verifyToken, getMyReports);
+
+/* ================= GET ALL REPORTS ================= */
 router.get("/", async (req, res) => {
   try {
     const { page = 1, limit = 5, status, search } = req.query;
@@ -88,6 +89,32 @@ router.get("/", async (req, res) => {
   }
 });
 
+/* ================= GET REPORT BY ID (FIXED SAFE ORDER) ================= */
+router.get("/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid report ID" });
+    }
+
+    const report = await Report.findById(id).populate(
+      "studentId",
+      "name grade"
+    );
+
+    if (!report) {
+      return res.status(404).json({ message: "Report not found" });
+    }
+
+    res.json(report);
+  } catch (err) {
+    console.error("GET report by ID error:", err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+/* ================= ACCEPT REPORT ================= */
 router.put("/:id/accept", verifyToken, async (req, res) => {
   try {
     const report = await Report.findById(req.params.id);
@@ -96,21 +123,18 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Report not found" });
     }
 
-    // 1. Accept report
     report.status = "accepted";
     await report.save();
 
-    // 2. Create incident (NOW LINKED PROPERLY)
     await Incident.create({
       studentId: report.studentId,
-      reportId: report._id, // 🔥 FIX ADDED
+      reportId: report._id,
       title: report.offense,
       category: report.offense,
       action: "Accepted",
       level: "Low",
     });
 
-    // 3. Recalculate stats
     const totalIncidents = await Incident.countDocuments({
       studentId: report.studentId,
     });
@@ -141,8 +165,7 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
   }
 });
 
-
-
+/* ================= REJECT REPORT ================= */
 router.put("/:id/reject", verifyToken, async (req, res) => {
   try {
     const report = await Report.findByIdAndUpdate(
@@ -160,31 +183,5 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-
-
-router.get("/my", verifyToken, getMyReports);
-
-router.get("/:id", verifyToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid report ID" });
-    }
-
-    const report = await Report.findById(id)
-      .populate("studentId", "name grade");
-
-    if (!report) {
-      return res.status(404).json({ message: "Report not found" });
-    }
-
-    res.json(report);
-  } catch (err) {
-    console.error("GET report by ID error:", err);
-    res.status(500).json({ message: err.message });
-  }
-});
-
 
 export default router;
