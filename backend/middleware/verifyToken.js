@@ -1,31 +1,36 @@
 import jwt from "jsonwebtoken";
 
 export const verifyToken = (req, res, next) => {
-
-  console.log("AUTH HEADER:", req.headers.authorization);
-  console.log("COOKIES:", req.cookies);
-  // Token can be in cookie or Authorization header
-  const token = req.cookies.token || req.headers.authorization?.split(" ")[1];
-
-  if (!token) {
-    return res.status(401).json({ message: "Unauthorized - no token provided" });
-  }
-
   try {
+    console.log("AUTH HEADER:", req.headers.authorization);
+    console.log("COOKIES:", req.cookies);
+
+    const token =
+      req.cookies.token ||
+      req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).json({
+        message: "Unauthorized - no token provided",
+      });
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Attach full user info to req.user
+    // 🔥 SAFE USER ATTACHMENT
     req.user = {
       id: decoded.id,
-      name: decoded.name,
-      email: decoded.email,
-      role: decoded.role || "admin", // default to admin
+      role: decoded.role || "student", // default SAFE fallback
     };
 
-    req.userId = decoded.id; // keep this if controllers use it
+    req.userId = decoded.id;
+
     next();
   } catch (error) {
     console.error("Token Verification Error:", error);
-    return res.status(401).json({ message: "Unauthorized - invalid token" });
+
+    return res.status(401).json({
+      message: "Unauthorized - invalid token",
+    });
   }
 };

@@ -247,10 +247,10 @@ export const login = async (req, res) => {
 };
 
 export const mobileLogin = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, accountType } = req.body;
 
   try {
-    if (!email || !password)
+    if (!email || !password || !accountType)
       return res.status(400).json({ message: "All fields are required" });
 
     const user = await User.findOne({ email });
@@ -264,7 +264,13 @@ export const mobileLogin = async (req, res) => {
     if (!user.isVerified)
       return res.status(401).json({ message: "Email not verified" });
 
-    
+    // ✅ ROLE VALIDATION (NEW)
+    if (user.role !== accountType) {
+      return res.status(403).json({
+        message: `Access denied. This account is registered as ${user.role}.`,
+      });
+    }
+
     const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
     user.loginOTP = loginOTP;
     user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000;
@@ -281,11 +287,10 @@ export const mobileLogin = async (req, res) => {
       ipAddress: req.ip,
     });
 
-    
     return res.status(200).json({
       success: true,
       requiresOTP: true,
-      role: user.role, 
+      role: user.role,
       message: "OTP sent to your email",
     });
   } catch (err) {
