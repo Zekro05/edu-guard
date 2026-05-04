@@ -232,51 +232,48 @@ export const verifyEmail = async (req, res) => {
 
 //  LOGIN 
 export const login = async (req, res) => {
-  const { email, password } = req.body;
-
   try {
-    if (!email || !password)
-      return res.status(400).json({ message: "All fields are required" });
+    const { email, password, accountType } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid)
-      return res.status(400).json({ message: "Wrong password" });
+    if (!user) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
 
-    if (user.role !== "admin")
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    // role check optional
+    if (accountType && user.role !== accountType.toLowerCase()) {
       return res.status(403).json({
-        message: "Access denied. Only admin accounts are allowed to log in.",
+        message: `Account is registered as ${user.role}`,
       });
+    }
 
-    if (!user.isVerified)
-      return res
-        .status(401)
-        .json({ message: "Email not verified", requiresOTP: true });
-
+    // 🔥 GENERATE OTP
     const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
+
     user.loginOTP = loginOTP;
     user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000;
+
     await user.save();
 
+    // send OTP
     await sendVerificationEmail(email, loginOTP);
 
-    await createHistoryLog({
-      userId: user._id,
-      role: mapRoleForHistory(user.role),
-      action: "Login OTP Sent",
-      category: "Auth",
-      details: "Login OTP sent to email",
-      ipAddress: req.ip,
+    return res.status(200).json({
+      success: true,
+      requiresOTP: true,
+      message: "OTP sent to your email",
     });
 
-    res
-      .status(200)
-      .json({ success: true, requiresOTP: true, message: "OTP sent to your email" });
   } catch (err) {
     console.error("Login Error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -284,23 +281,27 @@ export const mobileLogin = async (req, res) => {
   const { email, password, accountType } = req.body;
 
   try {
-    if (!email || !password || !accountType)
+    if (!email || !password || !accountType) {
       return res.status(400).json({ message: "All fields are required" });
+    }
 
-    const normalizedRole = accountType.toLowerCase(); // ✅ FIX
+    const normalizedRole = accountType.toLowerCase();
 
     const user = await User.findOne({ email });
-    if (!user)
+    if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
+    }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid)
+    if (!isPasswordValid) {
       return res.status(400).json({ message: "Wrong password" });
+    }
 
-    if (!user.isVerified)
+    if (!user.isVerified) {
       return res.status(401).json({ message: "Email not verified" });
+    }
 
-    // ================= ROLE VALIDATION =================
+    // 🔥 ROLE CHECK (FIXED)
     if (user.role !== normalizedRole) {
       return res.status(403).json({
         message: `Access denied. This account is registered as ${user.role}.`,
@@ -308,8 +309,10 @@ export const mobileLogin = async (req, res) => {
     }
 
     const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
+
     user.loginOTP = loginOTP;
     user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000;
+
     await user.save();
 
     await sendVerificationEmail(email, loginOTP);
@@ -331,7 +334,7 @@ export const mobileLogin = async (req, res) => {
     });
   } catch (err) {
     console.error("Mobile login error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -358,19 +361,20 @@ export const verifyMobileLoginOTP = async (req, res) => {
       role: mapRoleForHistory(user.role),
       action: "Mobile Login",
       category: "Auth",
-      details: `Mobile login verified (${user.role})`,
+      details: "Mobile login verified via OTP",
       ipAddress: req.ip,
     });
 
-    // ================= ROLE-BASED PROFILE FETCH =================
-    let profile = null;
+    let student = null;
+    let teacher = null;
 
+    // 🔥 FIXED: safe fetching
     if (user.role === "student") {
-      profile = await Student.findOne({ email });
+      student = await Student.findOne({ email });
     }
 
     if (user.role === "teacher") {
-      profile = await Teacher.findOne({ email });
+      teacher = await Teacher.findOne({ email });
     }
 
     const token = jwt.sign(
@@ -387,24 +391,24 @@ export const verifyMobileLoginOTP = async (req, res) => {
         middleName: user.middleName,
         lastName: user.lastName,
         email: user.email,
-
         role: user.role,
 
-        profilePhoto: profile?.profilePhoto || user.profilePhoto || "",
+        profilePhoto:
+          student?.profilePhoto ||
+          teacher?.profilePhoto ||
+          user.profilePhoto ||
+          "",
 
-        // student-specific
-        studentId: profile?.studentId || null,
-        gradeCourse: profile?.grade || null,
-
-        // teacher-specific
-        employeeId: profile?.employeeId || null,
-        department: profile?.department || null,
+        studentId: student?.studentId || null,
+        employeeId: teacher?.employeeId || null,
+        gradeCourse: student?.grade || null,
+        department: teacher?.department || null,
       },
       token,
     });
   } catch (err) {
     console.error("Verify Mobile Login OTP Error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
