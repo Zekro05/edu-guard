@@ -22,6 +22,7 @@ router.post("/", verifyToken, async (req, res) => {
       date,
       time,
       reporter,
+      reporterType,
     } = req.body;
 
     if (!studentId || !studentName || !description || !location) {
@@ -39,6 +40,7 @@ router.post("/", verifyToken, async (req, res) => {
       date,
       time,
       reporter,
+      reporterType: req.user?.role || "unknown", 
       reporterId: req.userId,
     });
 

@@ -25,6 +25,7 @@ export const createReport = async (req, res) => {
       date,
       time,
       reporter,
+      reporterType,
     } = req.body;
 
     const newReport = new Report({
