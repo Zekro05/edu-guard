@@ -1,5 +1,6 @@
 import { User } from "../models/userModel.js";
 import Student from "../models/studentModel.js";
+import Teacher from "../models/teacherModel.js"; 
 import fs from "fs";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -28,8 +29,10 @@ export const signup = async (req, res) => {
       gender,
     } = req.body;
 
+    const role = (req.body.role || "student").toLowerCase();
     const normalizedEmail = email.toLowerCase();
-    
+
+    // ================= VALIDATION =================
     if (
       !firstName ||
       !lastName ||
@@ -37,26 +40,30 @@ export const signup = async (req, res) => {
       !studentId ||
       !password ||
       !confirmPassword ||
-      !grade ||
-      !gender
+      !gender ||
+      (role === "student" && !grade)
     ) {
-      return res
-        .status(400)
-        .json({ message: "All required fields must be filled" });
+      return res.status(400).json({
+        message: "All required fields must be filled",
+      });
     }
 
     if (password !== confirmPassword) {
       return res.status(400).json({ message: "Passwords do not match" });
     }
 
+    // ================= CHECK EXISTING USER =================
     const existingUser = await User.findOne({ email: normalizedEmail });
-    if (existingUser)
+    if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     let profilePhotoPath = "";
-    if (req.file) profilePhotoPath = `http://localhost:5000/uploads/${req.file.filename}`;
+    if (req.file) {
+      profilePhotoPath = `http://localhost:5000/uploads/${req.file.filename}`;
+    }
 
     const verificationToken = Math.floor(
       100000 + Math.random() * 900000
@@ -66,6 +73,7 @@ export const signup = async (req, res) => {
       middleName ? middleName + " " : ""
     }${lastName}`.trim();
 
+    // ================= CREATE USER =================
     const user = new User({
       firstName,
       middleName: middleName || undefined,
@@ -74,7 +82,7 @@ export const signup = async (req, res) => {
       email: normalizedEmail,
       password: hashedPassword,
       studentId,
-      role: "student",
+      role,
       profilePhoto: profilePhotoPath,
       verificationToken,
       verificationTokenExpiresAt: Date.now() + 24 * 60 * 60 * 1000,
@@ -83,42 +91,68 @@ export const signup = async (req, res) => {
 
     await user.save();
 
-    const student = new Student({
-      firstName,
-      middleName: middleName || "",
-      lastName,
-      email: normalizedEmail,
-      profilePhoto: profilePhotoPath,
-      studentId,
-      grade,
-      gender,
-      createdBy: user._id,
-    });
+    // ================= CREATE ROLE PROFILE =================
+    let student = null;
+    let teacher = null;
 
-    await student.save();
+    if (role === "teacher") {
+      teacher = new Teacher({
+        firstName,
+        middleName: middleName || "",
+        lastName,
+        email: normalizedEmail,
+        profilePhoto: profilePhotoPath,
+        gender,
+        employeeId: studentId,
+        createdBy: user._id,
+      });
 
+      await teacher.save();
+    } else {
+      student = new Student({
+        firstName,
+        middleName: middleName || "",
+        lastName,
+        email: normalizedEmail,
+        profilePhoto: profilePhotoPath,
+        studentId,
+        grade,
+        gender,
+        createdBy: user._id,
+      });
+
+      await student.save();
+    }
+
+    // ================= HISTORY LOG =================
     await createHistoryLog({
       userId: user._id,
-      role: mapRoleForHistory(user.role),
+      role: mapRoleForHistory(role),
       action: "Signup",
       category: "Auth",
-      details: `Student account created (Student ID: ${student.studentId})`,
+      details:
+        role === "teacher"
+          ? `Teacher account created (Employee ID: ${teacher.employeeId})`
+          : `Student account created (Student ID: ${student.studentId})`,
       ipAddress: req.ip,
     });
 
+    // ================= SEND OTP =================
     try {
       await sendVerificationEmail(email, verificationToken);
     } catch (err) {
       console.error("OTP Email failed:", err);
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "Signup successful. Verification code sent to your email.",
     });
   } catch (err) {
     console.error("Signup Error:", err);
-    res.status(500).json({ message: err.message || "Server error" });
+    return res.status(500).json({
+      message: err.message || "Server error",
+    });
   }
 };
 
@@ -253,6 +287,8 @@ export const mobileLogin = async (req, res) => {
     if (!email || !password || !accountType)
       return res.status(400).json({ message: "All fields are required" });
 
+    const normalizedRole = accountType.toLowerCase(); // ✅ FIX
+
     const user = await User.findOne({ email });
     if (!user)
       return res.status(400).json({ message: "Invalid credentials" });
@@ -264,8 +300,8 @@ export const mobileLogin = async (req, res) => {
     if (!user.isVerified)
       return res.status(401).json({ message: "Email not verified" });
 
-    // ✅ ROLE VALIDATION (NEW)
-    if (user.role !== accountType) {
+    // ================= ROLE VALIDATION =================
+    if (user.role !== normalizedRole) {
       return res.status(403).json({
         message: `Access denied. This account is registered as ${user.role}.`,
       });
@@ -283,7 +319,7 @@ export const mobileLogin = async (req, res) => {
       role: mapRoleForHistory(user.role),
       action: "Mobile Login OTP Sent",
       category: "Auth",
-      details: "Mobile login OTP sent",
+      details: `Mobile login OTP sent (${user.role})`,
       ipAddress: req.ip,
     });
 
@@ -313,7 +349,6 @@ export const verifyMobileLoginOTP = async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
-    
     user.loginOTP = undefined;
     user.loginOTPExpiresAt = undefined;
     await user.save();
@@ -323,24 +358,28 @@ export const verifyMobileLoginOTP = async (req, res) => {
       role: mapRoleForHistory(user.role),
       action: "Mobile Login",
       category: "Auth",
-      details: "Mobile login verified via OTP",
+      details: `Mobile login verified (${user.role})`,
       ipAddress: req.ip,
     });
 
-    // 🔥 ONLY fetch student if needed
-    let student = null;
+    // ================= ROLE-BASED PROFILE FETCH =================
+    let profile = null;
+
     if (user.role === "student") {
-      student = await Student.findOne({ email });
+      profile = await Student.findOne({ email });
+    }
+
+    if (user.role === "teacher") {
+      profile = await Teacher.findOne({ email });
     }
 
     const token = jwt.sign(
-      { id: user._id, role: user.role }, 
+      { id: user._id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
-    
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       user: {
         _id: user._id,
@@ -349,14 +388,17 @@ export const verifyMobileLoginOTP = async (req, res) => {
         lastName: user.lastName,
         email: user.email,
 
-        role: user.role, // ✅ 🔥 THIS FIXES EVERYTHING
+        role: user.role,
 
-        profilePhoto: student?.profilePhoto || user.profilePhoto || "",
+        profilePhoto: profile?.profilePhoto || user.profilePhoto || "",
 
-        // only meaningful for students
-        studentId: student?.studentId || null,
-        gradeCourse: student?.grade || null,
-        contactNumber: student?.phone || null,
+        // student-specific
+        studentId: profile?.studentId || null,
+        gradeCourse: profile?.grade || null,
+
+        // teacher-specific
+        employeeId: profile?.employeeId || null,
+        department: profile?.department || null,
       },
       token,
     });

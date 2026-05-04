@@ -10,6 +10,7 @@ import toast from "react-hot-toast";
 
 const SignupPage = () => {
   const navigate = useNavigate();
+
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -21,10 +22,21 @@ const SignupPage = () => {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [grade, setGrade] = useState("");
   const [gender, setGender] = useState("");
-  const { signup, verifyOTP, otpRequired, setOtpRequired, error, isLoading } = useAuthStore();
+
+  // UI ONLY
+  const [accountType, setAccountType] = useState("");
+
+  const {
+    signup,
+    verifyOTP,
+    otpRequired,
+    setOtpRequired,
+    error,
+    isLoading,
+  } = useAuthStore();
+
   const [localError, setLocalError] = useState("");
 
-  // Handle image preview
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     setProfilePhoto(file);
@@ -35,10 +47,21 @@ const SignupPage = () => {
   const handleSignUp = async (e) => {
     e.preventDefault();
 
-    if (!firstName || !lastName || !email || !studentId || !password || !confirmPassword || !grade || !gender) {
+    if (
+      !firstName ||
+      !lastName ||
+      !email ||
+      !studentId ||
+      !password ||
+      !confirmPassword ||
+      !grade ||
+      !gender ||
+      !accountType
+    ) {
       setLocalError("Please fill in all required fields.");
       return;
     }
+
     if (password !== confirmPassword) {
       setLocalError("Passwords do not match");
       return;
@@ -46,7 +69,9 @@ const SignupPage = () => {
 
     try {
       setLocalError("");
+
       const formData = new FormData();
+
       formData.append("firstName", firstName);
       formData.append("middleName", middleName);
       formData.append("lastName", lastName);
@@ -56,6 +81,11 @@ const SignupPage = () => {
       formData.append("studentId", studentId);
       formData.append("grade", grade);
       formData.append("gender", gender);
+
+      // ✅ IMPORTANT FIX: convert accountType → role
+      const role = accountType === "Teacher" ? "teacher" : "student";
+      formData.append("role", role);
+
       if (profilePhoto) formData.append("profilePhoto", profilePhoto);
 
       await signup(formData);
@@ -76,14 +106,18 @@ const SignupPage = () => {
   };
 
   if (otpRequired) {
-    return <EmailVerificationPage onVerify={handleVerifyOTP} title="Enter OTP to Complete Signup" />;
+    return (
+      <EmailVerificationPage
+        onVerify={handleVerifyOTP}
+        title="Enter OTP to Complete Signup"
+      />
+    );
   }
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
       className="max-w-md w-full bg-gray-800/50 backdrop-filter backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden"
     >
       <div className="p-8">
@@ -92,17 +126,32 @@ const SignupPage = () => {
         </h2>
 
         <form onSubmit={handleSignUp} encType="multipart/form-data">
+
+          {/* Account Type (UI only) */}
+          <select
+            className="w-full p-3 rounded-xl bg-gray-800 text-gray-200 focus:outline-none focus:ring-2 focus:ring-green-400 transition mb-4"
+            value={accountType}
+            onChange={(e) => setAccountType(e.target.value)}
+            required
+          >
+            <option value="">Select Account Type*</option>
+            <option value="Student">Student</option>
+            <option value="Teacher">Teacher</option>
+          </select>
+
           <div className="grid grid-cols-2 gap-4">
             <Input icon={User} type="text" placeholder="First Name*" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
             <Input icon={User} type="text" placeholder="Last Name*" value={lastName} onChange={(e) => setLastName(e.target.value)} />
           </div>
 
           <Input icon={User} type="text" placeholder="Middle Name (Optional)" value={middleName} onChange={(e) => setMiddleName(e.target.value)} />
+
           <Input icon={Mail} type="email" placeholder="Email*" value={email} onChange={(e) => setEmail(e.target.value)} />
+
           <Input icon={User} type="text" placeholder="Student ID*" value={studentId} onChange={(e) => setStudentId(e.target.value)} />
+
           <Input icon={User} type="text" placeholder="Grade*" value={grade} onChange={(e) => setGrade(e.target.value)} />
 
-          {/* Gender select */}
           <select
             className="w-full p-3 rounded-xl bg-gray-800 text-gray-200 focus:outline-none focus:ring-2 focus:ring-green-400 transition mb-2"
             value={gender}
@@ -116,9 +165,16 @@ const SignupPage = () => {
           </select>
 
           <Input icon={Lock} type="password" placeholder="Password*" value={password} onChange={(e) => setPassword(e.target.value)} />
+
           <Input icon={Lock} type="password" placeholder="Confirm Password*" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
 
-          {photoPreview && <img src={photoPreview} alt="Preview" className="mt-2 w-24 h-24 object-cover rounded-full border-2 border-green-400" />}
+          {photoPreview && (
+            <img
+              src={photoPreview}
+              alt="Preview"
+              className="mt-2 w-24 h-24 object-cover rounded-full border-2 border-green-400"
+            />
+          )}
 
           <div className="mt-2">
             <label className="flex items-center gap-2 cursor-pointer text-gray-300">
@@ -127,20 +183,26 @@ const SignupPage = () => {
             </label>
           </div>
 
-          {(localError || error) && <p className="text-red-500 font-semibold mt-2">{localError || error}</p>}
+          {(localError || error) && (
+            <p className="text-red-500 font-semibold mt-2">
+              {localError || error}
+            </p>
+          )}
 
           <PasswordStrengthMeter password={password} />
 
           <motion.button
-            className="mt-5 w-full py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white
-            font-bold rounded-lg shadow-lg hover:from-green-600 hover:to-emerald-700 focus:outline-none focus:ring-green-500 focus:ring-offset-2
-            focus:ring-offset-gray-900 transition duration-200"
+            className="mt-5 w-full py-3 px-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-lg shadow-lg"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             type="submit"
             disabled={isLoading}
           >
-            {isLoading ? <Loader className="animate-spin mx-auto" size={24} /> : "Register"}
+            {isLoading ? (
+              <Loader className="animate-spin mx-auto" size={24} />
+            ) : (
+              "Register"
+            )}
           </motion.button>
         </form>
       </div>
