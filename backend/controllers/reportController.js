@@ -37,6 +37,7 @@ export const createReport = async (req, res) => {
       time,
       reporter,
       reporterId: req.userId,
+      reporterType: req.user?.role || "teacher"
     });
 
     const savedReport = await newReport.save();
