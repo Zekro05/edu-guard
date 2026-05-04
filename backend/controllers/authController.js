@@ -629,12 +629,24 @@ export const changePassword = async (req, res) => {
     const userId = req.userId;
     const { oldPassword, newPassword } = req.body;
 
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const isMatch = await bcrypt.compare(oldPassword, user.password);
-    if (!isMatch)
+    if (!isMatch) {
       return res.status(400).json({ message: "Old password is incorrect" });
+    }
+
+    const isSame = await bcrypt.compare(newPassword, user.password);
+    if (isSame) {
+      return res.status(400).json({
+        message: "New password cannot be the same as old password",
+      });
+    }
 
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
@@ -644,7 +656,7 @@ export const changePassword = async (req, res) => {
       message: "Password updated successfully",
     });
   } catch (err) {
-    console.error(err);
+    console.error("Change Password Error:", err);
     res.status(500).json({ message: "Server error" });
   }
 };

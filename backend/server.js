@@ -17,6 +17,7 @@ import historyRoutes from "./routes/historyRoutes.js";
 import geminiRoutes from "./routes/gemini.js";
 import messageRoutes from "./routes/messageRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import teacherReportRoutes from "./routes/teacherReportRoutes.js";
 
 import { User } from "./models/userModel.js";
 
@@ -66,6 +67,7 @@ app.use("/api/history", historyRoutes);
 app.use("/api/gemini", geminiRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/teacher-reports", teacherReportRoutes);
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
