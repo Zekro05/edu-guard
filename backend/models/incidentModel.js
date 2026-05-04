@@ -14,6 +14,11 @@ const incidentSchema = new mongoose.Schema(
       ref: "Report",
       index: true,
     },
+    status: {
+  type: String,
+  enum: ["active", "completed"],
+  default: "active",
+},
 
     title: {
       type: String,

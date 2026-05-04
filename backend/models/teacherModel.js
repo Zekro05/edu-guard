@@ -2,17 +2,77 @@ import mongoose from "mongoose";
 
 const teacherSchema = new mongoose.Schema(
   {
-    firstName: { type: String, required: true },
-    middleName: { type: String },
-    lastName: { type: String, required: true },
+    /* ================= PERSONAL INFO ================= */
+    firstName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
 
-    email: { type: String, required: true, unique: true },
+    middleName: {
+      type: String,
+      trim: true,
+    },
 
-    employeeId: { type: String, required: true }, // 🔥 teacher version of studentId
-    department: { type: String },
+    lastName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
 
-    profilePhoto: { type: String },
+    gender: {
+      type: String,
+      enum: ["Male", "Female"],
+      default: "",
+    },
 
+    /* ================= SCHOOL INFO ================= */
+    employeeId: {
+      type: String,
+      required: true,
+      unique: true,
+      sparse: true,
+    },
+
+    department: {
+      type: String,
+      default: "",
+    },
+
+    email: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      unique: true,
+      required: true,
+    },
+
+    phone: {
+      type: String,
+    },
+
+    /* ================= SYSTEM INFO ================= */
+    profilePhoto: {
+      type: String,
+      default: "",
+    },
+
+    riskLevel: {
+      type: String,
+      enum: ["Low", "Medium", "High"],
+      default: "Low",
+    },
+
+    notes: {
+      type: String,
+    },
+
+    totalIncidents: {
+      type: Number,
+      default: 0,
+    },
+
+    /* ================= RELATION ================= */
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -21,4 +81,12 @@ const teacherSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("Teacher", teacherSchema);
+/* ================= MODEL ================= */
+const Teacher = mongoose.model("Teacher", teacherSchema);
+
+export default Teacher;
+
+/* ================= BACKWARD COMPAT (optional like Student) ================= */
+export const find = () => Teacher.find();
+export const deleteMany = (query) => Teacher.deleteMany(query);
+export const insertMany = (data) => Teacher.insertMany(data);

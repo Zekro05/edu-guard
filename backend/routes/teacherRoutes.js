@@ -2,7 +2,7 @@ import express from "express";
 import {
   createTeacherReport,
   getTeacherReports,
-} from "../controllers/teacherReportController.js";
+} from "../controllers/teacherController.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 
 const router = express.Router();

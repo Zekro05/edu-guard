@@ -55,7 +55,7 @@ const reportSchema = new mongoose.Schema(
     reporterType: {
       type: String,
       enum: ["student", "teacher", "admin"],
-      default: "student",
+      required: true,
     },
 
     // 🔥 OPTIONAL: link to teacher profile (if reporter is teacher)

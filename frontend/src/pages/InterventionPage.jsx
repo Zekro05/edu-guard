@@ -17,74 +17,58 @@ const InterventionPage = () => {
   const [search, setSearch] = useState("");
 
   const [cases, setCases] = useState([]);
-  const [interventions, setInterventions] = useState({});
+  const [interventions, setInterventions] = useState([]);
 
   const [form, setForm] = useState({
     type: "warning",
     description: "",
-    status: "pending",
   });
 
   /* ================= FETCH DATA ================= */
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
-      const [reportRes, incidentRes] = await Promise.all([
+      const [reportRes, incidentRes, interventionRes] = await Promise.all([
         API.get("/api/reports"),
         API.get("/api/incidents"),
+        API.get("/api/interventions"),
       ]);
 
-      /* ================= REPORTS SAFE ================= */
       const reportsData = Array.isArray(reportRes.data?.reports)
         ? reportRes.data.reports
         : Array.isArray(reportRes.data)
         ? reportRes.data
         : [];
 
-      const reports = reportsData.map((r) => ({
-        _id: r._id,
-        studentId: String(r.studentId),
-        studentName: r.studentName || "Unknown",
-        offense: r.offense || "",
-      }));
+      setCases(
+        reportsData.map((r) => ({
+          _id: r._id,
+          studentId: String(r.studentId),
+          studentName: r.studentName || "Unknown",
+          offense: r.offense || "",
+        }))
+      );
 
-      setCases(reports);
-
-      /* ================= INCIDENTS SAFE ================= */
-      const incidentsData = Array.isArray(incidentRes.data)
-        ? incidentRes.data
-        : [];
-
-      const grouped = {};
-
-      incidentsData.forEach((i) => {
-        const key = String(i.studentId);
-
-        if (!grouped[key]) grouped[key] = [];
-
-        grouped[key].push({
-          type: i.title || "Intervention",
-          description: i.action || "",
-          status: "completed",
-        });
-      });
-
-      setInterventions(grouped);
-
+      setInterventions(Array.isArray(interventionRes.data) ? interventionRes.data : []);
     } catch (err) {
-      console.error("FULL ERROR:", err.response?.data || err.message);
+      console.error("FETCH ERROR:", err.response?.data || err.message);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   /* ================= HELPERS ================= */
   const getInitials = (name = "") =>
     name.split(" ").filter(Boolean).map((n) => n[0]).join("").toUpperCase();
 
+  const getStudentInterventions = (studentId) =>
+    interventions.filter(
+      (i) => String(i.studentId?._id || i.studentId) === String(studentId)
+    );
+
   const getOffenseCount = (studentId) =>
-    interventions[String(studentId)]?.length || 0;
+    getStudentInterventions(studentId).length;
 
   const getOffenderLevel = (studentId) => {
     const c = getOffenseCount(studentId);
@@ -109,9 +93,15 @@ const InterventionPage = () => {
   };
 
   const getStatus = (studentId) => {
-    const list = interventions[String(studentId)] || [];
+    const list = getStudentInterventions(studentId);
+
     if (list.length === 0) return "none";
-    if (list.some((i) => i.status === "active")) return "active";
+
+    const hasHigh = list.some((i) => i.type === "suspension");
+
+    if (hasHigh || list.length >= 3) return "active";
+    if (list.length >= 1) return "ongoing";
+
     return "completed";
   };
 
@@ -141,22 +131,27 @@ const InterventionPage = () => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  /* ================= FIXED SUBMIT (IMPORTANT) ================= */
   const submit = async () => {
     try {
+      if (!selected) return;
+
       const payload = {
-        studentId: selected.studentId,
-        title: form.type,
-        action: form.description,
-        level: "Low",
+        studentId: selected.studentId, // ✅ FIX: backend now handles incident lookup
+        type: form.type,
+        description: form.description,
       };
 
-      await API.post("/api/incidents", payload);
+      await API.post("/api/interventions", payload);
 
       await fetchData();
 
-      setForm({ type: "warning", description: "", status: "pending" });
+      setForm({ type: "warning", description: "" });
+      setOpen(false);
+      setSelected(null);
+
     } catch (err) {
-      console.error("Submit error:", err.response?.data || err.message);
+      console.error("SUBMIT ERROR:", err.response?.data || err.message);
     }
   };
 
@@ -207,7 +202,7 @@ const InterventionPage = () => {
         </div>
 
         <div className="flex gap-3 mb-6">
-          {["all", "none", "active", "completed"].map((t) => (
+          {["all", "none", "active", "ongoing", "completed"].map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -223,7 +218,7 @@ const InterventionPage = () => {
             <div
               key={c._id}
               onClick={() => { setSelected(c); setOpen(true); }}
-              className="bg-white/5 p-5 rounded-2xl hover:bg-white/10 cursor-pointer flex gap-4 items-center relative"
+              className="bg-white/5 p-5 rounded-2xl hover:bg-white/10 cursor-pointer flex gap-4 items-center"
             >
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center font-bold text-lg">
                 {getInitials(c.studentName)}
@@ -238,7 +233,7 @@ const InterventionPage = () => {
                 </p>
 
                 <p className="text-[10px] text-gray-500">
-                  Offenses: {getOffenseCount(c.studentId)} | {getOffenderLevel(c.studentId)}
+                  Status: {getStatus(c.studentId)}
                 </p>
               </div>
             </div>
@@ -260,25 +255,21 @@ const InterventionPage = () => {
 
             <p className="text-gray-400">{selected.offense}</p>
 
-            <div className="mt-4">
-              <h3 className="font-semibold mb-2">Timeline</h3>
-
-              <div className="border-l border-white/20 pl-4 space-y-2">
-                {(interventions[selected.studentId] || []).map((i, idx) => (
-                  <div key={idx}>
-                    <p className="font-semibold">{i.type}</p>
-                    <p className="text-xs text-gray-400">{i.description}</p>
-                  </div>
-                ))}
-              </div>
+            <div className="mt-4 border-l border-white/20 pl-4 space-y-2">
+              {getStudentInterventions(selected.studentId).map((i, idx) => (
+                <div key={idx}>
+                  <p className="font-semibold">{i.type}</p>
+                  <p className="text-xs text-gray-400">{i.description}</p>
+                </div>
+              ))}
             </div>
 
             <div className="mt-4 flex flex-col gap-2">
 
               <select name="type" onChange={handleChange} className="bg-white/10 p-2 rounded">
-                <option>warning</option>
-                <option>detention</option>
-                <option>suspension</option>
+                <option value="warning">warning</option>
+                <option value="detention">detention</option>
+                <option value="suspension">suspension</option>
               </select>
 
               <textarea
@@ -309,7 +300,6 @@ const InterventionPage = () => {
   );
 };
 
-/* ================= SMALL COMPONENTS ================= */
 const Nav = ({ icon, label, onClick }) => (
   <button onClick={onClick} className="flex gap-3 items-center px-4 py-3 hover:bg-white/10 rounded-xl">
     {icon} {label}
