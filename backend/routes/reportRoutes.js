@@ -5,7 +5,8 @@ import Incident from "../models/incidentModel.js";
 import Student from "../models/studentModel.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 import { io } from "../server.js";
-import { getMyReports } from "../controllers/reportController.js";
+import { getMyReports, getReports } from "../controllers/reportController.js";
+
 
 const router = express.Router();
 
@@ -73,6 +74,7 @@ router.get("/", async (req, res) => {
     }
 
     const reports = await Report.find(query)
+      .populate("studentId", "name section age gender") // ✅ THIS FIXES N/A
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
@@ -84,6 +86,7 @@ router.get("/", async (req, res) => {
       totalPages: Math.ceil(total / limit),
       currentPage: Number(page),
     });
+
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -183,5 +186,7 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+router.get("/reports", getReports);
 
 export default router;

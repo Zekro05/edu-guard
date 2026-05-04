@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { API } from "../store/authStore";
 import { exportInterventionPDF } from "../utils/exportInterventionPDF";
@@ -24,6 +24,23 @@ const InterventionPage = () => {
     description: "",
   });
 
+  /* ================= CUSTOM DROPDOWN ================= */
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  const options = ["warning", "detention", "suspension"];
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   /* ================= FETCH DATA ================= */
   const fetchData = async () => {
     try {
@@ -39,14 +56,20 @@ const InterventionPage = () => {
         ? reportRes.data
         : [];
 
-      setCases(
-        reportsData.map((r) => ({
-          _id: r._id,
-          studentId: String(r.studentId),
-          studentName: r.studentName || "Unknown",
-          offense: r.offense || "",
-        }))
-      );
+      const reports = reportsData.map((r) => ({
+        _id: r._id,
+
+        studentId: String(r.studentId?._id || r.studentId),
+
+        studentName: r.studentId?.name || r.studentName || "Unknown",
+        section: r.studentId?.section || "N/A",
+        age: r.studentId?.age || "N/A",
+        gender: r.studentId?.gender || "N/A",
+
+        offense: r.offense || "",
+      }));
+
+      setCases(reports);
 
       setInterventions(Array.isArray(interventionRes.data) ? interventionRes.data : []);
     } catch (err) {
@@ -127,17 +150,17 @@ const InterventionPage = () => {
   }, [cases, tab, search, interventions]);
 
   /* ================= FORM ================= */
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (field, value) => {
+    setForm({ ...form, [field]: value });
   };
 
-  /* ================= FIXED SUBMIT (IMPORTANT) ================= */
+  /* ================= SUBMIT ================= */
   const submit = async () => {
     try {
       if (!selected) return;
 
       const payload = {
-        studentId: selected.studentId, // ✅ FIX: backend now handles incident lookup
+        studentId: selected.studentId,
         type: form.type,
         description: form.description,
       };
@@ -155,10 +178,11 @@ const InterventionPage = () => {
     }
   };
 
-  /* ================= UI (UNCHANGED) ================= */
+  /* ================= UI ================= */
   return (
     <div className="h-screen w-screen flex bg-gradient-to-br from-gray-950 via-green-950 to-emerald-950 text-white">
 
+      {/* ================= SIDEBAR ================= */}
       <aside className="w-72 bg-white/5 p-6 border-r border-white/10">
         <h1 className="text-2xl font-bold text-green-400">EduGuard</h1>
 
@@ -174,6 +198,7 @@ const InterventionPage = () => {
         <Nav icon={<Settings />} label="Settings" onClick={() => navigate("/settings")} />
       </aside>
 
+      {/* ================= MAIN ================= */}
       <main className="flex-1 p-6 overflow-y-auto">
 
         <div className="flex justify-between items-center mb-6">
@@ -189,18 +214,14 @@ const InterventionPage = () => {
           </div>
         </div>
 
+        {/* ================= CARDS ================= */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <Stat label="Total Cases" value={cases.length} />
-          <Stat
-            label="Repeat Offenders"
-            value={cases.filter(c => getOffenderLevel(c.studentId) === "repeat-offender").length}
-          />
-          <Stat
-            label="Active Cases"
-            value={cases.filter(c => getStatus(c.studentId) === "active").length}
-          />
+          <Stat label="Repeat Offenders" value={cases.filter(c => getOffenderLevel(c.studentId) === "repeat-offender").length} />
+          <Stat label="Active Cases" value={cases.filter(c => getStatus(c.studentId) === "active").length} />
         </div>
 
+        {/* ================= FILTER ================= */}
         <div className="flex gap-3 mb-6">
           {["all", "none", "active", "ongoing", "completed"].map((t) => (
             <button
@@ -213,6 +234,7 @@ const InterventionPage = () => {
           ))}
         </div>
 
+        {/* ================= LIST ================= */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((c) => (
             <div
@@ -226,6 +248,12 @@ const InterventionPage = () => {
 
               <div className="flex-1">
                 <h3 className="font-semibold">{c.studentName}</h3>
+
+                {/* NEW INFO */}
+                <p className="text-xs text-gray-400">
+                  Section: {c.section} | Age: {c.age} | Gender: {c.gender}
+                </p>
+
                 <p className="text-gray-400 text-sm">{c.offense}</p>
 
                 <p className="text-xs text-green-400 mt-1">
@@ -241,6 +269,7 @@ const InterventionPage = () => {
         </div>
       </main>
 
+      {/* ================= MODAL ================= */}
       {open && selected && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
           <div className="bg-gray-900 w-[600px] p-6 rounded-2xl relative">
@@ -253,6 +282,10 @@ const InterventionPage = () => {
               {selected.studentName}
             </h2>
 
+            <p className="text-xs text-gray-400">
+              Section: {selected.section} | Age: {selected.age} | Gender: {selected.gender}
+            </p>
+
             <p className="text-gray-400">{selected.offense}</p>
 
             <div className="mt-4 border-l border-white/20 pl-4 space-y-2">
@@ -264,17 +297,38 @@ const InterventionPage = () => {
               ))}
             </div>
 
+            {/* ================= DROPDOWN ================= */}
             <div className="mt-4 flex flex-col gap-2">
 
-              <select name="type" onChange={handleChange} className="bg-white/10 p-2 rounded">
-                <option value="warning">warning</option>
-                <option value="detention">detention</option>
-                <option value="suspension">suspension</option>
-              </select>
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className="w-full bg-white/10 p-2 rounded text-left"
+                >
+                  {form.type}
+                </button>
+
+                {dropdownOpen && (
+                  <div className="absolute w-full mt-1 bg-gray-800 border border-white/10 rounded z-50">
+                    {options.map((opt) => (
+                      <div
+                        key={opt}
+                        onClick={() => {
+                          handleChange("type", opt);
+                          setDropdownOpen(false);
+                        }}
+                        className="p-2 hover:bg-white/10 cursor-pointer"
+                      >
+                        {opt}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <textarea
                 name="description"
-                onChange={handleChange}
+                onChange={(e) => handleChange("description", e.target.value)}
                 className="bg-white/10 p-2 rounded"
                 placeholder="Description..."
               />
@@ -300,6 +354,7 @@ const InterventionPage = () => {
   );
 };
 
+/* ================= SMALL COMPONENTS ================= */
 const Nav = ({ icon, label, onClick }) => (
   <button onClick={onClick} className="flex gap-3 items-center px-4 py-3 hover:bg-white/10 rounded-xl">
     {icon} {label}
