@@ -557,7 +557,7 @@ export const forgotPassword = async (req, res) => {
       });
 
     
-    await sendPasswordResetEmail(email, `<h3>Your OTP is:</h3><h2>${otp}</h2>`);
+   await sendPasswordResetEmail(email, otp);
 
     res.json({ message: "OTP sent to your email" });
   } catch (error) {
@@ -594,11 +594,14 @@ export const verifyForgotPasswordOTP = async (req, res) => {
 export const resendForgotPasswordOTP = async (req, res) => {
   try {
     const { email } = req.body;
+    const normalizedEmail = email.toLowerCase();
+    
+
 
     if (!email)
       return res.status(400).json({ message: "Email is required" });
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user)
       return res.status(404).json({ message: "User not found" });
 
@@ -608,10 +611,7 @@ export const resendForgotPasswordOTP = async (req, res) => {
     user.resetPasswordExpiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
     await user.save();
 
-    await sendPasswordResetEmail(
-      email,
-      `<h3>Your OTP is:</h3><h2>${otp}</h2>`
-    );
+    await sendPasswordResetEmail(normalizedEmail, otp);
 
     res.status(200).json({ message: "Password reset OTP resent successfully" });
   } catch (err) {
