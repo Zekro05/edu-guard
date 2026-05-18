@@ -91,7 +91,7 @@ const ReportPage = () => {
 
     socket.emit("register", user._id);
 
-    socket.on("new-report", (data) => {
+    socket.on("newNotification", (data) => {
 
       setReports((prev) => [data.report, ...prev]);
 

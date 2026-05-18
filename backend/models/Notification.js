@@ -3,22 +3,29 @@ import mongoose from "mongoose";
 const notificationSchema = new mongoose.Schema(
   {
     userId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       required: true,
     },
     title: String,
     message: String,
     type: {
       type: String,
-      default: "general", // update | success | general
+      enum: ["update", "success", "general", "warning"],
+      default: "general",
     },
     priority: {
       type: String,
-      default: "low", // low | high
+      enum: ["low", "high"],
+      default: "low",
     },
     isRead: {
       type: Boolean,
       default: false,
+    },
+    data: {
+      type: Object,
+      default: {},
     },
   },
   { timestamps: true }

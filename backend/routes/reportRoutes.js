@@ -8,6 +8,7 @@ import { io } from "../server.js";
 import { getMyReports, getReports, createReport } from "../controllers/reportController.js";
 import { getDisciplineAction } from "../utils/disciplineEngine.js";
 import { upload } from "../middleware/upload.js";
+import Notification from "../models/Notification.js";
 
 const router = express.Router();
 
