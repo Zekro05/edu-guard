@@ -77,6 +77,62 @@ export const createReport = async (req, res) => {
   }
 };
 
+export const createGuestReport = async (req, res) => {
+  try {
+    console.log("🔥 GUEST REPORT HIT");
+    console.log("BODY:", req.body);
+    console.log("FILES:", req.files);
+
+    const {
+      studentId,
+      studentName,
+      offense,
+      location,
+      description,
+      date,
+      time,
+      reporter,
+    } = req.body;
+
+    const files = req.files || [];
+
+    if (files.length === 0) {
+      return res.status(400).json({
+        message: "No evidence uploaded via multer",
+      });
+    }
+
+    const evidence = files.map((file) => ({
+      url: file.path,
+      type: file.mimetype.startsWith("image") ? "image" : "document",
+      uploadedAt: new Date(),
+    }));
+
+    const newReport = await Report.create({
+      studentId: studentId || null,
+      studentName,
+      offense,
+      location,
+      description,
+      date: new Date(date),
+      time,
+      reporter: reporter || "Guest",
+      reporterId: null,            // ✅ always null for guest
+      reporterType: "guest",
+      evidence,
+    });
+
+    return res.status(201).json({
+      message: "Guest report submitted successfully",
+      report: newReport,
+    });
+
+  } catch (err) {
+    console.error("GUEST REPORT ERROR:", err);
+    return res.status(500).json({ message: err.message });
+  }
+};
+
 // DELETE a report (optional)
 export const deleteReport = async (req, res) => {
   const { id } = req.params;

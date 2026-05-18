@@ -14,10 +14,26 @@ import {
 import { getDisciplineAction } from "../utils/disciplineEngine.js";
 import { upload } from "../middleware/upload.js";
 import Notification from "../models/Notification.js";
+import { createGuestReport } from "../controllers/reportController.js";
 
 const router = express.Router();
 
+
+
 /* ================= CREATE REPORT ================= */
+
+router.post(
+  "/guest",
+  upload.array("evidence", 10),
+  (req, res, next) => {
+    console.log("🔥 GUEST ROUTE HIT");
+    console.log("BODY:", req.body);
+    console.log("FILES:", req.files);
+    next();
+  },
+  createGuestReport
+);
+
 router.post(
   "/",
   verifyToken,
