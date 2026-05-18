@@ -112,15 +112,16 @@ const ComplaintReport = () => {
       const { date, time } = getDateTime();
 
       await API.post("/api/reports", {
-        studentId: form.studentId,
-        studentName: form.studentName,
-        offense: form.offense,
-        location: form.location,
-        description: form.description,
-        date,
-        time,
-        reporter: "Admin",
-      });
+  studentId: selectedStudent._id,
+  studentName: `${selectedStudent.firstName} ${selectedStudent.lastName}`,
+  offense: finalIncidentType,
+  location: finalLocation,
+  description,
+  date: formatDate(date),
+  time: formatTime(date),
+  reporter: isAnonymous ? "Anonymous" : "Guest",
+  evidence: uploadedUrls, // 👈 CLOUDINARY URLs ONLY
+});
 
       toast.success("Complaint submitted successfully!");
 

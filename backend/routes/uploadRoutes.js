@@ -9,7 +9,7 @@ router.post("/", upload.array("evidence", 5), (req, res) => {
     const files = req.files || [];
 
     const uploaded = files.map((file) => ({
-      url: `/uploads/${file.filename}`,
+      url: file.path,
       type: file.mimetype.startsWith("image/") ? "image" : "file",
       uploadedAt: new Date(),
     }));

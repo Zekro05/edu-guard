@@ -3,6 +3,9 @@ import Report from "../models/reportModel.js"; // make sure your model file is R
 import Student from "../models/studentModel.js";
 
 import { sendNotification } from "../server.js";
+
+const BASE_URL = "https://edu-guard-backend.onrender.com";
+
 // GET all reports by type
 export const getReportsByType = async (req, res) => {
   const { type } = req.params;
@@ -38,10 +41,10 @@ export const createReport = async (req, res) => {
     }
 
     const evidence = files.map((file) => ({
-      url: `/uploads/${file.filename}`,
-      type: file.mimetype.startsWith("image") ? "image" : "document",
-      uploadedAt: new Date(),
-    }));
+  url: file.path, // ✅ Cloudinary URL
+  type: file.mimetype.startsWith("image") ? "image" : "document",
+  uploadedAt: new Date(),
+}));
 
     const report = await Report.create({
       studentId,
@@ -53,7 +56,7 @@ export const createReport = async (req, res) => {
       time,
       reporter: reporter || "Guest",
       reporterId: req.userId || null,
-      reporterType: req.userId ? "user" : "guest",
+      reporterType: req.userId ? "student" : "guest",
       evidence,
     });
 
@@ -119,6 +122,10 @@ export const getReports = async (req, res) => {
   try {
     const reports = await Report.find()
       .populate("studentId", "name section age gender")
+      .populate({
+    path: "incidentId",   // or whatever your field is
+    select: "status"
+  })
       .sort({ createdAt: -1 });
 
     res.status(200).json(reports);

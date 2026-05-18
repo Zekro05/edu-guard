@@ -18,7 +18,18 @@ import Notification from "../models/Notification.js";
 const router = express.Router();
 
 /* ================= CREATE REPORT ================= */
-router.post("/", upload.array("evidence", 10), createReport);
+router.post(
+  "/",
+  verifyToken,
+  upload.array("evidence", 10),
+  (req, res, next) => {
+    console.log("🔥 REPORT ROUTE HIT");
+    console.log("BODY:", req.body);
+    console.log("FILES:", req.files);
+    next();
+  },
+  createReport
+);
 
 /* ================= GET MY REPORTS ================= */
 router.get("/my", verifyToken, getMyReports);

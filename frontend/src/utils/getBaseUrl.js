@@ -1,0 +1,14 @@
+const isDev = import.meta.env.DEV;
+
+export const BASE_URL = isDev
+  ? "http://localhost:5000"
+  : "https://edu-guard-backend.onrender.com";
+
+export const getFileUrl = (path) => {
+  if (!path) return "";
+
+  // already absolute
+  if (path.startsWith("http")) return path;
+
+  return `${BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+};

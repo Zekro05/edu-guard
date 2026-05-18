@@ -33,7 +33,7 @@ export const createIntervention = async (req, res) => {
 export const getInterventions = async (req, res) => {
   try {
     const interventions = await Intervention.find()
-      .populate("studentId", "name")
+      .populate("studentId", "name grade age gender profilePhoto")
       .populate("incidentId", "title level status")
       .sort({ createdAt: -1 });
 

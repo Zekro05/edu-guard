@@ -37,6 +37,7 @@ const InterventionPage = () => {
 
   const [notifications, setNotifications] = useState([]);
   const [openNotif, setOpenNotif] = useState(false);
+  const [auditLog, setAuditLog] = useState([]);
 
   const [form, setForm] = useState({
     type: "warning",
@@ -51,31 +52,55 @@ const InterventionPage = () => {
     "suspension",
   ];
 
+  const addAuditLog = (action) => {
+  const entry = {
+    id: Date.now(),
+    action,
+    time: new Date().toISOString(),
+  };
+
+  setAuditLog((prev) => [entry, ...prev]);
+};
+
   /* =========================================================
      FETCH
   ========================================================= */
   const fetchData = async () => {
     try {
-      const [reportRes, interventionRes] = await Promise.all([
-        API.get("/api/reports?limit=1000"),
+      const [incidentRes, interventionRes] = await Promise.all([
+        API.get("/api/incidents"),
         API.get("/api/interventions"),
       ]);
 
-      const reportsData = reportRes.data?.reports || [];
+      const incidentsData = incidentRes.data || [];
 
-      const reports = reportsData.map((r) => {
-        const student = r.studentId || {};
+const reports = incidentsData.map((i) => {
+  const student = i.studentId || {};
 
-        return {
-          _id: r._id,
-          studentId: String(student._id || r.studentId),
-          studentName: student.name || r.studentName || "Unknown",
-          section: student.section || "N/A",
-          age: student.age || "N/A",
-          gender: student.gender || "N/A",
-          offense: r.offense || "",
-        };
-      });
+  return {
+    _id: i._id,
+
+    studentId: student._id, // IMPORTANT
+
+    studentName:
+      `${student.firstName || ""} ${student.lastName || ""}`.trim() ||
+      "Unknown",
+
+    grade: student.grade || "N/A",   // ✅ use grade (not section)
+
+    gender: student.gender || "N/A",
+
+    studentCode: student.studentId || "N/A", // STU-2008
+
+    age: student.birthDate
+      ? new Date().getFullYear() -
+        new Date(student.birthDate).getFullYear()
+      : "N/A",
+
+    offense: i.title || "No title",
+    status: i.status,
+  };
+});
 
       setCases(reports);
       setInterventions(interventionRes.data || []);
@@ -154,6 +179,9 @@ const InterventionPage = () => {
         status: "active",
       });
 
+      addAuditLog(`Created intervention: ${form.type}`);
+
+
       await fetchData();
 
       setForm({
@@ -181,26 +209,27 @@ const InterventionPage = () => {
      FILTER
   ========================================================= */
   const filtered = useMemo(() => {
-    return cases.filter((c) => {
-      const status = getReportStatus(c.studentId);
+  return cases.filter((c) => {
+    // ✅ IMPORTANT: only intervention-ready from incident system
+    if (c.status !== "intervention-ready") return false;
 
-      if (tab !== "all" && tab !== status)
-        return false;
+    // tab filtering (UI preserved)
+    const status = getReportStatus(c.studentId);
 
-      if (
-        search &&
-        !c.studentName
-          .toLowerCase()
-          .includes(search.toLowerCase()) &&
-        !c.offense
-          .toLowerCase()
-          .includes(search.toLowerCase())
-      )
-        return false;
+    if (tab !== "all" && tab !== status) return false;
 
-      return true;
-    });
-  }, [cases, tab, search, interventions]);
+    // search
+    if (
+      search &&
+      !c.studentName.toLowerCase().includes(search.toLowerCase()) &&
+      !c.offense.toLowerCase().includes(search.toLowerCase())
+    ) {
+      return false;
+    }
+
+    return true;
+  });
+}, [cases, tab, search, interventions]);
 
   const stats = {
     total: cases.length,
@@ -640,7 +669,7 @@ const InterventionPage = () => {
                     </h3>
 
                     <p className="text-sm text-gray-500 mt-1">
-                      {c.section} • {c.age} • {c.gender}
+                      {c.section} • {c.studentCode} • {c.gender}
                     </p>
 
                     <div className="mt-5">
@@ -692,287 +721,284 @@ const InterventionPage = () => {
 
       </main>
 
-      {/* =========================================================
-         MODAL
-      ========================================================= */}
-      <AnimatePresence>
+    {/* =========================================================
+   MODERN PROFESSIONAL LIGHT MODE MODAL (REFINED)
+========================================================= */}
+<AnimatePresence>
+  {open && selected && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm"
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97, y: 18 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.97, y: 18 }}
+        transition={{ type: "spring", stiffness: 240, damping: 28 }}
+        className="
+          w-full max-w-6xl
+          bg-[#F9FAFB]
+          border border-gray-200
+          rounded-[24px]
+          shadow-[0_20px_60px_-20px_rgba(0,0,0,0.25)]
+          overflow-hidden
+        "
+      >
 
-        {open && selected && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+        {/* ================= HEADER ================= */}
+        <div className="flex items-center justify-between px-8 py-6 bg-white border-b border-gray-200">
+
+          <div className="flex items-center gap-5">
+
+            <div className="
+              w-14 h-14 rounded-2xl
+              bg-green-50 border border-green-100
+              flex items-center justify-center
+              text-green-700 font-semibold text-lg
+            ">
+              {getInitials(selected.studentName)}
+            </div>
+
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">
+                {selected.studentName}
+              </h2>
+
+              <p className="text-sm text-gray-500">
+                {selected.grade} • {selected.studentCode} • {selected.gender}
+              </p>
+            </div>
+
+          </div>
+
+          <button
+            onClick={() => setOpen(false)}
+            className="
+              w-10 h-10 rounded-xl
+              bg-gray-100 hover:bg-gray-200
+              border border-gray-200
+              flex items-center justify-center
+              transition
+            "
           >
+            <X size={16} className="text-gray-600" />
+          </button>
+        </div>
 
-            <motion.div
-              initial={{
-                opacity: 0,
-                scale: 0.96,
-                y: 20,
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-                y: 0,
-              }}
-              exit={{
-                opacity: 0,
-                scale: 0.96,
-              }}
-              className="
-                w-full max-w-3xl
-                bg-white/80 backdrop-blur-2xl
-                border border-white/30
-                rounded-[2.5rem]
-                shadow-2xl overflow-hidden
-              "
-            >
+        {/* ================= BODY ================= */}
+        <div className="grid grid-cols-12 gap-8 px-8 py-8 max-h-[75vh] overflow-y-auto">
 
-              {/* HEADER */}
-              <div className="p-8 border-b border-white/20 flex justify-between items-start">
+          {/* LEFT PANEL */}
+          <div className="col-span-5 space-y-6">
 
-                <div className="flex items-center gap-5">
+            {/* INCIDENT */}
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">
+                Incident Overview
+              </p>
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {selected.offense}
+              </p>
+            </div>
 
+            {/* AI RECOMMENDATION */}
+            <div className="rounded-2xl border border-green-100 bg-green-50 p-5">
+              <p className="text-xs uppercase tracking-wider text-green-600 mb-2">
+                AI Recommendation
+              </p>
+              <p className="text-lg font-semibold text-green-800">
+                {recommendAction(selected.offense)}
+              </p>
+              <p className="text-xs text-green-600/80 mt-2">
+                Suggested based on behavioral analysis
+              </p>
+            </div>
+
+            {/* STATS */}
+            <div className="grid grid-cols-2 gap-4">
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                <p className="text-xs text-gray-400">Status</p>
+                <p className="font-semibold text-gray-900 mt-1 capitalize">
+                  {getReportStatus(selected.studentId)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-4">
+                <p className="text-xs text-gray-400">Interventions</p>
+                <p className="font-semibold text-gray-900 mt-1">
+                  {getStudentInterventions(selected.studentId).length}
+                </p>
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* RIGHT PANEL */}
+          <div className="col-span-7 space-y-6">
+
+            {/* TIMELINE HEADER */}
+            <h3 className="text-sm font-semibold text-gray-700">
+              Intervention Timeline
+            </h3>
+
+            {/* TIMELINE */}
+            <div className="space-y-4">
+
+              {getStudentInterventions(selected.studentId).length === 0 ? (
+                <div className="text-sm text-gray-400 py-10 text-center border border-dashed border-gray-300 rounded-2xl bg-gray-50">
+                  No interventions recorded yet
+                </div>
+              ) : (
+                getStudentInterventions(selected.studentId).map((i) => (
                   <div
+                    key={i._id}
                     className="
-                      w-20 h-20 rounded-3xl
-                      bg-green-100 text-green-700
-                      flex items-center justify-center
-                      font-black text-2xl
+                      flex items-start justify-between gap-4
+                      p-5 rounded-2xl
+                      border border-gray-200
+                      bg-white
+                      hover:shadow-sm
+                      transition
                     "
                   >
-                    {getInitials(selected.studentName)}
-                  </div>
 
-                  <div>
-                    <h2 className="text-3xl font-black text-gray-900">
-                      {selected.studentName}
-                    </h2>
+                    <div className="flex gap-4">
 
-                    <p className="text-sm text-gray-500 mt-1">
-                      {selected.section} • {selected.age} • {selected.gender}
-                    </p>
-                  </div>
+                      <div className="w-2.5 h-2.5 mt-2 rounded-full bg-green-500" />
 
-                </div>
-
-                <button
-                  onClick={() => setOpen(false)}
-                  className="
-                    w-11 h-11 rounded-2xl
-                    bg-white/60 backdrop-blur-xl
-                    border border-white/30
-                    flex items-center justify-center
-                    hover:scale-105 transition
-                  "
-                >
-                  <X size={18} />
-                </button>
-
-              </div>
-
-              {/* BODY */}
-              <div className="p-8 max-h-[70vh] overflow-y-auto">
-
-                {/* INCIDENT */}
-                <div className="mb-6">
-
-                  <p className="text-xs uppercase tracking-wide text-gray-400 mb-2">
-                    Incident Case
-                  </p>
-
-                  <div className="bg-white/60 border border-white/30 rounded-3xl p-5">
-                    <p className="text-sm text-gray-700 leading-relaxed">
-                      {selected.offense}
-                    </p>
-                  </div>
-
-                </div>
-
-                {/* INTERVENTIONS */}
-                <div className="mb-6">
-
-                  <div className="flex items-center gap-2 mb-4">
-                    <AlertTriangle
-                      size={18}
-                      className="text-yellow-500"
-                    />
-
-                    <h3 className="font-bold text-lg">
-                      Intervention History
-                    </h3>
-                  </div>
-
-                  <div className="space-y-4">
-
-                    {getStudentInterventions(
-                      selected.studentId
-                    ).length === 0 ? (
-                      <div className="bg-white/60 border border-white/30 rounded-3xl p-6 text-center text-gray-500 text-sm">
-                        No interventions yet.
+                      <div>
+                        <p className="font-medium text-gray-900 capitalize">
+                          {i.type}
+                        </p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {i.description}
+                        </p>
                       </div>
-                    ) : (
-                      getStudentInterventions(
-                        selected.studentId
-                      ).map((i) => (
-                        <div
-                          key={i._id}
-                          className="
-                            bg-white/60 backdrop-blur-xl
-                            border border-white/30
-                            rounded-3xl p-5
-                            flex justify-between gap-4
-                          "
+
+                    </div>
+
+                    <div className="flex flex-col items-end gap-2">
+
+                      <span className="
+                        text-xs px-2 py-1 rounded-full
+                        bg-gray-100 text-gray-600 capitalize
+                      ">
+                        {i.status}
+                      </span>
+
+                      {i.status !== "completed" && (
+                        <button
+                          onClick={() => markComplete(i._id)}
+                          className="text-xs text-green-600 hover:underline"
                         >
+                          Mark complete
+                        </button>
+                      )}
 
-                          <div>
-                            <p className="font-bold capitalize text-gray-900">
-                              {i.type}
-                            </p>
-
-                            <p className="text-sm text-gray-600 mt-2">
-                              {i.description}
-                            </p>
-                          </div>
-
-                          <div className="flex flex-col items-end gap-2">
-
-                            <span
-                              className={`
-                                px-3 py-1 rounded-full text-[11px]
-                                font-semibold border
-                                ${
-                                  i.status === "completed"
-                                    ? "bg-green-100 text-green-700 border-green-200"
-                                    : "bg-yellow-100 text-yellow-700 border-yellow-200"
-                                }
-                              `}
-                            >
-                              {i.status}
-                            </span>
-
-                            {i.status !== "completed" && (
-                              <button
-                                onClick={() =>
-                                  markComplete(i._id)
-                                }
-                                className="text-xs text-green-700 hover:text-green-800 font-semibold"
-                              >
-                                Mark Complete
-                              </button>
-                            )}
-
-                          </div>
-
-                        </div>
-                      ))
-                    )}
+                    </div>
 
                   </div>
+                ))
+              )}
 
-                </div>
+            </div>
 
-                {/* FORM */}
-                <div className="space-y-4">
+            {/* AUDIT LOG */}
+            <div className="border border-gray-200 rounded-2xl p-5 bg-gray-50">
 
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-400 mb-2">
-                      Intervention Type
-                    </p>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                Audit Log
+              </h4>
 
-                    <select
-                      value={form.type}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          type: e.target.value,
-                        })
-                      }
-                      className="
-                        w-full rounded-2xl
-                        border border-white/30
-                        bg-white/60 backdrop-blur-xl
-                        px-4 py-3 outline-none text-sm
-                      "
-                    >
+              <div className="space-y-2 max-h-32 overflow-y-auto text-xs">
 
-                      {options.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-
-                    </select>
-
-                  </div>
-
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-gray-400 mb-2">
-                      Description
-                    </p>
-
-                    <textarea
-                      rows={4}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          description:
-                            e.target.value,
-                        })
-                      }
-                      className="
-                        w-full rounded-2xl
-                        border border-white/30
-                        bg-white/60 backdrop-blur-xl
-                        px-4 py-3 outline-none text-sm resize-none
-                      "
-                      placeholder="Describe the intervention plan..."
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-
-                    <button
-                      onClick={submit}
-                      className="
-                        bg-green-600 hover:bg-green-700
-                        text-white py-3 rounded-2xl
-                        font-semibold transition
-                      "
-                    >
-                      Add Intervention
-                    </button>
-
-                    <button
-                      onClick={() =>
-                        exportInterventionPDF(
-                          selected,
-                          interventions
-                        )
-                      }
-                      className="
-                        bg-blue-600 hover:bg-blue-700
-                        text-white py-3 rounded-2xl
-                        font-semibold transition
-                      "
-                    >
-                      Export PDF
-                    </button>
-
-                  </div>
-
-                </div>
+                {auditLog.length === 0 ? (
+                  <p className="text-gray-400">No actions yet</p>
+                ) : (
+                  auditLog.map((a) => (
+                    <div key={a.id} className="flex justify-between text-gray-600">
+                      <span>{a.action}</span>
+                      <span className="text-gray-400">
+                        {new Date(a.time).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))
+                )}
 
               </div>
+            </div>
 
-            </motion.div>
+            {/* FORM */}
+            <div className="border border-gray-200 rounded-2xl p-5 bg-white space-y-4">
 
-          </motion.div>
-        )}
+              <h4 className="text-sm font-semibold text-gray-900">
+                Create Intervention
+              </h4>
 
-      </AnimatePresence>
+              <select
+                value={form.type}
+                onChange={(e) =>
+                  setForm({ ...form, type: e.target.value })
+                }
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm"
+              >
+                {options.map((opt) => (
+                  <option key={opt}>{opt}</option>
+                ))}
+              </select>
 
+              <textarea
+                rows={4}
+                placeholder="Write intervention plan..."
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm resize-none"
+              />
+
+            </div>
+
+          </div>
+        </div>
+
+        {/* ================= FOOTER ================= */}
+        <div className="flex justify-between items-center px-8 py-5 border-t border-gray-200 bg-white">
+
+          <button
+            onClick={() =>
+              exportInterventionPDF(selected, interventions)
+            }
+            className="
+              px-5 py-2.5 rounded-xl
+              border border-gray-200
+              bg-white hover:bg-gray-50
+              text-sm font-medium
+            "
+          >
+            Export Report
+          </button>
+
+          <button
+            onClick={submit}
+            className="
+              px-5 py-2.5 rounded-xl
+              bg-green-600 hover:bg-green-700
+              text-white text-sm font-medium
+            "
+          >
+            Save Intervention
+          </button>
+
+        </div>
+
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
     </div>
   );
 };

@@ -26,6 +26,12 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 
 import { User } from "./models/userModel.js";
 
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+
 dotenv.config();
 
 const app = express();
@@ -77,7 +83,7 @@ app.use("/api/interventions", interventionRoutes);
 app.use("/api/cases", caseRoutes);
 app.use("/api/upload", uploadRoutes);
 
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
 
 /* USERS */
 app.get("/api/users", async (req, res) => {

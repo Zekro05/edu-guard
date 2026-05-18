@@ -365,9 +365,17 @@ const StudentPage = () => {
 
                     <div className="flex items-center gap-3">
 
-                      <div className="w-11 h-11 rounded-2xl bg-green-100 flex items-center justify-center">
-                        <Users size={18} className="text-green-700" />
-                      </div>
+                      <div className="w-11 h-11 rounded-2xl bg-green-100 overflow-hidden flex items-center justify-center">
+  {s.profilePhoto ? (
+    <img
+      src={s.profilePhoto}
+      alt="avatar"
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <Users size={18} className="text-green-700" />
+  )}
+</div>
 
                       <div>
                         <p className="font-semibold">

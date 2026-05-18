@@ -20,6 +20,7 @@ import {
 
 import { useNavigate } from "react-router-dom";
 import { API } from "../store/authStore";
+import { getFileUrl } from "../utils/getBaseUrl";
 
 /* ================= SOCKET ================= */
 const socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000");
@@ -84,35 +85,34 @@ const statusUI = {
 const normalizeCase = (c) => {
   let evidence = [];
 
-  try {
-    if (Array.isArray(c.evidence)) {
-      evidence = c.evidence
-        .map((e) => {
-          if (e && typeof e === "object" && e.url) {
-            return {
-              url: e.url,
-              type: e.type || "file",
-              uploadedAt: e.uploadedAt,
-            };
-          }
+try {
+  if (Array.isArray(c.evidence)) {
+    evidence = c.evidence
+      .map((e) => {
+        // CASE 1: already correct object
+        if (e && typeof e === "object" && e.url) {
+          return e;
+        }
 
-          if (typeof e === "string") {
-            try {
-              const parsed = JSON.parse(e);
-              if (parsed?.url) return parsed;
-            } catch {
-              const match = e.match(/\/uploads\/[^\s,'"}]+/);
-              if (match) return { url: match[0], type: "file" };
-            }
-          }
+        // CASE 2: string (Cloudinary or broken string)
+        if (typeof e === "string") {
+          const urlMatch = e.match(/https?:\/\/[^\s'"}]+/);
 
-          return null;
-        })
-        .filter(Boolean);
-    }
-  } catch {
-    evidence = [];
+          return {
+            url: urlMatch?.[0],
+            type: urlMatch?.[0]?.includes("video")
+              ? "video"
+              : "image",
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean);
   }
+} catch {
+  evidence = [];
+}
 
   return {
     ...c,
@@ -147,6 +147,20 @@ const severityColor = (lvl = "Low") => {
 
 const DEFAULT_AVATAR =
   "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png";
+
+const normalizeEvidenceUrl = (url) => {
+  if (!url) return null;
+
+  // Cloudinary already full URL
+  if (url.includes("cloudinary")) return url;
+
+  // old local format
+  if (url.startsWith("/uploads")) {
+    return `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${url}`;
+  }
+
+  return url;
+};
 
 /* ================= MAIN ================= */
 export default function CaseManagement() {
@@ -458,43 +472,60 @@ export default function CaseManagement() {
                 </p>
 
                 {Array.isArray(selected.evidence) && selected.evidence.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    {selected.evidence?.map((e, i) => {
-                      const url = e?.url;
-                      if (!url) return null;
+  <div className="grid grid-cols-3 gap-2">
+    {selected.evidence.map((e, i) => {
+      let parsed = e;
 
-                      const fixedUrl = url.startsWith("http")
-                        ? url
-                        : `http://localhost:5000${url.startsWith("/") ? url : `/${url}`}`;
+      // CASE 1: already object
+      if (typeof e === "object" && e !== null) {
+        parsed = e;
+      }
 
-                      const isImage =
-                        e?.type === "image" ||
-                        /\.(png|jpg|jpeg|jfif|webp|gif)$/i.test(url);
+      // CASE 2: malformed string from MongoDB
+      else if (typeof e === "string") {
+        // extract cloudinary/local URL
+        const urlMatch = e.match(/https?:\/\/[^\s'"}]+/);
 
-                      return (
-                        <div key={i} className="relative group">
-                          <img
-                            src={fixedUrl}
-                            alt="evidence"
-                            className="w-full h-24 object-cover rounded-lg bg-gray-100"
-                            loading="lazy"
-                            onError={(err) => {
-                              err.currentTarget.style.display = "none";
-                            }}
-                          />
+        // detect type
+        const typeMatch = e.match(/type:\s*'([^']+)'/);
 
-                          {!isImage && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs text-white rounded-lg">
-                              Open File
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-xs text-gray-500">No evidence attached</p>
-                )}
+        parsed = {
+          url: urlMatch?.[0] || null,
+          type: typeMatch?.[1] || "image",
+        };
+      }
+
+      if (!parsed?.url) return null;
+
+      const isImage =
+        parsed.type === "image" ||
+        /\.(jpg|jpeg|png|webp|gif)$/i.test(parsed.url);
+
+      return (
+        <div key={i} className="relative">
+          {isImage ? (
+            <img
+              src={parsed.url}
+              alt="evidence"
+              className="w-full h-24 object-cover rounded-lg border border-gray-200"
+            />
+          ) : (
+            <a
+              href={parsed.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center h-24 rounded-lg border border-gray-200 bg-gray-100 text-sm text-gray-600"
+            >
+              Open File
+            </a>
+          )}
+        </div>
+      );
+    })}
+  </div>
+) : (
+  <p className="text-xs text-gray-500">No evidence attached</p>
+)}
               </div>
             </div>
 

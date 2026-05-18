@@ -343,9 +343,7 @@ const IncidentReport = () => {
 
       files.forEach((file) => formData.append("evidence", file));
 
-      await API.post("/api/reports", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      await API.post("/api/reports", formData);
 
       toast.success("Report submitted!");
 

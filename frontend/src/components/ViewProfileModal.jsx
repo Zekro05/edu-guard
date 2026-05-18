@@ -49,22 +49,36 @@ const ViewProfileModal = ({ student, close }) => {
 
   /* ================= FETCH UNIFIED TIMELINE ================= */
   useEffect(() => {
-    if (!student?._id) return;
+  if (!student?._id) return;
 
-    const fetchTimeline = async () => {
-      try {
-        const res = await API.get(
-          `/api/students/${student._id}/timeline`
-        );
-        setTimeline(res.data || []);
-      } catch (err) {
-        console.log(err);
-        setTimeline([]);
-      }
-    };
+  const fetchTimeline = async () => {
+    try {
+      const res = await API.get(`/api/incidents/student/${student._id}`);
 
-    fetchTimeline();
-  }, [student?._id]);
+      const formatted = (res.data || [])
+        .filter(Boolean)
+        .map((i) => ({
+          type: "incident",
+          date: i.createdAt,
+          data: {
+            title: i.title,
+            action: i.action,
+            description: i.description || i.category,
+            details: i.details,
+            category: i.category,
+            level: i.level,
+          },
+        }));
+
+      setTimeline(formatted);
+    } catch (err) {
+      console.log(err);
+      setTimeline([]);
+    }
+  };
+
+  fetchTimeline();
+}, [student?._id]);
 
   /* ================= AI ANALYSIS ================= */
   useEffect(() => {

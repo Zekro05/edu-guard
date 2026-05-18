@@ -11,7 +11,7 @@ export const getIncidents = async (req, res) => {
     }
 
     const incidents = await Incident.find({})
-      .populate("studentId", "firstName middleName lastName grade profilePhoto")
+      .populate("studentId", "firstName middleName lastName studentId grade gender profilePhoto")
       .sort({ createdAt: -1 });
 
     return res.json(incidents);
@@ -96,7 +96,7 @@ export const getIncidentById = async (req, res) => {
   try {
     const incident = await Incident.findById(req.params.id).populate(
       "studentId",
-      "firstName middleName lastName grade profilePhoto"
+      "firstName middleName lastName grade gender studentId profilePhoto"
     );
 
     if (!incident) {
@@ -204,7 +204,7 @@ export const getIncidentsByStudent = async (req, res) => {
     const incidents = await Incident.find({
       studentId: new mongoose.Types.ObjectId(studentId),
     })
-      .populate("studentId", "firstName middleName lastName grade profilePhoto")
+      .populate("studentId", "firstName middleName lastName studentId grade gender profilePhoto")
       .sort({ createdAt: -1 });
 
     return res.json(incidents);
@@ -360,7 +360,7 @@ export const updateIncidentStatus = async (req, res) => {
 
     const populated = await Incident.findById(incident._id).populate(
       "studentId",
-      "firstName middleName lastName grade profilePhoto"
+      "firstName middleName lastName studentId grade gender profilePhoto"
     );
 
     // SOCKET FIX
