@@ -125,6 +125,10 @@ io.on("connection", (socket) => {
     io.emit("online_users", Array.from(onlineUsers.keys()));
   });
 
+  socket.on("join", (userId) => {
+  socket.join(userId);
+});
+
   socket.on("send_message", async (msg, callback) => {
   try {
     const chatId = [msg.sender, msg.receiver].sort().join("-");

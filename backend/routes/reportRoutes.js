@@ -129,6 +129,14 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
       riskLevel: decision.level,
     });
 
+    await Notification.create({
+  userId: report.studentId,
+  title: "Report Accepted",
+  message: `Your report "${report.offense}" was approved`,
+  type: "success",
+  priority: "low",
+});
+
     io.to(studentId.toString()).emit("newNotification", {
   id: report._id,
   title: "Report Accepted",
