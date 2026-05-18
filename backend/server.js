@@ -110,6 +110,15 @@ export const io = new Server(server, {
 const onlineUsers = new Map();
 
 /* ================= SOCKET LOGIC ================= */
+export const sendNotification = (userId, payload) => {
+  const socketId = onlineUsers.get(userId);
+
+  if (socketId) {
+    io.to(socketId).emit("newNotification", payload);
+  }
+
+  console.log("📨 NOTIFICATION SENT:", userId, payload);
+};
 
 io.on("connection", (socket) => {
   console.log("🟢 Connected:", socket.id);
@@ -180,16 +189,6 @@ io.on("connection", (socket) => {
     console.log("🔴 Disconnected:", socket.id);
   });
 
-  const sendNotification = (userId, payload) => {
-  const socketId = onlineUsers.get(userId);
-
-  if (socketId) {
-    io.to(socketId).emit("newNotification", payload);
-  }
-
-  // fallback broadcast if user offline (mobile will sync later via API)
-  io.emit("newNotification", payload);
-};
 });
 
 app.set("io", io);

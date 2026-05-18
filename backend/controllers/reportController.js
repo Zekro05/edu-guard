@@ -2,6 +2,7 @@
 import Report from "../models/reportModel.js"; // make sure your model file is Report.js
 import Student from "../models/studentModel.js";
 
+import { sendNotification } from "../server.js";
 // GET all reports by type
 export const getReportsByType = async (req, res) => {
   const { type } = req.params;
@@ -55,6 +56,16 @@ export const createReport = async (req, res) => {
       reporterType: req.userId ? "user" : "guest",
       evidence,
     });
+
+    sendNotification(req.userId, {
+  id: Date.now(),
+  title: "Report Submitted",
+  message: "Your report was submitted successfully.",
+  type: "success",
+  priority: "high",
+  isRead: false,
+  timeAgo: "Just now",
+});
 
     return res.status(201).json(report);
   } catch (err) {

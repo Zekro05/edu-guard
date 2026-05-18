@@ -3,21 +3,23 @@ import mongoose from "mongoose";
 import Report from "../models/reportModel.js";
 import Incident from "../models/incidentModel.js";
 import Student from "../models/studentModel.js";
+import User from "../models/userModel.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 import { io } from "../server.js";
-import { getMyReports, getReports, createReport } from "../controllers/reportController.js";
+import {
+  getMyReports,
+  getReports,
+  createReport,
+} from "../controllers/reportController.js";
 import { getDisciplineAction } from "../utils/disciplineEngine.js";
 import { upload } from "../middleware/upload.js";
 import Notification from "../models/Notification.js";
 
 const router = express.Router();
 
-/* ================= CREATE REPORT (CLEAN JSON ONLY) ================= */
-router.post(
-  "/",
-  upload.array("evidence", 10),
-  createReport
-);
+/* ================= CREATE REPORT ================= */
+router.post("/", upload.array("evidence", 10), createReport);
+
 /* ================= GET MY REPORTS ================= */
 router.get("/my", verifyToken, getMyReports);
 
@@ -26,7 +28,7 @@ router.get("/", async (req, res) => {
   try {
     const { page = 1, limit = 100, status, search } = req.query;
 
-    let query = {};
+    const query = {};
 
     if (status) query.status = status;
 
@@ -50,7 +52,6 @@ router.get("/", async (req, res) => {
       totalPages: Math.ceil(total / limit),
       currentPage: Number(page),
     });
-
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -130,30 +131,38 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
       riskLevel: decision.level,
     });
 
-    await Notification.create({
-  userId: report.studentId,
-  title: "Report Accepted",
-  message: `Your report "${report.offense}" was approved`,
-  type: "success",
-  priority: "low",
-});
+    /* ================= FIND USER ================= */
+    const student = await Student.findById(studentId);
+    if (!student) return res.json({ message: "Student not found" });
 
-    io.to(studentId.toString()).emit("newNotification", {
-  id: report._id,
-  title: "Report Accepted",
-  message: `Your report "${report.offense}" was approved`,
-  type: "success",
-  priority: "low",
-  isRead: false,
-  timeAgo: "Just now",
-});
+    const user = await User.findOne({ studentId: student.studentId });
 
+    if (user) {
+      await Notification.create({
+        userId: user._id,
+        title: "Report Accepted",
+        message: `A report regarding "${report.offense}" was approved.`,
+        type: "warning",
+        priority: "high",
+      });
+
+      io.to(user._id.toString()).emit("newNotification", {
+        id: report._id,
+        title: "Report Accepted",
+        message: `A report regarding "${report.offense}" was approved.`,
+        type: "warning",
+        priority: "high",
+        isRead: false,
+        timeAgo: "Just now",
+      });
+
+      console.log("✅ Notification sent to:", user._id.toString());
+    }
 
     return res.json({
-      message: "Report accepted & processed by Discipline Engine",
+      message: "Report accepted & processed",
       decision,
     });
-
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: err.message });
@@ -173,24 +182,39 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Report not found" });
     }
 
-    io.to(report.studentId.toString()).emit("newNotification", {
-      id: report._id,
-      title: "Report Rejected",
-      message: `Your report "${report.offense}" was rejected`,
-      type: "error",
-      priority: "high",
-      isRead: false,
-      timeAgo: "Just now",
-    });
+    const student = await Student.findById(report.studentId);
 
+    if (!student) return res.json({ message: "Student not found" });
 
-    res.json(report);
+    const user = await User.findOne({ studentId: student.studentId });
+
+    if (user) {
+      await Notification.create({
+        userId: user._id,
+        title: "Report Rejected",
+        message: `A report regarding "${report.offense}" was rejected.`,
+        type: "error",
+        priority: "high",
+      });
+
+      io.to(user._id.toString()).emit("newNotification", {
+        id: report._id,
+        title: "Report Rejected",
+        message: `A report regarding "${report.offense}" was rejected.`,
+        type: "error",
+        priority: "high",
+        isRead: false,
+        timeAgo: "Just now",
+      });
+    }
+
+    return res.json(report);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    return res.status(500).json({ message: err.message });
   }
 });
 
-/* ================= GET REPORTS (controller) ================= */
+/* ================= GET REPORTS ================= */
 router.get("/reports", getReports);
 
 export default router;
