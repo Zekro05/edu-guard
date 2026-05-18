@@ -1,19 +1,45 @@
-import React from 'react'
+import React from "react";
 
-const Input = ({icon:Icon, ...props}) => {
+const Input = ({ icon: Icon, ...props }) => {
   return (
-    <div className='relative mb-6'>
-        <div className='absolute inset-y-0 left-0 flex items-center  pl-3 pointer-events-none'>
-            <Icon className="size-5 text-green-500"/>
-        </div>
-        <input
-            {...props}
-            className='w-full pl-10 pr-3 py-2 bg-gray-800 bg-opacity-50 rounded-lg border border-gray-700
-            focus:border-green-500 focus:ring-2 focus:ring-green-500 text-white placeholder-gray-400 transition
-            duration-200'
-        />
-    </div>
-  )
-}
+    <div className="relative w-full">
+      {/* INPUT FIELD */}
+      <input
+        {...props}
+        className="
+          w-full h-14 pl-12 pr-4
+          rounded-2xl border
+          bg-white
+          text-gray-900
+          placeholder-gray-400
 
-export default Input
+          focus:outline-none
+          focus:ring-2
+          focus:ring-green-600/30
+          focus:border-green-600
+
+          transition-all duration-200
+
+          shadow-sm
+        "
+        style={{
+          borderColor: "#d1d5db",
+        }}
+      />
+
+      {/* ICON */}
+      <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+        {Icon && (
+          <Icon
+            className="w-5 h-5"
+            style={{
+              color: "#1B5E20",
+            }}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Input;

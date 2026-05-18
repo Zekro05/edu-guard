@@ -13,7 +13,10 @@ import {
   Eye,
   Pencil,
   Trash2,
-  Gavel
+  Upload,
+  Plus,
+  Search,
+  Gavel,
 } from "lucide-react";
 
 import { useAuthStore, API } from "../store/authStore";
@@ -23,315 +26,440 @@ import ViewProfileModal from "../components/ViewProfileModal";
 
 const socket = io("http://localhost:5000");
 
-const ITEMS_PER_PAGE = 5;
-
 const StudentPage = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { logout } = useAuthStore();
 
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState("");
+
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
 
-  // ✅ NEW (bulk import)
-  const fileInputRef = useRef(null);
+  const [page, setPage] = useState(1);
   const [importing, setImporting] = useState(false);
 
-  // FETCH
+  const fileRef = useRef(null);
+
+  const PER_PAGE = 8;
+
+  /* ================= FETCH ================= */
   const fetchStudents = async () => {
     const res = await API.get("/api/students");
-    setStudents(res.data);
+    setStudents(res.data || []);
   };
 
-  // BULK IMPORT HANDLER
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    try {
-      setImporting(true);
-
-      const text = await file.text();
-      const data = JSON.parse(text);
-
-      if (!Array.isArray(data)) {
-        toast.error("JSON must be an array of students");
-        return;
-      }
-
-      const validStudents = data.filter(
-        (s) => s.firstName && s.lastName && s.grade
-      );
-
-      if (validStudents.length === 0) {
-        toast.error("No valid student data found");
-        return;
-      }
-
-      await API.post("/api/students/bulk", validStudents);
-
-      toast.success(`Imported ${validStudents.length} students`);
-      fetchStudents();
-
-    } catch (err) {
-      console.error(err);
-      toast.error("Invalid JSON file");
-    } finally {
-      setImporting(false);
-      e.target.value = null;
-    }
-  };
-
-  // REAL-TIME SOCKET
+  /* ================= SOCKET ================= */
   useEffect(() => {
-    if (!user) return;
-
     fetchStudents();
 
-    socket.on("student-created", () => {
-      toast.success("New student added");
-      fetchStudents();
-    });
-
-    socket.on("student-updated", () => {
-      toast.success("Student updated");
-      fetchStudents();
-    });
-
-    socket.on("student-deleted", () => {
-      toast.error("Student removed");
-      fetchStudents();
-    });
+    socket.on("student-created", fetchStudents);
+    socket.on("student-updated", fetchStudents);
+    socket.on("student-deleted", fetchStudents);
 
     return () => {
       socket.off("student-created");
       socket.off("student-updated");
       socket.off("student-deleted");
     };
-  }, [user]);
+  }, []);
 
-  // FILTER
-  const filteredStudents = students.filter((s) =>
-    `${s.firstName} ${s.lastName}`.toLowerCase().includes(search.toLowerCase())
+  /* ================= FILTER ================= */
+  const filtered = students.filter((s) =>
+    `${s.firstName} ${s.lastName}`
+      .toLowerCase()
+      .includes(search.toLowerCase())
   );
 
-  const totalPages = Math.ceil(filteredStudents.length / ITEMS_PER_PAGE);
+  const pages = Math.ceil(filtered.length / PER_PAGE);
 
-  const paginated = filteredStudents.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+  const paginated = filtered.slice(
+    (page - 1) * PER_PAGE,
+    page * PER_PAGE
   );
 
-  useEffect(() => setCurrentPage(1), [search]);
+  useEffect(() => setPage(1), [search]);
 
-  // ANALYTICS
-  const total = students.length;
-  const high = students.filter(s => s.riskLevel === "High").length;
-  const med = students.filter(s => s.riskLevel === "Medium").length;
-  const low = students.filter(s => s.riskLevel === "Low").length;
+  /* ================= STATS ================= */
+  const stats = {
+    total: students.length,
+    high: students.filter((s) => s.riskLevel === "High").length,
+    med: students.filter((s) => s.riskLevel === "Medium").length,
+    low: students.filter((s) => s.riskLevel === "Low").length,
+  };
 
+  const handleImport = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  try {
+    setImporting(true);
+
+    const data = JSON.parse(await file.text());
+
+    const res = await API.post("/api/students/bulk", data);
+
+    toast.success(
+      `Import completed: ${res.data.count} students processed`
+    );
+
+    // IMPORTANT: refresh to reflect updated + new students
+    fetchStudents();
+
+    socket.emit("students-imported"); // optional realtime trigger
+  } catch (err) {
+    console.error(err);
+    toast.error("Invalid JSON or import failed");
+  } finally {
+    setImporting(false);
+  }
+};
+
+  /* ================= DELETE ================= */
   const confirmDelete = async () => {
     await API.delete(`/api/students/${deleteTarget._id}`);
     toast.success("Deleted");
+
     setDeleteTarget(null);
     fetchStudents();
   };
 
-  // NAV ITEM
+  /* ================= NAV ================= */
   const Nav = ({ icon, label, onClick, active }) => (
-    <button
+  <button
+    onClick={onClick}
+    className={`flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left transition ${
+      active
+        ? "bg-green-50 text-green-700 font-medium"
+        : "text-gray-600 hover:bg-gray-100"
+    }`}
+  >
+    {icon}
+    <span className="text-sm">{label}</span>
+  </button>
+);
+
+  /* ================= ACTION ================= */
+  const Action = ({ icon, danger, onClick }) => (
+    <motion.button
+      whileHover={{ scale: 1.08 }}
+      whileTap={{ scale: 0.95 }}
       onClick={onClick}
-      className={`flex gap-3 items-center px-4 py-3 rounded-xl transition ${
-        active ? "bg-green-500 text-white" : "hover:bg-white/10 text-gray-300"
+      className={`p-2 rounded-xl border transition ${
+        danger
+          ? "text-red-500 hover:bg-red-50 border-red-100"
+          : "hover:bg-white/70 text-gray-600 border-white/30"
       }`}
     >
-      {icon} {label}
-    </button>
+      {icon}
+    </motion.button>
   );
 
-  // ANALYTICS CARD
-  const Stat = ({ title, value, color }) => (
-    <motion.div
-      whileHover={{ scale: 1.05 }}
-      className="bg-white/5 border border-white/10 p-4 rounded-xl"
-    >
-      <p className="text-gray-400 text-sm">{title}</p>
-      <h2 className={`text-2xl font-bold ${color}`}>{value}</h2>
-    </motion.div>
-  );
-
-  // RISK PULSE INDICATOR
-  const RiskPulse = ({ level }) => {
-    const color =
-      level === "High"
-        ? "bg-red-500"
-        : level === "Medium"
-        ? "bg-yellow-400"
-        : "bg-green-400";
-
-    const animate =
-      level === "High"
-        ? "animate-ping"
-        : "animate-pulse";
-
-    return (
-      <div className="flex items-center gap-2 justify-center">
-        <span className={`relative flex h-3 w-3`}>
-          <span className={`absolute inline-flex h-full w-full rounded-full ${color} ${animate} opacity-75`} />
-          <span className={`relative inline-flex rounded-full h-3 w-3 ${color}`} />
-        </span>
-        <RiskBadge level={level} />
-      </div>
-    );
-  };
-
+  /* ================= UI ================= */
   return (
-    <div className="h-screen w-screen flex bg-gradient-to-br from-gray-950 via-green-950 to-emerald-950 text-white overflow-hidden">
+    <div className="min-h-screen w-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 text-gray-900 flex overflow-hidden">
 
-      {/* SIDEBAR */}
-      <aside className="w-72 h-full bg-white/5 backdrop-blur-xl border-r border-white/10 p-6 flex flex-col justify-between">
+      {/* ================= SIDEBAR ================= */}
+      <aside className="w-72 bg-white border-r border-gray-200 p-6 flex flex-col justify-between">
+
         <div>
-          <h1 className="text-2xl font-bold text-green-400">EduGuard</h1>
+          <h1 className="text-2xl font-bold text-green-600">
+            GuidEd
+          </h1>
 
-          <p className="text-xs text-gray-400 mb-6">
-            Our Lady of the Holy Rosary - General Trias Cavite
+          <p className="text-xs text-gray-500 mb-6">
+            School Management System
           </p>
 
-          <Nav icon={<LayoutDashboard />} label="Dashboard" onClick={() => navigate("/dashboard")} />
-          <Nav icon={<Users />} label="Students" active />
-          <Nav icon={<ShieldX />} label="Guidance" onClick={() => navigate("/guidance")} />
-          <Nav icon={<ChartNoAxesCombined />} label="Reports" onClick={() => navigate("/reports")} />
-          <Nav icon={<Gavel />} label="Interventions" onClick={() => navigate("/interventions")} />
-          <Nav icon={<Settings />} label="Settings" onClick={() => navigate("/settings")} />
-        </div>
+          <div className="space-y-2">
 
-        <button onClick={logout} className="bg-green-500 py-2 rounded-xl">
-          Logout
-        </button>
-      </aside>
-
-      {/* MAIN */}
-      <main className="flex-1 p-6 overflow-y-auto flex flex-col gap-6">
-
-        <div>
-          <h2 className="text-3xl font-bold">Student Analytics (Live)</h2>
-          <p className="text-gray-400 text-sm">Real-time discipline monitoring system</p>
-        </div>
-
-        {/* ANALYTICS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Stat title="Total Students" value={total} color="text-white" />
-          <Stat title="High Risk" value={high} color="text-red-400" />
-          <Stat title="Medium Risk" value={med} color="text-yellow-400" />
-          <Stat title="Low Risk" value={low} color="text-green-400" />
-        </div>
-
-        {/* SEARCH + ADD + IMPORT (UNCHANGED UI STYLE) */}
-        <div className="flex justify-between gap-4">
-          <input
-            placeholder="Search student..."
-            className="bg-white/10 px-4 py-2 rounded-xl w-full sm:w-1/3 outline-none"
-            onChange={(e) => setSearch(e.target.value)}
-          />
-
-          <div className="flex gap-2">
-            {/* HIDDEN INPUT */}
-            <input
-              type="file"
-              accept=".json"
-              ref={fileInputRef}
-              className="hidden"
-              onChange={handleFileUpload}
+            <Nav
+              icon={<LayoutDashboard size={18} />}
+              label="Dashboard"
+              onClick={() => navigate("/dashboard")}
             />
 
-            <button
-              onClick={() => fileInputRef.current.click()}
-              className="bg-blue-500 px-4 py-2 rounded-xl"
-              disabled={importing}
-            >
-              {importing ? "Importing..." : "Import JSON"}
-            </button>
+            <Nav
+              icon={<Users size={18} />}
+              label="Students"
+              active
+            />
 
-            <button
-              onClick={() => {
-                setSelectedStudent(null);
-                setIsEditing(false);
-                setShowModal(true);
-              }}
-              className="bg-green-500 px-4 py-2 rounded-xl"
-            >
-              + Add Student
-            </button>
+            <Nav
+              icon={<ShieldX size={18} />}
+              label="Guidance"
+              onClick={() => navigate("/guidance")}
+            />
+
+            <Nav
+              icon={<ChartNoAxesCombined size={18} />}
+              label="Reports"
+              onClick={() => navigate("/reports")}
+            />
+
+            <Nav
+              icon={<Gavel size={18} />}
+              label="Cases"
+              onClick={() => navigate("/cases")}
+            />
+
+            <Nav icon={<Gavel size={18} />} label="Interventions" onClick={() => navigate("/interventions")} />
+
+            <Nav
+              icon={<Settings size={18} />}
+              label="Settings"
+              onClick={() => navigate("/settings")}
+            />
+
           </div>
         </div>
 
-        {/* TABLE */}
-        <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+        <button
+          onClick={logout}
+          className="w-full bg-green-600 text-white py-2 rounded-xl hover:bg-green-700 transition"
+        >
+          Logout
+        </button>
+
+      </aside>
+
+      {/* ================= MAIN ================= */}
+      <main className="flex-1 overflow-y-auto p-10 space-y-8">
+
+        {/* HEADER */}
+        <motion.div
+          initial={{ opacity: 0, y: -15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex justify-between items-center"
+        >
+
+          <div>
+            <h2 className="text-4xl font-extrabold tracking-tight">
+              Students
+            </h2>
+
+            <p className="text-gray-500 mt-1">
+              Manage student records, risk monitoring, and behavioral insights
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={handleImport}
+            />
+
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => fileRef.current.click()}
+              className="px-4 py-2 rounded-2xl bg-white/60 backdrop-blur-xl border border-white/30 shadow-sm"
+            >
+              <Upload size={16} className="inline mr-2" />
+              {importing ? "Importing..." : "Import"}
+            </motion.button>
+
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => {
+                setShowModal(true);
+                setIsEditing(false);
+                setSelectedStudent(null);
+              }}
+              className="px-5 py-2 rounded-2xl bg-green-600 text-white shadow-lg shadow-green-200"
+            >
+              <Plus size={16} className="inline mr-2" />
+              Add Student
+            </motion.button>
+
+          </div>
+
+        </motion.div>
+
+        {/* ================= STATS ================= */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+
+          <Stat
+            label="Total Students"
+            value={stats.total}
+          />
+
+          <Stat
+            label="High Risk"
+            value={stats.high}
+            color="text-red-500"
+          />
+
+          <Stat
+            label="Medium Risk"
+            value={stats.med}
+            color="text-yellow-500"
+          />
+
+          <Stat
+            label="Low Risk"
+            value={stats.low}
+            color="text-green-600"
+          />
+
+        </div>
+
+        {/* ================= SEARCH ================= */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white/60 backdrop-blur-2xl border border-white/30 rounded-3xl p-5 shadow-sm"
+        >
+
+          <div className="flex items-center bg-white/70 border border-white/40 px-4 py-3 rounded-2xl">
+
+            <Search size={18} className="text-gray-400" />
+
+            <input
+              className="ml-3 w-full outline-none bg-transparent text-sm"
+              placeholder="Search students..."
+              onChange={(e) => setSearch(e.target.value)}
+            />
+
+          </div>
+
+        </motion.div>
+
+        {/* ================= TABLE ================= */}
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white/55 backdrop-blur-2xl border border-white/30 rounded-3xl overflow-hidden shadow-sm"
+        >
+
           <table className="w-full text-sm">
-            <thead className="bg-white/10 text-gray-300">
+
+            <thead className="bg-white/40 backdrop-blur text-gray-500 uppercase text-xs">
               <tr>
-                <th className="p-3 text-left">Name</th>
-                <th className="p-3 text-center">Grade</th>
-                <th className="p-3 text-center">Risk</th>
-                <th className="p-3 text-right">Actions</th>
+                <th className="p-5 text-left">Student</th>
+                <th className="p-5 text-center">Grade</th>
+                <th className="p-5 text-center">Risk</th>
+                <th className="p-5 text-right">Actions</th>
               </tr>
             </thead>
 
             <tbody>
-              {paginated.map((s, i) => (
+              {paginated.map((s, index) => (
                 <motion.tr
                   key={s._id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.03 }}
-                  className="border-t border-white/10 hover:bg-white/5"
+                  transition={{ delay: index * 0.03 }}
+                  className="border-t border-white/20 hover:bg-white/30 transition"
                 >
-                  <td className="p-3">{s.firstName} {s.lastName}</td>
-                  <td className="p-3 text-center">{s.grade}</td>
 
-                  <td className="p-3 text-center">
-                    <RiskPulse level={s.riskLevel} />
-                  </td>
+                  <td className="p-5">
 
-                  <td className="p-3">
-                    <div className="flex justify-end gap-2">
-                      <button onClick={() => { setSelectedStudent(s); setShowProfile(true); }} className="p-2 bg-white/10 rounded-lg">
-                        <Eye size={16} />
-                      </button>
+                    <div className="flex items-center gap-3">
 
-                      <button onClick={() => { setSelectedStudent(s); setIsEditing(true); setShowModal(true); }} className="p-2 bg-white/10 rounded-lg">
-                        <Pencil size={16} />
-                      </button>
+                      <div className="w-11 h-11 rounded-2xl bg-green-100 flex items-center justify-center">
+                        <Users size={18} className="text-green-700" />
+                      </div>
 
-                      <button onClick={() => setDeleteTarget(s)} className="p-2 bg-red-500/20 text-red-400 rounded-lg">
-                        <Trash2 size={16} />
-                      </button>
+                      <div>
+                        <p className="font-semibold">
+                          {s.firstName} {s.lastName}
+                        </p>
+
+                        <p className="text-xs text-gray-500">
+                          Student Profile
+                        </p>
+                      </div>
+
                     </div>
+
                   </td>
+
+                  <td className="p-5 text-center text-gray-600">
+                    {s.grade}
+                  </td>
+
+                  <td className="p-5 text-center">
+                    <RiskBadge level={s.riskLevel} />
+                  </td>
+
+                  <td className="p-5">
+
+                    <div className="flex justify-end gap-2">
+
+                      <Action
+                        icon={<Eye size={16} />}
+                        onClick={() => {
+                          setSelectedStudent(s);
+                          setShowProfile(true);
+                        }}
+                      />
+
+                      <Action
+                        icon={<Pencil size={16} />}
+                        onClick={() => {
+                          setSelectedStudent(s);
+                          setIsEditing(true);
+                          setShowModal(true);
+                        }}
+                      />
+
+                      <Action
+                        danger
+                        icon={<Trash2 size={16} />}
+                        onClick={() => setDeleteTarget(s)}
+                      />
+
+                    </div>
+
+                  </td>
+
                 </motion.tr>
               ))}
             </tbody>
+
           </table>
-        </div>
 
-        {/* PAGINATION */}
-        <div className="flex justify-between text-gray-400 text-sm">
-          <span>Page {currentPage} / {totalPages}</span>
+        </motion.div>
 
-          <div className="flex gap-2">
-            <button onClick={() => setCurrentPage(p => p - 1)}>Prev</button>
-            <button onClick={() => setCurrentPage(p => p + 1)}>Next</button>
+        {/* ================= PAGINATION ================= */}
+        <div className="flex justify-between items-center text-sm text-gray-500">
+
+          <p>
+            Showing page {page} of {pages}
+          </p>
+
+          <div className="flex gap-3">
+
+            <button
+              onClick={() => setPage((p) => Math.max(p - 1, 1))}
+              className="px-4 py-2 rounded-xl bg-white/60 backdrop-blur border border-white/30"
+            >
+              Prev
+            </button>
+
+            <button
+              onClick={() => setPage((p) => Math.min(p + 1, pages))}
+              className="px-4 py-2 rounded-xl bg-white/60 backdrop-blur border border-white/30"
+            >
+              Next
+            </button>
+
           </div>
+
         </div>
 
       </main>
 
-      {/* MODALS */}
+      {/* ================= MODALS ================= */}
       {showModal && (
         <StudentModal
           close={() => setShowModal(false)}
@@ -349,20 +477,72 @@ const StudentPage = () => {
         />
       )}
 
+      {/* ================= DELETE MODAL ================= */}
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
-          <div className="bg-gray-900 p-6 rounded-xl">
-            <p>Delete {deleteTarget.firstName}?</p>
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => setDeleteTarget(null)}>Cancel</button>
-              <button onClick={confirmDelete} className="text-red-400">Delete</button>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white/80 backdrop-blur-2xl border border-white/30 rounded-3xl p-7 w-[380px] shadow-2xl"
+          >
+
+            <h2 className="text-xl font-bold">
+              Delete Student
+            </h2>
+
+            <p className="text-gray-500 mt-2 text-sm">
+              Are you sure you want to delete{" "}
+              <span className="font-semibold text-gray-800">
+                {deleteTarget.firstName}
+              </span>
+              ?
+            </p>
+
+            <div className="flex justify-end gap-3 mt-6">
+
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 rounded-xl bg-red-500 text-white hover:bg-red-600"
+              >
+                Delete
+              </button>
+
             </div>
-          </div>
+
+          </motion.div>
+
         </div>
       )}
 
     </div>
   );
 };
+
+/* ================= STAT ================= */
+
+const Stat = ({ label, value, color = "text-gray-900" }) => (
+  <motion.div
+    whileHover={{ y: -3 }}
+    className="bg-white/55 backdrop-blur-2xl border border-white/30 rounded-3xl p-6 shadow-sm"
+  >
+
+    <p className="text-sm text-gray-500">
+      {label}
+    </p>
+
+    <h2 className={`text-4xl font-bold mt-2 ${color}`}>
+      {value}
+    </h2>
+
+  </motion.div>
+);
 
 export default StudentPage;

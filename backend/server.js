@@ -19,6 +19,10 @@ import messageRoutes from "./routes/messageRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import teacherReportRoutes from "./routes/teacherRoutes.js";
 import interventionRoutes from "./routes/interventionRoutes.js";
+import caseRoutes from "./routes/caseRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
+
+
 
 import { User } from "./models/userModel.js";
 
@@ -70,6 +74,8 @@ app.use("/api/messages", messageRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/teacher-reports", teacherReportRoutes);
 app.use("/api/interventions", interventionRoutes);
+app.use("/api/cases", caseRoutes);
+app.use("/api/upload", uploadRoutes);
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
@@ -169,9 +175,20 @@ io.on("connection", (socket) => {
     io.emit("online_users", Array.from(onlineUsers.keys()));
     console.log("🔴 Disconnected:", socket.id);
   });
+
+  const sendNotification = (userId, payload) => {
+  const socketId = onlineUsers.get(userId);
+
+  if (socketId) {
+    io.to(socketId).emit("newNotification", payload);
+  }
+
+  // fallback broadcast if user offline (mobile will sync later via API)
+  io.emit("newNotification", payload);
+};
 });
 
-
+app.set("io", io);
 
 /* ================= START SERVER ================= */
 

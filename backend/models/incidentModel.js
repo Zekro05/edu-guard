@@ -16,8 +16,20 @@ const incidentSchema = new mongoose.Schema(
     },
     status: {
   type: String,
-  enum: ["active", "completed"],
-  default: "active",
+  enum: [
+    "received",
+    "reviewing",
+    "waiting_for_student",
+    "escalated",
+    "intervention-ready",
+    "completed",
+  ],
+  default: "received",
+},
+
+completedAt: {
+  type: Date,
+  default: null,
 },
 
     title: {
@@ -40,6 +52,63 @@ const incidentSchema = new mongoose.Schema(
       enum: ["Low", "Medium", "High"],
       default: "Low",
     },
+
+    studentStatement: {
+  type: String,
+  default: "",
+},
+
+evidence: [
+  {
+    url: String,
+    type: String,
+    filename: String,
+
+    uploadedAt: {
+      type: Date,
+      default: Date.now,
+    },
+
+    uploadedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+
+    size: Number,
+  },
+],
+
+statementStatus: {
+  type: String,
+  enum: [
+    "not_requested",
+    "waiting_for_response",
+    "submitted",
+    "manual_entry",
+  ],
+  default: "not_requested",
+},
+
+statementRequestedAt: {
+  type: Date,
+  default: null,
+},
+
+statementSubmittedAt: {
+  type: Date,
+  default: null,
+},
+
+caseLogs: [
+  {
+    stage: String,
+    note: String,
+    time: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+],
   },
   {
     timestamps: true, // createdAt + updatedAt (USE THIS IN FRONTEND)

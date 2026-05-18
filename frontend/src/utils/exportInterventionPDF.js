@@ -1,96 +1,175 @@
 import jsPDF from "jspdf";
 
 /**
- * Professional Intervention Report Generator
+ * PROFESSIONAL Intervention Report (Clean Layout)
  */
-export const exportInterventionPDF = (selected, interventions = {}) => {
+export const exportInterventionPDF = (selected, interventions = []) => {
   if (!selected) return;
 
   const pdf = new jsPDF("p", "mm", "a4");
 
-  const pageWidth = 210;
   let y = 20;
 
-  const addText = (text, size = 12, color = [0, 0, 0]) => {
-    pdf.setFontSize(size);
-    pdf.setTextColor(...color);
-    pdf.text(text, 15, y);
-    y += size * 0.6 + 4;
+  /* ================= FILTER ================= */
+  const studentInterventions = interventions.filter(
+    (i) =>
+      String(i.studentId?._id || i.studentId) ===
+      String(selected.studentId)
+  );
+
+  /* ================= STATUS ================= */
+  const getStatus = () => {
+    if (studentInterventions.length === 0) return "No Action Taken";
+
+    const hasSuspension = studentInterventions.some((i) =>
+      (i.type || "").toLowerCase().includes("suspension")
+    );
+
+    if (hasSuspension || studentInterventions.length >= 3)
+      return "ACTIVE CASE";
+
+    if (studentInterventions.length >= 1)
+      return "ONGOING";
+
+    return "COMPLETED";
   };
 
-  const addLine = () => {
-    pdf.setDrawColor(200);
-    pdf.line(15, y, 195, y);
-    y += 6;
-  };
+  /* ================= HEADER BAR ================= */
+  pdf.setFillColor(0, 150, 80);
+  pdf.rect(0, 0, 210, 25, "F");
 
-  const addSection = (title) => {
-    y += 4;
-    pdf.setFontSize(14);
-    pdf.setTextColor(0, 150, 80);
-    pdf.text(title, 15, y);
-    y += 6;
-    addLine();
-  };
-
-  const studentInterventions = interventions[selected._id] || [];
-
-  // ================= HEADER =================
-  pdf.setFontSize(18);
-  pdf.setTextColor(0, 150, 80);
-  pdf.text("EDUGUARD DISCIPLINE REPORT", 15, y);
-  y += 10;
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFontSize(16);
+  pdf.text("GuidEd DISCIPLINE REPORT", 15, 15);
 
   pdf.setFontSize(10);
-  pdf.setTextColor(100);
-  pdf.text("Our Lady of the Holy Rosary - General Trias, Cavite", 15, y);
-  y += 10;
+  pdf.text(
+    "Our Lady of the Holy Rosary - General Trias, Cavite",
+    15,
+    21
+  );
 
-  addLine();
+  y = 35;
 
-  // ================= STUDENT INFO =================
-  addSection("Student Information");
+  /* ================= SECTION BOX ================= */
+  const sectionBox = (title) => {
+    pdf.setDrawColor(200);
+    pdf.rect(15, y, 180, 8);
+    pdf.setFontSize(11);
+    pdf.setTextColor(0, 120, 70);
+    pdf.text(title.toUpperCase(), 18, y + 5);
+    y += 12;
+  };
 
-  addText(`Name: ${selected.studentName}`);
-  addText(`Offense: ${selected.offense}`);
+  const field = (label, value) => {
+    pdf.setFontSize(11);
+    pdf.setTextColor(80);
+    pdf.text(`${label}:`, 15, y);
 
-  // ================= SUMMARY =================
-  addSection("Case Summary");
+    pdf.setTextColor(0);
+    pdf.text(String(value || "N/A"), 60, y);
 
-  addText(`Total Interventions: ${studentInterventions.length}`);
+    y += 7;
+  };
 
-  const status =
-    studentInterventions.length === 0
-      ? "No Action Taken"
-      : studentInterventions.some(i => i.status === "active")
-      ? "Active Case"
-      : "Resolved / Monitoring";
+  /* ================= STUDENT INFO ================= */
+  sectionBox("Student Information");
 
-  addText(`Status: ${status}`);
+  field("Name", selected.studentName);
+  field("Section", selected.section);
+  field("Age", selected.age);
+  field("Gender", selected.gender);
+  field("Offense", selected.offense);
 
-  // ================= TIMELINE =================
-  addSection("Intervention Timeline");
+  /* ================= SUMMARY ================= */
+  y += 4;
+  sectionBox("Case Summary");
+
+  field("Total Interventions", studentInterventions.length);
+  field("Case Status", getStatus());
+
+  /* ================= TIMELINE ================= */
+  y += 4;
+  sectionBox("Intervention Timeline");
 
   if (studentInterventions.length === 0) {
-    addText("No interventions recorded yet.", 11, [120, 120, 120]);
+    pdf.setTextColor(120);
+    pdf.text("No interventions recorded.", 15, y);
+    y += 6;
   } else {
     studentInterventions.forEach((i, index) => {
-      addText(`${index + 1}. ${i.type.toUpperCase()}`, 12);
-      addText(`   ${i.description || "No description"}`, 10, [80, 80, 80]);
-      addText(`   Status: ${i.status}`, 10, [100, 100, 100]);
-      y += 2;
+      const type = (i.type || "unknown")
+        .replace("detention", "Community Service")
+        .toUpperCase();
+
+      // Card-like box
+      pdf.setDrawColor(220);
+      pdf.rect(15, y, 180, 18);
+
+      pdf.setFontSize(11);
+      pdf.setTextColor(0);
+      pdf.text(`${index + 1}. ${type}`, 18, y + 6);
+
+      pdf.setFontSize(9);
+      pdf.setTextColor(90);
+      pdf.text(
+        i.description || "No description provided",
+        18,
+        y + 11
+      );
+
+      pdf.setTextColor(120);
+      pdf.text(
+        `Date: ${
+          i.createdAt
+            ? new Date(i.createdAt).toLocaleDateString()
+            : "N/A"
+        }`,
+        150,
+        y + 6
+      );
+
+      y += 22;
+
+      // Auto page break
+      if (y > 260) {
+        pdf.addPage();
+        y = 20;
+      }
     });
   }
 
-  // ================= FOOTER =================
-  y = 270;
+  /* ================= SIGNATURE ================= */
+  y += 10;
+
+  pdf.setDrawColor(180);
+  pdf.line(15, y, 80, y);
+  pdf.line(120, y, 185, y);
+
+  y += 5;
+
+  pdf.setFontSize(10);
+  pdf.setTextColor(80);
+
+  pdf.text("Prepared by:", 15, y);
+  pdf.text("Approved by:", 120, y);
+
+  y += 5;
+
+  pdf.setTextColor(0);
+  pdf.text("Guidance Office", 15, y);
+  pdf.text("School Authority", 120, y);
+
+  /* ================= FOOTER ================= */
   pdf.setFontSize(9);
   pdf.setTextColor(150);
   pdf.text(
-    `Generated by EduGuard System • ${new Date().toLocaleDateString()}`,
-    15,
-    y
+    `Generated by GuidEd • ${new Date().toLocaleDateString()}`,
+    105,
+    290,
+    { align: "center" }
   );
 
-  pdf.save(`${selected.studentName}_discipline_report.pdf`);
+  /* ================= SAVE ================= */
+  pdf.save(`${selected.studentName}_Intervention_Report.pdf`);
 };

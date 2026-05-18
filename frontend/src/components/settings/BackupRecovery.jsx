@@ -1,109 +1,137 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
 import { Database, Download, Upload, RefreshCcw } from "lucide-react";
 
-const API = "http://localhost:5000/api";
+/* ================= LOCAL STORAGE KEY ================= */
+const LOCAL_KEY = "system_backup_data";
 
+/* ================= MAIN ================= */
 const BackupRecovery = () => {
   const [backups, setBackups] = useState([]);
   const [loadingBackup, setLoadingBackup] = useState(false);
   const [loadingRestore, setLoadingRestore] = useState(false);
   const [file, setFile] = useState(null);
 
-  const fetchBackups = async () => {
-    try {
-      const res = await axios.get(`${API}/backups`, { withCredentials: true });
-      setBackups(res.data);
-    } catch (err) {
-      console.error("Failed to fetch backups:", err.response || err.message);
-    }
-  };
-
+  /* ================= LOAD BACKUP HISTORY ================= */
   useEffect(() => {
-    fetchBackups();
+    const stored = JSON.parse(localStorage.getItem(LOCAL_KEY)) || [];
+    setBackups(stored);
   }, []);
 
+  /* ================= CREATE BACKUP ================= */
   const handleBackup = async () => {
     setLoadingBackup(true);
+
     try {
-      const res = await axios.get(`${API}/backup`, { withCredentials: true });
-      alert(res.data.message);
-      fetchBackups();
+      // collect system data
+      const snapshot = {
+        date: new Date().toISOString(),
+        reports: JSON.parse(localStorage.getItem("reports") || "[]"),
+        incidents: JSON.parse(localStorage.getItem("incidents") || "[]"),
+        users: JSON.parse(localStorage.getItem("users") || "[]"),
+      };
+
+      const newBackup = {
+        id: Date.now(),
+        action: "Manual Backup",
+        createdAt: snapshot.date,
+        data: snapshot,
+      };
+
+      const updated = [newBackup, ...backups];
+
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(updated));
+      setBackups(updated);
+
+      // auto download file
+      const blob = new Blob([JSON.stringify(newBackup, null, 2)], {
+        type: "application/json",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `backup-${Date.now()}.json`;
+      a.click();
+
+      URL.revokeObjectURL(url);
     } catch (err) {
-      console.error("Backup failed:", err.response || err.message);
-      alert("Backup failed! Check console.");
+      console.error(err);
+      alert("Backup failed");
     } finally {
       setLoadingBackup(false);
     }
   };
 
+  /* ================= RESTORE FROM FILE ================= */
   const handleRestore = async (backupFile) => {
+    if (!backupFile) return;
+
     setLoadingRestore(true);
+
     try {
-      const formData = new FormData();
-      formData.append("backupFile", backupFile);
+      const text = await backupFile.text();
+      const data = JSON.parse(text);
 
-      const res = await axios.post(`${API}/restore-file`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-        withCredentials: true,
-      });
+      // restore into localStorage (merge strategy)
+      if (data.reports) localStorage.setItem("reports", JSON.stringify(data.reports));
+      if (data.incidents) localStorage.setItem("incidents", JSON.stringify(data.incidents));
+      if (data.users) localStorage.setItem("users", JSON.stringify(data.users));
 
-      alert(res.data.message);
-      fetchBackups();
+      alert("Restore successful!");
     } catch (err) {
-      console.error("Restore failed:", err.response || err.message);
-      alert("Restore failed! Check console.");
+      console.error(err);
+      alert("Invalid backup file");
     } finally {
       setLoadingRestore(false);
     }
   };
 
   return (
-    <div className="w-full min-h-screen bg-gradient-to-br from-gray-950 via-green-950 to-emerald-950 text-white p-6">
+    <div className="min-h-screen w-full bg-gray-50 text-gray-900 p-6">
 
       {/* HEADER */}
-      <div className="mb-6 flex items-center gap-3">
-        <div className="p-2 bg-green-500/20 rounded-lg">
-          <Database className="text-green-400" size={20} />
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 bg-green-100 rounded-xl">
+          <Database className="text-green-600" size={20} />
         </div>
 
         <div>
           <h1 className="text-2xl font-bold">Backup & Recovery</h1>
-          <p className="text-sm text-gray-400">
-            Secure system data and restore when needed
+          <p className="text-sm text-gray-500">
+            Create and restore local system snapshots
           </p>
         </div>
       </div>
 
-      {/* ACTIONS */}
+      {/* ACTION CARDS */}
       <div className="grid md:grid-cols-2 gap-6 mb-8">
 
         {/* BACKUP */}
-        <div className="bg-white/5 border border-white/10 rounded-xl p-6 backdrop-blur-xl">
-          <h2 className="text-green-400 font-semibold mb-2">Manual Backup</h2>
-          <p className="text-sm text-gray-400 mb-4">
-            Create a system snapshot instantly.
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <h2 className="text-green-600 font-semibold mb-2">
+            Create Backup
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Export system data as JSON file
           </p>
 
           <button
             onClick={handleBackup}
             disabled={loadingBackup}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
-              loadingBackup
-                ? "bg-gray-600 cursor-not-allowed"
-                : "bg-green-500 text-black hover:bg-green-600"
-            }`}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-500 text-white hover:bg-green-600 transition disabled:opacity-50"
           >
             <Download size={16} />
-            {loadingBackup ? "Backing up..." : "Create Backup"}
+            {loadingBackup ? "Creating..." : "Generate Backup"}
           </button>
         </div>
 
         {/* RESTORE */}
-        <div className="bg-white/5 border border-white/10 rounded-xl p-6 backdrop-blur-xl">
-          <h2 className="text-green-400 font-semibold mb-2">Restore Backup</h2>
-          <p className="text-sm text-gray-400 mb-4">
-            Restore from a saved backup file.
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+          <h2 className="text-green-600 font-semibold mb-2">
+            Restore Data
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Import backup JSON file
           </p>
 
           <input
@@ -116,34 +144,30 @@ const BackupRecovery = () => {
           <button
             onClick={() => handleRestore(file)}
             disabled={!file || loadingRestore}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
-              !file || loadingRestore
-                ? "bg-gray-600 cursor-not-allowed"
-                : "bg-gray-700 hover:bg-gray-800"
-            }`}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-900 text-white hover:bg-gray-800 transition disabled:opacity-50"
           >
             <Upload size={16} />
-            {loadingRestore ? "Restoring..." : "Restore Data"}
+            {loadingRestore ? "Restoring..." : "Restore"}
           </button>
         </div>
       </div>
 
-      {/* HISTORY (KEPT - ONLY STYLED) */}
-      <div className="bg-white/5 border border-white/10 rounded-xl p-6 backdrop-blur-xl">
+      {/* HISTORY */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
 
-        <h2 className="text-green-400 font-semibold mb-4">
+        <h2 className="text-green-600 font-semibold mb-4">
           Backup History
         </h2>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
 
-            <thead className="text-gray-300 border-b border-white/10">
+            <thead className="text-gray-500 border-b">
               <tr>
-                <th className="text-left p-3">Date</th>
-                <th className="text-left p-3">Type</th>
-                <th className="text-left p-3">Status</th>
-                <th className="text-left p-3">Action</th>
+                <th className="text-left py-3">Date</th>
+                <th className="text-left py-3">Type</th>
+                <th className="text-left py-3">Status</th>
+                <th className="text-left py-3">Action</th>
               </tr>
             </thead>
 
@@ -151,38 +175,45 @@ const BackupRecovery = () => {
               {backups.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="text-center py-6 text-gray-400">
-                    No backups found.
+                    No backups yet
                   </td>
                 </tr>
               ) : (
                 backups.map((b) => (
-                  <tr
-                    key={b._id}
-                    className="border-t border-white/10 hover:bg-white/5"
-                  >
-                    <td className="p-3">
+                  <tr key={b.id} className="border-t hover:bg-gray-50">
+
+                    <td className="py-3">
                       {new Date(b.createdAt).toLocaleString()}
                     </td>
 
-                    <td className="p-3">
-                      {b.action === "Created Backup" ? "Manual" : b.action}
+                    <td className="py-3 text-gray-700">
+                      {b.action}
                     </td>
 
-                    <td className="p-3 text-green-400 font-medium">
-                      Successful
+                    <td className="py-3 text-green-600 font-medium">
+                      Active
                     </td>
 
-                    <td className="p-3">
+                    <td className="py-3">
                       <button
-                        onClick={() =>
-                          alert("Restore from this backup using upload.")
-                        }
-                        className="flex items-center gap-1 text-green-400 hover:text-green-300"
+                        onClick={() => {
+                          const blob = new Blob(
+                            [JSON.stringify(b.data, null, 2)],
+                            { type: "application/json" }
+                          );
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `restore-${b.id}.json`;
+                          a.click();
+                        }}
+                        className="flex items-center gap-1 text-green-600 hover:text-green-700"
                       >
                         <RefreshCcw size={14} />
-                        Restore
+                        Export
                       </button>
                     </td>
+
                   </tr>
                 ))
               )}

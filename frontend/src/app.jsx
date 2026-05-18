@@ -15,6 +15,7 @@ import ReportPage from "./pages/ReportPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import GuidancePage from "./pages/GuidancePage.jsx";
 import InterventionPage from "./pages/InterventionPage.jsx";
+import CaseManagement from "./pages/CaseManagement.jsx";
 import { useAuthStore } from "./store/authStore.js";
 
 
@@ -134,6 +135,17 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route
+          path="/cases"
+          element={
+            <ProtectedRoute>
+              <CaseManagement/>
+            </ProtectedRoute>
+          }
+        />
+
+
         <Route
           path="/interventions"
           element={

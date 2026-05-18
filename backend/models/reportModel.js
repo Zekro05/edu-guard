@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 
 const reportSchema = new mongoose.Schema(
   {
-    /* ================= TARGET STUDENT ================= */
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Student",
@@ -10,40 +9,27 @@ const reportSchema = new mongoose.Schema(
     },
 
     studentName: {
-      type: String,
-      required: true,
-    },
+  type: String,
+  required: true,
+},
 
-    /* ================= INCIDENT INFO ================= */
-    offense: {
-      type: String,
-      required: true,
-    },
-
-    location: {
-      type: String,
-      required: true,
-    },
+    offense: { type: String, required: true },
+    location: { type: String, required: true },
 
     date: {
-      type: String,
+      type: Date,
       required: true,
     },
 
-    time: {
-      type: String,
-    },
+    time: String,
 
-    description: {
-      type: String,
-      required: true,
-    },
+    description: { type: String, required: true },
 
-    /* ================= REPORTER INFO ================= */
-    reporter: {
-      type: String,
-      required: true,
-    },
+    evidence: [{
+    url: { type: String, required: true },
+    type: { type: String, enum: ['image', 'video', 'document'] },
+    uploadedAt: { type: Date, default: Date.now }
+  }],
 
     reporterId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -51,22 +37,18 @@ const reportSchema = new mongoose.Schema(
       required: true,
     },
 
-    // 🔥 NEW: WHO CREATED THE REPORT
     reporterType: {
       type: String,
-      enum: ["student", "teacher", "admin"],
-      required: true,
-      default: "unknown",
+      enum: ["student", "teacher", "admin", "guest"], 
+      default: "student",
     },
 
-    // 🔥 OPTIONAL: link to teacher profile (if reporter is teacher)
     teacherId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Teacher",
       default: null,
     },
 
-    /* ================= STATUS ================= */
     status: {
       type: String,
       enum: ["pending", "accepted", "rejected"],
@@ -76,4 +58,8 @@ const reportSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("Report", reportSchema);
+const Report =
+  mongoose.models.Report || mongoose.model("Report", reportSchema);
+
+
+export default Report;

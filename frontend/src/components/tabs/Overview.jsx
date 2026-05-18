@@ -1,114 +1,191 @@
-import React, { memo } from "react";
-
-/* STATIC DATA OUTSIDE COMPONENT (IMPORTANT PERF FIX) */
-const monthlyIncidents = [
-  { month: "January", change: "up", count: 10 },
-  { month: "February", change: "down", count: 7 },
-  { month: "March", change: "down", count: 5 },
-  { month: "April", change: "up", count: 12 },
-];
-
-const offenseStats = [
-  { label: "Minor Offenses", count: 57, percentage: 45, color: "green" },
-  { label: "Moderate Offenses", count: 29, percentage: 30, color: "yellow" },
-  { label: "Major Offenses", count: 15, percentage: 25, color: "red" },
-];
-
-const riskDistribution = [
-  { risk: "High Risk", count: 12, color: "red" },
-  { risk: "Medium Risk", count: 28, color: "yellow" },
-  { risk: "Low Risk", count: 50, color: "green" },
-];
+import React, { memo, useEffect, useMemo, useState } from "react";
+import { API } from "../../store/authStore";
 
 /* ================= MAIN ================= */
 const Overview = () => {
-  return (
-    <div className="flex flex-col gap-6 text-white">
+  const [reports, setReports] = useState([]);
+  const [incidents, setIncidents] = useState([]);
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [reportRes, incidentRes] = await Promise.all([
+          API.get("/api/reports"),
+          API.get("/api/incidents"),
+        ]);
+
+        setReports(reportRes.data?.reports || reportRes.data || []);
+        setIncidents(incidentRes.data || []);
+      } catch (err) {
+        console.log("Overview fetch error:", err);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  /* ================= MONTHLY INCIDENTS ================= */
+  const monthlyIncidents = useMemo(() => {
+    const map = {};
+
+    incidents.forEach((i) => {
+      const month = new Date(i.createdAt).toLocaleString("default", {
+        month: "short",
+      });
+
+      map[month] = (map[month] || 0) + 1;
+    });
+
+    return Object.entries(map).map(([month, count], index, arr) => {
+      const prev = arr[index - 1]?.[1] || 0;
+
+      return {
+        month,
+        count,
+        change: count >= prev ? "up" : "down",
+      };
+    });
+  }, [incidents]);
+
+  /* ================= OFFENSE STATS ================= */
+  const offenseStats = useMemo(() => {
+    const total = reports.length;
+
+    const counts = { Minor: 0, Moderate: 0, Major: 0 };
+
+    reports.forEach((r) => {
+      const level = r.level || "Minor";
+
+      if (level === "High") counts.Major++;
+      else if (level === "Medium") counts.Moderate++;
+      else counts.Minor++;
+    });
+
+    return [
+      {
+        label: "Minor",
+        count: counts.Minor,
+        percentage: total ? (counts.Minor / total) * 100 : 0,
+        color: "#16a34a",
+      },
+      {
+        label: "Moderate",
+        count: counts.Moderate,
+        percentage: total ? (counts.Moderate / total) * 100 : 0,
+        color: "#f59e0b",
+      },
+      {
+        label: "Major",
+        count: counts.Major,
+        percentage: total ? (counts.Major / total) * 100 : 0,
+        color: "#dc2626",
+      },
+    ];
+  }, [reports]);
+
+  /* ================= RISK DISTRIBUTION ================= */
+  const riskDistribution = useMemo(() => {
+    const counts = { High: 0, Medium: 0, Low: 0 };
+
+    incidents.forEach((i) => {
+      const level = i.level || "Low";
+      if (level === "High") counts.High++;
+      else if (level === "Medium") counts.Medium++;
+      else counts.Low++;
+    });
+
+    return [
+      { label: "High Risk", count: counts.High, color: "#dc2626" },
+      { label: "Medium Risk", count: counts.Medium, color: "#f59e0b" },
+      { label: "Low Risk", count: counts.Low, color: "#16a34a" },
+    ];
+  }, [incidents]);
+
+  return (
+    <div className="p-6 bg-gray-50 min-h-screen text-gray-900">
+      
       {/* HEADER */}
-      <div>
-        <h2 className="text-xl font-semibold">Overview Analytics</h2>
-        <p className="text-sm text-gray-400">
+      <div className="mb-6">
+        <h2 className="text-2xl font-semibold">Overview Analytics</h2>
+        <p className="text-sm text-gray-500">
           System insights and risk breakdown
         </p>
       </div>
 
-      {/* MONTHLY INCIDENTS */}
-      <Card title="Monthly Incidents">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {monthlyIncidents.map((item) => (
-            <div
-              key={item.month}
-              className="flex justify-between items-center bg-white/5 border border-white/10 rounded-xl px-4 py-3"
-            >
-              <span className="text-sm font-medium">{item.month}</span>
+      {/* GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-              <span
-                className={`text-sm font-semibold ${
-                  item.change === "up"
-                    ? "text-red-400"
-                    : "text-green-400"
-                }`}
-              >
-                {item.change === "up" ? "↑" : "↓"} {item.count}
-              </span>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* OFFENSE STATS */}
-      <Card title="Offense Breakdown">
-        <div className="space-y-4">
-          {offenseStats.map((o) => (
-            <div key={o.label}>
-              <div className="flex justify-between text-xs text-gray-300 mb-1">
-                <span>{o.label}</span>
-                <span>{o.count}</span>
-              </div>
-
-              <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  className={`h-2 rounded-full ${
-                    o.color === "green"
-                      ? "bg-green-500"
-                      : o.color === "yellow"
-                      ? "bg-yellow-400"
-                      : "bg-red-500"
-                  }`}
-                  style={{ width: `${o.percentage}%` }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* RISK DISTRIBUTION */}
-      <Card title="Risk Distribution">
-        <div className="grid grid-cols-3 gap-3">
-          {riskDistribution.map((r) => (
-            <div
-              key={r.risk}
-              className="bg-white/5 border border-white/10 rounded-xl p-4 text-center"
-            >
+        {/* MONTHLY INCIDENTS */}
+        <Card title="Monthly Incidents">
+          <div className="space-y-2">
+            {monthlyIncidents.map((item) => (
               <div
-                className={`w-10 h-10 mx-auto mb-2 rounded-full flex items-center justify-center font-bold ${
-                  r.color === "red"
-                    ? "bg-red-500/20 text-red-400"
-                    : r.color === "yellow"
-                    ? "bg-yellow-500/20 text-yellow-300"
-                    : "bg-green-500/20 text-green-400"
-                }`}
+                key={item.month}
+                className="flex justify-between items-center bg-white border border-gray-100 rounded-lg px-4 py-3 shadow-sm"
               >
-                {r.count}
-              </div>
+                <span className="text-sm font-medium text-gray-700">
+                  {item.month}
+                </span>
 
-              <p className="text-xs text-gray-300">{r.risk}</p>
-            </div>
-          ))}
-        </div>
-      </Card>
+                <span
+                  className={`text-sm font-semibold ${
+                    item.change === "up"
+                      ? "text-red-500"
+                      : "text-green-600"
+                  }`}
+                >
+                  {item.change === "up" ? "↑" : "↓"} {item.count}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* OFFENSE BREAKDOWN */}
+        <Card title="Offense Breakdown">
+          <div className="space-y-4">
+            {offenseStats.map((o) => (
+              <div key={o.label}>
+                <div className="flex justify-between text-xs text-gray-600 mb-1">
+                  <span>{o.label}</span>
+                  <span>{o.count}</span>
+                </div>
+
+                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-2 rounded-full transition-all"
+                    style={{
+                      width: `${o.percentage}%`,
+                      backgroundColor: o.color,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        {/* RISK DISTRIBUTION */}
+        <Card title="Risk Distribution">
+          <div className="grid grid-cols-3 gap-3">
+            {riskDistribution.map((r) => (
+              <div
+                key={r.label}
+                className="bg-white border border-gray-100 rounded-xl p-4 text-center shadow-sm"
+              >
+                <div
+                  className="w-10 h-10 mx-auto mb-2 rounded-full flex items-center justify-center font-bold text-white"
+                  style={{ backgroundColor: r.color }}
+                >
+                  {r.count}
+                </div>
+
+                <p className="text-xs text-gray-600">{r.label}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 };
@@ -117,8 +194,8 @@ export default memo(Overview);
 
 /* ================= CARD ================= */
 const Card = memo(({ title, children }) => (
-  <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md">
-    <h3 className="text-sm font-semibold text-green-400 mb-4">
+  <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+    <h3 className="text-sm font-semibold text-gray-800 mb-4">
       {title}
     </h3>
     {children}

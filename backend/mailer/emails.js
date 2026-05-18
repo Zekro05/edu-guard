@@ -14,7 +14,7 @@ const sendEmail = async (to, subject, html) => {
     await emailApi.sendTransacEmail({
       sender: {
         email: process.env.EMAIL_FROM,
-        name: "EduGuard",
+        name: "GuidEd",
       },
       to: [{ email: to }],
       subject,
@@ -36,7 +36,7 @@ export const sendVerificationEmail = async (email, otp) => {
   const subject = "Your Verification Code";
   const html = `
     <div style="font-family: Arial, sans-serif;">
-      <h2>EduGuard Verification</h2>
+      <h2>GuidEd Verification</h2>
       <p>Your verification code is:</p>
 
       <h1 style="

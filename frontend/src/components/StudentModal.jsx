@@ -2,9 +2,9 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { API } from "../store/authStore";
 import toast from "react-hot-toast";
-import { User } from "lucide-react";
+import { User, X } from "lucide-react";
 
-const StudentModal = ({ close, refresh, student, isEditing, students }) => {
+const StudentModal = ({ close, refresh, student, isEditing }) => {
   const [form, setForm] = useState({
     firstName: "",
     middleName: "",
@@ -61,43 +61,118 @@ const StudentModal = ({ close, refresh, student, isEditing, students }) => {
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
       >
 
+        {/* MODAL SHELL */}
         <motion.form
           onSubmit={handleSubmit}
-          initial={{ scale: 0.9, y: 30, opacity: 0 }}
-          animate={{ scale: 1, y: 0, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          className="w-full max-w-3xl rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl text-white shadow-2xl"
+          initial={{ scale: 0.96, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.96, opacity: 0 }}
+          className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden"
         >
 
           {/* HEADER */}
-          <div className="relative p-6 bg-gradient-to-r from-green-600 to-emerald-600">
-            <h2 className="text-2xl font-bold tracking-wide">
-              {isEditing ? "Edit Student Profile" : "Create Student Profile"}
-            </h2>
-            <p className="text-white/80 text-sm">
-              EduGuard Secure Student Management System
-            </p>
+          <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-green-50 to-white">
+
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                {isEditing ? "Edit Student Profile" : "Create Student Profile"}
+              </h2>
+              <p className="text-sm text-slate-500">
+                Manage student identity and behavioral profile
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={close}
+              className="p-2 rounded-lg hover:bg-slate-100"
+            >
+              <X size={18} />
+            </button>
+
           </div>
 
           {/* BODY */}
-          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="p-6 grid grid-cols-2 gap-6">
 
-            {/* AVATAR */}
-            <div className="col-span-2 flex flex-col items-center">
-              <div className="w-28 h-28 rounded-full border border-green-400/40 shadow-lg overflow-hidden flex items-center justify-center bg-white/10">
-                {form.newPhoto ? (
-                  <img src={URL.createObjectURL(form.newPhoto)} className="w-full h-full object-cover" />
-                ) : form.profilePhoto ? (
-                  <img src={form.profilePhoto} className="w-full h-full object-cover" />
-                ) : (
-                  <User className="text-gray-300 w-10 h-10" />
-                )}
+            {/* LEFT COLUMN */}
+            <div className="space-y-5">
+
+              <SectionTitle title="Identity" />
+
+              <Input name="firstName" label="First Name" form={form} onChange={handleChange} />
+              <Input name="middleName" label="Middle Name" form={form} onChange={handleChange} />
+              <Input name="lastName" label="Last Name" form={form} onChange={handleChange} />
+
+              <SectionTitle title="Academic Info" />
+              <Input name="grade" label="Grade Level" form={form} onChange={handleChange} />
+              <Input name="studentId" label="Student ID" form={form} onChange={handleChange} />
+
+            </div>
+
+            {/* RIGHT COLUMN */}
+            <div className="space-y-5">
+
+              <SectionTitle title="Contact" />
+
+              <Input name="email" label="Email" form={form} onChange={handleChange} />
+              <Input name="phone" label="Phone" form={form} onChange={handleChange} />
+
+              <SectionTitle title="Classification" />
+
+              <Select
+                name="gender"
+                value={form.gender}
+                onChange={handleChange}
+                options={["Male", "Female"]}
+                label="Gender"
+              />
+
+              <Select
+                name="riskLevel"
+                value={form.riskLevel}
+                onChange={handleChange}
+                options={["Low", "Medium", "High"]}
+                label="Risk Level"
+              />
+
+            </div>
+
+            {/* FULL WIDTH NOTES */}
+            <div className="col-span-2">
+
+              <SectionTitle title="Notes" />
+
+              <textarea
+                name="notes"
+                value={form.notes}
+                onChange={handleChange}
+                placeholder="Add behavioral notes, guidance remarks, or observations..."
+                className="w-full border border-slate-200 rounded-xl p-3 h-28 outline-none focus:ring-2 focus:ring-green-500"
+              />
+
+            </div>
+
+            {/* PHOTO */}
+            <div className="col-span-2 flex items-center justify-between border-t pt-4">
+
+              <div className="flex items-center gap-3">
+
+                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                  <User size={18} className="text-slate-500" />
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium">Profile Photo</p>
+                  <p className="text-xs text-slate-500">Optional upload</p>
+                </div>
+
               </div>
 
               <input
@@ -105,83 +180,31 @@ const StudentModal = ({ close, refresh, student, isEditing, students }) => {
                 onChange={(e) =>
                   setForm({ ...form, newPhoto: e.target.files[0] })
                 }
-                className="mt-3 text-sm text-gray-300"
+                className="text-sm"
               />
+
             </div>
 
-            {/* INPUTS */}
-            {[
-              ["firstName", "First Name"],
-              ["middleName", "Middle Name"],
-              ["lastName", "Last Name"],
-              ["grade", "Grade"],
-              ["studentId", "Student ID"],
-              ["email", "Email"],
-              ["phone", "Phone"],
-            ].map(([name, label]) => (
-              <div
-                key={name}
-                className="bg-white/5 border border-white/10 rounded-xl p-3 hover:border-green-400/40 transition"
-              >
-                <p className="text-xs text-gray-400">{label}</p>
-                <input
-                  name={name}
-                  value={form[name]}
-                  onChange={handleChange}
-                  className="w-full bg-transparent outline-none text-white"
-                />
-              </div>
-            ))}
-
-            {/* SELECTS */}
-            <select
-              name="riskLevel"
-              value={form.riskLevel}
-              onChange={handleChange}
-              className="bg-white/5 border border-white/10 rounded-xl p-3"
-            >
-              <option>Low</option>
-              <option>Medium</option>
-              <option>High</option>
-            </select>
-
-            <select
-              name="gender"
-              value={form.gender}
-              onChange={handleChange}
-              className="bg-white/5 border border-white/10 rounded-xl p-3"
-            >
-              <option value="">Gender</option>
-              <option>Male</option>
-              <option>Female</option>
-            </select>
-
-            {/* NOTES */}
-            <textarea
-              name="notes"
-              value={form.notes}
-              onChange={handleChange}
-              placeholder="Additional intelligence notes..."
-              className="col-span-2 bg-white/5 border border-white/10 rounded-xl p-3 h-24"
-            />
           </div>
 
           {/* FOOTER */}
-          <div className="flex justify-end gap-3 p-5 border-t border-white/10 bg-white/5">
+          <div className="flex justify-end gap-3 px-6 py-4 border-t bg-slate-50">
+
             <button
               type="button"
               onClick={close}
-              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20"
+              className="px-4 py-2 rounded-xl border hover:bg-white"
             >
               Cancel
             </button>
 
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 hover:scale-105 transition"
+              className="px-5 py-2 rounded-xl bg-green-700 text-white font-semibold hover:bg-green-800"
             >
               {isEditing ? "Save Changes" : "Create Student"}
             </button>
+
           </div>
 
         </motion.form>
@@ -189,5 +212,41 @@ const StudentModal = ({ close, refresh, student, isEditing, students }) => {
     </AnimatePresence>
   );
 };
+
+/* ================= UI HELPERS ================= */
+
+const SectionTitle = ({ title }) => (
+  <h3 className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
+    {title}
+  </h3>
+);
+
+const Input = ({ name, label, form, onChange }) => (
+  <div>
+    <label className="text-xs text-slate-500">{label}</label>
+    <input
+      name={name}
+      value={form[name]}
+      onChange={onChange}
+      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
+    />
+  </div>
+);
+
+const Select = ({ name, value, onChange, options, label }) => (
+  <div>
+    <label className="text-xs text-slate-500">{label}</label>
+    <select
+      name={name}
+      value={value}
+      onChange={onChange}
+      className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
+    >
+      {options.map((o) => (
+        <option key={o} value={o}>{o}</option>
+      ))}
+    </select>
+  </div>
+);
 
 export default StudentModal;

@@ -1,11 +1,16 @@
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "../store/authStore";
+import { useAuthStore, API } from "../store/authStore";
 import { useEffect, useState, useRef, useMemo } from "react";
-import axios from "axios";
 import { io } from "socket.io-client";
+import { motion } from "framer-motion";
+
 import {
-  LayoutDashboard, Users, ShieldX, ChartNoAxesCombined,
-  Settings, Bell, Search, Gavel
+  LayoutDashboard,
+  Users,
+  ShieldX,
+  ChartNoAxesCombined,
+  Settings,
+  Gavel,
 } from "lucide-react";
 
 import {
@@ -17,7 +22,7 @@ import {
   Tooltip,
   Legend,
   LineElement,
-  PointElement
+  PointElement,
 } from "chart.js";
 
 import { Bar, Pie, Line } from "react-chartjs-2";
@@ -33,36 +38,63 @@ ChartJS.register(
   PointElement
 );
 
+/* ================= TOAST SYSTEM ================= */
+const useToast = () => {
+  const [toasts, setToasts] = useState([]);
+
+  const pushToast = (msg) => {
+    const id = Date.now();
+    setToasts((p) => [...p, { id, msg }]);
+
+    setTimeout(() => {
+      setToasts((p) => p.filter((t) => t.id !== id));
+    }, 3500);
+  };
+
+  const Toasts = () => (
+    <div className="fixed bottom-5 right-5 space-y-3 z-50">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className="px-4 py-3 rounded-xl bg-white/80 backdrop-blur-xl border shadow-lg text-sm"
+        >
+          {t.msg}
+        </div>
+      ))}
+    </div>
+  );
+
+  return { pushToast, Toasts };
+};
+
+/* ================= DASHBOARD ================= */
+
 const DashboardPage = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { logout } = useAuthStore();
+
+  const { pushToast, Toasts } = useToast();
+
+  const [students, setStudents] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [incidents, setIncidents] = useState([]);
+
+  const [notifCount, setNotifCount] = useState(0);
+  const [showNotifPanel, setShowNotifPanel] = useState(false);
 
   const socketRef = useRef(null);
-  const soundRef = useRef(null);
 
-  const [dark, setDark] = useState(true);
-  const [search, setSearch] = useState("");
-  const [reports, setReports] = useState([]);
-  const [filtered, setFiltered] = useState([]);
-  const [notif, setNotif] = useState([]);
-  const [selected, setSelected] = useState(null);
+  /* ================= FETCH ================= */
+  const fetchData = async () => {
+    const [s, r, i] = await Promise.all([
+      API.get("/api/students"),
+      API.get("/api/reports"),
+      API.get("/api/incidents"),
+    ]);
 
-  /* ================= AUDIO ================= */
-  useEffect(() => {
-    soundRef.current = new Audio("/notification.mp3");
-  }, []);
-
-  /* ================= FETCH REPORTS ================= */
-  const fetchReports = async () => {
-    try {
-      const res = await axios.get(
-        "https://edu-guard-backend.onrender.com/api/reports?status=pending"
-      );
-      setReports(res.data.reports || []);
-      setFiltered(res.data.reports || []);
-    } catch (err) {
-      console.log(err);
-    }
+    setStudents(s.data || []);
+    setReports(Array.isArray(r.data?.reports) ? r.data.reports : r.data || []);
+    setIncidents(Array.isArray(i.data) ? i.data : []);
   };
 
   /* ================= SOCKET ================= */
@@ -73,190 +105,275 @@ const DashboardPage = () => {
 
     socketRef.current = socket;
 
-    socket.on("connect", () => {
-      socket.emit("register", user?._id);
-    });
+    socket.on("newNotification", (data) => {
+  setReports((prev) => [data, ...prev]);
 
-    fetchReports();
+  setNotifications((prev) => [
+    {
+      id: data.id || data._id || Date.now(),
+      title: data.title || "New Report",
+      message: data.message || "A new report was submitted",
+      type: data.type || "update",
+      priority: data.priority || "normal",
+      time: new Date(),
+      isRead: false,
+    },
+    ...prev,
+  ]);
+
+  setNotifCount((prev) => prev + 1);
+});
+
+    fetchData();
 
     return () => socket.disconnect();
-  }, [user]);
+  }, []);
 
-  /* ================= SEARCH ================= */
-  useEffect(() => {
-    setFiltered(
-      reports.filter(
-        (r) =>
-          r.studentName?.toLowerCase().includes(search.toLowerCase()) ||
-          r.offense?.toLowerCase().includes(search.toLowerCase())
-      )
-    );
-  }, [search, reports]);
+  /* ================= RISK ================= */
+  const getRisk = (s) => {
+    const c = s.totalIncidents || 0;
+    if (c >= 5) return "High";
+    if (c >= 2) return "Medium";
+    return "Low";
+  };
+
+  const kpi = useMemo(() => ({
+    total: students.length,
+    high: students.filter((s) => getRisk(s) === "High").length,
+    medium: students.filter((s) => getRisk(s) === "Medium").length,
+    low: students.filter((s) => getRisk(s) === "Low").length,
+  }), [students]);
+
+  const topRisk = useMemo(() => {
+    const priority = { High: 3, Medium: 2, Low: 1 };
+
+    return [...students]
+      .sort((a, b) => priority[getRisk(b)] - priority[getRisk(a)])
+      .slice(0, 6);
+  }, [students]);
+
+  const behaviorSummary = useMemo(() => ({
+    high: kpi.high,
+    medium: kpi.medium,
+    low: kpi.low,
+  }), [kpi]);
 
   /* ================= CHARTS ================= */
-  const barData = useMemo(() => ({
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri"],
-    datasets: [{ label: "Incidents", data: [5, 8, 3, 6, 4], backgroundColor: "#22c55e" }]
-  }), []);
+  const barData = useMemo(() => {
+    const grouped = {};
+    reports.forEach(r => {
+      const d = r.date || "Unknown";
+      grouped[d] = (grouped[d] || 0) + 1;
+    });
+
+    return {
+      labels: Object.keys(grouped),
+      datasets: [{
+        label: "Reports",
+        data: Object.values(grouped),
+        backgroundColor: "rgba(27,94,32,0.75)",
+        borderRadius: 12,
+      }],
+    };
+  }, [reports]);
 
   const pieData = useMemo(() => ({
-    labels: ["Low", "Medium", "High"],
-    datasets: [{ data: [60, 25, 15], backgroundColor: ["#22c55e", "#facc15", "#ef4444"] }]
-  }), []);
+    labels: ["High", "Medium", "Low"],
+    datasets: [{
+      data: [kpi.high, kpi.medium, kpi.low],
+      backgroundColor: ["#ef4444", "#f59e0b", "#22c55e"],
+      borderWidth: 0,
+    }],
+  }), [kpi]);
 
-  const lineData = useMemo(() => ({
-    labels: ["Mon", "Tue", "Wed", "Thu", "Fri"],
-    datasets: [{ label: "Trend", data: [3, 6, 4, 8, 5], borderColor: "#22c55e" }]
-  }), []);
+  const lineData = useMemo(() => {
+    const grouped = {};
+    incidents.forEach(i => {
+      const d = new Date(i.createdAt).toLocaleDateString();
+      grouped[d] = (grouped[d] || 0) + 1;
+    });
 
+    return {
+      labels: Object.keys(grouped),
+      datasets: [{
+        label: "Incidents",
+        data: Object.values(grouped),
+        borderColor: "#1B5E20",
+        tension: 0.35,
+      }],
+    };
+  }, [incidents]);
+
+  /* ================= UI ================= */
   return (
-    <div className={dark ? "dark" : ""}>
-      <div className="h-screen w-screen flex bg-gradient-to-br from-gray-950 via-green-950 to-emerald-950 text-white overflow-hidden">
+    <div className="h-screen w-screen flex bg-gradient-to-br from-gray-50 to-gray-100 text-gray-900">
 
-        {/* SIDEBAR */}
-        <aside className="w-72 h-full bg-white/5 backdrop-blur-xl border-r border-white/10 p-6 flex flex-col justify-between">
+      {/* SIDEBAR */}
+      <aside className="w-72 bg-white border-r border-gray-200 p-6 flex flex-col justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-green-600">GuidEd</h1>
+          <p className="text-xs text-gray-500 mb-6">School Management System</p>
+
+          <Nav icon={<LayoutDashboard size={18} />} label="Dashboard" active />
+          <Nav icon={<Users size={18} />} label="Students" onClick={() => navigate("/students")} />
+          <Nav icon={<ShieldX size={18} />} label="Guidance" onClick={() => navigate("/guidance")} />
+          <Nav icon={<ChartNoAxesCombined size={18} />} label="Reports" onClick={() => navigate("/reports")} />
+          <Nav icon={<Gavel size={18} />} label="Cases" onClick={() => navigate("/cases")} />
+          <Nav icon={<Gavel size={18} />} label="Interventions" onClick={() => navigate("/interventions")} />
+          <Nav icon={<Settings size={18} />} label="Settings" onClick={() => navigate("/settings")} />
+        </div>
+
+        <button
+          onClick={logout}
+          className="w-full bg-green-600 text-white py-2 rounded-xl"
+        >
+          Logout
+        </button>
+      </aside>
+
+      {/* MAIN */}
+      <main className="flex-1 p-10 space-y-10 overflow-y-auto">
+
+        {/* HEADER */}
+        <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-2xl font-bold text-green-400">EduGuard</h1>
-            <p className="text-xs text-gray-400 mb-6">
-              Our Lady of the Holy Rosary - General Trias Cavite
+            <h2 className="text-4xl font-extrabold tracking-tight">
+              Dashboard Overview
+            </h2>
+            <p className="text-gray-500 mt-1">
+              Real-time insights & analytics
             </p>
-
-            <Nav icon={<LayoutDashboard />} label="Dashboard" />
-            <Nav icon={<Users />} label="Students" onClick={() => navigate("/students")} />
-            <Nav icon={<ShieldX />} label="Guidance" onClick={() => navigate("/guidance")} />
-            <Nav icon={<ChartNoAxesCombined />} label="Reports" onClick={() => navigate("/reports")} />
-            <Nav icon={<Gavel />} label="Interventions" onClick={() => navigate("/interventions")} />
-            <Nav icon={<Settings />} label="Settings" onClick={() => navigate("/settings")} />
           </div>
 
-          <button onClick={logout} className="bg-green-500 py-2 rounded-xl">
-            Logout
+          {/* NOTIFICATION BUTTON (KEPT) */}
+          <button
+            onClick={() => setShowNotifPanel((v) => !v)}
+            className="relative bg-white border px-4 py-2 rounded-xl shadow-sm hover:shadow transition"
+          >
+            🔔
+            {notifCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 rounded-full">
+                {notifCount}
+              </span>
+            )}
           </button>
-        </aside>
+        </div>
 
-        {/* MAIN */}
-        <main className="flex-1 p-6 overflow-y-auto flex flex-col gap-6">
+        {/* NOTIF PANEL */}
+        {showNotifPanel && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white/70 backdrop-blur-xl border rounded-2xl p-6"
+          >
+            <p className="font-semibold mb-2">Notifications</p>
+            <p className="text-sm text-gray-500">No need for clutter — using toast system instead.</p>
+          </motion.div>
+        )}
 
-          {/* HEADER */}
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-3xl font-bold">EduGuard Dashboard</h2>
-              <p className="text-gray-400 text-sm">Secure Monitoring System</p>
-            </div>
+        {/* KPI */}
+        <div className="grid md:grid-cols-4 gap-6">
+          <Glass label="Total Students" value={kpi.total} />
+          <Glass label="High Risk" value={kpi.high} />
+          <Glass label="Medium Risk" value={kpi.medium} />
+          <Glass label="Low Risk" value={kpi.low} />
+        </div>
 
-            <div className="flex items-center gap-3">
-              <div className="flex items-center bg-white/10 px-3 py-2 rounded-xl">
-                <Search size={16} />
-                <input
-                  className="bg-transparent ml-2 outline-none"
-                  placeholder="Search reports..."
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
+        {/* CHARTS */}
+        <div className="grid lg:grid-cols-3 gap-6">
+          <Panel title="Reports Overview"><Bar data={barData} /></Panel>
+          <Panel title="Risk Distribution"><Pie data={pieData} /></Panel>
+          <Panel title="Incident Trends"><Line data={lineData} /></Panel>
+        </div>
 
-              <button onClick={() => setDark(!dark)} className="px-3 py-2 bg-white/10 rounded-xl">
-                {dark ? "🌙" : "☀️"}
-              </button>
+        {/* INSIGHTS */}
+        <div className="grid lg:grid-cols-2 gap-6">
 
-              <div className="relative">
-                <Bell className="cursor-pointer" />
-                {notif.length > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 px-2 rounded-full text-xs">
-                    {notif.length}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
+          <Panel title="Top Risk Students">
+            <div className="space-y-3">
+              {topRisk.map(s => {
+                const r = getRisk(s);
 
-          {/* CHARTS */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="bg-white/5 p-4 rounded-xl"><Bar data={barData} /></div>
-            <div className="bg-white/5 p-4 rounded-xl"><Pie data={pieData} /></div>
-            <div className="bg-white/5 p-4 rounded-xl"><Line data={lineData} /></div>
-          </div>
+                return (
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    key={s._id}
+                    className="flex justify-between p-4 rounded-xl bg-white/60 backdrop-blur border"
+                  >
+                    <div>
+                      <p className="font-semibold">{s.firstName} {s.lastName}</p>
+                      <p className="text-xs text-gray-500">{s.totalIncidents} incidents</p>
+                    </div>
 
-          {/* RISK + ESCALATION PANEL (REPLACEMENT) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            {/* RISK LIST */}
-            <div className="bg-white/5 p-4 rounded-xl">
-              <h3 className="mb-3 font-semibold">Top Risk Students</h3>
-
-              {reports.slice(0, 5).map((r) => (
-                <div key={r._id} className="p-3 mb-2 bg-white/5 rounded-lg hover:bg-white/10">
-                  <div className="flex justify-between">
-                    <p className="text-sm font-semibold">{r.studentName}</p>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      r.offense?.toLowerCase().includes("fight")
-                        ? "bg-red-500"
-                        : r.offense?.toLowerCase().includes("bully")
-                        ? "bg-yellow-500"
-                        : "bg-green-500"
-                    }`}>
-                      {r.offense?.toLowerCase().includes("fight")
-                        ? "HIGH"
-                        : r.offense?.toLowerCase().includes("bully")
-                        ? "MED"
-                        : "LOW"}
+                    <span className="text-xs px-3 py-1 rounded-full text-white"
+                      style={{
+                        background:
+                          r === "High"
+                            ? "#ef4444"
+                            : r === "Medium"
+                            ? "#f59e0b"
+                            : "#22c55e",
+                      }}>
+                      {r}
                     </span>
-                  </div>
-
-                  <p className="text-xs text-gray-400">{r.offense}</p>
-                </div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
+          </Panel>
 
-            {/* ANALYTICS */}
-            <div className="lg:col-span-2 bg-white/5 p-4 rounded-xl">
-              <h3 className="mb-3 font-semibold">Behavior Overview</h3>
-
-              <div className="grid grid-cols-3 gap-4">
-
-                <div className="bg-white/5 p-4 rounded-xl">
-                  <p className="text-xs text-gray-400">High Risk</p>
-                  <h2 className="text-2xl font-bold text-red-400">
-                    {reports.filter(r => r.offense?.toLowerCase().includes("fight")).length}
-                  </h2>
-                </div>
-
-                <div className="bg-white/5 p-4 rounded-xl">
-                  <p className="text-xs text-gray-400">Medium Risk</p>
-                  <h2 className="text-2xl font-bold text-yellow-400">
-                    {reports.filter(r => r.offense?.toLowerCase().includes("bully")).length}
-                  </h2>
-                </div>
-
-                <div className="bg-white/5 p-4 rounded-xl">
-                  <p className="text-xs text-gray-400">Low Risk</p>
-                  <h2 className="text-2xl font-bold text-green-400">
-                    {reports.filter(r =>
-                      !r.offense?.toLowerCase().includes("fight") &&
-                      !r.offense?.toLowerCase().includes("bully")
-                    ).length}
-                  </h2>
-                </div>
-
-              </div>
-
-              <p className="text-xs text-gray-400 mt-4">
-                System auto-classifies student behavior for early intervention.
-              </p>
+          <Panel title="Behavior Summary">
+            <div className="space-y-4">
+              <Metric label="High Risk" value={behaviorSummary.high} color="#ef4444" />
+              <Metric label="Medium Risk" value={behaviorSummary.medium} color="#f59e0b" />
+              <Metric label="Low Risk" value={behaviorSummary.low} color="#22c55e" />
             </div>
+          </Panel>
 
-          </div>
+        </div>
 
-        </main>
-      </div>
+      </main>
+
+      <Toasts />
     </div>
   );
 };
 
-export default DashboardPage;
+/* ================= UI COMPONENTS ================= */
 
-/* ================= NAV ================= */
-const Nav = ({ icon, label, onClick }) => (
-  <button onClick={onClick} className="flex gap-3 items-center px-4 py-3 rounded-xl hover:bg-white/10">
-    {icon} {label}
+const Nav = ({ icon, label, onClick, active }) => (
+  <button
+    onClick={onClick}
+    className={`flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left transition ${
+      active
+        ? "bg-green-50 text-green-700 font-medium"
+        : "text-gray-600 hover:bg-gray-100"
+    }`}
+  >
+    {icon}
+    <span className="text-sm">{label}</span>
   </button>
 );
+
+const Glass = ({ label, value }) => (
+  <div className="p-6 rounded-2xl bg-white/60 backdrop-blur-xl border shadow-sm">
+    <p className="text-sm text-gray-500">{label}</p>
+    <h2 className="text-3xl font-bold mt-2">{value}</h2>
+  </div>
+);
+
+const Panel = ({ title, children }) => (
+  <div className="p-6 rounded-2xl bg-white/60 backdrop-blur-xl border shadow-sm">
+    <h3 className="font-semibold mb-4">{title}</h3>
+    {children}
+  </div>
+);
+
+const Metric = ({ label, value, color }) => (
+  <div className="flex justify-between p-4 rounded-xl bg-white/60 border backdrop-blur">
+    <span style={{ color }}>{label}</span>
+    <span className="font-bold">{value}</span>
+  </div>
+);
+
+export default DashboardPage;

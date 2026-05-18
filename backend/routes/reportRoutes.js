@@ -5,64 +5,25 @@ import Incident from "../models/incidentModel.js";
 import Student from "../models/studentModel.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 import { io } from "../server.js";
-import { getMyReports, getReports } from "../controllers/reportController.js";
-
+import { getMyReports, getReports, createReport } from "../controllers/reportController.js";
+import { getDisciplineAction } from "../utils/disciplineEngine.js";
+import { upload } from "../middleware/upload.js";
 
 const router = express.Router();
 
-/* ================= CREATE REPORT ================= */
-router.post("/", verifyToken, async (req, res) => {
-  try {
-    const {
-      studentId,
-      studentName,
-      offense,
-      location,
-      description,
-      date,
-      time,
-      reporter,
-      reporterType,
-    } = req.body;
-
-    if (!studentId || !studentName || !description || !location) {
-      return res.status(400).json({
-        message: "Missing required fields",
-      });
-    }
-
-    const report = await Report.create({
-      studentId,
-      studentName,
-      offense,
-      location,
-      description,
-      date,
-      time,
-      reporter,
-      reporterType: req.user?.role || "unknown", 
-      reporterId: req.userId,
-    });
-
-    io.emit("new-report", report);
-
-    return res.status(201).json(report);
-  } catch (err) {
-    console.log("REPORT ERROR:", err);
-    return res.status(500).json({
-      message: "Internal Server Error",
-      error: err.message,
-    });
-  }
-});
-
+/* ================= CREATE REPORT (CLEAN JSON ONLY) ================= */
+router.post(
+  "/",
+  upload.array("evidence", 10),
+  createReport
+);
 /* ================= GET MY REPORTS ================= */
 router.get("/my", verifyToken, getMyReports);
 
 /* ================= GET ALL REPORTS ================= */
 router.get("/", async (req, res) => {
   try {
-    const { page = 1, limit = 5, status, search } = req.query;
+    const { page = 1, limit = 100, status, search } = req.query;
 
     let query = {};
 
@@ -76,7 +37,7 @@ router.get("/", async (req, res) => {
     }
 
     const reports = await Report.find(query)
-      .populate("studentId", "name section age gender") // ✅ THIS FIXES N/A
+      .populate("studentId", "name section age gender")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
@@ -94,7 +55,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-/* ================= GET REPORT BY ID (FIXED SAFE ORDER) ================= */
+/* ================= GET REPORT BY ID ================= */
 router.get("/:id", verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -131,39 +92,59 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
     report.status = "accepted";
     await report.save();
 
+    const studentId = report.studentId;
+
+    const totalOffenses = await Report.countDocuments({ studentId });
+
+    const highCount = await Report.countDocuments({
+      studentId,
+      offense: /fighting|assault|violence/i,
+    });
+
+    const mediumCount = await Report.countDocuments({
+      studentId,
+      offense: /bullying|cheating|disrespect/i,
+    });
+
+    const decision = getDisciplineAction({
+      offenseCount: totalOffenses,
+      hasHigh: highCount,
+      hasMedium: mediumCount,
+      offense: report.offense,
+    });
+
     await Incident.create({
-      studentId: report.studentId,
+      studentId,
       reportId: report._id,
       title: report.offense,
       category: report.offense,
-      action: "Accepted",
-      level: "Low",
+      action: decision.action,
+      level: decision.level,
+      status: "received",
+      evidence: report.evidence || [],
     });
 
-    const totalIncidents = await Incident.countDocuments({
-      studentId: report.studentId,
+    await Student.findByIdAndUpdate(studentId, {
+      totalIncidents: totalOffenses,
+      riskLevel: decision.level,
     });
 
-    const highCount = await Incident.countDocuments({
-      studentId: report.studentId,
-      level: "High",
+    io.to(studentId.toString()).emit("newNotification", {
+  id: report._id,
+  title: "Report Accepted",
+  message: `Your report "${report.offense}" was approved`,
+  type: "success",
+  priority: "low",
+  isRead: false,
+  timeAgo: "Just now",
+});
+
+
+    return res.json({
+      message: "Report accepted & processed by Discipline Engine",
+      decision,
     });
 
-    const medCount = await Incident.countDocuments({
-      studentId: report.studentId,
-      level: "Medium",
-    });
-
-    let riskLevel = "Low";
-    if (highCount > 0) riskLevel = "High";
-    else if (medCount > 0) riskLevel = "Medium";
-
-    await Student.findByIdAndUpdate(report.studentId, {
-      totalIncidents,
-      riskLevel,
-    });
-
-    return res.json(report);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: err.message });
@@ -183,12 +164,24 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Report not found" });
     }
 
+    io.to(report.studentId.toString()).emit("newNotification", {
+      id: report._id,
+      title: "Report Rejected",
+      message: `Your report "${report.offense}" was rejected`,
+      type: "error",
+      priority: "high",
+      isRead: false,
+      timeAgo: "Just now",
+    });
+
+
     res.json(report);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
+/* ================= GET REPORTS (controller) ================= */
 router.get("/reports", getReports);
 
 export default router;

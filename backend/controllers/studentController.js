@@ -127,6 +127,52 @@ export const createStudentsBulk = async (req, res) => {
   }
 };
 
+export const getStudentTimeline = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [reports, incidents, cases, interventions] = await Promise.all([
+      Report.find({ studentId: id }),
+      Incident.find({ studentId: id }),
+      Case.find({ studentId: id }),
+      Intervention.find({ studentId: id }),
+    ]);
+
+    const timeline = [
+      ...reports.map(r => ({
+        type: "REPORT",
+        date: r.createdAt,
+        data: r,
+      })),
+
+      ...incidents.map(i => ({
+        type: "INCIDENT",
+        date: i.createdAt,
+        data: i,
+      })),
+
+      ...cases.map(c => ({
+        type: "CASE",
+        date: c.createdAt,
+        data: c,
+      })),
+
+      ...interventions.map(i => ({
+        type: "INTERVENTION",
+        date: i.createdAt,
+        data: i,
+      })),
+    ];
+
+    // sort newest first
+    timeline.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json(timeline);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 /*  DELETE STUDENT */
 export const deleteStudent = async (req, res) => {
   const user = await User.findById(req.userId);

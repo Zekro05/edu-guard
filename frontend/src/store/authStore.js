@@ -36,32 +36,32 @@ export const useAuthStore = create((set, get) => ({
   warningActive: false, // NEW: signal to React
 
  startInactivityTimer: (onLogoutCallback) => {
-    clearTimeout(get().inactivityTimer);
+  clearTimeout(get().inactivityTimer);
 
-    const inactivityMinutes = 1; // 1 minute
-    const warningSeconds = 30;   // show toast when 30 sec left
-    let remaining = inactivityMinutes * 60; // total seconds
+  const inactivityMinutes = 10; // 10 minutes
+  const warningSeconds = 30;   // show toast when 30 sec left
+  let remaining = inactivityMinutes * 60;
 
-    const tick = () => {
-      if (remaining === warningSeconds) {
-        toast("You will be logged out in 30 seconds due to inactivity", {
-          style: { background: "#FBBF24", color: "#000" }
-        });
-      }
+  const tick = () => {
+    if (remaining === warningSeconds) {
+      toast("You will be logged out in 30 seconds due to inactivity", {
+        style: { background: "#FBBF24", color: "#000" }
+      });
+    }
 
-      if (remaining <= 0) {
-        get().logout();
-        if (onLogoutCallback) onLogoutCallback();
-        return;
-      }
+    if (remaining <= 0) {
+      get().logout();
+      if (onLogoutCallback) onLogoutCallback();
+      return;
+    }
 
-      set({ countdown: remaining });
-      remaining -= 1;
-      get().inactivityTimer = setTimeout(tick, 1000);
-    };
+    set({ countdown: remaining });
+    remaining -= 1;
+    get().inactivityTimer = setTimeout(tick, 1000);
+  };
 
-    tick();
-  },
+  tick();
+},
 
   resetInactivityTimer: () => {
     clearTimeout(get().inactivityTimer);

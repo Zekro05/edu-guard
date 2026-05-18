@@ -17,10 +17,11 @@ export const verifyToken = (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // 🔥 SAFE USER ATTACHMENT
+    console.log("DECODED TOKEN:", decoded); // 🔥 DEBUG
+
     req.user = {
       id: decoded.id,
-      role: decoded.role || "student", // default SAFE fallback
+      role: decoded.role || "student", // safe fallback
     };
 
     req.userId = decoded.id;

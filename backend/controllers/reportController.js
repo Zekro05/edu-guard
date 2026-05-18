@@ -25,26 +25,45 @@ export const createReport = async (req, res) => {
       date,
       time,
       reporter,
-      reporterType,
     } = req.body;
 
-    const newReport = new Report({
+    const reporterId = req.userId || null;
+    const reporterType = req.userId ? "user" : "guest";
+
+    // 🚨 FORCE: ONLY MULTER FILES
+    const files = req.files;
+
+    console.log("BODY:", req.body);
+    console.log("FILES:", req.files);
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ message: "No evidence uploaded via multer" });
+    }
+
+    const evidence = files.map((file) => ({
+      url: `/uploads/${file.filename}`,
+      type: file.mimetype.startsWith("image") ? "image" : "document",
+      uploadedAt: new Date(),
+    }));
+
+    const report = await Report.create({
       studentId,
       studentName,
       offense,
       location,
       description,
-      date,
+      date: new Date(date),
       time,
-      reporter,
-      reporterId: req.userId,
-      reporterType: req.user?.role || "teacher"
+      reporter: reporter || "Guest",
+      reporterId: req.userId || null,   
+      reporterType: req.userId ? "user" : "guest",
+      evidence, // ✅ ONLY THIS IS USED
     });
 
-    const savedReport = await newReport.save();
-    res.status(201).json(savedReport);
+    return res.status(201).json(report);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error("CREATE REPORT ERROR:", err);
+    return res.status(500).json({ message: err.message });
   }
 };
 

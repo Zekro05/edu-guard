@@ -16,7 +16,7 @@ const interventionSchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ["warning", "detention", "counseling", "suspension"],
+      enum: ["warning", "detention", "call a parent", "community service", "suspension"],
       required: true,
     },
 

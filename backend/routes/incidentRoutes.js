@@ -1,21 +1,46 @@
 import express from "express";
-import { getIncidents, createIncident, deleteIncident, getIncidentById } from "../controllers/incidentController.js";
+import {
+  getIncidents,
+  createIncident,
+  deleteIncident,
+  getIncidentById,
+  getIncidentsByStudent,
+  completeIncident,
+  requestStudentStatement,
+  submitStudentStatement,
+  manualStudentStatement
+} from "../controllers/incidentController.js";
+
+import { updateIncidentStatus } from "../controllers/incidentController.js";
+
 import { verifyToken } from "../middleware/verifyToken.js";
 
 const router = express.Router();
 
-// GET /api/incidents?studentId=xxx
-router.get("/",verifyToken, getIncidents);
+/* ================= IMPORTANT ORDER ================= */
 
-// POST /api/incidents
-router.post("/", verifyToken, createIncident);
+// specific routes FIRST
+router.get("/student/:id", verifyToken, getIncidentsByStudent);
 
-router.get("/:id", verifyToken, getIncidentById);
+router.put("/:id/complete", verifyToken, completeIncident);
 
-// DELETE /api/incidents/:id
+router.put("/:id/request-statement", verifyToken, requestStudentStatement);
+
+router.put("/:id/student-statement", verifyToken, submitStudentStatement);
+
+router.put("/:id/manual-statement", verifyToken, manualStudentStatement);
+
+router.put("/:id/status", verifyToken, updateIncidentStatus);
+
 router.delete("/:id", verifyToken, deleteIncident);
 
+// main list
+router.get("/", verifyToken, getIncidents);
 
+// create
+router.post("/", verifyToken, createIncident);
 
+// last
+router.get("/:id", verifyToken, getIncidentById);
 
 export default router;

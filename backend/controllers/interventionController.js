@@ -67,7 +67,7 @@ export const resolveIntervention = async (req, res) => {
 
     const updated = await Intervention.findByIdAndUpdate(
       id,
-      { status: "resolved" },
+      { status: "completed" },
       { new: true }
     );
 
@@ -75,10 +75,9 @@ export const resolveIntervention = async (req, res) => {
       return res.status(404).json({ message: "Intervention not found" });
     }
 
-    return res.json(updated);
+    res.json(updated);
   } catch (err) {
-    console.error("resolveIntervention error:", err);
-    return res.status(500).json({ message: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
