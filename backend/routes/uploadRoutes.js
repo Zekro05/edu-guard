@@ -4,7 +4,7 @@ import { upload } from "../middleware/upload.js";
 const router = express.Router();
 
 /* ================= UPLOAD FILES ================= */
-router.post("/", upload.array("files", 5), (req, res) => {
+router.post("/", upload.array("evidence", 5), (req, res) => {
   try {
     const files = req.files || [];
 
