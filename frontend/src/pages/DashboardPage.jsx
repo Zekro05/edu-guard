@@ -102,6 +102,11 @@ const DashboardPage = () => {
     }
   });
 
+  socket.onAny((event, data) => {
+    console.log("📡 ANY EVENT:", event, data);
+  });
+
+
   socket.on("newNotification", (data) => {
     console.log("📩 RECEIVED:", data);
 
@@ -116,6 +121,7 @@ const DashboardPage = () => {
     ]);
   });
 
+  fetchData();
   return () => socket.disconnect();
 }, []);
 
@@ -281,6 +287,20 @@ Keep it professional and concise.
               )}
             </button>
           </div>
+
+          <button
+  onClick={() => {
+    socket.emit("newNotification", {
+      id: Date.now(),
+      title: "🔥 Local Test",
+      message: "This is a frontend-triggered test",
+      createdAt: new Date().toISOString(),
+    });
+  }}
+  className="p-3 bg-green-600 text-white rounded-xl"
+>
+  Test Notification
+</button>
         </div>
 
         {/* NOTIFICATIONS DRAWER */}

@@ -18,6 +18,7 @@ import { createGuestReport } from "../controllers/reportController.js";
 
 const router = express.Router();
 
+
 /* ================= CREATE REPORT ================= */
 router.get("/test-notif", (req, res) => {
   console.log("🔥 TEST NOTIF TRIGGERED");

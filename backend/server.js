@@ -84,6 +84,7 @@ app.use("/api/cases", caseRoutes);
 app.use("/api/upload", uploadRoutes);
 
 
+
 /* USERS */
 app.get("/api/users", async (req, res) => {
   try {
@@ -93,7 +94,9 @@ app.get("/api/users", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-
+app.get("/ping", (req, res) => {
+  res.json({ ok: true, message: "alive" });
+});
 /* ================= SOCKET.IO ================= */
 
 export const io = new Server(server, {
@@ -108,6 +111,18 @@ export const io = new Server(server, {
     methods: ["GET", "POST"],
     credentials: true,
   },
+});
+
+
+app.get("/api/test-notif", (req, res) => {
+  io.emit("newNotification", {
+    id: Date.now(),
+    title: "🔥 Test Notification",
+    message: "Dashboard socket is working",
+    createdAt: new Date().toISOString(),
+  });
+
+  res.json({ ok: true });
 });
 
 /* ================= ONLINE USERS ================= */

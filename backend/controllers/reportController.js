@@ -99,7 +99,7 @@ if (targetUserId) {
   });
 }
 
-io.to("dashboard").emit("newNotification", {
+io.emit("newNotification", {
   id: report._id,
   title: "New Report Submitted",
   message: `${report.studentName} submitted a report about "${report.offense}"`,
