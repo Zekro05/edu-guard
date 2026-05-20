@@ -18,9 +18,19 @@ import { createGuestReport } from "../controllers/reportController.js";
 
 const router = express.Router();
 
-
-
 /* ================= CREATE REPORT ================= */
+router.get("/test-notif", (req, res) => {
+  console.log("🔥 TEST NOTIF TRIGGERED");
+
+  io.emit("newNotification", {
+    id: Date.now(),
+    title: "TEST NOTIFICATION",
+    message: "Web socket test from backend",
+    createdAt: new Date().toISOString(),
+  });
+
+  return res.json({ message: "Test notification sent" });
+});
 
 router.post(
   "/guest",
@@ -68,6 +78,7 @@ router.get("/", async (req, res) => {
 
     const reports = await Report.find(query)
       .populate("studentId", "name section age gender")
+       .populate("reporterId", "name email")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
@@ -186,6 +197,29 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
       console.log("✅ Notification sent to:", user._id.toString());
     }
 
+    /* ================= NOTIFY REPORTER ================= */
+if (report.reporterId) {
+  await Notification.create({
+    userId: report.reporterId,
+    title: "Report Processed",
+    message: `Your report about "${report.offense}" has been accepted and is being acted upon.`,
+    type: "success",
+    priority: "low",
+  });
+
+  io.to(report.reporterId.toString()).emit("newNotification", {
+    id: report._id,
+    title: "Report Processed",
+    message: `Your report about "${report.offense}" has been accepted and is being acted upon.`,
+    type: "success",
+    priority: "low",
+    isRead: false,
+    timeAgo: "Just now",
+  });
+
+  console.log("✅ Reporter notified:", report.reporterId.toString());
+}
+
     return res.json({
       message: "Report accepted & processed",
       decision,
@@ -235,11 +269,33 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
       });
     }
 
+    /* ================= NOTIFY REPORTER ================= */
+if (report.reporterId) {
+  await Notification.create({
+    userId: report.reporterId,
+    title: "Your Report Was Reviewed",
+    message: `Your report about "${report.offense}" was reviewed and rejected.`,
+    type: "rejected",
+    priority: "medium",
+  });
+
+  io.to(report.reporterId.toString()).emit("newNotification", {
+    id: report._id,
+    title: "Your Report Was Reviewed",
+    message: `Your report about "${report.offense}" was reviewed and rejected.`,
+    type: "rejected",
+    priority: "medium",
+    isRead: false,
+    timeAgo: "Just now",
+  });
+}
+
     return res.json(report);
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 });
+
 
 /* ================= GET REPORTS ================= */
 router.get("/reports", getReports);

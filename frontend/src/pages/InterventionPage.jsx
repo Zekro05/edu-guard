@@ -835,7 +835,34 @@ const reports = incidentsData.map((i) => {
 
             </div>
 
+            {/* AUDIT LOG */}
+            <div className="border border-gray-200 rounded-2xl p-5 bg-gray-50">
+
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                Audit Log
+              </h4>
+
+              <div className="space-y-2 max-h-32 overflow-y-auto text-xs">
+
+                {auditLog.length === 0 ? (
+                  <p className="text-gray-400">No actions yet</p>
+                ) : (
+                  auditLog.map((a) => (
+                    <div key={a.id} className="flex justify-between text-gray-600">
+                      <span>{a.action}</span>
+                      <span className="text-gray-400">
+                        {new Date(a.time).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))
+                )}
+
+              </div>
+            </div>
+
           </div>
+
+          
 
           {/* RIGHT PANEL */}
           <div className="col-span-7 space-y-6">
@@ -905,31 +932,6 @@ const reports = incidentsData.map((i) => {
                 ))
               )}
 
-            </div>
-
-            {/* AUDIT LOG */}
-            <div className="border border-gray-200 rounded-2xl p-5 bg-gray-50">
-
-              <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                Audit Log
-              </h4>
-
-              <div className="space-y-2 max-h-32 overflow-y-auto text-xs">
-
-                {auditLog.length === 0 ? (
-                  <p className="text-gray-400">No actions yet</p>
-                ) : (
-                  auditLog.map((a) => (
-                    <div key={a.id} className="flex justify-between text-gray-600">
-                      <span>{a.action}</span>
-                      <span className="text-gray-400">
-                        {new Date(a.time).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  ))
-                )}
-
-              </div>
             </div>
 
             {/* FORM */}

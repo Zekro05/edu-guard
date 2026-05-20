@@ -84,7 +84,6 @@ app.use("/api/cases", caseRoutes);
 app.use("/api/upload", uploadRoutes);
 
 
-
 /* USERS */
 app.get("/api/users", async (req, res) => {
   try {
@@ -117,15 +116,10 @@ const onlineUsers = new Map();
 
 /* ================= SOCKET LOGIC ================= */
 export const sendNotification = (userId, payload) => {
-  const socketId = onlineUsers.get(userId);
+  if (!userId) return;
 
-  if (socketId) {
-    io.to(socketId).emit("newNotification", payload);
-  }
-
-  console.log("📨 NOTIFICATION SENT:", userId, payload);
+  io.to(String(userId)).emit("newNotification", payload);
 };
-
 io.on("connection", (socket) => {
   console.log("🟢 Connected:", socket.id);
 
@@ -133,15 +127,9 @@ io.on("connection", (socket) => {
     console.log("📥 EVENT:", event, data);
   });
 
-
-  socket.on("register", (userId) => {
-    if (!userId) return;
-    onlineUsers.set(userId, socket.id);
-    io.emit("online_users", Array.from(onlineUsers.keys()));
-  });
-
   socket.on("join", (userId) => {
   socket.join(userId);
+  console.log("User joined room:", userId);
 });
 
   socket.on("send_message", async (msg, callback) => {

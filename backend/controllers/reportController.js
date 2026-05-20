@@ -1,8 +1,10 @@
 // backend/controllers/reportController.js
 import Report from "../models/reportModel.js"; // make sure your model file is Report.js
 import Student from "../models/studentModel.js";
+import User from "../models/userModel.js";
+import Notification from "../models/Notification.js";
+import { io } from "../server.js";
 
-import { sendNotification } from "../server.js";
 
 const BASE_URL = "https://edu-guard-backend.onrender.com";
 
@@ -60,14 +62,51 @@ export const createReport = async (req, res) => {
       evidence,
     });
 
-    sendNotification(req.userId, {
-  id: Date.now(),
-  title: "Report Submitted",
-  message: "Your report was submitted successfully.",
-  type: "success",
+    let targetUserId = null;
+
+if (report.studentId) {
+  const student = await Student.findById(report.studentId);
+
+  if (student) {
+    const user = await User.findOne({ studentId: student.studentId });
+
+    if (user) targetUserId = user._id;
+  }
+}
+
+if (report.teacherId && !targetUserId) {
+  const teacherUser = await User.findOne({ teacherId: report.teacherId });
+  if (teacherUser) targetUserId = teacherUser._id;
+}
+
+if (targetUserId) {
+  await Notification.create({
+    userId: targetUserId,
+    title: "Report Notification",
+    message: `You have a report involving "${report.offense}".`,
+    type: "warning",
+    priority: "high",
+  });
+
+  io.to(targetUserId.toString()).emit("newNotification", {
+    id: Date.now(),
+    title: "Report Notification",
+    message: `You have a report involving "${report.offense}".`,
+    type: "warning",
+    priority: "high",
+    isRead: false,
+    timeAgo: "Just now",
+  });
+}
+
+io.to("dashboard").emit("newNotification", {
+  id: report._id,
+  title: "New Report Submitted",
+  message: `${report.studentName} submitted a report about "${report.offense}"`,
+  type: "info",
   priority: "high",
   isRead: false,
-  timeAgo: "Just now",
+  createdAt: new Date().toISOString(),
 });
 
     return res.status(201).json(report);
@@ -178,6 +217,7 @@ export const getReports = async (req, res) => {
   try {
     const reports = await Report.find()
       .populate("studentId", "name section age gender")
+      .populate("reporterId", "firstName lastName name email")
       .populate({
     path: "incidentId",   // or whatever your field is
     select: "status"

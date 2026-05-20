@@ -155,7 +155,12 @@ const MobileReport = ({ report, onAccept, onReject }) => {
           <Info
             icon={<User2 size={15} />}
             label="Reporter"
-            value={report.reporter}
+            value={
+  report.reporterId
+    ? report.reporterId.name ||
+      `${report.reporterId.firstName || ""} ${report.reporterId.lastName || ""}`.trim()
+    : "Guest"
+}
           />
 
         </div>

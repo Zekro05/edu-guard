@@ -14,24 +14,28 @@ const incidentSchema = new mongoose.Schema(
       ref: "Report",
       index: true,
     },
+
+    /* ================= STATUS FLOW ================= */
     status: {
-  type: String,
-  enum: [
-    "received",
-    "reviewing",
-    "waiting_for_student",
-    "escalated",
-    "intervention-ready",
-    "completed",
-  ],
-  default: "received",
-},
+      type: String,
+      enum: [
+        "received",
+        "saved-student-statement",
+        "reviewing",
+        "refer-for-intervention",
+        "intervention-ready",
+        "completed",
+      ],
+      default: "received",
+      index: true,
+    },
 
-completedAt: {
-  type: Date,
-  default: null,
-},
+    completedAt: {
+      type: Date,
+      default: null,
+    },
 
+    /* ================= CASE INFO ================= */
     title: {
       type: String,
       required: true,
@@ -53,66 +57,117 @@ completedAt: {
       default: "Low",
     },
 
-    studentStatement: {
-  type: String,
-  default: "",
+    escalationInfo: {
+  involvedPersons: String,
+  additionalParticipants: String,
+  approvalDetails: String,
 },
 
-evidence: [
-  {
-    url: String,
-    type: String,
-    filename: String,
-
-    uploadedAt: {
-      type: Date,
-      default: Date.now,
+    /* ================= STATEMENTS ================= */
+    studentStatement: {
+      type: String,
+      default: "",
     },
 
-    uploadedBy: {
+    statementStatus: {
+      type: String,
+      enum: [
+        "not_requested",
+        "waiting_for_response",
+        "submitted",
+        "manual_entry",
+      ],
+      default: "not_requested",
+    },
+
+    statementRequestedAt: {
+      type: Date,
+      default: null,
+    },
+
+    statementSubmittedAt: {
+      type: Date,
+      default: null,
+    },
+
+    /* ================= EVIDENCE ================= */
+    evidence: [
+      {
+        url: String,
+        type: String,
+        filename: String,
+
+        uploadedAt: {
+          type: Date,
+          default: Date.now,
+        },
+
+        uploadedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+
+        size: Number,
+      },
+    ],
+
+    /* ================= 👤 REVIEW TRACKING ================= */
+    reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      default: null,
     },
 
-    size: Number,
-  },
-],
-
-statementStatus: {
-  type: String,
-  enum: [
-    "not_requested",
-    "waiting_for_response",
-    "submitted",
-    "manual_entry",
-  ],
-  default: "not_requested",
-},
-
-statementRequestedAt: {
-  type: Date,
-  default: null,
-},
-
-statementSubmittedAt: {
-  type: Date,
-  default: null,
-},
-
-caseLogs: [
-  {
-    stage: String,
-    note: String,
-    time: {
-      type: Date,
-      default: Date.now,
+    reviewedByName: {
+      type: String,
+      default: null,
     },
+
+    /* ================= 🧾 AUDIT TRAIL ================= */
+    caseLogs: [
+      {
+        stage: {
+          type: String,
+          enum: [
+            "received",
+            "saved-student-statement",
+            "reviewing",
+            "refer-for-intervention",
+            "intervention-ready",
+            "completed",
+          ],
+          required: true,
+        },
+
+        note: {
+          type: String,
+          default: "",
+        },
+
+        changedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+
+        changedByName: {
+          type: String,
+          default: "N/A",
+          required: false,
+        },
+
+        time: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
-],
-  },
+
   {
-    timestamps: true, // createdAt + updatedAt (USE THIS IN FRONTEND)
+    timestamps: true, // createdAt + updatedAt
   }
 );
 
+/* ================= MODEL EXPORT ================= */
 export default mongoose.model("Incident", incidentSchema);

@@ -82,6 +82,8 @@ const SignupPage = () => {
   const [gender, setGender] = useState("");
 
   const [accountType, setAccountType] = useState("");
+  const [showPolicy, setShowPolicy] = useState(false);
+  const [acceptedPolicy, setAcceptedPolicy] = useState(false);
 
   const [localError, setLocalError] = useState("");
 
@@ -869,6 +871,35 @@ const SignupPage = () => {
                     </motion.div>
                   )}
 
+
+                  <button
+  type="button"
+  onClick={() => setShowPolicy(true)}
+  className="text-sm font-semibold underline"
+  style={{ color: LightColors.primary }}
+>
+  View GuidEd User Policy
+</button>
+
+                  {/* POLICY AGREEMENT */}
+<div className="flex items-start gap-3 p-4 rounded-2xl border bg-white"
+     style={{ borderColor: LightColors.border }}>
+
+  <input
+    type="checkbox"
+    checked={acceptedPolicy}
+    onChange={(e) => setAcceptedPolicy(e.target.checked)}
+    className="mt-1 w-5 h-5"
+  />
+
+  <div className="text-sm">
+    <p className="font-semibold">I agree to the Policy</p>
+    <p className="text-gray-500 text-xs">
+      You must read the full policy before continuing
+    </p>
+  </div>
+</div>
+
                   {/* Submit */}
                   <motion.button
                     whileHover={{
@@ -878,7 +909,7 @@ const SignupPage = () => {
                       scale: 0.985,
                     }}
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || !acceptedPolicy}
                     className="w-full h-16 rounded-2xl font-bold text-lg text-white shadow-xl flex items-center justify-center gap-3 transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
                     style={{
                       background: `
@@ -945,8 +976,230 @@ const SignupPage = () => {
           </motion.div>
         </div>
       </main>
+      
+     {/* ================= POLICY MODAL ================= */}
+      {showPolicy && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6">
+          <div className="bg-white max-w-3xl w-full max-h-[80vh] overflow-y-auto rounded-3xl p-8 shadow-2xl">
+
+            <h2 className="text-2xl font-black mb-4">
+              GuidEd User Policy
+            </h2>
+
+            <div className="text-sm leading-relaxed whitespace-pre-wrap text-gray-700">
+              {`GuidED User Policy and Agreement
+1. Purpose
+
+The purpose of this policy is to establish the rules, responsibilities, and procedures governing the use of the Student Discipline Management System (SDMS), a mobile and web-based application designed to improve the reporting, monitoring, recording, and analysis of student disciplinary incidents within the institution.
+
+The system allows teachers and guest users to submit disciplinary reports, students to review their own incident records, and students to communicate with the Guidance Counselor regarding disciplinary concerns, counseling, and follow-up actions. The system also uses Artificial Intelligence (AI) analysis to identify behavioral patterns and generate disciplinary insights.
+
+2. Scope
+
+This policy applies to the following users of the Student Discipline Management System:
+
+Students
+Teachers
+Guest Users (School Staff for Reporting Purposes)
+Guidance Counselors
+
+All users are required to comply with this policy and related institutional regulations.
+
+3. System Features
+
+The Student Discipline Management System provides the following functions:
+
+3.1 Incident Reporting
+
+Teachers and authorized guest users may digitally submit reports involving student misconduct, violations, or disciplinary concerns.
+
+3.2 Incident Record Viewing
+
+Students may access and review only their own disciplinary records and previous incidents through their accounts.
+
+3.3 Student–Guidance Counselor Communication
+
+Students may communicate directly with the Guidance Counselor through the system regarding:
+
+Counseling requests;
+Clarifications about incidents;
+Follow-up discussions;
+Behavioral guidance and support.
+
+All communications shall remain professional, respectful, and confidential.
+
+3.4 AI-Based Incident Analysis
+
+The system includes AI-powered analysis features that may:
+
+Detect repeated behavioral patterns;
+Categorize incident severity;
+Identify frequent violations;
+Generate summaries and recommendations;
+Assist school personnel in monitoring student behavior trends.
+
+AI-generated analysis serves only as a support tool and shall not replace human judgment or official disciplinary procedures.
+
+3.5 Notifications and Updates
+
+Users may receive notifications regarding:
+
+Newly submitted incidents;
+Incident status updates;
+Counseling schedules or responses;
+Disciplinary recommendations or actions.
+4. User Responsibilities
+4.1 Students
+
+Students are responsible for:
+
+Accessing only their own disciplinary records;
+Maintaining the confidentiality of their login credentials;
+Using the communication feature respectfully and responsibly;
+Reporting incorrect information to authorized personnel.
+
+Students are prohibited from:
+
+Accessing another user’s records;
+Sharing confidential information;
+Sending abusive, threatening, or inappropriate messages;
+Attempting to manipulate or alter disciplinary records.
+4.2 Teachers
+
+Teachers are authorized to:
+
+Submit disciplinary incident reports;
+Review submitted incidents;
+Access AI-generated analysis related to disciplinary cases.
+
+Teachers must:
+
+Submit factual, objective, and professional reports;
+Avoid biased or discriminatory statements;
+Maintain confidentiality of student information;
+Use AI-generated recommendations responsibly.
+
+False reporting or misuse of the system may result in administrative sanctions.
+
+4.3 Guest Users (School Staff)
+
+Guest users are school staff members granted limited access solely for incident reporting purposes.
+
+Guest users may:
+
+Submit disciplinary incident reports;
+Provide supporting information regarding incidents.
+
+Guest users are prohibited from:
+
+Viewing confidential disciplinary records;
+Editing existing incident reports;
+Accessing student disciplinary history;
+Sharing confidential information outside authorized channels.
+
+5. Data Privacy and Confidentiality
+
+All disciplinary records, counseling communications, and personal information stored in the system shall be treated as confidential.
+
+The institution shall:
+
+Protect user data using secure authentication measures;
+Restrict access according to user roles and permissions;
+Prevent unauthorized disclosure of records and communications;
+Use collected data only for legitimate educational and disciplinary purposes.
+
+Student disciplinary and counseling information shall not be publicly disclosed without proper authorization unless required by law.
+
+6. AI Ethics and Fair Use
+
+The AI analysis feature is intended only to assist in identifying behavioral trends and improving disciplinary management.
+
+The institution recognizes that:
+
+AI-generated analysis may contain inaccuracies;
+Human review is required before disciplinary actions are finalized;
+AI analysis must not result in discrimination or unfair treatment.
+
+All disciplinary decisions shall remain subject to proper school procedures and human evaluation.
+
+7. Prohibited Activities
+
+The following activities are strictly prohibited:
+
+Unauthorized access to accounts or records;
+Sharing confidential disciplinary or counseling information;
+Submitting false or misleading incident reports;
+Sending abusive or inappropriate messages;
+Attempting to bypass system security;
+Misusing AI-generated analysis for harassment or discrimination.
+
+Violations may result in disciplinary action, suspension of access privileges, or legal consequences.
+
+8. Record Retention
+
+Disciplinary records and counseling communications shall be retained according to institutional policies and applicable regulations.
+
+The institution reserves the right to archive or remove records after the approved retention period.
+
+9. System Availability and Maintenance
+
+The institution may temporarily suspend access to the system for:
+
+System maintenance;
+Security updates;
+Technical improvements;
+Emergency situations.
+
+Users shall be informed whenever possible regarding scheduled maintenance activities.
+
+10. Policy Violations
+
+Failure to comply with this policy may result in:
+
+Suspension of system access;
+Administrative sanctions;
+School disciplinary action;
+
+11. Acceptance of Terms
+
+By accessing and using the Student Discipline Management System, users acknowledge that they have read, understood, and agreed to comply with this policy and related institutional regulations.
+
+12. Conclusion
+
+The Student Discipline Management System aims to modernize school discipline processes by improving accountability, transparency, efficiency, communication, and behavioral monitoring through digital technology and AI-assisted analysis. The institution remains committed to ensuring fairness, responsible technology use, and the protection of student rights, privacy, and well-being.
+`}
+            </div>
+
+            <div className="flex justify-end mt-6 gap-3">
+              <button
+                onClick={() => setShowPolicy(false)}
+                className="px-4 py-2 rounded-xl border"
+              >
+                Close
+              </button>
+
+              <button
+                onClick={() => {
+                  setAcceptedPolicy(true);
+                  setShowPolicy(false);
+                }}
+                className="px-4 py-2 rounded-xl text-white"
+                style={{ background: LightColors.primary }}
+              >
+                I Understand & Accept
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
+    
   );
+  
 };
+
+
 
 export default SignupPage;
