@@ -90,40 +90,166 @@ export const updateStudent = async (req, res) => {
 };
 
 export const createStudentsBulk = async (req, res) => {
+  console.log("🔥 BULK ROUTE HIT");
+  console.log("REQ BODY:", req.body);
+
   try {
     const user = await User.findById(req.userId);
-
     const students = req.body;
 
     if (!Array.isArray(students) || students.length === 0) {
       return res.status(400).json({ message: "Invalid student data" });
     }
 
-    // OPTIONAL: sanitize + add createdBy
-    const preparedStudents = students.map((s) => ({
-      ...s,
-      createdBy: req.userId,
-    }));
+    let inserted = 0;
+    let updated = 0;
+    let invalid = 0;
 
-    const created = await Student.insertMany(preparedStudents);
+    const gradeMap = {
+      "Grade 10": "Grade 11",
+      "Grade 11": "Grade 12",
+      "Grade 12": "Grade 12",
+      "Grade12" : "Graduated"
+    };
+
+    for (const s of students) {
+      if (!s.studentId) {
+        invalid++;
+        continue;
+      }
+
+      const existing = await Student.findOne({
+        studentId: s.studentId.trim(),
+      });
+
+      // =========================
+      // UPDATE FLOW (IMPORTANT FIX)
+      // =========================
+      if (existing) {
+        const newGrade = gradeMap[s.grade || existing.grade] || existing.grade;
+
+        const updatedStudent = await Student.findOneAndUpdate(
+          { studentId: s.studentId.trim() },
+          {
+            $set: {
+              // only update fields that exist in payload
+              ...(s.firstName && { firstName: s.firstName }),
+              ...(s.lastName && { lastName: s.lastName }),
+              ...(s.middleName && { middleName: s.middleName }),
+              ...(s.email && { email: s.email }),
+              ...(s.phone && { phone: s.phone }),
+              ...(s.gender && { gender: s.gender }),
+              ...(s.riskLevel && { riskLevel: s.riskLevel }),
+
+              grade: newGrade, // always update grade
+            },
+          },
+          {
+            new: true,
+            runValidators: true,
+          }
+        );
+
+        if (updatedStudent) updated++;
+        continue;
+      }
+
+      // =========================
+      // INSERT FLOW (FULL DATA REQUIRED)
+      // =========================
+      if (!s.firstName || !s.lastName || !s.gender) {
+        invalid++;
+        continue;
+      }
+
+      await Student.create({
+        studentId: s.studentId.trim(),
+        firstName: s.firstName,
+        lastName: s.lastName,
+        middleName: s.middleName || "",
+        email: s.email || "",
+        phone: s.phone || "",
+        gender: s.gender,
+        grade: s.grade || "Grade 10",
+        riskLevel: s.riskLevel || "Low",
+        createdBy: req.userId,
+      });
+
+      inserted++;
+    }
+
+    console.log("📊 FINAL RESULT:", { inserted, updated, invalid });
 
     await createHistoryLog({
       userId: user._id,
       role: mapRoleForHistory(user.role),
-      action: "Bulk Import Students",
+      action: "Bulk Upsert Students",
       category: "Student",
-      details: `Imported ${created.length} students`,
+      details: `Inserted: ${inserted}, Updated: ${updated}, Invalid: ${invalid}`,
       ipAddress: req.ip,
     });
 
-    res.status(201).json({
-      message: "Bulk import successful",
-      count: created.length,
-      data: created,
+    return res.status(200).json({
+      message: "Bulk upsert completed",
+      inserted,
+      updated,
+      invalid,
     });
   } catch (error) {
-    console.error("BULK IMPORT ERROR:", error);
-    res.status(500).json({ message: "Failed bulk import" });
+    console.error("BULK UPSERT ERROR:", error);
+    return res.status(500).json({ message: "Failed bulk upsert" });
+  }
+};
+
+export const previewBulkStudents = async (req, res) => {
+  try {
+    const students = req.body;
+
+    if (!Array.isArray(students)) {
+      return res.status(400).json({ message: "Invalid data format" });
+    }
+
+    const result = {
+      toInsert: [],
+      toUpdate: [],
+      invalid: [],
+    };
+
+    for (const s of students) {
+      if (!s.studentId) {
+        result.invalid.push({
+          data: s,
+          reason: "Missing studentId",
+        });
+        continue;
+      }
+
+      const existing = await Student.findOne({ studentId: s.studentId });
+
+      if (existing) {
+        result.toUpdate.push({
+  studentId: s.studentId,
+  name: `${existing.firstName} ${existing.lastName}`,
+  oldGrade: existing.grade,
+  newGrade: s.grade,
+  email: s.email,
+  phone: s.phone,
+});
+      } else {
+        result.toInsert.push({
+  studentId: s.studentId,
+  name: `${s.firstName || ""} ${s.lastName || ""}`,
+  grade: s.grade,
+  email: s.email,
+  phone: s.phone,
+});
+      }
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Preview failed" });
   }
 };
 

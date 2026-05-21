@@ -4,7 +4,8 @@ import Incident from "../models/incidentModel.js";
 /* ================= CREATE INTERVENTION ================= */
 export const createIntervention = async (req, res) => {
   try {
-    const { studentId, type, description } = req.body;
+    const { studentId, type, description, interventionBy,
+    approvedBy} = req.body;
 
     const incident = await Incident.findOne({ studentId });
 
@@ -14,17 +15,43 @@ export const createIntervention = async (req, res) => {
       });
     }
 
+    const adminName =
+      interventionBy ||
+      req.user?.name ||
+      "Admin";
+
+
     const intervention = await Intervention.create({
       studentId,
       incidentId: incident._id,
+
       type,
       description,
+
+      status: "active",
+
       createdBy: req.userId,
+
+      interventionBy: adminName,
+
+      approvedBy:
+        approvedBy || adminName,
+
+      auditLogs: [
+        {
+          action: "Intervention Created",
+          note: description,
+          by: adminName,
+          createdAt: new Date(),
+        },
+      ],
     });
+
 
     res.status(201).json(intervention);
 
   } catch (err) {
+    console.error("createIntervention error:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -65,19 +92,47 @@ export const resolveIntervention = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const updated = await Intervention.findByIdAndUpdate(
-      id,
-      { status: "completed" },
-      { new: true }
-    );
+    const { completedBy } = req.body;
 
-    if (!updated) {
-      return res.status(404).json({ message: "Intervention not found" });
+    const intervention =
+      await Intervention.findById(id);
+
+    if (!intervention) {
+      return res.status(404).json({
+        message: "Intervention not found",
+      });
     }
 
-    res.json(updated);
+    intervention.status = "completed";
+
+    intervention.completedBy =
+      completedBy ||
+      req.user?.name ||
+      "Guidance Admin";
+
+    intervention.auditLogs.push({
+      action: "Intervention Completed",
+      note: "Marked as completed",
+      by:
+        completedBy ||
+        req.user?.name ||
+        "Guidance Admin",
+        createdAt: new Date(),
+    });
+
+    await intervention.save();
+
+    res.json(intervention);
+
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error(
+      "resolveIntervention error:",
+      err
+    );
+
+    res.status(500).json({
+      message: err.message,
+    });
   }
 };
 

@@ -27,7 +27,7 @@ const interventionSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["active", "resolved"],
+      enum: ["active", "resolved", "completed"],
       default: "active",
     },
 
@@ -35,6 +35,35 @@ const interventionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+     interventionBy: {
+    type: String,
+    default: "Unknown Admin",
+  },
+  approvedBy: {
+    type: String,
+    default: "",
+  },
+completedBy: {
+    type: String,
+    default: "",
+  },
+auditLogs: [
+    {
+      action: String,
+      note: String,
+
+      by: {
+        type: String,
+        default: "System",
+      },
+
+      time: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
+
   },
   { timestamps: true }
 );

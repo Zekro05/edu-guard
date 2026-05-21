@@ -38,11 +38,16 @@ const InterventionPage = () => {
   const [notifications, setNotifications] = useState([]);
   const [openNotif, setOpenNotif] = useState(false);
   const [auditLog, setAuditLog] = useState([]);
+  const [openTimeline, setOpenTimeline] = useState(null);
 
   const [form, setForm] = useState({
     type: "warning",
     description: "",
   });
+
+  const loggedInUser =
+    JSON.parse(localStorage.getItem("user"))?.name || "Unknown User";
+
 
   const options = [
     "warning",
@@ -173,11 +178,14 @@ const reports = incidentsData.map((i) => {
       if (!selected) return;
 
       await API.post("/api/interventions", {
-        studentId: selected.studentId,
-        type: form.type,
-        description: form.description,
-        status: "active",
-      });
+  studentId: selected.studentId,
+  type: form.type,
+  description: form.description,
+  status: "active",
+
+  interventionBy: loggedInUser,
+  approvedBy: loggedInUser,
+});
 
       addAuditLog(`Created intervention: ${form.type}`);
 
@@ -198,7 +206,12 @@ const reports = incidentsData.map((i) => {
 
   const markComplete = async (id) => {
     try {
-      await API.put(`/api/interventions/${id}/resolve`);
+      await API.put(
+  `/api/interventions/${id}/resolve`,
+  {
+    completedBy: loggedInUser,
+  }
+);
       await fetchData();
     } catch (err) {
       console.error(err.response?.data || err.message);
@@ -243,6 +256,15 @@ const reports = incidentsData.map((i) => {
       (c) => getReportStatus(c.studentId) === "none"
     ).length,
   };
+
+  const Meta = ({ label, value }) => (
+  <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+    <p className="text-gray-400 mb-1">{label}</p>
+    <p className="font-medium text-gray-700">
+      {value || "N/A"}
+    </p>
+  </div>
+);
 
   return (
     <div className="h-screen w-screen flex bg-[#F4F7FB] text-gray-900 overflow-hidden">
@@ -875,62 +897,112 @@ const reports = incidentsData.map((i) => {
             {/* TIMELINE */}
             <div className="space-y-4">
 
-              {getStudentInterventions(selected.studentId).length === 0 ? (
-                <div className="text-sm text-gray-400 py-10 text-center border border-dashed border-gray-300 rounded-2xl bg-gray-50">
-                  No interventions recorded yet
+              {getStudentInterventions(selected.studentId).map((i) => {
+  const isOpen = openTimeline === i._id;
+
+  return (
+    <div
+      key={i._id}
+      className="border border-gray-200 bg-white rounded-2xl overflow-hidden"
+    >
+      {/* HEADER */}
+      <div
+        onClick={() =>
+          setOpenTimeline(isOpen ? null : i._id)
+        }
+        className="flex justify-between items-center p-5 cursor-pointer hover:bg-gray-50 transition"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
+
+          <div>
+            <p className="font-medium capitalize">
+              {i.type}
+            </p>
+            <p className="text-xs text-gray-500">
+              {i.status}
+            </p>
+          </div>
+        </div>
+
+        <span className="text-xs text-gray-400">
+          {isOpen ? "Hide" : "View"}
+        </span>
+      </div>
+
+      {/* BODY (COLLAPSIBLE) */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="px-5 pb-5 space-y-4"
+          >
+            {/* DESCRIPTION */}
+            <p className="text-sm text-gray-600">
+              {i.description}
+            </p>
+
+            {/* META */}
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <Meta label="Intervention By" value={i.interventionBy} />
+              <Meta label="Approved By" value={i.approvedBy} />
+              <Meta label="Created At" value={i.createdAt} />
+              <Meta label="Completed By" value={i.completedBy} />
+            </div>
+
+            {/* AUDIT LOG */}
+            {i.auditLogs?.length > 0 && (
+              <div className="border rounded-xl overflow-hidden">
+                <div className="bg-gray-50 px-3 py-2 text-xs font-semibold">
+                  Audit Trail
                 </div>
-              ) : (
-                getStudentInterventions(selected.studentId).map((i) => (
+
+                {i.auditLogs.map((log, idx) => (
                   <div
-                    key={i._id}
-                    className="
-                      flex items-start justify-between gap-4
-                      p-5 rounded-2xl
-                      border border-gray-200
-                      bg-white
-                      hover:shadow-sm
-                      transition
-                    "
+                    key={idx}
+                    className="px-3 py-2 text-xs flex justify-between"
                   >
-
-                    <div className="flex gap-4">
-
-                      <div className="w-2.5 h-2.5 mt-2 rounded-full bg-green-500" />
-
-                      <div>
-                        <p className="font-medium text-gray-900 capitalize">
-                          {i.type}
-                        </p>
-                        <p className="text-sm text-gray-500 mt-1">
-                          {i.description}
-                        </p>
-                      </div>
-
+                    <div>
+                      <p className="font-medium">
+                        {log.action}
+                      </p>
+                      <p className="text-gray-500">
+                        {log.note}
+                      </p>
                     </div>
 
-                    <div className="flex flex-col items-end gap-2">
-
-                      <span className="
-                        text-xs px-2 py-1 rounded-full
-                        bg-gray-100 text-gray-600 capitalize
-                      ">
-                        {i.status}
-                      </span>
-
-                      {i.status !== "completed" && (
-                        <button
-                          onClick={() => markComplete(i._id)}
-                          className="text-xs text-green-600 hover:underline"
-                        >
-                          Mark complete
-                        </button>
-                      )}
-
+                    <div className="text-right">
+                      <p>{log.by}</p>
+                      <p className="text-gray-400">
+                        {new Date(
+                          log.createdAt ||
+                          log.time ||
+                          Date.now()
+                        ).toLocaleString()}
+                      </p>
                     </div>
-
                   </div>
-                ))
-              )}
+                ))}
+              </div>
+            )}
+
+            {/* ACTION */}
+            {i.status !== "completed" && (
+              <button
+                onClick={() => markComplete(i._id)}
+                className="w-full bg-green-600 text-white py-2 rounded-xl text-sm"
+              >
+                Mark Complete
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+})}
 
             </div>
 

@@ -43,8 +43,11 @@ const StudentPage = () => {
   const [importing, setImporting] = useState(false);
 
   const fileRef = useRef(null);
-
+const [preview, setPreview] = useState(null);
+const [showPreview, setShowPreview] = useState(false);
   const PER_PAGE = 8;
+
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   /* ================= FETCH ================= */
   const fetchStudents = async () => {
@@ -100,19 +103,65 @@ const StudentPage = () => {
 
     const data = JSON.parse(await file.text());
 
-    const res = await API.post("/api/students/bulk", data);
+    const res = await API.post("/api/students/bulk/preview", data);
 
-    toast.success(
-      `Import completed: ${res.data.count} students processed`
-    );
+    setPreview(res.data);
+    setShowPreview(true);
 
-    // IMPORTANT: refresh to reflect updated + new students
-    fetchStudents();
-
-    socket.emit("students-imported"); // optional realtime trigger
   } catch (err) {
     console.error(err);
-    toast.error("Invalid JSON or import failed");
+    toast.error("Invalid JSON or preview failed");
+  } finally {
+    setImporting(false);
+  }
+};
+
+const confirmImport = async () => {
+  try {
+    setImporting(true);
+
+    const payload = [
+  ...preview.toInsert.map((s) => {
+    const [firstName, ...rest] = s.name.split(" ");
+
+    return {
+      studentId: s.studentId,
+      firstName,
+      lastName: rest.join(" ") || "",
+      grade: s.grade,
+      gender: "Male",
+
+      // ✅ ADD THESE
+      email: s.email || "",
+      phone: s.phone || "",
+    };
+  }),
+
+  ...preview.toUpdate.map((s) => ({
+    studentId: s.studentId,
+    grade: s.newGrade,
+
+    // OPTIONAL: if you want updates too
+    email: s.email || undefined,
+    phone: s.phone || undefined,
+  })),
+];
+
+    const res = await API.post("/api/students/bulk", payload);
+
+    toast.success(
+      `Import done: ${res.data.inserted} inserted, ${res.data.updated} updated`
+    );
+
+    setShowPreview(false);
+    setPreview(null);
+
+    fetchStudents();
+    socket.emit("students-imported");
+
+  } catch (err) {
+    console.error(err);
+    toast.error("Import failed");
   } finally {
     setImporting(false);
   }
@@ -485,6 +534,81 @@ const StudentPage = () => {
         />
       )}
 
+      {showPreview && preview && (
+  <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="bg-white rounded-3xl p-6 w-[750px] max-h-[80vh] overflow-y-auto shadow-2xl">
+
+      <h2 className="text-xl font-bold mb-4">
+        Import Preview
+      </h2>
+
+      {/* INSERTS */}
+      <div className="mb-5">
+        <h3 className="font-semibold text-green-600">
+          New Students ({preview.toInsert.length})
+        </h3>
+
+        <div className="text-sm mt-2 space-y-1">
+          {preview.toInsert.map((s, i) => (
+            <p key={i}>🟢 {s.name} - {s.grade}</p>
+          ))}
+        </div>
+      </div>
+
+      {/* UPDATES */}
+      <div className="mb-5">
+        <h3 className="font-semibold text-yellow-600">
+          Updates ({preview.toUpdate.length})
+        </h3>
+
+        <div className="text-sm mt-2 space-y-1">
+          {preview.toUpdate.map((s, i) => (
+            <p key={i}>
+              🟡 {s.name} | {s.oldGrade} → {s.newGrade}
+            </p>
+          ))}
+        </div>
+      </div>
+
+      {/* INVALID */}
+      {preview.invalid.length > 0 && (
+        <div className="mb-5">
+          <h3 className="font-semibold text-red-600">
+            Invalid ({preview.invalid.length})
+          </h3>
+
+          <div className="text-sm mt-2 space-y-1">
+            {preview.invalid.map((s, i) => (
+              <p key={i}>🔴 Missing studentId</p>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ACTIONS */}
+      <div className="flex justify-end gap-3 mt-6">
+        <button
+          onClick={() => {
+            setShowPreview(false);
+            setPreview(null);
+          }}
+          className="px-4 py-2 bg-gray-200 rounded-xl"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={confirmImport}
+          className="px-4 py-2 bg-green-600 text-white rounded-xl"
+        >
+          Confirm Import
+        </button>
+      </div>
+
+    </div>
+  </div>
+)}
+
       {/* ================= DELETE MODAL ================= */}
       {deleteTarget && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
@@ -496,34 +620,48 @@ const StudentPage = () => {
           >
 
             <h2 className="text-xl font-bold">
-              Delete Student
-            </h2>
+  Delete Student
+</h2>
 
-            <p className="text-gray-500 mt-2 text-sm">
-              Are you sure you want to delete{" "}
-              <span className="font-semibold text-gray-800">
-                {deleteTarget.firstName}
-              </span>
-              ?
-            </p>
+<p className="text-gray-500 mt-2 text-sm">
+  This action cannot be undone. Type{" "}
+  <span className="font-semibold text-red-600">DELETE</span> to confirm
+</p>
 
-            <div className="flex justify-end gap-3 mt-6">
+<div className="mt-4">
+  <input
+    value={deleteConfirmText}
+    onChange={(e) => setDeleteConfirmText(e.target.value)}
+    placeholder="Type DELETE here..."
+    className="w-full px-4 py-2 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-red-200"
+  />
+</div>
 
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200"
-              >
-                Cancel
-              </button>
+<div className="flex justify-end gap-3 mt-6">
 
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 rounded-xl bg-red-500 text-white hover:bg-red-600"
-              >
-                Delete
-              </button>
+  <button
+    onClick={() => {
+      setDeleteTarget(null);
+      setDeleteConfirmText("");
+    }}
+    className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200"
+  >
+    Cancel
+  </button>
 
-            </div>
+  <button
+    onClick={confirmDelete}
+    disabled={deleteConfirmText !== "DELETE"}
+    className={`px-4 py-2 rounded-xl text-white transition ${
+      deleteConfirmText === "DELETE"
+        ? "bg-red-500 hover:bg-red-600"
+        : "bg-red-300 cursor-not-allowed"
+    }`}
+  >
+    Delete
+  </button>
+
+</div>
 
           </motion.div>
 
