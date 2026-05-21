@@ -159,7 +159,7 @@ const MobileReport = ({ report, onAccept, onReject }) => {
   report.reporterId
     ? report.reporterId.name ||
       `${report.reporterId.firstName || ""} ${report.reporterId.lastName || ""}`.trim()
-    : "Guest"
+    : "Anonymous"
 }
           />
 

@@ -67,6 +67,7 @@ const DashboardPage = () => {
 
   const [aiOpen, setAiOpen] = useState(false);
   const [aiText, setAiText] = useState("");
+  const notifSound = useRef(null);
 
   const socketRef = useRef(null);
 
@@ -87,10 +88,13 @@ const DashboardPage = () => {
     setTimeout(() => setLoading(false), 600);
   };
 
+
   /* ================= SOCKET ================= */
   useEffect(() => {
   socket.connect();
 
+  notifSound.current = new Audio("/notification.mp3");
+  notifSound.current.volume = 1;
   socket.on("connect", () => {
     console.log("🟢 CONNECTED:", socket.id);
 
@@ -109,6 +113,14 @@ const DashboardPage = () => {
 
   socket.on("newNotification", (data) => {
     console.log("📩 RECEIVED:", data);
+
+    notifSound.current?.play().catch((err) => {
+      console.log("🔇 Audio blocked:", err);
+    });
+
+
+    setNotifCount((prev) => prev + 1);
+
 
     setNotifications((prev) => [
       {
@@ -278,29 +290,22 @@ Keep it professional and concise.
               <Brain size={18} />
             </button>
 
-            <button onClick={() => setOpenNotif(!openNotif)} className="p-3 rounded-2xl bg-white border relative">
+            <button onClick={() => {
+    setOpenNotif(!openNotif);
+
+    // clear unread count when opened
+    if (!openNotif) {
+      setNotifCount(0);
+    }
+  }} className="p-3 rounded-2xl bg-white border relative">
               <Bell size={18} />
-              {notifCount > 0 &&  (
+              {unreadCount > 0 &&  (
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-2 rounded-full">
-                  {notifCount}
+                  {unreadCount}
                 </span>
               )}
             </button>
           </div>
-
-          <button
-  onClick={() => {
-    socket.emit("newNotification", {
-      id: Date.now(),
-      title: "🔥 Local Test",
-      message: "This is a frontend-triggered test",
-      createdAt: new Date().toISOString(),
-    });
-  }}
-  className="p-3 bg-green-600 text-white rounded-xl"
->
-  Test Notification
-</button>
         </div>
 
         {/* NOTIFICATIONS DRAWER */}

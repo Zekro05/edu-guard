@@ -237,62 +237,70 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
     const report = await Report.findByIdAndUpdate(
       req.params.id,
       { status: "rejected" },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!report) {
       return res.status(404).json({ message: "Report not found" });
     }
 
-    const student = await Student.findById(report.studentId);
+    // =========================
+    // ONLY FOR REGISTERED STUDENTS
+    // =========================
+    if (report.studentId) {
+      const student = await Student.findById(report.studentId);
 
-    if (!student) return res.json({ message: "Student not found" });
+      if (student) {
+        const user = await User.findOne({ studentId: student.studentId });
 
-    const user = await User.findOne({ studentId: student.studentId });
+        if (user) {
+          await Notification.create({
+            userId: user._id,
+            title: "Report Rejected",
+            message: `A report regarding "${report.offense}" was rejected.`,
+            type: "error",
+            priority: "high",
+          });
 
-    if (user) {
+          io.to(user._id.toString()).emit("newNotification", {
+            id: report._id,
+            title: "Report Rejected",
+            message: `A report regarding "${report.offense}" was rejected.`,
+            type: "error",
+            priority: "high",
+            isRead: false,
+            timeAgo: "Just now",
+          });
+        }
+      }
+    }
+
+    // =========================
+    // GUEST / REPORTER NOTIFICATION
+    // =========================
+    if (report.reporterId) {
       await Notification.create({
-        userId: user._id,
-        title: "Report Rejected",
-        message: `A report regarding "${report.offense}" was rejected.`,
-        type: "error",
-        priority: "high",
+        userId: report.reporterId,
+        title: "Your Report Was Reviewed",
+        message: `Your report about "${report.offense}" was reviewed and rejected.`,
+        type: "rejected",
+        priority: "low", // keep valid enum
       });
 
-      io.to(user._id.toString()).emit("newNotification", {
+      io.to(report.reporterId.toString()).emit("newNotification", {
         id: report._id,
-        title: "Report Rejected",
-        message: `A report regarding "${report.offense}" was rejected.`,
-        type: "error",
-        priority: "high",
+        title: "Your Report Was Reviewed",
+        message: `Your report about "${report.offense}" was reviewed and rejected.`,
+        type: "rejected",
+        priority: "low",
         isRead: false,
         timeAgo: "Just now",
       });
     }
 
-    /* ================= NOTIFY REPORTER ================= */
-if (report.reporterId) {
-  await Notification.create({
-    userId: report.reporterId,
-    title: "Your Report Was Reviewed",
-    message: `Your report about "${report.offense}" was reviewed and rejected.`,
-    type: "rejected",
-    priority: "medium",
-  });
-
-  io.to(report.reporterId.toString()).emit("newNotification", {
-    id: report._id,
-    title: "Your Report Was Reviewed",
-    message: `Your report about "${report.offense}" was reviewed and rejected.`,
-    type: "rejected",
-    priority: "medium",
-    isRead: false,
-    timeAgo: "Just now",
-  });
-}
-
     return res.json(report);
   } catch (err) {
+    console.error("REJECT ERROR:", err);
     return res.status(500).json({ message: err.message });
   }
 });

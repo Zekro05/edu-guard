@@ -99,10 +99,13 @@ if (targetUserId) {
   });
 }
 
+const reporterName =
+  report.reporterId?.name || "Anonymous";
+
 io.emit("newNotification", {
   id: report._id,
   title: "New Report Submitted",
-  message: `${report.studentName} submitted a report about "${report.offense}"`,
+  message: `${reporterName} submitted a report against ${report.studentName} for "${report.offense}"`,
   type: "info",
   priority: "high",
   isRead: false,
@@ -201,7 +204,9 @@ export const getMyReports = async (req, res) => {
 export const getReportById = async (req, res) => {
   try {
     const report = await Report.findById(req.params.id)
-      .populate("studentId", "name");
+      .populate("studentId", "name")
+      .populate("reporterId", "firstName lastName name email");;
+
 
     if (!report) {
       return res.status(404).json({ message: "Report not found" });
