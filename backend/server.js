@@ -50,6 +50,7 @@ const allowedOrigins = [
   "http://localhost:8081",
   "exp://localhost:8081",
   "https://edu-guard-backend.onrender.com",
+  "https://edu-guard-mu.vercel.app",
 ];
 
 app.use(
