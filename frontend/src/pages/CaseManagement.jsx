@@ -145,39 +145,81 @@ const offenseMap = {
 const normalize = (str = "") =>
   str.toLowerCase().trim();
 
+const findMatch = (text, list = []) =>
+  list.find((item) => text.includes(normalize(item)));
+
 const classifyCase = (c = {}) => {
   const text = normalize(
-    c.offense || c.category || c.title || ""
+    [
+      c.offense,
+      c.category,
+      c.title,
+      c.description,
+    ]
+      .filter(Boolean)
+      .join(" ")
   );
 
-  const isMajorKeyword = offenseMap.MAJOR.some((o) =>
-    text.includes(normalize(o))
+  const matchedMajor = findMatch(text, offenseMap.MAJOR);
+  const matchedMinor = findMatch(text, offenseMap.MINOR);
+
+  // =========================
+  // HIGH RISK
+  // =========================
+  const criticalKeywords = [
+    "drug",
+    "weapon",
+    "assault",
+    "physical injury",
+    "physical assault",
+    "hazing",
+    "voyeurism",
+    "fighting",
+    "threatening",
+  ];
+
+  const isCritical = criticalKeywords.some((k) =>
+    text.includes(normalize(k))
   );
 
-  const isMinorKeyword = offenseMap.MINOR.some((o) =>
-    text.includes(normalize(o))
-  );
-
-  if (isMajorKeyword) {
+  if (matchedMajor && isCritical) {
     return {
       risk: "HIGH",
-      severity: "MAJOR OFFENSE",
-      insight: "Major offense detected based on policy mapping.",
+      severity: "CRITICAL MAJOR OFFENSE",
+      insight: `Critical violation detected (${matchedMajor}). Immediate intervention recommended.`,
     };
   }
 
-  if (isMinorKeyword) {
+  // =========================
+  // MEDIUM RISK
+  // =========================
+  if (matchedMajor) {
+    return {
+      risk: "MEDIUM",
+      severity: "MAJOR OFFENSE",
+      insight: `Major offense detected (${matchedMajor}). Guidance review and escalation may be required.`,
+    };
+  }
+
+  // =========================
+  // LOW RISK
+  // =========================
+  if (matchedMinor) {
     return {
       risk: "LOW",
       severity: "MINOR OFFENSE",
-      insight: "Minor offense detected based on policy mapping.",
+      insight: `Minor offense detected (${matchedMinor}). Monitor student behavior and apply corrective action.`,
     };
   }
 
+  // =========================
+  // UNKNOWN
+  // =========================
   return {
-    risk: "LOW", // 👈 change this (don’t default MEDIUM)
+    risk: "LOW",
     severity: "UNCLASSIFIED",
-    insight: "No direct policy match. Manual review recommended.",
+    insight:
+      "No direct policy match found. Manual review recommended.",
   };
 };
 
@@ -221,37 +263,69 @@ const statusUI = {
 const normalizeCase = (c) => {
   let evidence = [];
 
-try {
-  if (Array.isArray(c.evidence)) {
-    evidence = c.evidence
-      .map((e) => {
-        // CASE 1: already correct object
-        if (e && typeof e === "object" && e.url) {
-          return e;
-        }
+  try {
+    if (Array.isArray(c.evidence)) {
+      evidence = c.evidence
+        .map((e) => {
+          // CASE 1: already correct object
+          if (e && typeof e === "object" && e.url) {
+            return e;
+          }
 
-        // CASE 2: string (Cloudinary or broken string)
-        if (typeof e === "string") {
-          const urlMatch = e.match(/https?:\/\/[^\s'"}]+/);
+          // CASE 2: string (Cloudinary or broken string)
+          if (typeof e === "string") {
+            const urlMatch = e.match(/https?:\/\/[^\s'"}]+/);
 
-          return {
-            url: urlMatch?.[0],
-            type: urlMatch?.[0]?.includes("video")
-              ? "video"
-              : "image",
-          };
-        }
+            return {
+              url: urlMatch?.[0],
+              type: urlMatch?.[0]?.includes("video")
+                ? "video"
+                : "image",
+            };
+          }
 
-        return null;
-      })
-      .filter(Boolean);
+          return null;
+        })
+        .filter(Boolean);
+    }
+  } catch {
+    evidence = [];
   }
-} catch {
-  evidence = [];
-}
 
   return {
     ...c,
+
+    // =========================
+    // FLATTEN IMPORTANT FIELDS
+    // =========================
+    offense:
+      c.offense ||
+      c.reportId?.offense ||
+      c.report?.offense ||
+      c.title ||
+      "Unknown Offense",
+
+    category:
+      c.category ||
+      c.reportId?.category ||
+      c.report?.category ||
+      "",
+
+    title:
+      c.title ||
+      c.reportId?.title ||
+      c.report?.title ||
+      "",
+
+    description:
+      c.description ||
+      c.reportId?.description ||
+      c.report?.description ||
+      "",
+
+    // =========================
+    // STUDENT
+    // =========================
     student: c.studentId
       ? {
           name: `${c.studentId.firstName || ""} ${c.studentId.lastName || ""}`,
@@ -261,15 +335,27 @@ try {
           studentId: c.studentId.studentId,
         }
       : c.student || {},
+
+    // =========================
+    // OTHER FIELDS
+    // =========================
     status: c.status || "received",
-    logs: c.caseLogs || [],
+
+    logs: c.caseLogs || c.logs || [],
+
     evidence,
+
     location:
-    c.reportId?.location ||
-    c.report?.location ||
-    "Unknown location",
-    reporter: c.reportId?.reporterId?.name || "Anonymous",
- 
+      c.location ||
+      c.reportId?.location ||
+      c.report?.location ||
+      "Unknown location",
+
+    reporter:
+      c.reporter ||
+      c.reportId?.reporterId?.name ||
+      c.report?.reporterId?.name ||
+      "Anonymous",
   };
 };
 
@@ -283,8 +369,8 @@ const categoryColor = (cat = "") => {
 };
 
 const severityColor = (lvl = "Low") => {
-  if (lvl === "High") return "text-red-500";
-  if (lvl === "Medium") return "text-yellow-500";
+  if (lvl === "HIGH") return "text-red-500";
+  if (lvl === "MEDIUM") return "text-yellow-500";
   return "text-green-500";
 };
 
@@ -929,8 +1015,19 @@ const flowWithMeta = flow.map((step) => {
                   </div>
 
                   <div className="mt-3 text-xs text-gray-500">
-                     AI Risk: <span>{severity}</span>
-                  </div>
+  AI Risk:
+  <span
+    className={`ml-1 font-semibold ${
+      severity === "HIGH"
+        ? "text-red-500"
+        : severity === "MEDIUM"
+        ? "text-yellow-500"
+        : "text-green-500"
+    }`}
+  >
+    {severity}
+  </span>
+</div>
 
                   <div className={`mt-3 h-1 w-full rounded-full bg-gradient-to-r ${statusUI[status]}`} />
                   <p className="text-[10px] mt-2 text-gray-500 uppercase">
@@ -985,8 +1082,8 @@ const flowWithMeta = flow.map((step) => {
                     {selected.student?.grade} • {selected.student?.studentId}
                   </p>
 
-                  <p className={`text-xs mt-1 font-semibold ${severityColor(selected.level)}`}>
-                    Severity: {selected.level}
+                  <p className={`text-xs mt-1 font-semibold ${severityColor(ai?.risk)}`}>
+                    Severity: {ai?.risk}
                   </p>
 
                    

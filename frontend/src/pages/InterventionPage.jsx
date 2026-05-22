@@ -51,7 +51,6 @@ const InterventionPage = () => {
 
   const options = [
     "warning",
-    "detention",
     "call a parent",
     "community service",
     "suspension",

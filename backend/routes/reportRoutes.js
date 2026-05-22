@@ -258,7 +258,7 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
             userId: user._id,
             title: "Report Rejected",
             message: `A report regarding "${report.offense}" was rejected.`,
-            type: "error",
+            type: "rejected",
             priority: "high",
           });
 
@@ -266,7 +266,7 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
             id: report._id,
             title: "Report Rejected",
             message: `A report regarding "${report.offense}" was rejected.`,
-            type: "error",
+            type: "rejected",
             priority: "high",
             isRead: false,
             timeAgo: "Just now",

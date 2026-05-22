@@ -76,8 +76,8 @@ export const exportInterventionPDF = (selected, interventions = []) => {
   sectionBox("Student Information");
 
   field("Name", selected.studentName);
-  field("Section", selected.section);
-  field("Age", selected.age);
+  field("Section", selected.grade);
+  field("Phone Number", selected.phone);
   field("Gender", selected.gender);
   field("Offense", selected.offense);
 
