@@ -196,19 +196,23 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  logout: async () => {
-    try {
-      await API.post("/api/auth/logout");
-      set({
-        user: null,
-        isAuthenticated: false,
-      });
-      localStorage.removeItem("user");
-      toast.success("Logged out successfully");
-    } catch (err) {
-      toast.error(err.response?.data?.message || err.message);
-    }
-  },
+  logout: async (callback) => {
+  try {
+    await API.post("/api/auth/logout");
+  } catch {}
+
+  set({
+    user: null,
+    isAuthenticated: false,
+    countdown: 0,
+    warningActive: false,
+  });
+
+  localStorage.removeItem("user");
+
+  if (callback) callback();
+  toast.success("Logged out successfully");
+},
 
   resendOTP: async () => {
   set({ isLoading: true, error: null });

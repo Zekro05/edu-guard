@@ -61,9 +61,10 @@ export const signup = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     let profilePhotoPath = "";
-    if (req.file) {
-      profilePhotoPath = `http://localhost:5000/uploads/${req.file.filename}`;
-    }
+
+if (req.file) {
+  profilePhotoPath = `${BASE_URL}/uploads/${req.file.filename}`;
+}
 
     const verificationToken = Math.floor(
       100000 + Math.random() * 900000
