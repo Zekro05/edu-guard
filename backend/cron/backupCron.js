@@ -3,8 +3,6 @@ import axios from "axios";
 
 const API =
   process.env.BASE_URL || "https://edu-guard-backend.onrender.com";
-
-// every day at 12 AM
 cron.schedule("0 0 * * *", async () => {
   try {
     await API.get(`${BASE_URL}/api/backup?type=auto`);

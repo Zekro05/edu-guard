@@ -5,6 +5,12 @@ import { io } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
 import { API } from "../lib/api.js"
 
+import { useAuthStore, API } from "../store/authStore";
+import { useEffect, useState, useRef, useMemo } from "react";
+import { io } from "socket.io-client";
+import { motion, AnimatePresence } from "framer-motion";
+
+
 import {
   LayoutDashboard,
   Users,
