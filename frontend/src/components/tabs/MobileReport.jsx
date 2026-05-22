@@ -140,17 +140,33 @@ const MobileReport = ({ report, onAccept, onReject }) => {
             value={report.location}
           />
 
-          <Info
-            icon={<Calendar size={15} />}
-            label="Date"
-            value={report.date}
-          />
+         <Info
+  icon={<Calendar size={15} />}
+  label="Created Report Case Date"
+  value={
+    report.createdAt
+      ? new Date(report.createdAt).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
+      : "N/A"
+  }
+/>
 
           <Info
-            icon={<Clock3 size={15} />}
-            label="Time"
-            value={report.time}
-          />
+  icon={<Calendar size={15} />}
+  label="Incident Date & Time"
+  value={
+    report.date
+      ? `${new Date(report.date).toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })} • ${report.time || "N/A"}`
+      : "N/A"
+  }
+/>
 
           <Info
             icon={<User2 size={15} />}
