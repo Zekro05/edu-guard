@@ -1,11 +1,7 @@
 import express from "express";
-import { GoogleGenAI } from "@google/genai";
+import { ai } from "../config/geminiAi";
 
 const router = express.Router();
-
-const client = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
 
 router.post("/generate", async (req, res) => {
   try {
@@ -15,16 +11,13 @@ router.post("/generate", async (req, res) => {
       return res.status(400).json({ error: "Prompt is required" });
     }
 
-    const response = await client.models.generateContent({
+    const response = await ai.models.generateContent({
       model: "models/gemini-3-flash-preview",
       contents: prompt,
     });
 
-    // 🔥 SAFE EXTRACTION (FIXES YOUR ISSUE)
     const text =
-      response?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      response?.text ||
-      "";
+      response?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!text || text.trim().length === 0) {
       console.error("Gemini empty response:", response);
