@@ -24,7 +24,7 @@ import { verifyMobileLoginOTP } from "../controllers/authController.js";
 const router = express.Router();
 
 // ---------------- AUTH CHECK ----------------
-router.get("/check-auth", verifyToken, checkAuth);
+
 
 // ---------------- SIGNUP ----------------
 router.post("/signup", upload.single("profilePhoto"), signup);
@@ -32,6 +32,8 @@ router.post("/signup", upload.single("profilePhoto"), signup);
 // ---------------- LOGIN ----------------
 router.post("/login", login);
 router.post ("/mobile-login", mobileLogin);
+
+router.get("/check-auth", verifyToken, checkAuth);
 
 // ---------------- LOGOUT ----------------
 router.post("/logout", logout);
