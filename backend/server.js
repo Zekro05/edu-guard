@@ -107,8 +107,7 @@ export const io = new Server(server, {
       "http://localhost:5174",
       "exp://localhost:19000",
       "https://edu-guard-backend.onrender.com",
-      "edu-guard-mu.vercel.app",
-      "*"
+      "https://edu-guard-mu.vercel.app",
     ],
     methods: ["GET", "POST"],
     credentials: true,
