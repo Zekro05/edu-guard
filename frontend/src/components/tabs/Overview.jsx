@@ -1,5 +1,5 @@
 import React, { memo, useEffect, useMemo, useState } from "react";
-import { API } from "../lib/api";
+import { API } from "../../lib/api";
 
 /* ================= MAIN ================= */
 const Overview = () => {

@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { Search, Paperclip, UploadCloud } from "lucide-react";
 import toast from "react-hot-toast";
-import { API } from "../lib/api";;
+import { API } from "../../lib/api";
 
 /* ================= OPTIONS ================= */
 

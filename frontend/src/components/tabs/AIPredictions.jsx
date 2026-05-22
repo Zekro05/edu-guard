@@ -1,5 +1,5 @@
 import React, { useState, useEffect, memo } from "react";
-import { API } from "../lib/api";;
+import { API } from "../../lib/api";
 
 /* ================= MAIN ================= */
 const AIPredictions = () => {
