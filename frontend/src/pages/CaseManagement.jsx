@@ -22,7 +22,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 import { useNavigate } from "react-router-dom";
-import { API } from "../../lib/api";
+import { API } from "../lib/api";
 import { getFileUrl } from "../utils/getBaseUrl";
 
 /* ================= SOCKET ================= */
