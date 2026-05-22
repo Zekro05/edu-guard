@@ -1,6 +1,6 @@
 import { Clock, Filter, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
-import { API } from "../lib/api";;
+import { API } from "../../lib/api";
 
 const HistoryLogs = () => {
   const [logs, setLogs] = useState([]);
