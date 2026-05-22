@@ -269,6 +269,7 @@ Keep it professional and concise.
           <Nav icon={<ShieldX size={18} />} label="Guidance" onClick={() => navigate("/guidance")} />
           <Nav icon={<ChartNoAxesCombined size={18} />} label="Reports" onClick={() => navigate("/reports")} />
           <Nav icon={<Gavel size={18} />} label="Cases" onClick={() => navigate("/cases")} />
+          <Nav icon={<Gavel size={18} />} label="Interventions" onClick={() => navigate("/interventions")} />
           <Nav icon={<Settings size={18} />} label="Settings" onClick={() => navigate("/settings")} />
         </div>
 
