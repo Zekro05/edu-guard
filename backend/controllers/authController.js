@@ -431,7 +431,11 @@ export const verifyLoginOTP = async (req, res) => {
     user.loginOTPExpiresAt = undefined;
     await user.save();
 
-    generateTokenAndSetCookie(res, user._id);
+    const token = jwt.sign(
+      { id: user._id, role: user.role, name: user.name },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
     await createHistoryLog({
       userId: user._id,
@@ -442,12 +446,15 @@ export const verifyLoginOTP = async (req, res) => {
       ipAddress: req.ip,
     });
 
-    res
-      .status(200)
-      .json({ success: true, user: { ...user._doc, password: undefined}, token });
+    return res.status(200).json({
+      success: true,
+      user: { ...user._doc, password: undefined },
+      token,
+    });
+
   } catch (err) {
     console.error("Verify Login OTP Error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
