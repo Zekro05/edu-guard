@@ -1,5 +1,5 @@
 import express from "express";
-import { ai } from "../config/geminiAi";
+import { ai } from "../config/geminiAi.js";
 
 const router = express.Router();
 

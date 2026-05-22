@@ -1,8 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({
-  apiKey: "AIzaSyB_NBtSgqQePmuHlmtBh3r4Y0w1wmqMk8o",
-});
+import { ai } from "../config/geminiAi.js";
 
 async function main() {
   try {
