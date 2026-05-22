@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 
 import RiskBadge from "./RiskBadge";
-import { API } from "../store/authStore";
+import { API } from "../lib/api";;
 
 const ViewProfileModal = ({ student, close }) => {
   const [tab, setTab] = useState("history");

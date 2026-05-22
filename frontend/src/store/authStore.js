@@ -2,10 +2,7 @@ import { create } from "zustand";
 import axios from "axios";
 import { toast } from "react-hot-toast";
 
-export const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  withCredentials: true,
-});
+
 
 //  ATTACH TOKEN AUTOMATICALLY 
 API.interceptors.request.use((config) => {

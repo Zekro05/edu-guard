@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import { Search } from "lucide-react";
 import toast from "react-hot-toast";
-import { API } from "../../store/authStore";
+import { API } from "../lib/api";;
 
 /* ================= THEME ================= */
 const C = {

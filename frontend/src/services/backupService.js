@@ -4,7 +4,7 @@ const API = import.meta.env.VITE_API_URL + "/api";
 
 // ✅ Download backup
 export const createBackup = async () => {
-  const res = await axios.get(`${API}/backup`, {
+  const res = await API.get(`${API}/backup`, {
     responseType: "blob",
   });
 

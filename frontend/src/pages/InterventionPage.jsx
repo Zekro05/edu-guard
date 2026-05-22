@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { API } from "../store/authStore";
+import { API } from "../lib/api";
 import { exportInterventionPDF } from "../utils/exportInterventionPDF";
 
 import {
