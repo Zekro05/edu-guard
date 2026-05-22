@@ -65,7 +65,7 @@ export const signup = async (req, res) => {
     let profilePhotoPath = "";
 
 if (req.file) {
-  profilePhotoPath = `${BASE_URL}/uploads/${req.file.filename}`;
+  profilePhotoPath = req.file.path; // Cloudinary URL
 }
 
     const verificationToken = Math.floor(
@@ -86,7 +86,7 @@ if (req.file) {
       password: hashedPassword,
       studentId,
       role,
-      profilePhoto: profilePhotoPath,
+      profilePhoto: profilePhotoPath || "https://ui-avatars.com/api/?name=User&background=random",
       verificationToken,
       verificationTokenExpiresAt: Date.now() + 24 * 60 * 60 * 1000,
       isVerified: false,
