@@ -444,7 +444,7 @@ export const verifyLoginOTP = async (req, res) => {
 
     res
       .status(200)
-      .json({ success: true, user: { ...user._doc, password: undefined } });
+      .json({ success: true, user: { ...user._doc, password: undefined}, token });
   } catch (err) {
     console.error("Verify Login OTP Error:", err);
     res.status(500).json({ message: "Server error" });
