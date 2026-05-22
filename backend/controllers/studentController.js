@@ -1,0 +1,347 @@
+import Student from "../models/studentModel.js";
+import { User } from "../models/userModel.js";
+import { createHistoryLog } from "../utils/createHistoryLog.js";
+import { mapRoleForHistory } from "../utils/roleMapper.js";
+
+/* GET ALL STUDENTS */
+export const getStudents = async (req, res) => {
+  try {
+    const students = await Student.find()
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(students);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch students" });
+  }
+};
+
+/*  CREATE STUDENT  */
+export const createStudent = async (req, res) => {
+  try {
+    const profilePhoto = req.file
+      ? `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`
+      : "";
+
+    const student = new Student({
+      ...req.body,
+      profilePhoto,
+      createdBy: req.userId,
+    });
+
+    await student.save();
+
+    io.emit("activity_feed", {
+  type: "student",
+  message: `👤 New student added: ${student.name}`,
+  time: new Date(),
+});
+
+    res.status(201).json(student);
+  } catch (error) {
+    console.error("CREATE STUDENT ERROR:", error);
+    res.status(400).json({ message: "Failed to create student" });
+  }
+};
+
+/*  UPDATE STUDENT  */
+export const updateStudent = async (req, res) => {
+  const user = await User.findById(req.userId);
+  try {
+    const studentId = req.params.id;
+
+    // Find the existing student
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    // Handle profile photo
+    let profilePhoto = student.profilePhoto; // keep existing by default
+    if (req.file) {
+      profilePhoto = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    }
+
+    // Prepare updated data
+    const updatedData = {
+      ...req.body,
+      profilePhoto, // either new uploaded photo or existing
+    };
+
+    // Update student
+    const updatedStudent = await Student.findByIdAndUpdate(studentId, updatedData, {
+      new: true,
+      runValidators: true,
+    });
+
+    await createHistoryLog({
+          userId: user._id,
+          role: mapRoleForHistory(user.role),
+          action: "Update Student Details",
+          category: "Student",
+          details: `Student details updated: (Student ID: ${student.studentId})`,
+          ipAddress: req.ip,
+        });
+
+    res.status(200).json(updatedStudent);
+  } catch (error) {
+    console.error("Failed to update student:", error);
+    res.status(400).json({ message: "Failed to update student" });
+  }
+};
+
+export const createStudentsBulk = async (req, res) => {
+  console.log("🔥 BULK ROUTE HIT");
+  console.log("REQ BODY:", req.body);
+
+  try {
+    const user = await User.findById(req.userId);
+    const students = req.body;
+
+    if (!Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({ message: "Invalid student data" });
+    }
+
+    let inserted = 0;
+    let updated = 0;
+    let invalid = 0;
+
+    const gradeMap = {
+      "Grade 10": "Grade 11",
+      "Grade 11": "Grade 12",
+      "Grade 12": "Grade 12",
+      "Grade12" : "Graduated"
+    };
+
+    for (const s of students) {
+      if (!s.studentId) {
+        invalid++;
+        continue;
+      }
+
+      const existing = await Student.findOne({
+        studentId: s.studentId.trim(),
+      });
+
+      // =========================
+      // UPDATE FLOW (IMPORTANT FIX)
+      // =========================
+      if (existing) {
+        const newGrade = gradeMap[s.grade || existing.grade] || existing.grade;
+
+        const updatedStudent = await Student.findOneAndUpdate(
+          { studentId: s.studentId.trim() },
+          {
+            $set: {
+              // only update fields that exist in payload
+              ...(s.firstName && { firstName: s.firstName }),
+              ...(s.lastName && { lastName: s.lastName }),
+              ...(s.middleName && { middleName: s.middleName }),
+              ...(s.email && { email: s.email }),
+              ...(s.phone && { phone: s.phone }),
+              ...(s.gender && { gender: s.gender }),
+              ...(s.riskLevel && { riskLevel: s.riskLevel }),
+
+              grade: newGrade, // always update grade
+            },
+          },
+          {
+            new: true,
+            runValidators: true,
+          }
+        );
+
+        if (updatedStudent) updated++;
+        continue;
+      }
+
+      // =========================
+      // INSERT FLOW (FULL DATA REQUIRED)
+      // =========================
+      if (!s.firstName || !s.lastName || !s.gender) {
+        invalid++;
+        continue;
+      }
+
+      await Student.create({
+        studentId: s.studentId.trim(),
+        firstName: s.firstName,
+        lastName: s.lastName,
+        middleName: s.middleName || "",
+        email: s.email || "",
+        phone: s.phone || "",
+        gender: s.gender,
+        grade: s.grade || "Grade 10",
+        riskLevel: s.riskLevel || "Low",
+        createdBy: req.userId,
+      });
+
+      inserted++;
+    }
+
+    console.log("📊 FINAL RESULT:", { inserted, updated, invalid });
+
+    await createHistoryLog({
+      userId: user._id,
+      role: mapRoleForHistory(user.role),
+      action: "Bulk Upsert Students",
+      category: "Student",
+      details: `Inserted: ${inserted}, Updated: ${updated}, Invalid: ${invalid}`,
+      ipAddress: req.ip,
+    });
+
+    return res.status(200).json({
+      message: "Bulk upsert completed",
+      inserted,
+      updated,
+      invalid,
+    });
+  } catch (error) {
+    console.error("BULK UPSERT ERROR:", error);
+    return res.status(500).json({ message: "Failed bulk upsert" });
+  }
+};
+
+export const previewBulkStudents = async (req, res) => {
+  try {
+    const students = req.body;
+
+    if (!Array.isArray(students)) {
+      return res.status(400).json({ message: "Invalid data format" });
+    }
+
+    const result = {
+      toInsert: [],
+      toUpdate: [],
+      invalid: [],
+    };
+
+    for (const s of students) {
+      if (!s.studentId) {
+        result.invalid.push({
+          data: s,
+          reason: "Missing studentId",
+        });
+        continue;
+      }
+
+      const existing = await Student.findOne({ studentId: s.studentId });
+
+      if (existing) {
+        result.toUpdate.push({
+  studentId: s.studentId,
+  name: `${existing.firstName} ${existing.lastName}`,
+  oldGrade: existing.grade,
+  newGrade: s.grade,
+  email: s.email,
+  phone: s.phone,
+});
+      } else {
+        result.toInsert.push({
+  studentId: s.studentId,
+  name: `${s.firstName || ""} ${s.lastName || ""}`,
+  grade: s.grade,
+  email: s.email,
+  phone: s.phone,
+});
+      }
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Preview failed" });
+  }
+};
+
+export const getStudentTimeline = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [reports, incidents, cases, interventions] = await Promise.all([
+      Report.find({ studentId: id }),
+      Incident.find({ studentId: id }),
+      Case.find({ studentId: id }),
+      Intervention.find({ studentId: id }),
+    ]);
+
+    const timeline = [
+      ...reports.map(r => ({
+        type: "REPORT",
+        date: r.createdAt,
+        data: r,
+      })),
+
+      ...incidents.map(i => ({
+        type: "INCIDENT",
+        date: i.createdAt,
+        data: i,
+      })),
+
+      ...cases.map(c => ({
+        type: "CASE",
+        date: c.createdAt,
+        data: c,
+      })),
+
+      ...interventions.map(i => ({
+        type: "INTERVENTION",
+        date: i.createdAt,
+        data: i,
+      })),
+    ];
+
+    // sort newest first
+    timeline.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.json(timeline);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/*  DELETE STUDENT */
+export const deleteStudent = async (req, res) => {
+  const user = await User.findById(req.userId);
+  try {
+    const student = await Student.findByIdAndDelete(req.params.id);
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    await createHistoryLog({
+          userId: user._id,
+          role: mapRoleForHistory(user.role),
+          action: "Update Student Details",
+          category: "Student",
+          details: `Student details deleted: (Student ID: ${student.studentId})`,
+          ipAddress: req.ip,
+        });
+
+    res.status(200).json({ message: "Student deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete student" });
+  }
+};
+
+export const searchStudents = async (req, res) => {
+  try {
+    const { query } = req.query;
+
+    if (!query) return res.json([]);
+
+    const students = await Student.find({
+      $or: [
+        { firstName: { $regex: query, $options: "i" } },
+        { lastName: { $regex: query, $options: "i" } },
+        { email: { $regex: query, $options: "i" } },
+      ],
+    })
+      .select("_id firstName lastName email")
+      .limit(10);
+
+    res.json(students);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
