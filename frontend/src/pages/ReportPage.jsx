@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useAuthStore, API } from "../store/authStore";
+import { useAuthStore} from "../store/authStore";
 import {
   useState,
   useEffect,
@@ -7,6 +7,8 @@ import {
   useCallback,
   useMemo,
 } from "react";
+
+import { API } from "../lib/api";
 
 import axios from "axios";
 import { io } from "socket.io-client";

@@ -19,7 +19,8 @@ import {
   Gavel,
 } from "lucide-react";
 
-import { useAuthStore, API } from "../store/authStore";
+import { useAuthStore} from "../store/authStore";
+import { API } from "../lib/api";
 import StudentModal from "../components/StudentModal";
 import RiskBadge from "../components/RiskBadge";
 import ViewProfileModal from "../components/ViewProfileModal";
