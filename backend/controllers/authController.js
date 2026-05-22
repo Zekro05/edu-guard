@@ -14,6 +14,8 @@ import {
   sendResetSuccessEmail,
 } from "../mailer/emails.js";
 
+const BASE_URL = process.env.BASE_URL || "https://edu-guard-backend.onrender.com";
+
 // SIGNUP 
 export const signup = async (req, res) => {
   try {
