@@ -24,7 +24,7 @@ import StudentModal from "../components/StudentModal";
 import RiskBadge from "../components/RiskBadge";
 import ViewProfileModal from "../components/ViewProfileModal";
 
-const socket = io("http://localhost:5000");
+const socket = io(import.meta.env.VITE_SOCKET_URL || "https://edu-guard-backend.onrender.com");
 
 const StudentPage = () => {
   const navigate = useNavigate();

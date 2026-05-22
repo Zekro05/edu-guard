@@ -36,7 +36,7 @@ import {
 /* =========================================================
    SOCKET
 ========================================================= */
-const socket = io("http://localhost:5000", {
+const socket = io(import.meta.env.VITE_SOCKET_URL, {
   autoConnect: false,
   transports: ["websocket"],
 });
@@ -61,21 +61,21 @@ const ReportPage = () => {
      FETCH REPORTS
   ========================================================= */
   const fetchReports = useCallback(
-    async (customSearch = search) => {
-      setLoading(true);
+  async (customSearch = search) => {
+    setLoading(true);
 
-      try {
-        const res = await axios.get(
-          `http://localhost:5000/api/reports?status=pending&search=${customSearch}`
-        );
+    try {
+      const res = await API.get(
+        `/api/reports?status=pending&search=${customSearch}`
+      );
 
-        setReports(res.data.reports || []);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [search]
-  );
+      setReports(res.data.reports || []);
+    } finally {
+      setLoading(false);
+    }
+  },
+  [search]
+);
 
   useEffect(() => {
     fetchReports();

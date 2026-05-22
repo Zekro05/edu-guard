@@ -1,8 +1,7 @@
 const isDev = import.meta.env.DEV;
 
-export const BASE_URL = isDev
-  ? "http://localhost:5000"
-  : "https://edu-guard-backend.onrender.com";
+export const BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export const getFileUrl = (path) => {
   if (!path) return "";
