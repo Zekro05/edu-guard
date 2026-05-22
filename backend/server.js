@@ -50,7 +50,7 @@ const allowedOrigins = [
   "http://localhost:8081",
   "exp://localhost:8081",
   "https://edu-guard-backend.onrender.com",
-  "https://edu-guard-mu.vercel.app",
+  "https://guide-ed.vercel.app",
 ];
 
 app.use(
@@ -72,6 +72,7 @@ app.use(
      allowedHeaders: ["Content-Type", "Authorization"]
   })
 );
+
 
 /* ================= ROUTES ================= */
 
@@ -112,7 +113,7 @@ export const io = new Server(server, {
       "http://localhost:5174",
       "exp://localhost:19000",
       "https://edu-guard-backend.onrender.com",
-      "https://edu-guard-mu.vercel.app",
+      "https://guide-ed.vercel.app",
     ],
     methods: ["GET", "POST"],
     credentials: true,
