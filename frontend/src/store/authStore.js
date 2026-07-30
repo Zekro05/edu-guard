@@ -310,4 +310,25 @@ export const useAuthStore = create((set, get) => ({
     set({ isLoading: false });
   }
 },
+changePassword: async (oldPassword, newPassword) => {
+  set({ isLoading: true, error: null });
+
+  try {
+    const { data } = await API.post("/api/auth/change-password", {
+      oldPassword,
+      newPassword,
+    });
+
+    toast.success(data.message);
+
+    return data;
+  } catch (err) {
+    const message = err.response?.data?.message || "Failed to change password";
+    set({ error: message });
+    toast.error(message);
+    throw err;
+  } finally {
+    set({ isLoading: false });
+  }
+},
 }));
