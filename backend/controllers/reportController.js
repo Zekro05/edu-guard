@@ -15,7 +15,7 @@ const BASE_URL = "https://edu-guard-backend.onrender.com";
 export const getReportsByType = async (req, res) => {
   const { type } = req.params;
   try {
-    const reports = await Report.find({ type });
+    const reports = await Report.find({ type });a
     res.json(reports);
   } catch (err) {
     res.status(500).json({ message: err.message });

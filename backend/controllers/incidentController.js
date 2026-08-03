@@ -10,15 +10,28 @@ import { io } from "../server.js";
 export const getIncidents = async (req, res) => {
   try {
     if (!req.userId) {
-      return res.status(401).json({ message: "Unauthorized" });
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
+    }
+
+    // Get logged-in user
+    const user = await User.findById(req.userId).select(
+      "role studentId email"
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
     }
 
     let query = {};
 
-    // Student should only see their own incidents
-    if (req.user.role === "student") {
+    // Students should only see their own incidents
+    if (user.role === "student") {
       const student = await Student.findOne({
-        createdBy: req.userId,
+        studentId: user.studentId,
       });
 
       if (!student) {
@@ -30,11 +43,11 @@ export const getIncidents = async (req, res) => {
       query.studentId = student._id;
     }
 
-    // Admin sees everything
+    // Admins/Teachers see all incidents
     const incidents = await Incident.find(query)
       .populate(
         "studentId",
-        "firstName middleName lastName studentId grade gender profilePhoto"
+        "firstName middleName lastName studentId grade gender phone profilePhoto"
       )
       .populate({
         path: "reportId",
@@ -46,11 +59,12 @@ export const getIncidents = async (req, res) => {
       })
       .sort({ createdAt: -1 });
 
-    return res.json(incidents);
+    return res.status(200).json(incidents);
   } catch (err) {
-    console.error(err);
+    console.error("Get Incidents Error:", err);
+
     return res.status(500).json({
-      message: err.message,
+      message: err.message || "Server error",
     });
   }
 };
