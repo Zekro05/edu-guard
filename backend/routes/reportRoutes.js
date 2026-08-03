@@ -15,6 +15,7 @@ import { getDisciplineAction } from "../utils/disciplineEngine.js";
 import { upload } from "../middleware/upload.js";
 import Notification from "../models/Notification.js";
 import { createGuestReport } from "../controllers/reportController.js";
+import { createDirectIncident } from "../controllers/reportController.js";
 
 const router = express.Router();
 
@@ -56,6 +57,13 @@ router.post(
     next();
   },
   createReport
+);
+
+router.post(
+  "/direct",
+  verifyToken,
+  upload.array("evidence", 10),
+  createDirectIncident
 );
 
 /* ================= GET MY REPORTS ================= */

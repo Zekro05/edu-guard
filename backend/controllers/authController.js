@@ -1,6 +1,6 @@
 import { User } from "../models/userModel.js";
 import Student from "../models/studentModel.js";
-import Teacher from "../models/teacherModel.js"; 
+import Teacher from "../models/teacherModel.js";
 import fs from "fs";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -14,9 +14,10 @@ import {
   sendResetSuccessEmail,
 } from "../mailer/emails.js";
 
-const BASE_URL = process.env.BASE_URL || "https://edu-guard-backend.onrender.com";
+const BASE_URL =
+  process.env.BASE_URL || "https://edu-guard-backend.onrender.com";
 
-// SIGNUP 
+// SIGNUP
 export const signup = async (req, res) => {
   try {
     const {
@@ -64,12 +65,12 @@ export const signup = async (req, res) => {
 
     let profilePhotoPath = "";
 
-if (req.file) {
-  profilePhotoPath = req.file.path; // Cloudinary URL
-}
+    if (req.file) {
+      profilePhotoPath = req.file.path; // Cloudinary URL
+    }
 
     const verificationToken = Math.floor(
-      100000 + Math.random() * 900000
+      100000 + Math.random() * 900000,
     ).toString();
 
     const fullName = `${firstName} ${
@@ -86,7 +87,9 @@ if (req.file) {
       password: hashedPassword,
       studentId,
       role,
-      profilePhoto: profilePhotoPath || "https://ui-avatars.com/api/?name=User&background=random",
+      profilePhoto:
+        profilePhotoPath ||
+        "https://ui-avatars.com/api/?name=User&background=random",
       verificationToken,
       verificationTokenExpiresAt: Date.now() + 24 * 60 * 60 * 1000,
       isVerified: false,
@@ -159,11 +162,7 @@ if (req.file) {
   }
 };
 
-
-
-
-
-//  VERIFY SIGNUP OTP 
+//  VERIFY SIGNUP OTP
 export const verifyEmail = async (req, res) => {
   const { email, code } = req.body;
   const client = req.headers["x-client-type"] || req.body.client;
@@ -196,14 +195,64 @@ export const verifyEmail = async (req, res) => {
       details: "Account email verified via OTP",
       ipAddress: req.ip,
     });
-
+a
     if (client === "mobile") {
-      const student = await Student.findOne({ email });
+  let student = null;
+  let teacher = null;
 
-      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-        expiresIn: "7d",
-      });
+  if (user.role === "student") {
+    student = await Student.findOne({
+      studentId: user.studentId,
+    });
+  }
 
+  if (user.role === "teacher") {
+    teacher = await Teacher.findOne({
+      email: user.email,
+    });
+  }
+
+  const token = jwt.sign(
+    {
+      id: user._id,
+      role: user.role,
+      name: user.name,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: "7d",
+    }
+  );
+
+  return res.status(200).json({
+    success: true,
+    message: "Signup verified! You are now logged in.",
+    token,
+
+    user: {
+      _id: user._id,
+      firstName: user.firstName,
+      middleName: user.middleName,
+      lastName: user.lastName,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+
+      profilePhoto:
+        student?.profilePhoto ||
+        teacher?.profilePhoto ||
+        user.profilePhoto ||
+        "",
+
+      studentId: student?.studentId || null,
+      employeeId: teacher?.employeeId || null,
+
+      grade: student?.grade || null,
+      phone: student?.phone || null,
+
+      department: teacher?.department || null,
+    },
+  });
       return res.status(200).json({
         success: true,
         message: "Signup verified! You are now logged in.",
@@ -213,10 +262,23 @@ export const verifyEmail = async (req, res) => {
           middleName: user.middleName || "",
           lastName: user.lastName,
           email: user.email,
-          profilePhoto: student?.profilePhoto || user.profilePhoto || "",
-          studentId: student?.studentId || "Not Available",
-          gradeCourse: student?.grade || "Not Available",
-          contactNumber: student?.phone || "Not Available",
+
+          // ⭐ ADD THIS
+          role: user.role,
+
+          profilePhoto:
+            student?.profilePhoto ||
+            teacher?.profilePhoto ||
+            user.profilePhoto ||
+            "",
+
+          studentId: student?.studentId || null,
+          employeeId: teacher?.employeeId || null,
+
+          gradeCourse: student?.grade || null,
+          department: teacher?.department || null,
+
+          contactNumber: student?.phone || teacher?.phone || null,
         },
         token,
       });
@@ -232,8 +294,7 @@ export const verifyEmail = async (req, res) => {
   }
 };
 
-
-//  LOGIN 
+//  LOGIN
 export const login = async (req, res) => {
   try {
     const { email, password, accountType } = req.body;
@@ -273,7 +334,6 @@ export const login = async (req, res) => {
       requiresOTP: true,
       message: "OTP sent to your email",
     });
-
   } catch (err) {
     console.error("Login Error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -381,9 +441,9 @@ export const verifyMobileLoginOTP = async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user._id, role: user.role, name: user.name},
+      { id: user._id, role: user.role, name: user.name },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     return res.status(200).json({
@@ -415,7 +475,7 @@ export const verifyMobileLoginOTP = async (req, res) => {
   }
 };
 
-// VERIFY LOGIN OTP 
+// VERIFY LOGIN OTP
 export const verifyLoginOTP = async (req, res) => {
   const { email, code } = req.body;
 
@@ -436,7 +496,7 @@ export const verifyLoginOTP = async (req, res) => {
     const token = jwt.sign(
       { id: user._id, role: user.role, name: user.name },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "7d" },
     );
 
     await createHistoryLog({
@@ -453,7 +513,6 @@ export const verifyLoginOTP = async (req, res) => {
       user: { ...user._doc, password: undefined },
       token,
     });
-
   } catch (err) {
     console.error("Verify Login OTP Error:", err);
     return res.status(500).json({ message: "Server error" });
@@ -467,10 +526,13 @@ export const resendSignupOTP = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
-    if (user.isVerified) return res.status(400).json({ message: "Email already verified" });
+    if (user.isVerified)
+      return res.status(400).json({ message: "Email already verified" });
 
     // Generate new OTP
-    const verificationToken = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationToken = Math.floor(
+      100000 + Math.random() * 900000,
+    ).toString();
     user.verificationToken = verificationToken;
     user.verificationTokenExpiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24h
     await user.save();
@@ -484,7 +546,7 @@ export const resendSignupOTP = async (req, res) => {
   }
 };
 
-//resending login 
+//resending login
 export const resendLoginOTP = async (req, res) => {
   try {
     const { email } = req.body;
@@ -494,9 +556,10 @@ export const resendLoginOTP = async (req, res) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     if (!user.isVerified)
-      return res.status(400).json({ message: "Email not verified. Cannot resend login OTP." });
+      return res
+        .status(400)
+        .json({ message: "Email not verified. Cannot resend login OTP." });
 
-    
     const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
     user.loginOTP = loginOTP;
     user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
@@ -510,7 +573,7 @@ export const resendLoginOTP = async (req, res) => {
     res.status(500).json({ message: "Failed to resend login OTP" });
   }
 };
-// CHECK AUTH 
+// CHECK AUTH
 export const checkAuth = async (req, res) => {
   try {
     const user = await User.findById(req.userId).select("-password");
@@ -523,7 +586,7 @@ export const checkAuth = async (req, res) => {
   }
 };
 
-//  LOGOUT 
+//  LOGOUT
 export const logout = async (req, res) => {
   if (req.userId) {
     await createHistoryLog({
@@ -540,7 +603,7 @@ export const logout = async (req, res) => {
   res.status(200).json({ success: true, message: "Logged out successfully" });
 };
 
-//  FORGOT PASSWORD 
+//  FORGOT PASSWORD
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -550,24 +613,22 @@ export const forgotPassword = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     user.resetPasswordToken = otp;
-    user.resetPasswordExpiresAt = Date.now() + 10 * 60 * 1000; 
+    user.resetPasswordExpiresAt = Date.now() + 10 * 60 * 1000;
     await user.save();
 
     await createHistoryLog({
-        userId: user._id,
-        role: mapRoleForHistory(user.role),
-        action: "Forgot Password",
-        category: "Auth",
-        details: "Password reset OTP requested",
-        ipAddress: req.ip,
-      });
+      userId: user._id,
+      role: mapRoleForHistory(user.role),
+      action: "Forgot Password",
+      category: "Auth",
+      details: "Password reset OTP requested",
+      ipAddress: req.ip,
+    });
 
-    
-   await sendPasswordResetEmail(email, otp);
+    await sendPasswordResetEmail(email, otp);
 
     res.json({ message: "OTP sent to your email" });
   } catch (error) {
@@ -587,7 +648,7 @@ export const verifyForgotPasswordOTP = async (req, res) => {
     const user = await User.findOne({
       email,
       resetPasswordToken: code,
-      resetPasswordExpiresAt: { $gt: Date.now() }, 
+      resetPasswordExpiresAt: { $gt: Date.now() },
     });
 
     if (!user) {
@@ -605,15 +666,11 @@ export const resendForgotPasswordOTP = async (req, res) => {
   try {
     const { email } = req.body;
     const normalizedEmail = email.toLowerCase();
-    
 
-
-    if (!email)
-      return res.status(400).json({ message: "Email is required" });
+    if (!email) return res.status(400).json({ message: "Email is required" });
 
     const user = await User.findOne({ email: normalizedEmail });
-    if (!user)
-      return res.status(404).json({ message: "User not found" });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -630,8 +687,7 @@ export const resendForgotPasswordOTP = async (req, res) => {
   }
 };
 
-
-//RESET PASSWORD 
+//RESET PASSWORD
 export const resetPassword = async (req, res) => {
   try {
     const { email, newPassword, code } = req.body;
@@ -652,7 +708,9 @@ export const resetPassword = async (req, res) => {
     if (isSameAsOld)
       return res
         .status(400)
-        .json({ message: "New password cannot be the same as the old password" });
+        .json({
+          message: "New password cannot be the same as the old password",
+        });
 
     user.password = await bcrypt.hash(newPassword, 10);
 
@@ -751,8 +809,8 @@ export const searchUsers = async (req, res) => {
         { firstName: { $regex: query, $options: "i" } },
         { lastName: { $regex: query, $options: "i" } },
         { name: { $regex: query, $options: "i" } },
-        { email: { $regex: query, $options: "i" } }
-      ]
+        { email: { $regex: query, $options: "i" } },
+      ],
     })
       .select("firstName lastName name email profilePhoto role")
       .limit(10);
@@ -763,4 +821,3 @@ export const searchUsers = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-

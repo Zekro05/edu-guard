@@ -170,4 +170,4 @@ const incidentSchema = new mongoose.Schema(
 );
 
 /* ================= MODEL EXPORT ================= */
-export default mongoose.model("Incident", incidentSchema);
+export default mongoose.models.Incident || mongoose.model("Incident", incidentSchema);

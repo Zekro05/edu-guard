@@ -21,6 +21,8 @@ import teacherReportRoutes from "./routes/teacherRoutes.js";
 import interventionRoutes from "./routes/interventionRoutes.js";
 import caseRoutes from "./routes/caseRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
+import notificationSettingsRoutes from "./routes/notificationSettings.js";
+
 
 
 
@@ -89,6 +91,7 @@ app.use("/api/teacher-reports", teacherReportRoutes);
 app.use("/api/interventions", interventionRoutes);
 app.use("/api/cases", caseRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/notification-settings",notificationSettingsRoutes);
 
 
 

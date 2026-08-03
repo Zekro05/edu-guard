@@ -13,26 +13,45 @@ export const getIncidents = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    
+    let query = {};
 
-    const incidents = await Incident.find({})
-      .populate("studentId", "firstName middleName lastName studentId grade gender profilePhoto")
-      .populate({
-    path: "reportId",
-    populate: {
-      path: "reporterId",
-      model: "User",
-      select: "firstName lastName name email"
+    // Student should only see their own incidents
+    if (req.user.role === "student") {
+      const student = await Student.findOne({
+        createdBy: req.userId,
+      });
+
+      if (!student) {
+        return res.status(404).json({
+          message: "Student profile not found",
+        });
+      }
+
+      query.studentId = student._id;
     }
-  })
-      .sort({ createdAt: -1 });
 
-      console.log("FIRST INCIDENT:", incidents[0]);
+    // Admin sees everything
+    const incidents = await Incident.find(query)
+      .populate(
+        "studentId",
+        "firstName middleName lastName studentId grade gender profilePhoto"
+      )
+      .populate({
+        path: "reportId",
+        populate: {
+          path: "reporterId",
+          model: "User",
+          select: "firstName lastName name email",
+        },
+      })
+      .sort({ createdAt: -1 });
 
     return res.json(incidents);
   } catch (err) {
-    console.error("getIncidents error:", err);
-    return res.status(500).json({ message: err.message });
+    console.error(err);
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };
 

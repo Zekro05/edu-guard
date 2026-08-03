@@ -4,6 +4,9 @@ import Student from "../models/studentModel.js";
 import User from "../models/userModel.js";
 import Notification from "../models/Notification.js";
 import { io } from "../server.js";
+import { getDisciplineAction } from "../utils/disciplineEngine.js";
+import Incident from "../models/incidentModel.js";
+
 
 
 const BASE_URL = "https://edu-guard-backend.onrender.com";
@@ -116,6 +119,91 @@ io.emit("newNotification", {
   } catch (err) {
     console.error("CREATE REPORT ERROR:", err);
     return res.status(500).json({ message: err.message });
+  }
+};
+
+export const createDirectIncident = async (req, res) => {
+  try {
+    const {
+      studentId,
+      studentName,
+      offense,
+      location,
+      description,
+      date,
+      time,
+      reporter,
+    } = req.body;
+
+    const files = req.files || [];
+
+    const evidence = files.map((file) => ({
+      url: file.path,
+      type: file.mimetype.startsWith("image") ? "image" : "document",
+      uploadedAt: new Date(),
+    }));
+
+    // Create an already accepted report
+    const report = await Report.create({
+      studentId,
+      studentName,
+      offense,
+      location,
+      description,
+      date: new Date(date),
+      time,
+      reporter: reporter || "Teacher",
+      reporterId: req.userId,
+      reporterType: "teacher",
+      status: "accepted",
+      evidence,
+    });
+
+    // Determine discipline action
+    const totalOffenses = await Report.countDocuments({ studentId });
+
+    const highCount = await Report.countDocuments({
+      studentId,
+      offense: /fighting|assault|violence/i,
+    });
+
+    const mediumCount = await Report.countDocuments({
+      studentId,
+      offense: /bullying|cheating|disrespect/i,
+    });
+
+    const decision = getDisciplineAction({
+      offenseCount: totalOffenses,
+      hasHigh: highCount,
+      hasMedium: mediumCount,
+      offense,
+    });
+
+    // Create Incident immediately
+    await Incident.create({
+      studentId,
+      reportId: report._id,
+      title: offense,
+      category: offense,
+      action: decision.action,
+      level: decision.level,
+      status: "received",
+      evidence,
+    });
+
+    await Student.findByIdAndUpdate(studentId, {
+      totalIncidents: totalOffenses,
+      riskLevel: decision.level,
+    });
+
+    return res.status(201).json({
+      message: "Incident created successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
