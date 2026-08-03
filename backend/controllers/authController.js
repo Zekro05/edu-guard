@@ -195,64 +195,64 @@ export const verifyEmail = async (req, res) => {
       details: "Account email verified via OTP",
       ipAddress: req.ip,
     });
-a
+    a;
     if (client === "mobile") {
-  let student = null;
-  let teacher = null;
+      let student = null;
+      let teacher = null;
 
-  if (user.role === "student") {
-    student = await Student.findOne({
-      studentId: user.studentId,
-    });
-  }
+      if (user.role === "student") {
+        student = await Student.findOne({
+          studentId: user.studentId,
+        });
+      }
 
-  if (user.role === "teacher") {
-    teacher = await Teacher.findOne({
-      email: user.email,
-    });
-  }
+      if (user.role === "teacher") {
+        teacher = await Teacher.findOne({
+          email: user.email,
+        });
+      }
 
-  const token = jwt.sign(
-    {
-      id: user._id,
-      role: user.role,
-      name: user.name,
-    },
-    process.env.JWT_SECRET,
-    {
-      expiresIn: "7d",
-    }
-  );
+      const token = jwt.sign(
+        {
+          id: user._id,
+          role: user.role,
+          name: user.name,
+        },
+        process.env.JWT_SECRET,
+        {
+          expiresIn: "7d",
+        },
+      );
 
-  return res.status(200).json({
-    success: true,
-    message: "Signup verified! You are now logged in.",
-    token,
+      return res.status(200).json({
+        success: true,
+        message: "Signup verified! You are now logged in.",
+        token,
 
-    user: {
-      _id: user._id,
-      firstName: user.firstName,
-      middleName: user.middleName,
-      lastName: user.lastName,
-      name: user.name,
-      email: user.email,
-      role: user.role,
+        user: {
+          _id: user._id,
+          firstName: user.firstName,
+          middleName: user.middleName,
+          lastName: user.lastName,
+          name: user.name,
+          email: user.email,
+          role: user.role,
 
-      profilePhoto:
-        student?.profilePhoto ||
-        teacher?.profilePhoto ||
-        user.profilePhoto ||
-        "",
+          profilePhoto:
+            student?.profilePhoto ||
+            teacher?.profilePhoto ||
+            user.profilePhoto ||
+            "",
 
-      studentId: student?.studentId || null,
-      employeeId: teacher?.employeeId || null,
+          studentId: student?.studentId || null,
+          employeeId: teacher?.employeeId || null,
 
-      grade: student?.grade || null,
-      phone: student?.phone || null,
+          grade: student?.grade || null,
+          phone: student?.phone || null,
 
-      department: teacher?.department || null,
-    },
-  });
+          department: teacher?.department || null,
+        },
+      });
       return res.status(200).json({
         success: true,
         message: "Signup verified! You are now logged in.",
@@ -433,7 +433,9 @@ export const verifyMobileLoginOTP = async (req, res) => {
 
     // 🔥 FIXED: safe fetching
     if (user.role === "student") {
-      student = await Student.findOne({ email });
+      student = await Student.findOne({
+        studentId: user.studentId,
+      });
     }
 
     if (user.role === "teacher") {
@@ -464,7 +466,7 @@ export const verifyMobileLoginOTP = async (req, res) => {
 
         studentId: student?.studentId || null,
         employeeId: teacher?.employeeId || null,
-        gradeCourse: student?.grade || null,
+        grade: student?.grade || null,
         department: teacher?.department || null,
       },
       token,
@@ -706,11 +708,9 @@ export const resetPassword = async (req, res) => {
 
     const isSameAsOld = await bcrypt.compare(newPassword, user.password);
     if (isSameAsOld)
-      return res
-        .status(400)
-        .json({
-          message: "New password cannot be the same as the old password",
-        });
+      return res.status(400).json({
+        message: "New password cannot be the same as the old password",
+      });
 
     user.password = await bcrypt.hash(newPassword, 10);
 

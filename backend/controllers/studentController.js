@@ -15,6 +15,31 @@ export const getStudents = async (req, res) => {
   }
 };
 
+export const getStudentById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Search using the studentId string stored in both User and Student
+    const student = await Student.findOne({
+      studentId: id,
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        message: "Student not found",
+      });
+    }
+
+    return res.status(200).json(student);
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
 /*  CREATE STUDENT  */
 export const createStudent = async (req, res) => {
   try {

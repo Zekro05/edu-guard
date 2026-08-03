@@ -8,6 +8,7 @@ import {
   createStudentsBulk,
   previewBulkStudents,
   searchStudents,
+  getStudentById,
 } from "../controllers/studentController.js";
 import { upload } from "../middleware/upload.js";
 
@@ -17,6 +18,7 @@ const router = express.Router();
 router.get("/search", searchStudents);
 router.get("/", verifyToken, getStudents);
 router.post("/", verifyToken, upload.single("profilePhoto"), createStudent);
+router.get("/:id", verifyToken, getStudentById);
 router.post("/bulk", verifyToken, createStudentsBulk);
 router.post("/bulk/preview",verifyToken, previewBulkStudents);
 router.put("/:id", verifyToken, upload.single("profilePhoto"), updateStudent);
