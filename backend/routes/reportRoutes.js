@@ -16,9 +16,9 @@ import { upload } from "../middleware/upload.js";
 import Notification from "../models/Notification.js";
 import { createGuestReport } from "../controllers/reportController.js";
 import { createDirectIncident } from "../controllers/reportController.js";
+import { getOffenseSeverity } from "../utils/offenseSeverity.js";
 
 const router = express.Router();
-
 
 /* ================= CREATE REPORT ================= */
 router.get("/test-notif", (req, res) => {
@@ -43,7 +43,7 @@ router.post(
     console.log("FILES:", req.files);
     next();
   },
-  createGuestReport
+  createGuestReport,
 );
 
 router.post(
@@ -56,14 +56,14 @@ router.post(
     console.log("FILES:", req.files);
     next();
   },
-  createReport
+  createReport,
 );
 
 router.post(
   "/direct",
   verifyToken,
   upload.array("evidence", 10),
-  createDirectIncident
+  createDirectIncident,
 );
 
 /* ================= GET MY REPORTS ================= */
@@ -87,7 +87,7 @@ router.get("/", async (req, res) => {
 
     const reports = await Report.find(query)
       .populate("studentId", "name section age gender")
-       .populate("reporterId", "name email")
+      .populate("reporterId", "name email")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit));
@@ -115,7 +115,7 @@ router.get("/:id", verifyToken, async (req, res) => {
 
     const report = await Report.findById(id).populate(
       "studentId",
-      "name grade"
+      "name grade",
     );
 
     if (!report) {
@@ -145,22 +145,14 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
 
     const totalOffenses = await Report.countDocuments({ studentId });
 
-    const highCount = await Report.countDocuments({
-      studentId,
-      offense: /fighting|assault|violence/i,
-    });
-
-    const mediumCount = await Report.countDocuments({
-      studentId,
-      offense: /bullying|cheating|disrespect/i,
-    });
+    const severity = getOffenseSeverity(report.offense);
 
     const decision = getDisciplineAction({
       offenseCount: totalOffenses,
-      hasHigh: highCount,
-      hasMedium: mediumCount,
       offense: report.offense,
     });
+
+    decision.level = severity;
 
     await Incident.create({
       studentId,
@@ -207,27 +199,27 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
     }
 
     /* ================= NOTIFY REPORTER ================= */
-if (report.reporterId) {
-  await Notification.create({
-    userId: report.reporterId,
-    title: "Report Processed",
-    message: `Your report about "${report.offense}" has been accepted and is being acted upon.`,
-    type: "success",
-    priority: "low",
-  });
+    if (report.reporterId) {
+      await Notification.create({
+        userId: report.reporterId,
+        title: "Report Processed",
+        message: `Your report about "${report.offense}" has been accepted and is being acted upon.`,
+        type: "success",
+        priority: "low",
+      });
 
-  io.to(report.reporterId.toString()).emit("newNotification", {
-    id: report._id,
-    title: "Report Processed",
-    message: `Your report about "${report.offense}" has been accepted and is being acted upon.`,
-    type: "success",
-    priority: "low",
-    isRead: false,
-    timeAgo: "Just now",
-  });
+      io.to(report.reporterId.toString()).emit("newNotification", {
+        id: report._id,
+        title: "Report Processed",
+        message: `Your report about "${report.offense}" has been accepted and is being acted upon.`,
+        type: "success",
+        priority: "low",
+        isRead: false,
+        timeAgo: "Just now",
+      });
 
-  console.log("✅ Reporter notified:", report.reporterId.toString());
-}
+      console.log("✅ Reporter notified:", report.reporterId.toString());
+    }
 
     return res.json({
       message: "Report accepted & processed",
@@ -245,7 +237,7 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
     const report = await Report.findByIdAndUpdate(
       req.params.id,
       { status: "rejected" },
-      { returnDocument: "after" }
+      { returnDocument: "after" },
     );
 
     if (!report) {
@@ -312,7 +304,6 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 });
-
 
 /* ================= GET REPORTS ================= */
 router.get("/reports", getReports);
