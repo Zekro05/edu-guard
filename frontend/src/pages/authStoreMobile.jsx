@@ -141,6 +141,7 @@ export const useAuthStore = create((set, get) => ({
         role: data.user.role,
         token: parsedUser.token,
         studentId: data.user.studentId,
+        employeeId: data.user.employeeId,
       };
 
       let studentData = null;
@@ -172,7 +173,7 @@ export const useAuthStore = create((set, get) => ({
         };
       } else if (data.user.role === "teacher") {
         const { data: teacher } = await API.get(
-          `/api/teachers/${data.user.studentId}`,
+          `/api/teachers/${data.user.employeeId}`,
         );
 
         teacherData = teacher;
@@ -246,6 +247,9 @@ export const useAuthStore = create((set, get) => ({
         email: data.user.email,
         role: data.user.role,
         token: data.token,
+        studentId: data.user.studentId,
+        employeeId: data.user.employeeId,
+
       };
 
       let teacherData = null;
@@ -278,7 +282,7 @@ export const useAuthStore = create((set, get) => ({
       } else if (data.user.role === "teacher") {
         try {
           const teacherRes = await API.get(
-            `/api/teachers/${data.user.studentId}`,
+            `/api/teachers/${data.user.employeeId}`,
           );
 
           teacherData = teacherRes.data;
@@ -360,6 +364,8 @@ export const useAuthStore = create((set, get) => ({
         email: data.user.email,
         role: data.user.role,
         token: data.token,
+        studentId: data.user.studentId,
+        employeeId: data.user.employeeId,
       };
 
       let studentData = null;
@@ -526,35 +532,37 @@ export const useAuthStore = create((set, get) => ({
   },
 
   fetchTeacherData: async () => {
-    try {
-      const { user } = get();
+  try {
+    const { user } = get();
 
-      if (!user?.studentId) return;
+    if (!user?.employeeId) return;
 
-      const { data } = await API.get(`/api/teachers/${user.studentId}`);
+    const { data } = await API.get(
+      `/api/teachers/${user.employeeId}`
+    );
 
-      set({
-        teacherData: data,
+    set({
+      teacherData: data,
 
-        user: {
-          ...user,
+      user: {
+        ...user,
 
-          firstName: data.firstName,
-          middleName: data.middleName,
-          lastName: data.lastName,
+        firstName: data.firstName,
+        middleName: data.middleName,
+        lastName: data.lastName,
 
-          name: `${data.firstName} ${data.lastName}`,
+        name: `${data.firstName} ${data.lastName}`,
 
-          employeeId: data.employeeId,
-          department: data.department,
-          phone: data.phone,
-          profilePhoto: data.profilePhoto,
-        },
-      });
-    } catch (err) {
-      console.log(err.message);
-    }
-  },
+        employeeId: data.employeeId,
+        department: data.department,
+        phone: data.phone,
+        profilePhoto: data.profilePhoto,
+      },
+    });
+  } catch (err) {
+    console.log(err.message);
+  }
+},
 
   /* ================= SIGNUP ================= */
   signup: async (formData) => {

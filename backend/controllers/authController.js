@@ -28,6 +28,7 @@ export const signup = async (req, res) => {
       password,
       confirmPassword,
       studentId,
+      employeeId,
       grade,
       gender,
     } = req.body;
@@ -40,11 +41,11 @@ export const signup = async (req, res) => {
       !firstName ||
       !lastName ||
       !email ||
-      !studentId ||
       !password ||
       !confirmPassword ||
       !gender ||
-      (role === "student" && !grade)
+      (role === "student" && (!studentId || !grade)) ||
+      (role === "teacher" && !employeeId)
     ) {
       return res.status(400).json({
         message: "All required fields must be filled",
@@ -52,13 +53,20 @@ export const signup = async (req, res) => {
     }
 
     if (password !== confirmPassword) {
-      return res.status(400).json({ message: "Passwords do not match" });
+      return res.status(400).json({
+        message: "Passwords do not match",
+      });
     }
 
     // ================= CHECK EXISTING USER =================
-    const existingUser = await User.findOne({ email: normalizedEmail });
+    const existingUser = await User.findOne({
+      email: normalizedEmail,
+    });
+
     if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
+      return res.status(400).json({
+        message: "User already exists",
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -66,11 +74,11 @@ export const signup = async (req, res) => {
     let profilePhotoPath = "";
 
     if (req.file) {
-      profilePhotoPath = req.file.path; // Cloudinary URL
+      profilePhotoPath = req.file.path;
     }
 
     const verificationToken = Math.floor(
-      100000 + Math.random() * 900000,
+      100000 + Math.random() * 900000
     ).toString();
 
     const fullName = `${firstName} ${
@@ -85,11 +93,17 @@ export const signup = async (req, res) => {
       name: fullName,
       email: normalizedEmail,
       password: hashedPassword,
-      studentId,
+
       role,
+
+      // Save only the appropriate ID
+      studentId: role === "student" ? studentId : undefined,
+      employeeId: role === "teacher" ? employeeId : undefined,
+
       profilePhoto:
         profilePhotoPath ||
         "https://ui-avatars.com/api/?name=User&background=random",
+
       verificationToken,
       verificationTokenExpiresAt: Date.now() + 24 * 60 * 60 * 1000,
       isVerified: false,
@@ -109,7 +123,7 @@ export const signup = async (req, res) => {
         email: normalizedEmail,
         profilePhoto: profilePhotoPath,
         gender,
-        employeeId: studentId,
+        employeeId,
         createdBy: user._id,
       });
 
@@ -145,7 +159,7 @@ export const signup = async (req, res) => {
 
     // ================= SEND OTP =================
     try {
-      await sendVerificationEmail(email, verificationToken);
+      await sendVerificationEmail(normalizedEmail, verificationToken);
     } catch (err) {
       console.error("OTP Email failed:", err);
     }
@@ -156,6 +170,7 @@ export const signup = async (req, res) => {
     });
   } catch (err) {
     console.error("Signup Error:", err);
+
     return res.status(500).json({
       message: err.message || "Server error",
     });
@@ -208,7 +223,7 @@ export const verifyEmail = async (req, res) => {
 
       if (user.role === "teacher") {
         teacher = await Teacher.findOne({
-          email: user.email,
+          email: user.employeeId,
         });
       }
 
@@ -440,7 +455,7 @@ export const verifyMobileLoginOTP = async (req, res) => {
 
     if (user.role === "teacher") {
       teacher = await Teacher.findOne({ 
-        employeeId: user.studentId, 
+        employeeId: user.employeeId, 
       });
     }
 

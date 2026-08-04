@@ -37,6 +37,14 @@ const userSchema = new mongoose.Schema({
     },
   },
 
+  employeeId: {
+    type: String,
+    required: function () {
+      return this.role === "teacher"; 
+    },
+  },
+
+
 
   lastLogin: {
     type: Date,
