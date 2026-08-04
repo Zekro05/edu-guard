@@ -71,6 +71,7 @@ const SignupPage = () => {
 
   const [email, setEmail] = useState("");
   const [studentId, setStudentId] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");

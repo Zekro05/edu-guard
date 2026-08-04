@@ -30,6 +30,7 @@ export const signup = async (req, res) => {
       studentId,
       employeeId,
       grade,
+      department,
       gender,
     } = req.body;
 
@@ -45,7 +46,7 @@ export const signup = async (req, res) => {
       !confirmPassword ||
       !gender ||
       (role === "student" && (!studentId || !grade)) ||
-      (role === "teacher" && !employeeId)
+      (role === "teacher" && (!employeeId || !department))
     ) {
       return res.status(400).json({
         message: "All required fields must be filled",
@@ -124,6 +125,7 @@ export const signup = async (req, res) => {
         profilePhoto: profilePhotoPath,
         gender,
         employeeId,
+        department,
         createdBy: user._id,
       });
 
