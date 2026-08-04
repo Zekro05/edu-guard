@@ -9,9 +9,9 @@ export const getTeacherById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Search using the teacherId string stored in both User and Teacher
+    // Search using the employeeId string stored in both User and Teacher
     const teacher = await Teacher.findOne({
-      teacherId: id,
+      employeeId: id,
     });
 
     if (!teacher) {

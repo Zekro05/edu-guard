@@ -111,6 +111,7 @@ export const useAuthStore = create((set, get) => ({
         set({
           user: null,
           studentData: null,
+          teacherData: null,
           isAuthenticated: false,
         });
 
@@ -129,6 +130,7 @@ export const useAuthStore = create((set, get) => ({
         set({
           user: null,
           studentData: null,
+          teacherData: null,
           isAuthenticated: false,
         });
 
@@ -212,6 +214,7 @@ export const useAuthStore = create((set, get) => ({
       set({
         user: null,
         studentData: null,
+        teacherData: null,
         isAuthenticated: false,
       });
     } finally {
@@ -252,6 +255,7 @@ export const useAuthStore = create((set, get) => ({
 
       };
 
+      let studentData = null;
       let teacherData = null;
 
       if (data.user.role === "student") {
@@ -399,7 +403,7 @@ export const useAuthStore = create((set, get) => ({
       } else if (data.user.role === "teacher") {
         try {
           const teacherRes = await API.get(
-            `/api/teachers/${data.user.studentId}`,
+            `/api/teachers/${data.user.employeeId}`,
           );
 
           teacherData = teacherRes.data;
