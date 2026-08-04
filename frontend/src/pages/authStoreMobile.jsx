@@ -95,6 +95,7 @@ export const useAuthStore = create((set, get) => ({
   isAuthenticated: false,
   isCheckingAuth: true,
   studentData: null,
+  teacherData: null,
   otpCode: null,
 
   /* ================= CHECK AUTH ================= */
@@ -106,80 +107,116 @@ export const useAuthStore = create((set, get) => ({
 
       if (!storedUser) {
         cachedToken = null;
-        set({ user: null, isAuthenticated: false });
+
+        set({
+          user: null,
+          studentData: null,
+          isAuthenticated: false,
+        });
+
         return;
       }
 
       const parsedUser = JSON.parse(storedUser);
+
       cachedToken = parsedUser?.token || null;
 
       const { data } = await API.get("/api/auth/check-auth");
 
-      if (data.authenticated) {
-        let userData = {
-          _id: data.user._id,
-          email: data.user.email,
-          role: data.user.role,
-          token: data.token,
-        };
-
-        // Only students have a Student document
-        if (data.user.role === "student") {
-          try {
-            const { data: student } = await API.get(
-              `/api/students/${data.user.studentId}`,
-            );
-
-            userData = {
-              ...userData,
-
-              firstName: student.firstName,
-              middleName: student.middleName,
-              lastName: student.lastName,
-              name: `${student.firstName} ${student.lastName}`,
-
-              studentId: student.studentId,
-              grade: student.grade,
-              phone: student.phone,
-              profilePhoto: student.profilePhoto || "",
-            };
-          } catch (err) {
-            console.log("Student fetch failed:", err.message);
-          }
-        } else {
-          // Admin / Teacher
-          userData = {
-            ...userData,
-
-            firstName: data.user.firstName,
-            middleName: data.user.middleName,
-            lastName: data.user.lastName,
-            name: data.user.name,
-
-            profilePhoto: data.user.profilePhoto || "",
-            employeeId: data.user.employeeId || null,
-            department: data.user.department || null,
-          };
-        }
+      if (!data.authenticated) {
+        await AsyncStorage.removeItem("user");
 
         set({
-          user: userData,
-          isAuthenticated: true,
+          user: null,
+          studentData: null,
+          isAuthenticated: false,
         });
 
-        await AsyncStorage.setItem("user", JSON.stringify(userData));
-        connectSocketSafely(userData._id);
-      } else {
-        cachedToken = null;
-        await AsyncStorage.removeItem("user");
-        set({ user: null, isAuthenticated: false });
+        return;
       }
+
+      let userData = {
+        _id: data.user._id,
+        email: data.user.email,
+        role: data.user.role,
+        token: parsedUser.token,
+        studentId: data.user.studentId,
+      };
+
+      let studentData = null;
+      let teacherData = null;
+
+      if (data.user.role === "student") {
+        const { data: student } = await API.get(
+          `/api/students/${data.user.studentId}`,
+        );
+
+        studentData = student;
+
+        userData = {
+          ...userData,
+
+          firstName: student.firstName,
+          middleName: student.middleName,
+          lastName: student.lastName,
+
+          name: `${student.firstName} ${student.lastName}`,
+
+          studentId: student.studentId,
+
+          grade: student.grade,
+
+          phone: student.phone,
+
+          profilePhoto: student.profilePhoto || "",
+        };
+      } else if (data.user.role === "teacher") {
+        const { data: teacher } = await API.get(
+          `/api/teachers/${data.user.studentId}`,
+        );
+
+        teacherData = teacher;
+
+        userData = {
+          ...userData,
+
+          firstName: teacher.firstName,
+          middleName: teacher.middleName,
+          lastName: teacher.lastName,
+
+          name: `${teacher.firstName} ${teacher.lastName}`,
+
+          employeeId: teacher.employeeId,
+          department: teacher.department,
+          phone: teacher.phone,
+          profilePhoto: teacher.profilePhoto || "",
+        };
+      }
+
+      set({
+        user: userData,
+        studentData,
+        teacherData,
+        isAuthenticated: true,
+      });
+
+      await AsyncStorage.setItem("user", JSON.stringify(userData));
+
+      connectSocketSafely(userData._id);
     } catch (err) {
-      cachedToken = null;
+      console.log("CHECK AUTH ERROR:", err.message);
+
       await AsyncStorage.removeItem("user");
-      set({ user: null, isAuthenticated: false });
+
+      set({
+        user: null,
+        studentData: null,
+        isAuthenticated: false,
+      });
     } finally {
-      set({ isCheckingAuth: false });
+      set({
+        isCheckingAuth: false,
+      });
     }
   },
 
@@ -211,6 +248,8 @@ export const useAuthStore = create((set, get) => ({
         token: data.token,
       };
 
+      let teacherData = null;
+
       if (data.user.role === "student") {
         try {
           const studentRes = await API.get(
@@ -236,6 +275,31 @@ export const useAuthStore = create((set, get) => ({
         } catch (err) {
           console.log(err.message);
         }
+      } else if (data.user.role === "teacher") {
+        try {
+          const teacherRes = await API.get(
+            `/api/teachers/${data.user.studentId}`,
+          );
+
+          teacherData = teacherRes.data;
+
+          userData = {
+            ...userData,
+
+            firstName: teacherData.firstName,
+            middleName: teacherData.middleName,
+            lastName: teacherData.lastName,
+
+            name: `${teacherData.firstName} ${teacherData.lastName}`,
+
+            employeeId: teacherData.employeeId,
+            department: teacherData.department,
+            phone: teacherData.phone,
+            profilePhoto: teacherData.profilePhoto || "",
+          };
+        } catch (err) {
+          console.log(err.message);
+        }
       }
 
       cachedToken = data.token;
@@ -244,6 +308,7 @@ export const useAuthStore = create((set, get) => ({
 
       set({
         user: userData,
+        teacherData,
         isAuthenticated: true,
         otpRequired: false,
         tempEmail: null,
@@ -285,6 +350,11 @@ export const useAuthStore = create((set, get) => ({
 
       const { data } = await API.post(url, payload);
 
+      // Save the token FIRST
+      cachedToken = data.token;
+      await setToken(data.token);
+      API.defaults.headers.common.Authorization = `Bearer ${data.token}`;
+
       let userData = {
         _id: data.user._id,
         email: data.user.email,
@@ -292,37 +362,65 @@ export const useAuthStore = create((set, get) => ({
         token: data.token,
       };
 
+      let studentData = null;
+      let teacherData = null;
+
       if (data.user.role === "student") {
         try {
           const studentRes = await API.get(
             `/api/students/${data.user.studentId}`,
           );
 
-          const student = studentRes.data;
+          studentData = studentRes.data;
 
           userData = {
             ...userData,
 
-            firstName: student.firstName,
-            middleName: student.middleName,
-            lastName: student.lastName,
+            firstName: studentData.firstName,
+            middleName: studentData.middleName,
+            lastName: studentData.lastName,
 
-            name: `${student.firstName} ${student.lastName}`,
+            name: `${studentData.firstName} ${studentData.lastName}`,
 
-            studentId: student.studentId,
-            grade: student.grade,
-            phone: student.phone,
-            profilePhoto: student.profilePhoto || "",
+            studentId: studentData.studentId,
+            grade: studentData.grade,
+            phone: studentData.phone,
+            profilePhoto: studentData.profilePhoto || "",
+          };
+        } catch (err) {
+          console.log(err.message);
+        }
+      } else if (data.user.role === "teacher") {
+        try {
+          const teacherRes = await API.get(
+            `/api/teachers/${data.user.studentId}`,
+          );
+
+          teacherData = teacherRes.data;
+
+          userData = {
+            ...userData,
+
+            firstName: teacherData.firstName,
+            middleName: teacherData.middleName,
+            lastName: teacherData.lastName,
+
+            name: `${teacherData.firstName} ${teacherData.lastName}`,
+
+            employeeId: teacherData.employeeId,
+            department: teacherData.department,
+            phone: teacherData.phone,
+            profilePhoto: teacherData.profilePhoto || "",
           };
         } catch (err) {
           console.log(err.message);
         }
       }
 
-      cachedToken = data.token;
-
       set({
         user: userData,
+        studentData,
+        teacherData,
         isAuthenticated: true,
         otpRequired: false,
         tempEmail: null,
@@ -397,35 +495,66 @@ export const useAuthStore = create((set, get) => ({
 
   /* ================= STUDENT DATA ================= */
   fetchStudentData: async () => {
-  try {
-    const { user } = get();
+    try {
+      const { user } = get();
 
-    if (!user?.studentId) return;
+      if (!user?.studentId) return;
 
-    const { data } = await API.get(`/api/students/${user.studentId}`);
+      const { data } = await API.get(`/api/students/${user.studentId}`);
 
-    set({
-      studentData: data,
+      set({
+        studentData: data,
 
-      user: {
-        ...user,
+        user: {
+          ...user,
 
-        firstName: data.firstName,
-        middleName: data.middleName,
-        lastName: data.lastName,
+          firstName: data.firstName,
+          middleName: data.middleName,
+          lastName: data.lastName,
 
-        name: `${data.firstName} ${data.lastName}`,
+          name: `${data.firstName} ${data.lastName}`,
 
-        studentId: data.studentId,
-        grade: data.grade,
-        phone: data.phone,
-        profilePhoto: data.profilePhoto,
-      },
-    });
-  } catch (err) {
-    console.log(err.message);
-  }
-},
+          studentId: data.studentId,
+          grade: data.grade,
+          phone: data.phone,
+          profilePhoto: data.profilePhoto,
+        },
+      });
+    } catch (err) {
+      console.log(err.message);
+    }
+  },
+
+  fetchTeacherData: async () => {
+    try {
+      const { user } = get();
+
+      if (!user?.studentId) return;
+
+      const { data } = await API.get(`/api/teachers/${user.studentId}`);
+
+      set({
+        teacherData: data,
+
+        user: {
+          ...user,
+
+          firstName: data.firstName,
+          middleName: data.middleName,
+          lastName: data.lastName,
+
+          name: `${data.firstName} ${data.lastName}`,
+
+          employeeId: data.employeeId,
+          department: data.department,
+          phone: data.phone,
+          profilePhoto: data.profilePhoto,
+        },
+      });
+    } catch (err) {
+      console.log(err.message);
+    }
+  },
 
   /* ================= SIGNUP ================= */
   signup: async (formData) => {

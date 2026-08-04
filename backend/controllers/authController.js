@@ -195,7 +195,7 @@ export const verifyEmail = async (req, res) => {
       details: "Account email verified via OTP",
       ipAddress: req.ip,
     });
-    
+
     if (client === "mobile") {
       let student = null;
       let teacher = null;
@@ -439,7 +439,9 @@ export const verifyMobileLoginOTP = async (req, res) => {
     }
 
     if (user.role === "teacher") {
-      teacher = await Teacher.findOne({ email });
+      teacher = await Teacher.findOne({ 
+        employeeId: user.studentId, 
+      });
     }
 
     const token = jwt.sign(

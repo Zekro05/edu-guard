@@ -3,6 +3,29 @@ import Teacher from "../models/teacherModel.js";
 import { createHistoryLog } from "../utils/createHistoryLog.js";
 import { mapRoleForHistory } from "../utils/roleMapper.js";
 
+
+/* ================= GET TEACHER PROFILE ================= */
+export const getTeacherById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find using employeeId (e.g. 213456)
+    const teacher = await Teacher.findOne({ employeeId: id }).select("-password");
+
+    if (!teacher) {
+      return res.status(404).json({
+        message: "Teacher not found",
+      });
+    }
+
+    res.status(200).json(teacher);
+  } catch (err) {
+    console.error("Get Teacher Error:", err);
+    res.status(500).json({
+      message: err.message,
+    });
+  }
+};
 /* ================= CREATE REPORT (TEACHER) ================= */
 export const createTeacherReport = async (req, res) => {
   try {
