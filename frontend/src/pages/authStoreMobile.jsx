@@ -532,37 +532,35 @@ export const useAuthStore = create((set, get) => ({
   },
 
   fetchTeacherData: async () => {
-  try {
-    const { user } = get();
+    try {
+      const { user } = get();
 
-    if (!user?.employeeId) return;
+      if (!user?.employeeId) return;
 
-    const { data } = await API.get(
-      `/api/teachers/${user.employeeId}`
-    );
+      const { data } = await API.get(`/api/teachers/${user.employeeId}`);
 
-    set({
-      teacherData: data,
+      set({
+        teacherData: data,
 
-      user: {
-        ...user,
+        user: {
+          ...user,
 
-        firstName: data.firstName,
-        middleName: data.middleName,
-        lastName: data.lastName,
+          firstName: data.firstName,
+          middleName: data.middleName,
+          lastName: data.lastName,
 
-        name: `${data.firstName} ${data.lastName}`,
+          name: `${data.firstName} ${data.lastName}`,
 
-        employeeId: data.employeeId,
-        department: data.department,
-        phone: data.phone,
-        profilePhoto: data.profilePhoto,
-      },
-    });
-  } catch (err) {
-    console.log(err.message);
-  }
-},
+          employeeId: data.employeeId,
+          department: data.department,
+          phone: data.phone,
+          profilePhoto: data.profilePhoto,
+        },
+      });
+    } catch (err) {
+      console.log(err.message);
+    }
+  },
 
   /* ================= SIGNUP ================= */
   signup: async (formData) => {

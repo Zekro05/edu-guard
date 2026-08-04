@@ -80,6 +80,7 @@ const SignupPage = () => {
   const [photoPreview, setPhotoPreview] = useState(null);
 
   const [grade, setGrade] = useState("");
+  const [department, setDepartment] = useState("");
   const [gender, setGender] = useState("");
 
   const [accountType, setAccountType] = useState("");
@@ -92,14 +93,8 @@ const SignupPage = () => {
      STORE
   ========================================================= */
 
-  const {
-    signup,
-    verifyOTP,
-    otpRequired,
-    setOtpRequired,
-    error,
-    isLoading,
-  } = useAuthStore();
+  const { signup, verifyOTP, otpRequired, setOtpRequired, error, isLoading } =
+    useAuthStore();
 
   /* =========================================================
      PHOTO
@@ -128,12 +123,12 @@ const SignupPage = () => {
       !firstName ||
       !lastName ||
       !email ||
-      !studentId ||
       !password ||
       !confirmPassword ||
-      !grade ||
       !gender ||
-      !accountType
+      !accountType ||
+      (accountType === "Student" && (!studentId || !grade)) ||
+      (accountType === "Teacher" && (!employeeId || !department))
     ) {
       setLocalError("Please fill in all required fields.");
       return;
@@ -158,14 +153,16 @@ const SignupPage = () => {
       formData.append("password", password);
       formData.append("confirmPassword", confirmPassword);
 
-      formData.append("studentId", studentId);
-      formData.append("grade", grade);
+      if (accountType === "Student") {
+        formData.append("studentId", studentId);
+        formData.append("grade", grade);
+      } else {
+        formData.append("employeeId", employeeId);
+        formData.append("department", department);
+      }
       formData.append("gender", gender);
 
-      const role =
-        accountType === "Teacher"
-          ? "teacher"
-          : "student";
+      const role = accountType === "Teacher" ? "teacher" : "student";
 
       formData.append("role", role);
 
@@ -177,9 +174,7 @@ const SignupPage = () => {
 
       toast.success("OTP sent to your email!");
     } catch (err) {
-      setLocalError(
-        err.response?.data?.message || err.message
-      );
+      setLocalError(err.response?.data?.message || err.message);
     }
   };
 
@@ -197,10 +192,7 @@ const SignupPage = () => {
         replace: true,
       });
     } catch (err) {
-      toast.error(
-        err.response?.data?.message ||
-          "OTP verification failed"
-      );
+      toast.error(err.response?.data?.message || "OTP verification failed");
     }
   };
 
@@ -395,7 +387,6 @@ const SignupPage = () => {
               >
                 Join The
                 <br />
-
                 <span
                   style={{
                     color: LightColors.primary,
@@ -403,7 +394,6 @@ const SignupPage = () => {
                 >
                   Future
                 </span>
-
                 <br />
                 Of Campus Safety.
               </h1>
@@ -414,9 +404,9 @@ const SignupPage = () => {
                   color: LightColors.textSecondary,
                 }}
               >
-                Create your GuidEd account and gain access to
-                a secure, modern campus safety ecosystem built
-                for students, teachers, and administrators.
+                Create your GuidEd account and gain access to a secure, modern
+                campus safety ecosystem built for students, teachers, and
+                administrators.
               </p>
             </div>
 
@@ -595,8 +585,8 @@ const SignupPage = () => {
                       color: LightColors.textSecondary,
                     }}
                   >
-                    Register your account to access GuidEd’s
-                    secure campus safety management platform.
+                    Register your account to access GuidEd’s secure campus
+                    safety management platform.
                   </p>
                 </div>
 
@@ -619,9 +609,7 @@ const SignupPage = () => {
 
                     <select
                       value={accountType}
-                      onChange={(e) =>
-                        setAccountType(e.target.value)
-                      }
+                      onChange={(e) => setAccountType(e.target.value)}
                       required
                       className="w-full h-14 px-5 rounded-2xl border bg-white outline-none transition-all"
                       style={{
@@ -629,17 +617,11 @@ const SignupPage = () => {
                         color: LightColors.textPrimary,
                       }}
                     >
-                      <option value="">
-                        Select Account Type
-                      </option>
+                      <option value="">Select Account Type</option>
 
-                      <option value="Student">
-                        Student
-                      </option>
+                      <option value="Student">Student</option>
 
-                      <option value="Teacher">
-                        Teacher
-                      </option>
+                      <option value="Teacher">Teacher</option>
                     </select>
                   </div>
 
@@ -650,9 +632,7 @@ const SignupPage = () => {
                       type="text"
                       placeholder="First Name"
                       value={firstName}
-                      onChange={(e) =>
-                        setFirstName(e.target.value)
-                      }
+                      onChange={(e) => setFirstName(e.target.value)}
                     />
 
                     <Input
@@ -660,9 +640,7 @@ const SignupPage = () => {
                       type="text"
                       placeholder="Last Name"
                       value={lastName}
-                      onChange={(e) =>
-                        setLastName(e.target.value)
-                      }
+                      onChange={(e) => setLastName(e.target.value)}
                     />
                   </div>
 
@@ -672,9 +650,7 @@ const SignupPage = () => {
                     type="text"
                     placeholder="Middle Name (Optional)"
                     value={middleName}
-                    onChange={(e) =>
-                      setMiddleName(e.target.value)
-                    }
+                    onChange={(e) => setMiddleName(e.target.value)}
                   />
 
                   {/* Email */}
@@ -683,33 +659,47 @@ const SignupPage = () => {
                     type="email"
                     placeholder="Institutional Email"
                     value={email}
-                    onChange={(e) =>
-                      setEmail(e.target.value)
-                    }
+                    onChange={(e) => setEmail(e.target.value)}
                   />
 
                   {/* Student */}
-                  <div className="grid md:grid-cols-2 gap-5">
-                    <Input
-                      icon={User}
-                      type="text"
-                      placeholder="Student ID"
-                      value={studentId}
-                      onChange={(e) =>
-                        setStudentId(e.target.value)
-                      }
-                    />
+                  {accountType === "Student" ? (
+                    <div className="grid md:grid-cols-2 gap-5">
+                      <Input
+                        icon={User}
+                        type="text"
+                        placeholder="Student ID"
+                        value={studentId}
+                        onChange={(e) => setStudentId(e.target.value)}
+                      />
 
-                    <Input
-                      icon={User}
-                      type="text"
-                      placeholder="Grade / Year"
-                      value={grade}
-                      onChange={(e) =>
-                        setGrade(e.target.value)
-                      }
-                    />
-                  </div>
+                      <Input
+                        icon={User}
+                        type="text"
+                        placeholder="Grade / Year"
+                        value={grade}
+                        onChange={(e) => setGrade(e.target.value)}
+                      />
+                    </div>
+                  ) : accountType === "Teacher" ? (
+                    <div className="grid md:grid-cols-2 gap-5">
+                      <Input
+                        icon={User}
+                        type="text"
+                        placeholder="Employee ID"
+                        value={employeeId}
+                        onChange={(e) => setEmployeeId(e.target.value)}
+                      />
+
+                      <Input
+                        icon={GraduationCap}
+                        type="text"
+                        placeholder="Department"
+                        value={department}
+                        onChange={(e) => setDepartment(e.target.value)}
+                      />
+                    </div>
+                  ) : null}
 
                   {/* Gender */}
                   <div>
@@ -724,9 +714,7 @@ const SignupPage = () => {
 
                     <select
                       value={gender}
-                      onChange={(e) =>
-                        setGender(e.target.value)
-                      }
+                      onChange={(e) => setGender(e.target.value)}
                       required
                       className="w-full h-14 px-5 rounded-2xl border bg-white outline-none transition-all"
                       style={{
@@ -734,21 +722,13 @@ const SignupPage = () => {
                         color: LightColors.textPrimary,
                       }}
                     >
-                      <option value="">
-                        Select Gender
-                      </option>
+                      <option value="">Select Gender</option>
 
-                      <option value="Male">
-                        Male
-                      </option>
+                      <option value="Male">Male</option>
 
-                      <option value="Female">
-                        Female
-                      </option>
+                      <option value="Female">Female</option>
 
-                      <option value="Other">
-                        Other
-                      </option>
+                      <option value="Other">Other</option>
                     </select>
                   </div>
 
@@ -759,9 +739,7 @@ const SignupPage = () => {
                       type="password"
                       placeholder="Password"
                       value={password}
-                      onChange={(e) =>
-                        setPassword(e.target.value)
-                      }
+                      onChange={(e) => setPassword(e.target.value)}
                     />
 
                     <Input
@@ -769,18 +747,12 @@ const SignupPage = () => {
                       type="password"
                       placeholder="Confirm Password"
                       value={confirmPassword}
-                      onChange={(e) =>
-                        setConfirmPassword(
-                          e.target.value
-                        )
-                      }
+                      onChange={(e) => setConfirmPassword(e.target.value)}
                     />
                   </div>
 
                   {/* Strength */}
-                  <PasswordStrengthMeter
-                    password={password}
-                  />
+                  <PasswordStrengthMeter password={password} />
 
                   {/* Photo */}
                   <div>
@@ -805,8 +777,7 @@ const SignupPage = () => {
                           alt="Preview"
                           className="w-28 h-28 object-cover rounded-full border"
                           style={{
-                            borderColor:
-                              LightColors.primary,
+                            borderColor: LightColors.primary,
                           }}
                         />
                       ) : (
@@ -814,16 +785,14 @@ const SignupPage = () => {
                           <Camera
                             className="w-10 h-10 mb-3"
                             style={{
-                              color:
-                                LightColors.primary,
+                              color: LightColors.primary,
                             }}
                           />
 
                           <p
                             className="font-semibold"
                             style={{
-                              color:
-                                LightColors.textPrimary,
+                              color: LightColors.textPrimary,
                             }}
                           >
                             Upload Profile Photo
@@ -832,8 +801,7 @@ const SignupPage = () => {
                           <p
                             className="text-sm mt-1"
                             style={{
-                              color:
-                                LightColors.textSecondary,
+                              color: LightColors.textSecondary,
                             }}
                           >
                             PNG, JPG or JPEG
@@ -872,34 +840,34 @@ const SignupPage = () => {
                     </motion.div>
                   )}
 
-
                   <button
-  type="button"
-  onClick={() => setShowPolicy(true)}
-  className="text-sm font-semibold underline"
-  style={{ color: LightColors.primary }}
->
-  View GuidEd User Policy
-</button>
+                    type="button"
+                    onClick={() => setShowPolicy(true)}
+                    className="text-sm font-semibold underline"
+                    style={{ color: LightColors.primary }}
+                  >
+                    View GuidEd User Policy
+                  </button>
 
                   {/* POLICY AGREEMENT */}
-<div className="flex items-start gap-3 p-4 rounded-2xl border bg-white"
-     style={{ borderColor: LightColors.border }}>
+                  <div
+                    className="flex items-start gap-3 p-4 rounded-2xl border bg-white"
+                    style={{ borderColor: LightColors.border }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={acceptedPolicy}
+                      onChange={(e) => setAcceptedPolicy(e.target.checked)}
+                      className="mt-1 w-5 h-5"
+                    />
 
-  <input
-    type="checkbox"
-    checked={acceptedPolicy}
-    onChange={(e) => setAcceptedPolicy(e.target.checked)}
-    className="mt-1 w-5 h-5"
-  />
-
-  <div className="text-sm">
-    <p className="font-semibold">I agree to the Policy</p>
-    <p className="text-gray-500 text-xs">
-      You must read the full policy before continuing
-    </p>
-  </div>
-</div>
+                    <div className="text-sm">
+                      <p className="font-semibold">I agree to the Policy</p>
+                      <p className="text-gray-500 text-xs">
+                        You must read the full policy before continuing
+                      </p>
+                    </div>
+                  </div>
 
                   {/* Submit */}
                   <motion.button
@@ -920,8 +888,7 @@ const SignupPage = () => {
                           #256d2a 100%
                         )
                       `,
-                      boxShadow:
-                        "0 20px 40px rgba(27,94,32,0.25)",
+                      boxShadow: "0 20px 40px rgba(27,94,32,0.25)",
                     }}
                   >
                     {isLoading ? (
@@ -977,15 +944,12 @@ const SignupPage = () => {
           </motion.div>
         </div>
       </main>
-      
-     {/* ================= POLICY MODAL ================= */}
+
+      {/* ================= POLICY MODAL ================= */}
       {showPolicy && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6">
           <div className="bg-white max-w-3xl w-full max-h-[80vh] overflow-y-auto rounded-3xl p-8 shadow-2xl">
-
-            <h2 className="text-2xl font-black mb-4">
-              GuidEd User Policy
-            </h2>
+            <h2 className="text-2xl font-black mb-4">GuidEd User Policy</h2>
 
             <div className="text-sm leading-relaxed whitespace-pre-wrap text-gray-700">
               {`GuidED User Policy and Agreement
@@ -1190,17 +1154,11 @@ The Student Discipline Management System aims to modernize school discipline pro
                 I Understand & Accept
               </button>
             </div>
-
           </div>
         </div>
       )}
-
     </div>
-    
   );
-  
 };
-
-
 
 export default SignupPage;

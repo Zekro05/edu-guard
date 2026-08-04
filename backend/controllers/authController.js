@@ -37,6 +37,13 @@ export const signup = async (req, res) => {
     const role = (req.body.role || "student").toLowerCase();
     const normalizedEmail = email.toLowerCase();
 
+    console.log("BODY:", req.body);
+    console.log("ROLE:", role);
+    console.log("studentId:", studentId);
+    console.log("employeeId:", employeeId);
+    console.log("grade:", grade);
+    console.log("department:", department);
+
     // ================= VALIDATION =================
     if (
       !firstName ||
@@ -79,7 +86,7 @@ export const signup = async (req, res) => {
     }
 
     const verificationToken = Math.floor(
-      100000 + Math.random() * 900000
+      100000 + Math.random() * 900000,
     ).toString();
 
     const fullName = `${firstName} ${
@@ -456,8 +463,8 @@ export const verifyMobileLoginOTP = async (req, res) => {
     }
 
     if (user.role === "teacher") {
-      teacher = await Teacher.findOne({ 
-        employeeId: user.employeeId, 
+      teacher = await Teacher.findOne({
+        employeeId: user.employeeId,
       });
     }
 
