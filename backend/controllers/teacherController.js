@@ -5,22 +5,24 @@ import { mapRoleForHistory } from "../utils/roleMapper.js";
 
 
 /* ================= GET TEACHER PROFILE ================= */
-export const getTeacherByEmployeeId = async (req, res) => {
+export const getTeacherProfile = async (req, res) => {
   try {
-    const { employeeId } = req.params;
-
-    const teacher = await Teacher.findOne({ employeeId });
+    const teacher = await Teacher.findOne({
+      createdBy: req.userId,
+    }).select("-__v");
 
     if (!teacher) {
       return res.status(404).json({
-        message: "Teacher not found",
+        success: false,
+        message: "Teacher profile not found",
       });
     }
 
     res.status(200).json(teacher);
   } catch (err) {
-    console.error("Get Teacher Error:", err);
+    console.error("Get Teacher Profile Error:", err);
     res.status(500).json({
+      success: false,
       message: "Server error",
     });
   }

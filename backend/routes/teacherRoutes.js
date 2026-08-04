@@ -2,13 +2,13 @@ import express from "express";
 import {
   createTeacherReport,
   getTeacherReports,
-  getTeacherByEmployeeId,
+  getTeacherProfile,
 } from "../controllers/teacherController.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 
 const router = express.Router();
 
-router.get("/:employeeId", verifyToken, getTeacherByEmployeeId);
+router.get("/profile", verifyToken, getTeacherProfile);
 
 /* ================= CREATE REPORT ================= */
 router.post("/", verifyToken, createTeacherReport);
