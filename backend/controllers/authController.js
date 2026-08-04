@@ -195,7 +195,7 @@ export const verifyEmail = async (req, res) => {
       details: "Account email verified via OTP",
       ipAddress: req.ip,
     });
-    a;
+    
     if (client === "mobile") {
       let student = null;
       let teacher = null;
