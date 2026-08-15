@@ -335,6 +335,15 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
+        // 🚫 STUDENTS ARE NOT ALLOWED TO USE THIS LOGIN
+    if (user.role === "student") {
+      return res.status(403).json({
+        success: false,
+        message: "Student accounts cannot login here.",
+      });
+    }
+
+
     // role check optional
     if (accountType && user.role !== accountType.toLowerCase()) {
       return res.status(403).json({

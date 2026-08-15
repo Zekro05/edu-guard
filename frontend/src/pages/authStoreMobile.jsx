@@ -104,7 +104,6 @@ export const useAuthStore = create((set, get) => ({
       set({ isCheckingAuth: true });
 
       const storedUser = await AsyncStorage.getItem("user");
-
       if (!storedUser) {
         cachedToken = null;
 
@@ -174,7 +173,7 @@ export const useAuthStore = create((set, get) => ({
           profilePhoto: student.profilePhoto || "",
         };
       } else if (data.user.role === "teacher") {
-        const { data: teacher } = await API.get(
+        const { data: teacher  } = await API.get(
           `/api/teachers/${data.user.employeeId}`,
         );
 
@@ -214,7 +213,6 @@ export const useAuthStore = create((set, get) => ({
       set({
         user: null,
         studentData: null,
-        teacherData: null,
         isAuthenticated: false,
       });
     } finally {
@@ -250,13 +248,7 @@ export const useAuthStore = create((set, get) => ({
         email: data.user.email,
         role: data.user.role,
         token: data.token,
-        studentId: data.user.studentId,
-        employeeId: data.user.employeeId,
-
       };
-
-      let studentData = null;
-      let teacherData = null;
 
       if (data.user.role === "student") {
         try {
@@ -289,7 +281,7 @@ export const useAuthStore = create((set, get) => ({
             `/api/teachers/${data.user.employeeId}`,
           );
 
-          teacherData = teacherRes.data;
+          const teacherData = teacherRes.data;
 
           userData = {
             ...userData,
@@ -316,7 +308,6 @@ export const useAuthStore = create((set, get) => ({
 
       set({
         user: userData,
-        teacherData,
         isAuthenticated: true,
         otpRequired: false,
         tempEmail: null,
@@ -368,8 +359,6 @@ export const useAuthStore = create((set, get) => ({
         email: data.user.email,
         role: data.user.role,
         token: data.token,
-        studentId: data.user.studentId,
-        employeeId: data.user.employeeId,
       };
 
       let studentData = null;

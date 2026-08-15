@@ -8,12 +8,10 @@ import { verifyToken } from "../middleware/verifyToken.js";
 
 const router = express.Router();
 
-router.get("/:id", verifyToken, getTeacherById);
-
-/* ================= CREATE REPORT ================= */
 router.post("/", verifyToken, createTeacherReport);
 
-/* ================= GET MY REPORT HISTORY ================= */
 router.get("/my", verifyToken, getTeacherReports);
+
+router.get("/:id", verifyToken, getTeacherById);
 
 export default router;

@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -117,7 +118,7 @@ const LoginPage = () => {
 
   return (
     <div
-      className="min-h-screen w-full relative overflow-hidden"
+      className="min-h-screen w-full relative overflow-x-hidden"
       style={{
         background: LightColors.background,
       }}
@@ -126,14 +127,22 @@ const LoginPage = () => {
           BACKGROUND
       ========================================================= */}
 
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Main Gradient */}
         <div
           className="absolute inset-0"
           style={{
             background: `
-              radial-gradient(circle at top left, rgba(27,94,32,0.10), transparent 25%),
-              radial-gradient(circle at bottom right, rgba(34,197,94,0.10), transparent 25%)
+              radial-gradient(
+                circle at top left,
+                rgba(27,94,32,0.10),
+                transparent 25%
+              ),
+              radial-gradient(
+                circle at bottom right,
+                rgba(34,197,94,0.10),
+                transparent 25%
+              )
             `,
           }}
         />
@@ -148,7 +157,7 @@ const LoginPage = () => {
             duration: 12,
             repeat: Infinity,
           }}
-          className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full blur-3xl opacity-10"
+          className="absolute -top-40 -left-40 w-[350px] h-[350px] sm:w-[500px] sm:h-[500px] rounded-full blur-3xl opacity-10"
           style={{
             background: LightColors.primary,
           }}
@@ -163,7 +172,7 @@ const LoginPage = () => {
             duration: 14,
             repeat: Infinity,
           }}
-          className="absolute bottom-[-200px] right-[-200px] w-[600px] h-[600px] rounded-full blur-3xl opacity-10"
+          className="absolute bottom-[-150px] right-[-150px] sm:bottom-[-200px] sm:right-[-200px] w-[400px] h-[400px] sm:w-[600px] sm:h-[600px] rounded-full blur-3xl opacity-10"
           style={{
             background: "#22C55E",
           }}
@@ -175,30 +184,35 @@ const LoginPage = () => {
       ========================================================= */}
 
       <header className="relative z-20 w-full">
-        <div className="w-full px-8 lg:px-16 py-6 flex items-center justify-between">
+        <div
+          className="
+            w-full
+            px-5 sm:px-8 lg:px-16
+            py-4 sm:py-6
+            flex items-center justify-between
+          "
+        >
           {/* LEFT */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             {/* SCHOOL LOGO */}
             <div
-              className="w-16 h-16 rounded-3xl bg-white border shadow-lg overflow-hidden flex items-center justify-center"
+              className="
+                w-12 h-12
+                sm:w-16 sm:h-16
+                rounded-2xl sm:rounded-3xl
+                bg-white
+                border
+                shadow-lg
+                overflow-hidden
+                flex items-center justify-center
+                shrink-0
+              "
               style={{
                 borderColor: LightColors.border,
               }}
             >
-              {/* =========================================================
-                  REPLACE THIS WITH CLIENT SCHOOL LOGO
-                  
-                  Example:
-                  
-                  <img
-                    src="/school-logo.png"
-                    alt="School Logo"
-                    className="w-full h-full object-cover"
-                  />
-              ========================================================= */}
-
               <GraduationCap
-                className="w-8 h-8"
+                className="w-6 h-6 sm:w-8 sm:h-8"
                 style={{
                   color: LightColors.primary,
                 }}
@@ -207,7 +221,13 @@ const LoginPage = () => {
 
             <div>
               <h1
-                className="text-3xl font-black tracking-tight"
+                className="
+                  text-xl
+                  sm:text-2xl
+                  lg:text-3xl
+                  font-black
+                  tracking-tight
+                "
                 style={{
                   color: LightColors.textPrimary,
                 }}
@@ -216,7 +236,13 @@ const LoginPage = () => {
               </h1>
 
               <p
-                className="text-sm font-medium"
+                className="
+                  hidden
+                  sm:block
+                  text-xs
+                  lg:text-sm
+                  font-medium
+                "
                 style={{
                   color: LightColors.textSecondary,
                 }}
@@ -245,8 +271,24 @@ const LoginPage = () => {
           MAIN SECTION
       ========================================================= */}
 
-      <main className="relative z-10 w-full min-h-[calc(100vh-100px)]">
-        <div className="grid lg:grid-cols-2 min-h-[calc(100vh-100px)]">
+      <main
+        className="
+          relative
+          z-10
+          w-full
+          px-4 sm:px-6 lg:px-0
+          pb-10 sm:pb-14
+        "
+      >
+        <div
+          className="
+            grid
+            grid-cols-1
+            lg:grid-cols-2
+            min-h-0
+            lg:min-h-[calc(100vh-100px)]
+          "
+        >
           {/* =========================================================
               LEFT SIDE
           ========================================================= */}
@@ -263,24 +305,46 @@ const LoginPage = () => {
             transition={{
               duration: 0.7,
             }}
-            className="flex flex-col justify-center px-8 lg:px-20 py-14"
+            className="
+              flex
+              flex-col
+              justify-center
+              px-2
+              sm:px-4
+              lg:px-20
+              py-8
+              sm:py-12
+              lg:py-14
+            "
           >
             {/* Badge */}
             <div
-              className="inline-flex items-center gap-2 w-fit px-5 py-2 rounded-full border bg-white shadow-sm"
+              className="
+                inline-flex
+                items-center
+                gap-2
+                w-fit
+                px-4
+                sm:px-5
+                py-2
+                rounded-full
+                border
+                bg-white
+                shadow-sm
+              "
               style={{
                 borderColor: LightColors.border,
               }}
             >
               <ShieldCheck
-                className="w-4 h-4"
+                className="w-4 h-4 shrink-0"
                 style={{
                   color: LightColors.primary,
                 }}
               />
 
               <span
-                className="text-sm font-semibold"
+                className="text-xs sm:text-sm font-semibold"
                 style={{
                   color: LightColors.primary,
                 }}
@@ -290,9 +354,17 @@ const LoginPage = () => {
             </div>
 
             {/* Hero Text */}
-            <div className="mt-10">
+            <div className="mt-7 sm:mt-10">
               <h1
-                className="text-6xl lg:text-7xl font-black leading-[1.02] tracking-tight"
+                className="
+                  text-4xl
+                  sm:text-5xl
+                  md:text-6xl
+                  lg:text-7xl
+                  font-black
+                  leading-[1.05]
+                  tracking-tight
+                "
                 style={{
                   color: LightColors.textPrimary,
                 }}
@@ -313,7 +385,14 @@ const LoginPage = () => {
               </h1>
 
               <p
-                className="mt-8 text-lg leading-relaxed max-w-2xl"
+                className="
+                  mt-5
+                  sm:mt-8
+                  text-base
+                  sm:text-lg
+                  leading-relaxed
+                  max-w-2xl
+                "
                 style={{
                   color: LightColors.textSecondary,
                 }}
@@ -326,7 +405,18 @@ const LoginPage = () => {
             </div>
 
             {/* Features */}
-            <div className="grid sm:grid-cols-2 gap-5 mt-12 max-w-2xl">
+            <div
+              className="
+                grid
+                grid-cols-1
+                sm:grid-cols-2
+                gap-3
+                sm:gap-5
+                mt-8
+                sm:mt-12
+                max-w-2xl
+              "
+            >
               {[
                 "Real-time Incident Monitoring",
                 "AI-Powered Case Management",
@@ -335,13 +425,25 @@ const LoginPage = () => {
               ].map((item, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-3 bg-white border rounded-2xl px-5 py-4 shadow-sm"
+                  className="
+                    flex
+                    items-center
+                    gap-3
+                    bg-white
+                    border
+                    rounded-2xl
+                    px-4
+                    sm:px-5
+                    py-3
+                    sm:py-4
+                    shadow-sm
+                  "
                   style={{
                     borderColor: LightColors.border,
                   }}
                 >
                   <CheckCircle2
-                    className="w-5 h-5"
+                    className="w-5 h-5 shrink-0"
                     style={{
                       color: LightColors.primary,
                     }}
@@ -360,10 +462,25 @@ const LoginPage = () => {
             </div>
 
             {/* Bottom Stats */}
-            <div className="grid grid-cols-3 gap-5 mt-14 max-w-xl">
+            <div
+              className="
+                grid
+                grid-cols-3
+                gap-3
+                sm:gap-5
+                mt-9
+                sm:mt-14
+                max-w-xl
+              "
+            >
               <div>
                 <h2
-                  className="text-4xl font-black"
+                  className="
+                    text-2xl
+                    sm:text-3xl
+                    lg:text-4xl
+                    font-black
+                  "
                   style={{
                     color: LightColors.primary,
                   }}
@@ -372,7 +489,7 @@ const LoginPage = () => {
                 </h2>
 
                 <p
-                  className="text-sm mt-2"
+                  className="text-xs sm:text-sm mt-1 sm:mt-2"
                   style={{
                     color: LightColors.textSecondary,
                   }}
@@ -383,7 +500,12 @@ const LoginPage = () => {
 
               <div>
                 <h2
-                  className="text-4xl font-black"
+                  className="
+                    text-2xl
+                    sm:text-3xl
+                    lg:text-4xl
+                    font-black
+                  "
                   style={{
                     color: LightColors.primary,
                   }}
@@ -392,7 +514,7 @@ const LoginPage = () => {
                 </h2>
 
                 <p
-                  className="text-sm mt-2"
+                  className="text-xs sm:text-sm mt-1 sm:mt-2"
                   style={{
                     color: LightColors.textSecondary,
                   }}
@@ -403,7 +525,12 @@ const LoginPage = () => {
 
               <div>
                 <h2
-                  className="text-4xl font-black"
+                  className="
+                    text-2xl
+                    sm:text-3xl
+                    lg:text-4xl
+                    font-black
+                  "
                   style={{
                     color: LightColors.primary,
                   }}
@@ -412,7 +539,7 @@ const LoginPage = () => {
                 </h2>
 
                 <p
-                  className="text-sm mt-2"
+                  className="text-xs sm:text-sm mt-1 sm:mt-2"
                   style={{
                     color: LightColors.textSecondary,
                   }}
@@ -439,10 +566,28 @@ const LoginPage = () => {
             transition={{
               duration: 0.7,
             }}
-            className="flex items-center justify-center px-8 lg:px-20 py-14"
+            className="
+              flex
+              items-center
+              justify-center
+              px-0
+              sm:px-2
+              lg:px-20
+              py-6
+              sm:py-10
+              lg:py-14
+            "
           >
             <div
-              className="w-full max-w-xl rounded-[40px] overflow-hidden border"
+              className="
+                w-full
+                max-w-xl
+                rounded-[28px]
+                sm:rounded-[36px]
+                lg:rounded-[40px]
+                overflow-hidden
+                border
+              "
               style={{
                 background: "rgba(255,255,255,0.80)",
                 backdropFilter: "blur(22px)",
@@ -452,7 +597,7 @@ const LoginPage = () => {
             >
               {/* Accent Top */}
               <div
-                className="h-2 w-full"
+                className="h-1.5 sm:h-2 w-full"
                 style={{
                   background: `
                     linear-gradient(
@@ -464,21 +609,48 @@ const LoginPage = () => {
                 }}
               />
 
-              <div className="p-10 lg:p-12">
+              <div
+                className="
+                  p-6
+                  sm:p-8
+                  md:p-10
+                  lg:p-12
+                "
+              >
                 {/* LOGO */}
                 <div className="flex flex-col items-center text-center">
                   <div
-                    className="w-28 h-28 rounded-[32px] bg-white border shadow-lg overflow-hidden flex items-center justify-center"
+                    className="
+                      w-20
+                      h-20
+                      sm:w-24
+                      sm:h-24
+                      lg:w-28
+                      lg:h-28
+                      rounded-[24px]
+                      sm:rounded-[28px]
+                      lg:rounded-[32px]
+                      bg-white
+                      border
+                      shadow-lg
+                      overflow-hidden
+                      flex
+                      items-center
+                      justify-center
+                    "
                     style={{
                       borderColor: LightColors.border,
                     }}
                   >
-                    {/* =========================================================
-                        REPLACE WITH CLIENT SCHOOL LOGO
-                    ========================================================= */}
-
                     <GraduationCap
-                      className="w-12 h-12"
+                      className="
+                        w-9
+                        h-9
+                        sm:w-11
+                        sm:h-11
+                        lg:w-12
+                        lg:h-12
+                      "
                       style={{
                         color: LightColors.primary,
                       }}
@@ -486,7 +658,15 @@ const LoginPage = () => {
                   </div>
 
                   <h2
-                    className="mt-7 text-5xl font-black tracking-tight"
+                    className="
+                      mt-5
+                      sm:mt-7
+                      text-3xl
+                      sm:text-4xl
+                      lg:text-5xl
+                      font-black
+                      tracking-tight
+                    "
                     style={{
                       color: LightColors.textPrimary,
                     }}
@@ -495,7 +675,14 @@ const LoginPage = () => {
                   </h2>
 
                   <p
-                    className="mt-4 text-base max-w-md leading-relaxed"
+                    className="
+                      mt-3
+                      sm:mt-4
+                      text-sm
+                      sm:text-base
+                      max-w-md
+                      leading-relaxed
+                    "
                     style={{
                       color: LightColors.textSecondary,
                     }}
@@ -508,12 +695,18 @@ const LoginPage = () => {
                 {/* FORM */}
                 <form
                   onSubmit={handleLogin}
-                  className="mt-12 space-y-7"
+                  className="
+                    mt-8
+                    sm:mt-10
+                    lg:mt-12
+                    space-y-5
+                    sm:space-y-7
+                  "
                 >
                   {/* EMAIL */}
                   <div>
                     <label
-                      className="block mb-3 text-sm font-bold"
+                      className="block mb-2 sm:mb-3 text-sm font-bold"
                       style={{
                         color: LightColors.textLabel,
                       }}
@@ -533,7 +726,7 @@ const LoginPage = () => {
                   {/* PASSWORD */}
                   <div>
                     <label
-                      className="block mb-3 text-sm font-bold"
+                      className="block mb-2 sm:mb-3 text-sm font-bold"
                       style={{
                         color: LightColors.textLabel,
                       }}
@@ -561,7 +754,14 @@ const LoginPage = () => {
                         opacity: 1,
                         y: 0,
                       }}
-                      className="rounded-2xl border px-4 py-3 text-sm font-medium"
+                      className="
+                        rounded-2xl
+                        border
+                        px-4
+                        py-3
+                        text-sm
+                        font-medium
+                      "
                       style={{
                         color: LightColors.danger,
                         background: "#fef2f2",
@@ -595,7 +795,25 @@ const LoginPage = () => {
                     }}
                     type="submit"
                     disabled={isLoading}
-                    className="w-full h-16 rounded-2xl font-bold text-lg text-white shadow-xl flex items-center justify-center gap-3 transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="
+                      w-full
+                      h-14
+                      sm:h-16
+                      rounded-2xl
+                      font-bold
+                      text-base
+                      sm:text-lg
+                      text-white
+                      shadow-xl
+                      flex
+                      items-center
+                      justify-center
+                      gap-3
+                      transition-all
+                      duration-300
+                      disabled:opacity-60
+                      disabled:cursor-not-allowed
+                    "
                     style={{
                       background: `
                         linear-gradient(
@@ -612,15 +830,15 @@ const LoginPage = () => {
                       <Loader2 className="w-6 h-6 animate-spin" />
                     ) : (
                       <>
-                        Login to Dashboard
-                        <ArrowRight className="w-5 h-5" />
+                        <span>Login to Dashboard</span>
+                        <ArrowRight className="w-5 h-5 shrink-0" />
                       </>
                     )}
                   </motion.button>
                 </form>
 
                 {/* FOOTER */}
-                <div className="mt-10 text-center">
+                <div className="mt-8 sm:mt-10 text-center">
                   <p
                     className="text-sm"
                     style={{
@@ -642,13 +860,26 @@ const LoginPage = () => {
 
                 {/* COPYRIGHT */}
                 <div
-                  className="mt-10 pt-6 border-t text-center"
+                  className="
+                    mt-8
+                    sm:mt-10
+                    pt-5
+                    sm:pt-6
+                    border-t
+                    text-center
+                  "
                   style={{
                     borderColor: LightColors.divider,
                   }}
                 >
                   <p
-                    className="text-xs uppercase tracking-[0.2em]"
+                    className="
+                      text-[9px]
+                      sm:text-xs
+                      uppercase
+                      tracking-[0.15em]
+                      sm:tracking-[0.2em]
+                    "
                     style={{
                       color: LightColors.textMuted,
                     }}
@@ -666,3 +897,4 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
+
