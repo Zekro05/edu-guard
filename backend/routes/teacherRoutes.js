@@ -3,10 +3,13 @@ import {
   createTeacherReport,
   getTeacherReports,
   getTeacherById,
+  updateMyTeacherProfile
 } from "../controllers/teacherController.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 
 const router = express.Router();
+
+router.put("/profile", verifyToken, updateMyTeacherProfile);
 
 router.post("/", verifyToken, createTeacherReport);
 

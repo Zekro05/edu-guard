@@ -9,10 +9,13 @@ import {
   previewBulkStudents,
   searchStudents,
   getStudentById,
+  updateMyProfile
 } from "../controllers/studentController.js";
 import { upload } from "../middleware/upload.js";
 
 const router = express.Router();
+
+router.put("/profile", verifyToken, updateMyProfile);
 
 // PROTECTED ROUTES
 router.get("/search", searchStudents);

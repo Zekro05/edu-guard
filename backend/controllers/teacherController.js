@@ -96,3 +96,95 @@ export const getTeacherReports = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+export const updateMyTeacherProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const {
+      firstName,
+      middleName,
+      lastName,
+      phone,
+    } = req.body;
+
+    // Find logged-in user
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User account not found.",
+      });
+    }
+
+    // Only teachers can use this route
+    if (user.role !== "teacher") {
+      return res.status(403).json({
+        success: false,
+        message: "Only teachers can update their profile.",
+      });
+    }
+
+    // Find teacher record
+    const teacher = await Teacher.findOne({
+      employeeId: user.employeeId,
+    });
+
+    if (!teacher) {
+      return res.status(404).json({
+        success: false,
+        message: "Teacher record not found.",
+      });
+    }
+
+    // Validation
+    if (!firstName?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "First name is required.",
+      });
+    }
+
+    if (!lastName?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Last name is required.",
+      });
+    }
+
+    // Update teacher information
+    teacher.firstName = firstName.trim();
+    teacher.middleName = middleName?.trim() || "";
+    teacher.lastName = lastName.trim();
+    teacher.phone = phone?.trim() || "";
+
+    await teacher.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Teacher profile updated successfully.",
+      teacher: {
+        _id: teacher._id,
+        firstName: teacher.firstName,
+        middleName: teacher.middleName,
+        lastName: teacher.lastName,
+        employeeId: teacher.employeeId,
+        department: teacher.department,
+        email: teacher.email,
+        phone: teacher.phone,
+        profilePhoto: teacher.profilePhoto,
+        riskLevel: teacher.riskLevel,
+      },
+    });
+
+  } catch (error) {
+    console.error("UPDATE MY TEACHER PROFILE ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update teacher profile.",
+      error: error.message,
+    });
+  }
+};

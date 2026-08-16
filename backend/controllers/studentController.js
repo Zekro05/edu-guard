@@ -55,12 +55,6 @@ export const createStudent = async (req, res) => {
 
     await student.save();
 
-    io.emit("activity_feed", {
-  type: "student",
-  message: `👤 New student added: ${student.name}`,
-  time: new Date(),
-});
-
     res.status(201).json(student);
   } catch (error) {
     console.error("CREATE STUDENT ERROR:", error);
@@ -111,6 +105,98 @@ export const updateStudent = async (req, res) => {
   } catch (error) {
     console.error("Failed to update student:", error);
     res.status(400).json({ message: "Failed to update student" });
+  }
+};
+
+export const updateMyProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const {
+      firstName,
+      middleName,
+      lastName,
+      phone,
+    } = req.body;
+
+    // Find the logged-in user
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User account not found.",
+      });
+    }
+
+    // Make sure only students can use this route
+    if (user.role !== "student") {
+      return res.status(403).json({
+        success: false,
+        message: "Only students can update their profile.",
+      });
+    }
+
+    // Find the student record using studentId
+    const student = await Student.findOne({
+      studentId: user.studentId,
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student record not found.",
+      });
+    }
+
+    // Validation
+    if (!firstName?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "First name is required.",
+      });
+    }
+
+    if (!lastName?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Last name is required.",
+      });
+    }
+
+    // Update student information
+    student.firstName = firstName.trim();
+    student.middleName = middleName?.trim() || "";
+    student.lastName = lastName.trim();
+    student.phone = phone?.trim() || "";
+
+    await student.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully.",
+      student: {
+        _id: student._id,
+        firstName: student.firstName,
+        middleName: student.middleName,
+        lastName: student.lastName,
+        studentId: student.studentId,
+        grade: student.grade,
+        email: student.email,
+        phone: student.phone,
+        profilePhoto: student.profilePhoto,
+        riskLevel: student.riskLevel,
+      },
+    });
+
+  } catch (error) {
+    console.error("UPDATE MY PROFILE ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update profile.",
+      error: error.message,
+    });
   }
 };
 
