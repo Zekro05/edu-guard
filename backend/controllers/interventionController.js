@@ -1,20 +1,17 @@
 import Intervention from "../models/interventionModel.js";
 import Incident from "../models/incidentModel.js";
 
+
 /* ================= CREATE INTERVENTION ================= */
 export const createIntervention = async (req, res) => {
   try {
-    const {
-      studentId,
-      type,
-      description,
-      interventionBy,
-      approvedBy,
-    } = req.body;
+    const { studentId, type, description, interventionBy, approvedBy } =
+      req.body;
 
     // Find the latest incident for this student
-    const incident = await Incident.findOne({ studentId })
-      .sort({ createdAt: -1 });
+    const incident = await Incident.findOne({ studentId }).sort({
+      createdAt: -1,
+    });
 
     if (!incident) {
       return res.status(404).json({
@@ -22,10 +19,7 @@ export const createIntervention = async (req, res) => {
       });
     }
 
-    const adminName =
-      interventionBy ||
-      req.user?.name ||
-      "Admin";
+    const adminName = interventionBy || req.user?.name || "Admin";
 
     // ============================================
     // CREATE INTERVENTION
@@ -68,20 +62,21 @@ export const createIntervention = async (req, res) => {
       suspension: "Suspension",
     };
 
-    const actionName =
-      readableType[type] || type;
+    const actionName = readableType[type] || type;
 
-    incident.action = description
+    const newAction = description
       ? `${actionName} — ${description}`
       : actionName;
 
+    if (incident.action) {
+      incident.action = `${incident.action}\n• ${newAction}`;
+    } else {
+      incident.action = `• ${newAction}`;
+    }
+
     await incident.save();
 
-    console.log(
-      "✅ Incident action updated:",
-      incident._id,
-      incident.action
-    );
+    console.log("✅ Incident action updated:", incident._id, incident.action);
 
     // ============================================
     // RESPONSE
@@ -92,7 +87,6 @@ export const createIntervention = async (req, res) => {
       intervention,
       incident,
     });
-
   } catch (err) {
     console.error("createIntervention error:", err);
 
@@ -140,8 +134,7 @@ export const resolveIntervention = async (req, res) => {
 
     const { completedBy } = req.body;
 
-    const intervention =
-      await Intervention.findById(id);
+    const intervention = await Intervention.findById(id);
 
     if (!intervention) {
       return res.status(404).json({
@@ -152,29 +145,20 @@ export const resolveIntervention = async (req, res) => {
     intervention.status = "completed";
 
     intervention.completedBy =
-      completedBy ||
-      req.user?.name ||
-      "Guidance Admin";
+      completedBy || req.user?.name || "Guidance Admin";
 
     intervention.auditLogs.push({
       action: "Intervention Completed",
       note: "Marked as completed",
-      by:
-        completedBy ||
-        req.user?.name ||
-        "Guidance Admin",
-        createdAt: new Date(),
+      by: completedBy || req.user?.name || "Guidance Admin",
+      createdAt: new Date(),
     });
 
     await intervention.save();
 
     res.json(intervention);
-
   } catch (err) {
-    console.error(
-      "resolveIntervention error:",
-      err
-    );
+    console.error("resolveIntervention error:", err);
 
     res.status(500).json({
       message: err.message,

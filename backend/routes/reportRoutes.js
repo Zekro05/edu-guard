@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Report from "../models/reportModel.js";
 import Incident from "../models/incidentModel.js";
 import Student from "../models/studentModel.js";
+import Intervention from "../models/interventionModel.js";
 import User from "../models/userModel.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 import { io } from "../server.js";
@@ -116,8 +117,11 @@ router.get("/:id", verifyToken, async (req, res) => {
     }
 
     const report = await Report.findById(id)
-      .populate("studentId", "name grade")
-      .lean();
+      .populate(
+        "studentId",
+        "firstName middleName lastName name grade section gender",
+      )
+      .populate("reporterId", "firstName lastName name email");
 
     if (!report) {
       return res.status(404).json({
@@ -125,48 +129,45 @@ router.get("/:id", verifyToken, async (req, res) => {
       });
     }
 
-    // =====================================================
-    // FIND CONNECTED INCIDENT
-    // =====================================================
-
+    // Find the incident created from this report
     const incident = await Incident.findOne({
       reportId: report._id,
-    })
-      .select("status completedAt")
-      .lean();
+    }).select("status completedAt statementStatus caseLogs action level");
 
-    // =====================================================
-    // USE INCIDENT STATUS WHEN AVAILABLE
-    // =====================================================
+    let interventions = [];
 
-    if (incident?.status) {
-      const incidentStatus = incident.status.toLowerCase();
-
-      if (incidentStatus === "completed") {
-        report.status = "completed";
-      } else if (
-        incidentStatus === "reviewing" ||
-        incidentStatus === "saved-student-statement" ||
-        incidentStatus === "refer-for-intervention" ||
-        incidentStatus === "intervention-ready" ||
-        incidentStatus === "received"
-      ) {
-        report.status = "under_review";
-      }
+    if (incident) {
+      interventions = await Intervention.find({
+        incidentId: incident._id,
+      }).sort({ createdAt: -1 });
     }
 
-    console.log("=================================");
-    console.log("REPORT ID:", report._id);
-    console.log("REPORT STATUS:", report.status);
-    console.log("INCIDENT STATUS:", incident?.status);
-    console.log("=================================");
+    // Use the Incident status if it exists
+    const currentStatus = incident?.status || report.status || "pending";
 
-    return res.json(report);
+    res.json({
+      ...report.toObject(),
 
+      // Actual case status
+      status: currentStatus,
+
+      // Keep report status separately if needed
+      reportStatus: report.status,
+
+      // Incident information
+      incidentId: incident?._id || null,
+      incidentStatus: incident?.status || null,
+      completedAt: incident?.completedAt || null,
+      statementStatus: incident?.statementStatus || null,
+      caseLogs: incident?.caseLogs || [],
+      actionTaken: incident?.action || null,
+      incidentLevel: incident?.level || null,
+      interventions
+    });
   } catch (err) {
     console.error("GET report by ID error:", err);
 
-    return res.status(500).json({
+    res.status(500).json({
       message: err.message,
     });
   }
