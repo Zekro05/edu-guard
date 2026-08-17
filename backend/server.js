@@ -177,9 +177,9 @@ io.on("connection", (socket) => {
 
       /* ================= CREATE CHAT ID ================= */
 
-      const chatId = [sender, receiver]
-        .sort()
-        .join("-");
+      const chatId = [String(sender), String(receiver)].sort().join("-");
+
+      console.log("💬 Chat ID:", chatId);
 
       /* ================= SAVE MESSAGE ================= */
 
@@ -195,16 +195,13 @@ io.on("connection", (socket) => {
 
       /* ================= SEND TO RECEIVER ================= */
 
-      io.to(String(receiver)).emit(
-        "receive_message",
-        message
-      );
+      io.to(String(receiver)).emit("receive_message", message);
 
-      console.log(
-        "📩 receive_message sent to:",
-        receiver
-      );
+      console.log("📩 receive_message sent to:", receiver);
 
+      io.to(String(sender)).emit("receive_message", message);
+
+      console.log("📤 receive_message sent back to sender:", sender);
       /* ================= ACTIVITY FEED ================= */
 
       const senderUser = await User.findById(sender);
@@ -220,9 +217,11 @@ io.on("connection", (socket) => {
       /* ================= SEND BACK TO SENDER ================= */
 
       if (typeof callback === "function") {
-        callback(message);
+        callback({
+          success: true,
+          message,
+        });
       }
-
     } catch (err) {
       console.error("❌ SOCKET SEND MESSAGE ERROR:", err);
 

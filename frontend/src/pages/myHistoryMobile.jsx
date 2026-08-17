@@ -26,45 +26,63 @@ export default function IncidentHistory() {
   // =========================================================
 
   const formatStatus = (status, action) => {
+    const s = status ? String(status).toLowerCase().trim() : "";
+    const a = action ? String(action).toLowerCase().trim() : "";
+
     // =========================================================
-    // ACTION TAKEN HAS PRIORITY
+    // ACTION HAS PRIORITY
     // =========================================================
 
-    if (action && String(action).trim() !== "") {
-      return "Action Taken";
-    }
-
-    if (!status) return "Pending";
-
-    const s = String(status).toLowerCase().trim();
-
-    // Completed
-    if (s.includes("completed")) {
-      return "Completed";
-    }
-
-    // Resolved
-    if (s.includes("resolved")) {
-      return "Resolved";
-    }
-
-    // Rejected
-    if (s.includes("rejected")) {
-      return "Rejected";
-    }
-
-    // Accepted
-    if (s.includes("accepted")) {
+    // ADMIN ACCEPTED
+    if (a === "accepted" || a.includes("accepted")) {
       return "Accepted";
     }
 
-    // Under Review
-    if (s.includes("under") || s.includes("review")) {
+    // ADMIN REJECTED
+    if (a === "rejected" || a.includes("rejected")) {
+      return "Rejected";
+    }
+
+    // ACTION TAKEN / UNDER REVIEW
+    if (
+      a === "action taken" ||
+      a === "action_taken" ||
+      a === "taken" ||
+      a === "reviewing" ||
+      a === "review" ||
+      a === "under review" ||
+      a === "under_review"
+    ) {
       return "Under Review";
     }
 
-    // Pending
-    if (s.includes("pending")) {
+    // =========================================================
+    // FALLBACK TO INCIDENT STATUS
+    // =========================================================
+
+    if (s === "accepted" || s.includes("accepted")) {
+      return "Accepted";
+    }
+
+    if (s === "rejected" || s.includes("rejected")) {
+      return "Rejected";
+    }
+
+    if (s === "resolved" || s.includes("resolved")) {
+      return "Resolved";
+    }
+
+    if (
+      s === "reviewing" ||
+      s === "review" ||
+      s === "under review" ||
+      s === "under_review" ||
+      s.includes("review")
+    ) {
+      return "Under Review";
+    }
+
+    if (s === "pending" || s.includes("pending")) {
       return "Pending";
     }
 
@@ -84,19 +102,6 @@ export default function IncidentHistory() {
       console.log("RAW INCIDENTS:", data);
 
       const formatted = data.map((item) => {
-        // =========================================================
-        // ACTION TAKEN
-        // =========================================================
-
-        const actionTaken =
-          item.action || item.actionTaken || item.actionsTaken || "";
-
-        // =========================================================
-        // STATUS
-        // =========================================================
-
-        const formattedStatus = formatStatus(item.status, actionTaken);
-
         return {
           id: item._id,
 
@@ -112,10 +117,8 @@ export default function IncidentHistory() {
               })
             : "No Date",
 
-          status: formattedStatus,
-
-          // Keep the actual action
-          action: actionTaken || "No action taken",
+          // Status comes ONLY from incident.status
+          status: formatStatus(item.status, item.action),
 
           risk: item.level ? `${item.level} Risk` : "Unknown Risk",
 
@@ -182,17 +185,6 @@ export default function IncidentHistory() {
 
   const getStatusStyle = (status) => {
     switch (status) {
-      // =====================================================
-      // ACTION TAKEN
-      // =====================================================
-
-      case "Action Taken":
-        return {
-          backgroundColor: colors.primary + "18",
-          color: colors.primary,
-          icon: "checkmark-done-circle-outline",
-        };
-
       // =====================================================
       // COMPLETED / RESOLVED
       // =====================================================
