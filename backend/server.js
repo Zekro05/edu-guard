@@ -158,44 +158,78 @@ io.on("connection", (socket) => {
 
   socket.on("send_message", async (msg, callback) => {
     try {
-      console.log("📨 Message received:", msg);
+      console.log("📨 Socket message received:", msg);
 
-      if (!msg?.sender || !msg?.receiver || !msg?.text?.trim()) {
+      const { sender, receiver, text } = msg;
+
+      if (!sender || !receiver || !text?.trim()) {
         console.log("⚠️ Invalid message data");
+
+        if (typeof callback === "function") {
+          callback({
+            error: true,
+            message: "Missing sender, receiver, or message text.",
+          });
+        }
+
         return;
       }
 
-      const message = new Message({
-        sender: msg.sender,
-        receiver: msg.receiver,
-        text: msg.text.trim(),
-        createdAt: msg.createdAt || new Date(),
+      /* ================= CREATE CHAT ID ================= */
+
+      const chatId = [sender, receiver]
+        .sort()
+        .join("-");
+
+      /* ================= SAVE MESSAGE ================= */
+
+      const message = await Message.create({
+        chatId,
+        sender,
+        receiver,
+        text: text.trim(),
+        seen: false,
       });
 
-      const savedMessage = await message.save();
+      console.log("💾 Message saved:", message._id);
 
-      const messageData = savedMessage.toObject();
+      /* ================= SEND TO RECEIVER ================= */
 
-      console.log("💾 Message saved:", messageData._id);
-
-      // Send message to receiver
-      io.to(String(msg.receiver)).emit(
+      io.to(String(receiver)).emit(
         "receive_message",
-        messageData
+        message
       );
 
-      // Send saved message back to sender
+      console.log(
+        "📩 receive_message sent to:",
+        receiver
+      );
+
+      /* ================= ACTIVITY FEED ================= */
+
+      const senderUser = await User.findById(sender);
+
+      io.emit("activity_feed", {
+        type: "message",
+        message: `💬 ${senderUser?.name || "User"}: ${text.trim()}`,
+        time: new Date(),
+      });
+
+      console.log("🔥 Activity feed emitted");
+
+      /* ================= SEND BACK TO SENDER ================= */
+
       if (typeof callback === "function") {
-        callback(messageData);
+        callback(message);
       }
 
-    } catch (error) {
-      console.error("❌ SEND MESSAGE ERROR:", error);
+    } catch (err) {
+      console.error("❌ SOCKET SEND MESSAGE ERROR:", err);
 
       if (typeof callback === "function") {
         callback({
           error: true,
-          message: error.message,
+          message: err.message,
         });
       }
     }
