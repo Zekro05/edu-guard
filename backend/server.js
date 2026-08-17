@@ -149,10 +149,56 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Put this user's socket into their private room
     socket.join(String(userId));
 
     console.log(`👤 User registered: ${userId}`);
+  });
+
+  /* ================= SEND MESSAGE ================= */
+
+  socket.on("send_message", async (msg, callback) => {
+    try {
+      console.log("📨 Message received:", msg);
+
+      if (!msg?.sender || !msg?.receiver || !msg?.text?.trim()) {
+        console.log("⚠️ Invalid message data");
+        return;
+      }
+
+      const message = new Message({
+        sender: msg.sender,
+        receiver: msg.receiver,
+        text: msg.text.trim(),
+        createdAt: msg.createdAt || new Date(),
+      });
+
+      const savedMessage = await message.save();
+
+      const messageData = savedMessage.toObject();
+
+      console.log("💾 Message saved:", messageData._id);
+
+      // Send message to receiver
+      io.to(String(msg.receiver)).emit(
+        "receive_message",
+        messageData
+      );
+
+      // Send saved message back to sender
+      if (typeof callback === "function") {
+        callback(messageData);
+      }
+
+    } catch (error) {
+      console.error("❌ SEND MESSAGE ERROR:", error);
+
+      if (typeof callback === "function") {
+        callback({
+          error: true,
+          message: error.message,
+        });
+      }
+    }
   });
 
   /* ================= DISCONNECT ================= */
