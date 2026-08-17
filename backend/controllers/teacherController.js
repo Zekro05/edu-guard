@@ -188,3 +188,84 @@ export const updateMyTeacherProfile = async (req, res) => {
     });
   }
 };
+
+export const updateMyTeacherProfilePhoto = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // =========================================================
+    // FIND USER
+    // =========================================================
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User account not found.",
+      });
+    }
+
+    // =========================================================
+    // CHECK ROLE
+    // =========================================================
+
+    if (user.role !== "teacher") {
+      return res.status(403).json({
+        success: false,
+        message: "Only teachers can update their profile photo.",
+      });
+    }
+
+    // =========================================================
+    // FIND TEACHER
+    // =========================================================
+
+    const teacher = await Teacher.findOne({
+      employeeId: user.employeeId,
+    });
+
+    if (!teacher) {
+      return res.status(404).json({
+        success: false,
+        message: "Teacher record not found.",
+      });
+    }
+
+    // =========================================================
+    // CHECK FILE
+    // =========================================================
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Profile photo is required.",
+      });
+    }
+
+    // =========================================================
+    // SAVE CLOUDINARY URL
+    // =========================================================
+
+    teacher.profilePhoto = req.file.path;
+
+    await teacher.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile photo updated successfully.",
+      profilePhoto: teacher.profilePhoto,
+    });
+  } catch (error) {
+    console.error(
+      "UPDATE TEACHER PROFILE PHOTO ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update profile photo.",
+      error: error.message,
+    });
+  }
+};

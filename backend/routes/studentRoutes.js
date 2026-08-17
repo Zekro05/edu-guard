@@ -9,7 +9,8 @@ import {
   previewBulkStudents,
   searchStudents,
   getStudentById,
-  updateMyProfile
+  updateMyProfile,
+  updateMyProfilePhoto
 } from "../controllers/studentController.js";
 import { upload } from "../middleware/upload.js";
 
@@ -25,6 +26,12 @@ router.get("/:id", verifyToken, getStudentById);
 router.post("/bulk", verifyToken, createStudentsBulk);
 router.post("/bulk/preview",verifyToken, previewBulkStudents);
 router.put("/:id", verifyToken, upload.single("profilePhoto"), updateStudent);
+router.put(
+  "/profile/photo",
+  verifyToken,
+  upload.single("profilePhoto"),
+  updateMyProfilePhoto
+);
 router.delete("/:id", verifyToken, deleteStudent);
 
 

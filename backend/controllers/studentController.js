@@ -229,6 +229,84 @@ export const updateMyProfile = async (req, res) => {
   }
 };
 
+export const updateMyProfilePhoto = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    // =========================================================
+    // FIND USER
+    // =========================================================
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User account not found.",
+      });
+    }
+
+    // =========================================================
+    // CHECK ROLE
+    // =========================================================
+
+    if (user.role !== "student") {
+      return res.status(403).json({
+        success: false,
+        message: "Only students can update their profile photo.",
+      });
+    }
+
+    // =========================================================
+    // FIND STUDENT
+    // =========================================================
+
+    const student = await Student.findOne({
+      studentId: user.studentId,
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student record not found.",
+      });
+    }
+
+    // =========================================================
+    // CHECK FILE
+    // =========================================================
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Profile photo is required.",
+      });
+    }
+
+    // Cloudinary URL
+    student.profilePhoto = req.file.path;
+
+    await student.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile photo updated successfully.",
+      profilePhoto: student.profilePhoto,
+    });
+  } catch (error) {
+    console.error(
+      "UPDATE STUDENT PROFILE PHOTO ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update profile photo.",
+      error: error.message,
+    });
+  }
+};
+
 export const createStudentsBulk = async (req, res) => {
   console.log("🔥 BULK ROUTE HIT");
   console.log("REQ BODY:", req.body);

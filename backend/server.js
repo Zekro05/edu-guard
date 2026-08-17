@@ -23,17 +23,12 @@ import caseRoutes from "./routes/caseRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import notificationSettingsRoutes from "./routes/notificationSettings.js";
 
-
-
-
 import { User } from "./models/userModel.js";
 
 import { fileURLToPath } from "url";
 
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 
 dotenv.config();
 
@@ -59,23 +54,20 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-  if (!origin) return callback(null, true);
+      if (!origin) return callback(null, true);
 
-  const isAllowed = allowedOrigins.some((o) =>
-    origin.startsWith(o)
-  );
+      const isAllowed = allowedOrigins.some((o) => origin.startsWith(o));
 
-  if (isAllowed) {
-    return callback(null, true);
-  }
+      if (isAllowed) {
+        return callback(null, true);
+      }
 
-  return callback(new Error("Not allowed by CORS"));
-},
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true, // 🔥 REQUIRED FOR COOKIES
-     allowedHeaders: ["Content-Type", "Authorization"]
-  })
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
 );
-
 
 /* ================= ROUTES ================= */
 
@@ -91,9 +83,7 @@ app.use("/api/teacher-reports", teacherReportRoutes);
 app.use("/api/interventions", interventionRoutes);
 app.use("/api/cases", caseRoutes);
 app.use("/api/upload", uploadRoutes);
-app.use("/api/notification-settings",notificationSettingsRoutes);
-
-
+app.use("/api/notification-settings", notificationSettingsRoutes);
 
 /* USERS */
 app.get("/api/users", async (req, res) => {
@@ -124,7 +114,6 @@ export const io = new Server(server, {
   },
 });
 
-
 app.get("/api/test-notif", (req, res) => {
   io.emit("newNotification", {
     id: Date.now(),
@@ -141,74 +130,36 @@ app.get("/api/test-notif", (req, res) => {
 const onlineUsers = new Map();
 
 /* ================= SOCKET LOGIC ================= */
+/* ================= SOCKET.IO ================= */
+
 export const sendNotification = (userId, payload) => {
   if (!userId) return;
 
   io.to(String(userId)).emit("newNotification", payload);
 };
+
 io.on("connection", (socket) => {
-  console.log("🟢 Connected:", socket.id);
+  console.log("🟢 Socket connected:", socket.id);
 
-  socket.onAny((event, data) => {
-    console.log("📥 EVENT:", event, data);
-  });
+  /* ================= REGISTER USER ================= */
 
-  socket.on("join", (userId) => {
-  socket.join(userId);
-  console.log("User joined room:", userId);
-});
-
-  socket.on("send_message", async (msg, callback) => {
-  try {
-    const chatId = [msg.sender, msg.receiver].sort().join("-");
-
-    const saved = await Message.create({
-      chatId,
-      sender: msg.sender,
-      receiver: msg.receiver,
-      text: msg.text,
-      seen: false,
-    });
-
-    const receiverSocket = onlineUsers.get(msg.receiver);
-
-    if (receiverSocket) {
-      io.to(receiverSocket).emit("receive_message", saved);
+  socket.on("register", (userId) => {
+    if (!userId) {
+      console.log("⚠️ No user ID received");
+      return;
     }
 
-    socket.emit("receive_message", saved);
+    // Put this user's socket into their private room
+    socket.join(String(userId));
 
-    console.log("📩 SOCKET send_message HIT:", msg);
+    console.log(`👤 User registered: ${userId}`);
+  });
 
-
-    io.emit("activity_feed", {
-      type: "message",
-      message: `💬 New message from ${msg.sender}`,
-      time: new Date(),
-    });
-
-    console.log("🚀 activity_feed EMITTED");
-
-    if (callback) callback(saved);
-  } catch (err) {
-    console.log(err);
-  }
-});
-
-  
+  /* ================= DISCONNECT ================= */
 
   socket.on("disconnect", () => {
-    for (const [userId, sockId] of onlineUsers.entries()) {
-      if (sockId === socket.id) {
-        onlineUsers.delete(userId);
-        break;
-      }
-    }
-
-    io.emit("online_users", Array.from(onlineUsers.keys()));
-    console.log("🔴 Disconnected:", socket.id);
+    console.log("🔴 Socket disconnected:", socket.id);
   });
-
 });
 
 app.set("io", io);

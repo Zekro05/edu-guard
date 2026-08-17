@@ -739,6 +739,76 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  updateStudentProfilePhoto: async (imageUri) => {
+  try {
+    const formData = new FormData();
+
+    formData.append("profilePhoto", {
+      uri: imageUri,
+      name: "profile-photo.jpg",
+      type: "image/jpeg",
+    });
+
+    const response = await API.put(
+      "/api/students/profile/photo",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    if (response.data?.success) {
+      const profilePhoto = response.data.profilePhoto;
+
+      const currentUser = get().user;
+
+      const updatedUser = {
+        ...currentUser,
+        profilePhoto,
+      };
+
+      set({
+        user: updatedUser,
+        studentData: {
+          ...get().studentData,
+          profilePhoto,
+        },
+      });
+
+      await AsyncStorage.setItem(
+        "user",
+        JSON.stringify(updatedUser)
+      );
+
+      return {
+        success: true,
+        profilePhoto,
+      };
+    }
+
+    return {
+      success: false,
+      error:
+        response.data?.message ||
+        "Failed to update profile photo.",
+    };
+  } catch (error) {
+    console.error(
+      "UPDATE STUDENT PROFILE PHOTO ERROR:",
+      error?.response?.data || error
+    );
+
+    return {
+      success: false,
+      error:
+        error?.response?.data?.message ||
+        "Failed to update profile photo.",
+    };
+  }
+},
+
   /* ================= UPDATE TEACHER PROFILE ================= */
   updateTeacherProfile: async (profileData) => {
     try {
@@ -785,6 +855,76 @@ export const useAuthStore = create((set, get) => ({
       };
     }
   },
+
+  updateTeacherProfilePhoto: async (imageUri) => {
+  try {
+    const formData = new FormData();
+
+    formData.append("profilePhoto", {
+      uri: imageUri,
+      name: "profile-photo.jpg",
+      type: "image/jpeg",
+    });
+
+    const response = await API.put(
+      "/api/teacher-reports/profile/photo",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+
+    if (response.data?.success) {
+      const profilePhoto = response.data.profilePhoto;
+
+      const currentUser = get().user;
+
+      const updatedUser = {
+        ...currentUser,
+        profilePhoto,
+      };
+
+      set({
+        user: updatedUser,
+        teacherData: {
+          ...get().teacherData,
+          profilePhoto,
+        },
+      });
+
+      await AsyncStorage.setItem(
+        "user",
+        JSON.stringify(updatedUser)
+      );
+
+      return {
+        success: true,
+        profilePhoto,
+      };
+    }
+
+    return {
+      success: false,
+      error:
+        response.data?.message ||
+        "Failed to update profile photo.",
+    };
+  } catch (error) {
+    console.error(
+      "UPDATE TEACHER PROFILE PHOTO ERROR:",
+      error?.response?.data || error
+    );
+
+    return {
+      success: false,
+      error:
+        error?.response?.data?.message ||
+        "Failed to update profile photo.",
+    };
+  }
+},
 
   /* ================= SIGNUP ================= */
   signup: async (formData) => {

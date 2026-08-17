@@ -3,6 +3,7 @@ import Incident from "../models/incidentModel.js";
 import Student from "../models/studentModel.js";
 import Notification from "../models/Notification.js";
 import User from "../models/userModel.js";
+import Report from "../models/reportModel.js";
 import { io } from "../server.js";
 
 
@@ -211,16 +212,24 @@ export const completeIncident = async (req, res) => {
     const incident = await Incident.findById(req.params.id);
 
     if (!incident) {
-      return res.status(404).json({ message: "Incident not found" });
+      return res.status(404).json({
+        message: "Incident not found",
+      });
     }
 
+    const user = req.user;
+
     const log = {
-  stage: "completed",
-  note: "Incident marked as completed",
-  time: new Date(),
-  changedBy: req.user._id,
-  changedByName: req.user.name,
-};
+      stage: "completed",
+      note: "Incident marked as completed",
+      time: new Date(),
+      changedBy: user?._id || null,
+      changedByName: user?.name || "Admin",
+    };
+
+    // =====================================================
+    // UPDATE INCIDENT
+    // =====================================================
 
     incident.status = "completed";
     incident.completedAt = new Date();
@@ -229,7 +238,33 @@ export const completeIncident = async (req, res) => {
 
     await incident.save();
 
-    /* 🔥 REAL-TIME */
+    // =====================================================
+    // UPDATE CONNECTED REPORT
+    // =====================================================
+
+    if (incident.reportId) {
+      const report = await Report.findByIdAndUpdate(
+        incident.reportId,
+        {
+          status: "completed",
+        },
+        {
+          new: true,
+        }
+      );
+
+      console.log(
+        "✅ Connected report updated:",
+        report?._id,
+        "→",
+        report?.status
+      );
+    }
+
+    // =====================================================
+    // REAL-TIME INCIDENT UPDATE
+    // =====================================================
+
     io.emit("caseUpdated", incident);
 
     io.emit("caseLogAdded", {
@@ -237,12 +272,28 @@ export const completeIncident = async (req, res) => {
       log,
     });
 
+    // =====================================================
+    // REAL-TIME REPORT UPDATE
+    // =====================================================
+
+    if (incident.reportId) {
+      io.emit("reportUpdated", {
+        reportId: incident.reportId,
+        status: "completed",
+      });
+    }
+
     return res.json({
-      message: "Incident marked as completed",
+      message: "Incident and connected report marked as completed",
       incident,
     });
+
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    console.error("completeIncident error:", err);
+
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
@@ -550,6 +601,35 @@ if (
 }
 
     await incident.save();
+
+    // =====================================================
+// SYNC CONNECTED REPORT STATUS
+// =====================================================
+
+if (status === "completed" && incident.reportId) {
+  const report = await Report.findByIdAndUpdate(
+    incident.reportId,
+    {
+      status: "completed",
+    },
+    {
+      new: true,
+    }
+  );
+
+  console.log(
+    "✅ Report synchronized with completed incident:",
+    report?._id,
+    "→",
+    report?.status
+  );
+
+  // Notify connected clients
+  io.emit("reportUpdated", {
+    reportId: incident.reportId,
+    status: "completed",
+  });
+}
 
     const student = await Student.findById(incident.studentId);
 

@@ -110,22 +110,65 @@ router.get("/:id", verifyToken, async (req, res) => {
     const { id } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid report ID" });
+      return res.status(400).json({
+        message: "Invalid report ID",
+      });
     }
 
-    const report = await Report.findById(id).populate(
-      "studentId",
-      "name grade",
-    );
+    const report = await Report.findById(id)
+      .populate("studentId", "name grade")
+      .lean();
 
     if (!report) {
-      return res.status(404).json({ message: "Report not found" });
+      return res.status(404).json({
+        message: "Report not found",
+      });
     }
 
-    res.json(report);
+    // =====================================================
+    // FIND CONNECTED INCIDENT
+    // =====================================================
+
+    const incident = await Incident.findOne({
+      reportId: report._id,
+    })
+      .select("status completedAt")
+      .lean();
+
+    // =====================================================
+    // USE INCIDENT STATUS WHEN AVAILABLE
+    // =====================================================
+
+    if (incident?.status) {
+      const incidentStatus = incident.status.toLowerCase();
+
+      if (incidentStatus === "completed") {
+        report.status = "completed";
+      } else if (
+        incidentStatus === "reviewing" ||
+        incidentStatus === "saved-student-statement" ||
+        incidentStatus === "refer-for-intervention" ||
+        incidentStatus === "intervention-ready" ||
+        incidentStatus === "received"
+      ) {
+        report.status = "under_review";
+      }
+    }
+
+    console.log("=================================");
+    console.log("REPORT ID:", report._id);
+    console.log("REPORT STATUS:", report.status);
+    console.log("INCIDENT STATUS:", incident?.status);
+    console.log("=================================");
+
+    return res.json(report);
+
   } catch (err) {
     console.error("GET report by ID error:", err);
-    res.status(500).json({ message: err.message });
+
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 });
 
@@ -138,7 +181,7 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Report not found" });
     }
 
-    report.status = "accepted";
+    report.status = "under_review";
     await report.save();
 
     const studentId = report.studentId;

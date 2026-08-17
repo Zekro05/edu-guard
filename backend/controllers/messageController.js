@@ -10,33 +10,57 @@ export const sendMessage = async (req, res) => {
   try {
     const { sender, receiver, text } = req.body;
 
-    if (!sender || !receiver)
-      return res.status(400).json({ message: "Missing fields" });
+    if (!sender || !receiver || !text?.trim()) {
+      return res.status(400).json({
+        message: "Missing fields",
+      });
+    }
 
     const chatId = createChatId(sender, receiver);
 
+    // Save message ONCE
     const message = await Message.create({
       chatId,
       sender,
       receiver,
-      text,
+      text: text.trim(),
+      seen: false,
     });
 
-    /* 🔥 GET SENDER NAME (OPTIONAL BUT BETTER) */
+    console.log("💾 Message saved:", message._id);
+
+    /* ================= LIVE MESSAGE ================= */
+
+    io.to(String(receiver)).emit(
+      "receive_message",
+      message
+    );
+
+    console.log(
+      "📩 receive_message sent to:",
+      receiver
+    );
+
+    /* ================= ACTIVITY FEED ================= */
+
     const senderUser = await User.findById(sender);
 
-    /* 🔥 EMIT LIVE FEED */
     io.emit("activity_feed", {
       type: "message",
       message: `💬 ${senderUser?.name || "User"}: ${text}`,
       time: new Date(),
     });
 
-    console.log("🔥 ACTIVITY FEED EMITTED FROM CONTROLLER");
+    console.log("🔥 Activity feed emitted");
 
     res.status(201).json(message);
+
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("❌ SEND MESSAGE ERROR:", err);
+
+    res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
