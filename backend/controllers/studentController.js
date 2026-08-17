@@ -110,7 +110,7 @@ export const updateStudent = async (req, res) => {
 
 export const updateMyProfile = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user._id;
 
     const {
       firstName,
@@ -119,7 +119,10 @@ export const updateMyProfile = async (req, res) => {
       phone,
     } = req.body;
 
-    // Find the logged-in user
+    // =========================================================
+    // FIND LOGGED-IN USER
+    // =========================================================
+
     const user = await User.findById(userId);
 
     if (!user) {
@@ -129,7 +132,10 @@ export const updateMyProfile = async (req, res) => {
       });
     }
 
-    // Make sure only students can use this route
+    // =========================================================
+    // MAKE SURE USER IS A STUDENT
+    // =========================================================
+
     if (user.role !== "student") {
       return res.status(403).json({
         success: false,
@@ -137,7 +143,10 @@ export const updateMyProfile = async (req, res) => {
       });
     }
 
-    // Find the student record using studentId
+    // =========================================================
+    // FIND STUDENT RECORD
+    // =========================================================
+
     const student = await Student.findOne({
       studentId: user.studentId,
     });
@@ -149,7 +158,10 @@ export const updateMyProfile = async (req, res) => {
       });
     }
 
-    // Validation
+    // =========================================================
+    // VALIDATION
+    // =========================================================
+
     if (!firstName?.trim()) {
       return res.status(400).json({
         success: false,
@@ -164,17 +176,31 @@ export const updateMyProfile = async (req, res) => {
       });
     }
 
-    // Update student information
+    // =========================================================
+    // UPDATE
+    // =========================================================
+
     student.firstName = firstName.trim();
-    student.middleName = middleName?.trim() || "";
-    student.lastName = lastName.trim();
-    student.phone = phone?.trim() || "";
+
+    student.middleName =
+      middleName?.trim() || "";
+
+    student.lastName =
+      lastName.trim();
+
+    student.phone =
+      phone?.trim() || "";
 
     await student.save();
+
+    // =========================================================
+    // RESPONSE
+    // =========================================================
 
     return res.status(200).json({
       success: true,
       message: "Profile updated successfully.",
+
       student: {
         _id: student._id,
         firstName: student.firstName,
@@ -190,7 +216,10 @@ export const updateMyProfile = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("UPDATE MY PROFILE ERROR:", error);
+    console.error(
+      "UPDATE MY PROFILE ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
