@@ -4,10 +4,17 @@ import Incident from "../models/incidentModel.js";
 /* ================= CREATE INTERVENTION ================= */
 export const createIntervention = async (req, res) => {
   try {
-    const { studentId, type, description, interventionBy,
-    approvedBy} = req.body;
+    const {
+      studentId,
+      type,
+      description,
+      interventionBy,
+      approvedBy,
+    } = req.body;
 
-    const incident = await Incident.findOne({ studentId });
+    // Find the latest incident for this student
+    const incident = await Incident.findOne({ studentId })
+      .sort({ createdAt: -1 });
 
     if (!incident) {
       return res.status(404).json({
@@ -20,6 +27,9 @@ export const createIntervention = async (req, res) => {
       req.user?.name ||
       "Admin";
 
+    // ============================================
+    // CREATE INTERVENTION
+    // ============================================
 
     const intervention = await Intervention.create({
       studentId,
@@ -34,25 +44,61 @@ export const createIntervention = async (req, res) => {
 
       interventionBy: adminName,
 
-      approvedBy:
-        approvedBy || adminName,
+      approvedBy: approvedBy || adminName,
 
       auditLogs: [
         {
           action: "Intervention Created",
-          note: description,
+          note: description || `Intervention: ${type}`,
           by: adminName,
-          createdAt: new Date(),
+          time: new Date(),
         },
       ],
     });
 
+    // ============================================
+    // UPDATE INCIDENT ACTION
+    // ============================================
 
-    res.status(201).json(intervention);
+    const readableType = {
+      warning: "Warning",
+      detention: "Detention",
+      "call a parent": "Call Parent",
+      "community service": "Community Service",
+      suspension: "Suspension",
+    };
+
+    const actionName =
+      readableType[type] || type;
+
+    incident.action = description
+      ? `${actionName} — ${description}`
+      : actionName;
+
+    await incident.save();
+
+    console.log(
+      "✅ Incident action updated:",
+      incident._id,
+      incident.action
+    );
+
+    // ============================================
+    // RESPONSE
+    // ============================================
+
+    return res.status(201).json({
+      message: "Intervention created and incident updated",
+      intervention,
+      incident,
+    });
 
   } catch (err) {
     console.error("createIntervention error:", err);
-    res.status(500).json({ message: err.message });
+
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };
 

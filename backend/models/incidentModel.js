@@ -48,7 +48,7 @@ const incidentSchema = new mongoose.Schema(
 
     action: {
       type: String,
-      default: "Pending review",
+      default: "",
     },
 
     level: {
