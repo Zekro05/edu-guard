@@ -13,7 +13,8 @@ import {
   resendSignupOTP,
   resendLoginOTP,
   resendForgotPasswordOTP,
-  changePassword
+  changePassword,
+  saveExpoPushToken,
 } from "../controllers/authController.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 import { upload } from "../middleware/upload.js";
@@ -45,6 +46,11 @@ router.post("/verify-email", verifyEmail);
 router.post("/verify-login-otp", verifyLoginOTP);
 router.post("/verify-mobile-login-otp", verifyMobileLoginOTP);
 
+router.post(
+  "/save-push-token",
+  verifyToken,
+  saveExpoPushToken
+);
 
 // ---------------- FORGOT PASSWORD ----------------
 router.post("/forgot-password", forgotPassword);
