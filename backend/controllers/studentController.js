@@ -548,18 +548,46 @@ export const searchStudents = async (req, res) => {
 
     if (!query) return res.json([]);
 
-    const students = await Student.find({
+    let excludeStudentId = null;
+
+    // Find the currently logged-in user's Student record
+    if (req.userId) {
+      const currentUser = await User.findById(req.userId);
+
+      if (currentUser?.role === "student" && currentUser.studentId) {
+        const currentStudent = await Student.findOne({
+          studentId: currentUser.studentId,
+        });
+
+        if (currentStudent) {
+          excludeStudentId = currentStudent._id;
+        }
+      }
+    }
+
+    const searchFilter = {
       $or: [
         { firstName: { $regex: query, $options: "i" } },
         { lastName: { $regex: query, $options: "i" } },
         { email: { $regex: query, $options: "i" } },
       ],
-    })
-      .select("_id firstName lastName email")
+    };
+
+    // Exclude the currently logged-in student
+    if (excludeStudentId) {
+      searchFilter._id = { $ne: excludeStudentId };
+    }
+
+    const students = await Student.find(searchFilter)
+      .select("_id firstName lastName email studentId")
       .limit(10);
 
     res.json(students);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("SEARCH STUDENTS ERROR:", error);
+
+    res.status(500).json({
+      message: error.message,
+    });
   }
 };
