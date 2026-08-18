@@ -5,9 +5,85 @@ import Intervention from "../models/interventionModel.js";
 import Notification from "../models/Notification.js";
 import User from "../models/userModel.js";
 import Report from "../models/reportModel.js";
+import { sendPushNotification } from "../utils/pushNotification.js";
 import { io } from "../server.js";
 
+/* ================= STUDENT NOTIFICATION HELPER ================= */
 
+const notifyStudent = async ({
+  studentId,
+  title,
+  message,
+  type = "update",
+  priority = "low",
+  data = {},
+}) => {
+  try {
+    const student = await Student.findById(studentId);
+
+    if (!student) {
+      console.log("⚠️ Student not found for notification:", studentId);
+      return;
+    }
+
+    const user = await User.findOne({
+      studentId: student.studentId,
+    });
+
+    if (!user) {
+      console.log("⚠️ User account not found for student:", student.studentId);
+      return;
+    }
+
+    /* ================= DATABASE NOTIFICATION ================= */
+
+    await Notification.create({
+      userId: user._id,
+      title,
+      message,
+      type,
+      priority,
+    });
+
+    /* ================= SOCKET.IO ================= */
+
+    io.to(user._id.toString()).emit("newNotification", {
+      id: Date.now(),
+      title,
+      message,
+      type,
+      priority,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+    });
+
+    /* ================= PHONE PUSH NOTIFICATION ================= */
+
+    if (user.expoPushToken) {
+      try {
+        await sendPushNotification({
+          token: user.expoPushToken,
+          title: `EduGuard 🔔`,
+          body: `${title}: ${message}`,
+          data: {
+            type,
+            ...data,
+          },
+        });
+
+        console.log("📱 Push notification sent to:", user.email);
+      } catch (pushError) {
+        console.error("⚠️ Push notification failed:", pushError.message);
+      }
+    } else {
+      console.log("⚠️ No Expo push token for:", user.email);
+    }
+
+    console.log("✅ Notification created for:", user.email);
+  } catch (error) {
+    console.error("❌ Student notification error:", error.message);
+  }
+};
 /* ================= GET INCIDENTS ================= */
 /* ================= GET INCIDENTS ================= */
 export const getIncidents = async (req, res) => {
@@ -22,9 +98,7 @@ export const getIncidents = async (req, res) => {
     // GET LOGGED-IN USER
     // =====================================================
 
-    const user = await User.findById(req.userId).select(
-      "role studentId email"
-    );
+    const user = await User.findById(req.userId).select("role studentId email");
 
     if (!user) {
       return res.status(404).json({
@@ -59,7 +133,7 @@ export const getIncidents = async (req, res) => {
     const incidents = await Incident.find(query)
       .populate(
         "studentId",
-        "firstName middleName lastName studentId grade gender phone profilePhoto"
+        "firstName middleName lastName studentId grade gender phone profilePhoto",
       )
       .populate({
         path: "reportId",
@@ -90,8 +164,7 @@ export const getIncidents = async (req, res) => {
 
     const formattedIncidents = incidents.map((incident) => {
       const intervention = interventions.find(
-        (item) =>
-          String(item.incidentId) === String(incident._id)
+        (item) => String(item.incidentId) === String(incident._id),
       );
 
       return {
@@ -110,9 +183,7 @@ export const getIncidents = async (req, res) => {
         // If no intervention exists, use incident status.
         // =================================================
 
-        effectiveStatus: intervention
-          ? intervention.status
-          : incident.status,
+        effectiveStatus: intervention ? intervention.status : incident.status,
       };
     });
 
@@ -123,7 +194,7 @@ export const getIncidents = async (req, res) => {
         incidentStatus: item.status,
         interventionStatus: item.intervention?.status || null,
         effectiveStatus: item.effectiveStatus,
-      }))
+      })),
     );
 
     return res.status(200).json(formattedIncidents);
@@ -135,7 +206,6 @@ export const getIncidents = async (req, res) => {
     });
   }
 };
-
 
 /* ================= CREATE INCIDENT ================= */
 export const createIncident = async (req, res) => {
@@ -184,8 +254,14 @@ export const createIncident = async (req, res) => {
     /* UPDATE STUDENT STATS */
     const totalIncidents = await Incident.countDocuments({ studentId });
 
-    const highCount = await Incident.countDocuments({ studentId, level: "High" });
-    const medCount = await Incident.countDocuments({ studentId, level: "Medium" });
+    const highCount = await Incident.countDocuments({
+      studentId,
+      level: "High",
+    });
+    const medCount = await Incident.countDocuments({
+      studentId,
+      level: "Medium",
+    });
 
     let riskLevel = "Low";
     if (highCount > 0) riskLevel = "High";
@@ -198,41 +274,53 @@ export const createIncident = async (req, res) => {
 
     /* ================= NOTIFICATION ================= */
 
-const student = await Student.findById(studentId);
+    const student = await Student.findById(studentId);
 
-let targetUserId = null;
+    let targetUserId = null;
 
-if (student) {
-  const user = await User.findOne({
-    studentId: student.studentId,
-  });
+    if (student) {
+      const user = await User.findOne({
+        studentId: student.studentId,
+      });
 
-  if (user) {
-    targetUserId = user._id;
-  }
-}
+      if (user) {
+        targetUserId = user._id;
+      }
+    }
 
-if (targetUserId) {
-  await Notification.create({
-    userId: targetUserId,
-    title: "Incident Notice",
-    message: `A new incident has been recorded: "${title}".`,
-    type: "warning",
-    priority: level?.toLowerCase() === "high" ? "high" : "medium",
-  });
+    if (targetUserId) {
+      await Notification.create({
+        userId: targetUserId,
+        title: "Incident Notice",
+        message: `A new incident has been recorded: "${title}".`,
+        type: "warning",
+        priority: level?.toLowerCase() === "high" ? "high" : "medium",
+      });
 
-  io.to(targetUserId.toString()).emit("newNotification", {
-    id: Date.now(),
-    title: "Incident Notice",
-    message: `A new incident has been recorded: "${title}".`,
-    type: "warning",
-    priority: level?.toLowerCase() === "high" ? "high" : "medium",
-    isRead: false,
-    createdAt: new Date().toISOString(),
-  });
-}
+      io.to(targetUserId.toString()).emit("newNotification", {
+        id: Date.now(),
+        title: "Incident Notice",
+        message: `A new incident has been recorded: "${title}".`,
+        type: "warning",
+        priority: level?.toLowerCase() === "high" ? "high" : "medium",
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      });
+    }
 
-console.log("✅ Notification sent to:", user._id.toString());
+    console.log("✅ Notification sent to:", user._id.toString());
+
+    await notifyStudent({
+      studentId,
+      title: "Incident Notice",
+      message: `A new incident has been recorded: "${title}".`,
+      type: "warning",
+      priority: level?.toLowerCase() === "high" ? "high" : "medium",
+      data: {
+        type: "incident",
+        incidentId: incident._id.toString(),
+      },
+    });
 
     /* 🔥 REAL-TIME */
     io.emit("caseCreated", incident);
@@ -254,7 +342,7 @@ export const getIncidentById = async (req, res) => {
     const incident = await Incident.findById(req.params.id)
       .populate(
         "studentId",
-        "firstName middleName lastName grade gender studentId profilePhoto"
+        "firstName middleName lastName grade gender studentId profilePhoto",
       )
       .populate({
         path: "reportId",
@@ -297,21 +385,16 @@ export const getIncidentById = async (req, res) => {
     // DEBUG
     // =====================================================
 
-    console.log(
-      "========== INCIDENT DETAILS STATUS =========="
-    );
+    console.log("========== INCIDENT DETAILS STATUS ==========");
 
     console.log({
       incidentId: incident._id,
       incidentStatus: incident.status,
-      interventionStatus:
-        intervention?.status || null,
+      interventionStatus: intervention?.status || null,
       effectiveStatus,
     });
 
-    console.log(
-      "============================================="
-    );
+    console.log("=============================================");
 
     // =====================================================
     // RETURN INCIDENT + INTERVENTION
@@ -365,6 +448,18 @@ export const completeIncident = async (req, res) => {
 
     await incident.save();
 
+    await notifyStudent({
+      studentId: incident.studentId,
+      title: "Incident Completed",
+      message: "Your incident has been marked as completed.",
+      type: "incident_completed",
+      priority: "low",
+      data: {
+        type: "incident_completed",
+        incidentId: incident._id.toString(),
+      },
+    });
+
     // =====================================================
     // UPDATE CONNECTED REPORT
     // =====================================================
@@ -377,14 +472,14 @@ export const completeIncident = async (req, res) => {
         },
         {
           new: true,
-        }
+        },
       );
 
       console.log(
         "✅ Connected report updated:",
         report?._id,
         "→",
-        report?.status
+        report?.status,
       );
     }
 
@@ -414,7 +509,6 @@ export const completeIncident = async (req, res) => {
       message: "Incident and connected report marked as completed",
       incident,
     });
-
   } catch (err) {
     console.error("completeIncident error:", err);
 
@@ -443,8 +537,14 @@ export const deleteIncident = async (req, res) => {
 
     const totalIncidents = await Incident.countDocuments({ studentId });
 
-    const highCount = await Incident.countDocuments({ studentId, level: "High" });
-    const medCount = await Incident.countDocuments({ studentId, level: "Medium" });
+    const highCount = await Incident.countDocuments({
+      studentId,
+      level: "High",
+    });
+    const medCount = await Incident.countDocuments({
+      studentId,
+      level: "Medium",
+    });
 
     let riskLevel = "Low";
     if (highCount > 0) riskLevel = "High";
@@ -471,16 +571,19 @@ export const getIncidentsByStudent = async (req, res) => {
     const studentId = req.params.id;
 
     if (!studentId || !mongoose.Types.ObjectId.isValid(studentId)) {
-  return res.status(400).json({
-    message: "Invalid or missing studentId",
-    received: studentId,
-  });
-}
+      return res.status(400).json({
+        message: "Invalid or missing studentId",
+        received: studentId,
+      });
+    }
 
     const incidents = await Incident.find({
       studentId: new mongoose.Types.ObjectId(studentId),
     })
-      .populate("studentId", "firstName middleName lastName studentId grade gender profilePhoto")
+      .populate(
+        "studentId",
+        "firstName middleName lastName studentId grade gender profilePhoto",
+      )
       .sort({ createdAt: -1 });
 
     return res.json(incidents);
@@ -537,12 +640,12 @@ export const submitStudentStatement = async (req, res) => {
     }
 
     const log = {
-  stage: "STUDENT STATEMENT SUBMITTED",
-  note: statement,
-  time: new Date(),
-  changedBy: req.user._id,
-  changedByName: req.user.name,
-};
+      stage: "STUDENT STATEMENT SUBMITTED",
+      note: statement,
+      time: new Date(),
+      changedBy: req.user._id,
+      changedByName: req.user.name,
+    };
 
     incident.studentStatement = statement;
     incident.statementStatus = "submitted";
@@ -585,7 +688,6 @@ export const manualStudentStatement = async (req, res) => {
     incident.status = "saved-student-statement";
     incident.statementStatus = "manual_entry";
 
-
     incident.statementSubmittedAt = new Date();
 
     const log = {
@@ -602,37 +704,50 @@ export const manualStudentStatement = async (req, res) => {
 
     const student = await Student.findById(incident.studentId);
 
-if (student) {
-  const user = await User.findOne({
-    studentId: student.studentId,
-  });
+    if (student) {
+      const user = await User.findOne({
+        studentId: student.studentId,
+      });
 
-  if (user) {
-    await Notification.create({
-      userId: user._id,
+      if (user) {
+        await Notification.create({
+          userId: user._id,
+          title: "Incident Update",
+          message: `Your incident status is now "saved-student-statement".`,
+          type: "update",
+          priority: "low",
+        });
+
+        io.to(user._id.toString()).emit("newNotification", {
+          id: Date.now(),
+          title: "Incident Update",
+          message: `Your incident status is now "saved-student-statement".`,
+          type: "update",
+          priority: "low",
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    await notifyStudent({
+      studentId: incident.studentId,
       title: "Incident Update",
-      message: `Your incident status is now "saved-student-statement".`,
+      message: 'Your incident status is now "saved-student-statement".',
       type: "update",
       priority: "low",
+      data: {
+        type: "incident_update",
+        incidentId: incident._id.toString(),
+        status: "saved-student-statement",
+      },
     });
 
-    io.to(user._id.toString()).emit("newNotification", {
-      id: Date.now(),
-      title: "Incident Update",
-      message: `Your incident status is now "saved-student-statement".`,
-      type: "update",
-      priority: "low",
-      isRead: false,
-      createdAt: new Date().toISOString()
-    });
-  }
-}
-
-console.log("✅ Notification sent to:", user._id.toString());
+    console.log("✅ Notification sent to:", user._id.toString());
 
     const populated = await Incident.findById(incident._id).populate(
       "studentId",
-      "firstName middleName lastName studentId grade gender profilePhoto"
+      "firstName middleName lastName studentId grade gender profilePhoto",
     );
 
     req.app.get("io")?.emit("caseUpdated", populated);
@@ -650,7 +765,7 @@ console.log("✅ Notification sent to:", user._id.toString());
 /* ================= UPDATE STATUS ================= */
 export const updateIncidentStatus = async (req, res) => {
   try {
-    const { status, note, escalationInfo  } = req.body;
+    const { status, note, escalationInfo } = req.body;
 
     const incident = await Incident.findById(req.params.id);
 
@@ -671,35 +786,35 @@ export const updateIncidentStatus = async (req, res) => {
     ];
 
     const currentIndex = flow.indexOf(incident.status);
-const nextIndex = flow.indexOf(status);
+    const nextIndex = flow.indexOf(status);
 
-if (nextIndex === -1) {
-  return res.status(400).json({
-    message: "Invalid status value",
-    attempted: status,
-  });
-}
+    if (nextIndex === -1) {
+      return res.status(400).json({
+        message: "Invalid status value",
+        attempted: status,
+      });
+    }
 
-// allow same or next step OR admin override
-const allowedTransitions = {
-  received: ["reviewing"],
-  reviewing: ["saved-student-statement", "refer-for-intervention"],
-  "saved-student-statement": ["reviewing", "refer-for-intervention"],
-  "refer-for-intervention": ["intervention-ready"],
-  "intervention-ready": ["completed"],
-  completed: [],
-};
+    // allow same or next step OR admin override
+    const allowedTransitions = {
+      received: ["reviewing"],
+      reviewing: ["saved-student-statement", "refer-for-intervention"],
+      "saved-student-statement": ["reviewing", "refer-for-intervention"],
+      "refer-for-intervention": ["intervention-ready"],
+      "intervention-ready": ["completed"],
+      completed: [],
+    };
 
-if (
-  !allowedTransitions[incident.status]?.includes(status) &&
-  status !== incident.status
-) {
-  return res.status(400).json({
-    message: "Invalid status transition",
-    current: incident.status,
-    attempted: status,
-  });
-}
+    if (
+      !allowedTransitions[incident.status]?.includes(status) &&
+      status !== incident.status
+    ) {
+      return res.status(400).json({
+        message: "Invalid status transition",
+        current: incident.status,
+        attempted: status,
+      });
+    }
 
     /* ================= REVIEWER TRACKING ================= */
     if (status === "reviewing" && !incident.reviewedBy) {
@@ -724,74 +839,87 @@ if (
     });
 
     if (escalationInfo) {
-  incident.escalationInfo = escalationInfo;
-}
+      incident.escalationInfo = escalationInfo;
+    }
 
     await incident.save();
 
     // =====================================================
-// SYNC CONNECTED REPORT STATUS
-// =====================================================
+    // SYNC CONNECTED REPORT STATUS
+    // =====================================================
 
-if (status === "completed" && incident.reportId) {
-  const report = await Report.findByIdAndUpdate(
-    incident.reportId,
-    {
-      status: "completed",
-    },
-    {
-      new: true,
+    if (status === "completed" && incident.reportId) {
+      const report = await Report.findByIdAndUpdate(
+        incident.reportId,
+        {
+          status: "completed",
+        },
+        {
+          new: true,
+        },
+      );
+
+      console.log(
+        "✅ Report synchronized with completed incident:",
+        report?._id,
+        "→",
+        report?.status,
+      );
+
+      // Notify connected clients
+      io.emit("reportUpdated", {
+        reportId: incident.reportId,
+        status: "completed",
+      });
     }
-  );
-
-  console.log(
-    "✅ Report synchronized with completed incident:",
-    report?._id,
-    "→",
-    report?.status
-  );
-
-  // Notify connected clients
-  io.emit("reportUpdated", {
-    reportId: incident.reportId,
-    status: "completed",
-  });
-}
 
     const student = await Student.findById(incident.studentId);
 
-if (student) {
-  const user = await User.findOne({
-    studentId: student.studentId,
-  });
+    if (student) {
+      const user = await User.findOne({
+        studentId: student.studentId,
+      });
 
-  if (user) {
-    await Notification.create({
-      userId: user._id,
+      if (user) {
+        await Notification.create({
+          userId: user._id,
+          title: "Incident Update",
+          message: `Your incident status is now "${status}".`,
+          type: "update",
+          priority: "low",
+        });
+
+        io.to(user._id.toString()).emit("newNotification", {
+          id: Date.now(),
+          title: "Incident Update",
+          message: `Your incident status is now "${status}".`,
+          type: "update",
+          priority: "low",
+          isRead: false,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    await notifyStudent({
+      studentId: incident.studentId,
       title: "Incident Update",
       message: `Your incident status is now "${status}".`,
       type: "update",
-      priority: "low",
+      priority: status === "completed" ? "low" : "medium",
+      data: {
+        type: "incident_update",
+        incidentId: incident._id.toString(),
+        status,
+      },
     });
 
-    io.to(user._id.toString()).emit("newNotification", {
-      id: Date.now(),
-      title: "Incident Update",
-      message: `Your incident status is now "${status}".`,
-      type: "update",
-      priority: "low",
-      isRead: false,
-      createdAt: new Date().toISOString()
-    });
-  }
-}
-
-console.log("✅ Notification sent to:", user._id.toString());
+    console.log("✅ Notification sent to:", user._id.toString());
 
     /* ================= POPULATE ================= */
     const populated = await Incident.findById(incident._id).populate(
       "studentId",
-      "firstName middleName lastName studentId grade gender profilePhoto"
+      "firstName middleName lastName studentId grade gender profilePhoto",
     );
 
     /* ================= SOCKET ================= */

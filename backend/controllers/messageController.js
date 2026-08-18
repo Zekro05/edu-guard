@@ -18,7 +18,8 @@ export const sendMessage = async (req, res) => {
 
     const chatId = createChatId(sender, receiver);
 
-    // Save message ONCE
+    /* ================= SAVE MESSAGE ================= */
+
     const message = await Message.create({
       chatId,
       sender,
@@ -31,30 +32,99 @@ export const sendMessage = async (req, res) => {
 
     /* ================= LIVE MESSAGE ================= */
 
-    io.to(String(receiver)).emit(
-      "receive_message",
-      message
-    );
+    io.to(String(receiver)).emit("receive_message", message);
 
-    console.log(
-      "📩 receive_message sent to:",
-      receiver
-    );
+    console.log("📩 receive_message sent to:", receiver);
+
+    /* ================= GET USERS ================= */
+
+    const senderUser = await User.findById(sender);
+    const receiverUser = await User.findById(receiver);
+
+    const senderName =
+      senderUser?.name ||
+      `${senderUser?.firstName || ""} ${senderUser?.lastName || ""}`.trim() ||
+      "User";
 
     /* ================= ACTIVITY FEED ================= */
 
-    const senderUser = await User.findById(sender);
-
     io.emit("activity_feed", {
       type: "message",
-      message: `💬 ${senderUser?.name || "User"}: ${text}`,
+      message: `💬 ${senderName}: ${text.trim()}`,
       time: new Date(),
     });
 
     console.log("🔥 Activity feed emitted");
 
-    res.status(201).json(message);
+    /* ================= DATABASE NOTIFICATION ================= */
 
+    if (receiverUser) {
+      await Notification.create({
+        userId: receiverUser._id,
+        title: "New Message",
+        message: `${senderName}: ${text.trim()}`,
+        type: "message",
+        priority: "medium",
+      });
+
+      console.log("🔔 Message notification saved for:", receiverUser.email);
+    }
+
+    /* ================= REAL-TIME NOTIFICATION ================= */
+
+    io.to(String(receiver)).emit("newNotification", {
+      id: Date.now(),
+      title: "New Message",
+      message: `${senderName}: ${text.trim()}`,
+      type: "message",
+      priority: "medium",
+      isRead: false,
+      createdAt: new Date().toISOString(),
+      data: {
+        type: "message",
+        messageId: message._id.toString(),
+        chatId,
+        senderId: sender,
+        receiverId: receiver,
+      },
+    });
+
+    console.log("🔔 Real-time notification sent to:", receiver);
+
+    /* ================= PHONE PUSH NOTIFICATION ================= */
+
+    if (receiverUser?.expoPushToken) {
+      try {
+        await sendPushNotification({
+          token: receiverUser.expoPushToken,
+
+          title: `New Message from ${senderName}`,
+
+          body: text.trim(),
+
+          data: {
+            type: "message",
+            messageId: message._id.toString(),
+            chatId,
+            senderId: String(sender),
+            receiverId: String(receiver),
+          },
+        });
+
+        console.log("📱 Push notification sent to:", receiverUser.email);
+      } catch (pushError) {
+        console.error("⚠️ Push notification failed:", pushError.message);
+      }
+    } else {
+      console.log(
+        "⚠️ Receiver has no Expo push token:",
+        receiverUser?.email || receiver,
+      );
+    }
+
+    /* ================= RESPONSE ================= */
+
+    res.status(201).json(message);
   } catch (err) {
     console.error("❌ SEND MESSAGE ERROR:", err);
 

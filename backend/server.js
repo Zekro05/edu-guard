@@ -24,6 +24,7 @@ import interventionRoutes from "./routes/interventionRoutes.js";
 import caseRoutes from "./routes/caseRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import notificationSettingsRoutes from "./routes/notificationSettings.js";
+import pushNotificationRoutes from "./routes/pushNotificationRoutes.js";
 
 import { User } from "./models/userModel.js";
 
@@ -321,6 +322,11 @@ app.use("/api/upload", uploadRoutes);
 app.use(
   "/api/notification-settings",
   notificationSettingsRoutes
+);
+
+app.use(
+  "/api/push-notifications",
+  pushNotificationRoutes
 );
 
 /* =========================================================

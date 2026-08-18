@@ -335,14 +335,13 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-        // 🚫 STUDENTS ARE NOT ALLOWED TO USE THIS LOGIN
+    // 🚫 STUDENTS ARE NOT ALLOWED TO USE THIS LOGIN
     if (user.role === "student") {
       return res.status(403).json({
         success: false,
         message: "Student accounts cannot login here.",
       });
     }
-
 
     // role check optional
     if (accountType && user.role !== accountType.toLowerCase()) {
@@ -638,6 +637,44 @@ export const logout = async (req, res) => {
 
   res.clearCookie("token", { httpOnly: true, sameSite: "lax" });
   res.status(200).json({ success: true, message: "Logged out successfully" });
+};
+
+export const saveExpoPushToken = async (req, res) => {
+  try {
+    const { expoPushToken } = req.body;
+
+    if (!expoPushToken) {
+      return res.status(400).json({
+        message: "Expo push token is required",
+      });
+    }
+
+    const userId = req.user._id;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        expoPushToken,
+      },
+      { new: true },
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    res.status(200).json({
+      message: "Push token saved successfully",
+    });
+  } catch (error) {
+    console.error("SAVE PUSH TOKEN ERROR:", error);
+
+    res.status(500).json({
+      message: "Failed to save push token",
+    });
+  }
 };
 
 //  FORGOT PASSWORD

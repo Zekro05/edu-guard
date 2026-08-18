@@ -1,16 +1,22 @@
 import Intervention from "../models/interventionModel.js";
 import Incident from "../models/incidentModel.js";
 
-
 /* ================= CREATE INTERVENTION ================= */
 export const createIntervention = async (req, res) => {
   try {
-    const { studentId, type, description, interventionBy, approvedBy } =
-      req.body;
+    const {
+      studentId,
+      incidentId,
+      type,
+      description,
+      interventionBy,
+      approvedBy,
+    } = req.body;
 
     // Find the latest incident for this student
-    const incident = await Incident.findOne({ studentId }).sort({
-      createdAt: -1,
+    const incident = await Incident.findOne({
+      _id: incidentId,
+      studentId,
     });
 
     if (!incident) {
@@ -131,7 +137,6 @@ export const getStudentInterventions = async (req, res) => {
 export const resolveIntervention = async (req, res) => {
   try {
     const { id } = req.params;
-
     const { completedBy } = req.body;
 
     const intervention = await Intervention.findById(id);
@@ -142,25 +147,53 @@ export const resolveIntervention = async (req, res) => {
       });
     }
 
+    // ============================================
+    // COMPLETE INTERVENTION
+    // ============================================
+
     intervention.status = "completed";
 
-    intervention.completedBy =
-      completedBy || req.user?.name || "Guidance Admin";
+    const completedByName = completedBy || req.user?.name || "Guidance Admin";
+
+    intervention.completedBy = completedByName;
 
     intervention.auditLogs.push({
       action: "Intervention Completed",
       note: "Marked as completed",
-      by: completedBy || req.user?.name || "Guidance Admin",
-      createdAt: new Date(),
+      by: completedByName,
+      time: new Date(),
     });
 
     await intervention.save();
 
-    res.json(intervention);
+    // ============================================
+    // COMPLETE ONLY THE LINKED INCIDENT
+    // ============================================
+
+    const incident = await Incident.findById(intervention.incidentId);
+
+    if (incident) {
+      incident.status = "completed";
+      incident.completedAt = new Date();
+
+      await incident.save();
+
+      console.log("✅ Linked incident completed:", incident._id);
+    }
+
+    // ============================================
+    // RESPONSE
+    // ============================================
+
+    return res.json({
+      message: "Intervention and linked incident completed",
+      intervention,
+      incident,
+    });
   } catch (err) {
     console.error("resolveIntervention error:", err);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: err.message,
     });
   }

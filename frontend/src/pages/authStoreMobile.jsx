@@ -4,7 +4,7 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert } from "react-native";
 import { Platform } from "react-native";
-
+import { registerForPushNotificationsAsync } from "../services/notificationService";
 /* ================= API ================= */
 export const API = axios.create({
   baseURL: "https://edu-guard-backend.onrender.com",
@@ -98,6 +98,35 @@ export const useAuthStore = create((set, get) => ({
   teacherData: null,
   otpCode: null,
 
+  /* ================= PUSH NOTIFICATIONS ================= */
+  registerPushToken: async () => {
+    try {
+      const { user } = get();
+
+      if (!user?._id) {
+        console.log("⚠️ Cannot register push token: no user.");
+        return;
+      }
+
+      const expoPushToken = await registerForPushNotificationsAsync();
+
+      if (!expoPushToken) {
+        return;
+      }
+
+      await API.post("/api/auth/save-push-token", {
+        expoPushToken,
+      });
+
+      console.log("✅ Push token saved to EduGuard backend.");
+    } catch (err) {
+      console.log(
+        "❌ SAVE PUSH TOKEN ERROR:",
+        err.response?.data || err.message,
+      );
+    }
+  },
+
   /* ================= CHECK AUTH ================= */
   checkAuth: async () => {
     try {
@@ -173,7 +202,7 @@ export const useAuthStore = create((set, get) => ({
           profilePhoto: student.profilePhoto || "",
         };
       } else if (data.user.role === "teacher") {
-        const { data: teacher  } = await API.get(
+        const { data: teacher } = await API.get(
           `/api/teachers/${data.user.employeeId}`,
         );
 
@@ -205,6 +234,9 @@ export const useAuthStore = create((set, get) => ({
       await AsyncStorage.setItem("user", JSON.stringify(userData));
 
       connectSocketSafely(userData._id);
+      setTimeout(() => {
+        get().registerPushToken();
+      }, 300);
     } catch (err) {
       console.log("CHECK AUTH ERROR:", err.message);
 
@@ -316,6 +348,11 @@ export const useAuthStore = create((set, get) => ({
       await AsyncStorage.setItem("user", JSON.stringify(userData));
 
       connectSocketSafely(userData._id);
+
+      // Register phone for push notifications
+      setTimeout(() => {
+        get().registerPushToken();
+      }, 300);
 
       return { success: true };
     } catch (err) {
@@ -430,7 +467,8 @@ export const useAuthStore = create((set, get) => ({
 
       setTimeout(() => {
         connectSocketSafely(userData._id);
-      }, 150);
+        get().registerPushToken();
+      }, 300);
 
       Alert.alert("Success", "Login verified!");
 
@@ -487,6 +525,7 @@ export const useAuthStore = create((set, get) => ({
       isAuthenticated: false,
       tempEmail: null,
       otpRequired: false,
+      teacherData: null,
     });
 
     return { success: true };

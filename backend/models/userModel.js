@@ -1,112 +1,116 @@
 import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema({
-  firstName: { type: String},
-  middleName: { type: String },
-  lastName: { type: String},
-  name: {
-    type: String,
-    required: true,
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-  },
-
-  password: {
-    type: String,
-    required: true,
-  },
-
-  role: {
-    type: String,
-    enum: ["admin", "student", "teacher"],
-    default: "student", 
-  },
-
-  profilePhoto: {
-  type: String, 
-  default: "",  
-},
-
-  studentId: {
-    type: String,
-    required: function () {
-      return this.role === "student"; 
+const userSchema = new mongoose.Schema(
+  {
+    firstName: { type: String },
+    middleName: { type: String },
+    lastName: { type: String },
+    name: {
+      type: String,
+      required: true,
     },
-  },
-
-  employeeId: {
-    type: String,
-    required: function () {
-      return this.role === "teacher"; 
+    email: {
+      type: String,
+      required: true,
+      unique: true,
     },
-  },
 
+    password: {
+      type: String,
+      required: true,
+    },
 
+    role: {
+      type: String,
+      enum: ["admin", "student", "teacher"],
+      default: "student",
+    },
 
-  lastLogin: {
-    type: Date,
-    default: Date.now,
-  },
+    expoPushToken: {
+      type: String,
+      default: null,
+    },
 
-  isVerified: {
-    type: Boolean,
-    default: false,
-  },
+    profilePhoto: {
+      type: String,
+      default: "",
+    },
 
-  notificationSettings: {
-  mute: {
-    type: Boolean,
-    default: false,
-  },
-  incidentUpdates: {
-    type: Boolean,
-    default: true,
-  },
-  guidanceMessages: {
-    type: Boolean,
-    default: true,
-  },
-  systemAnnouncements: {
-    type: Boolean,
-    default: true,
-  },
-  highRiskAlerts: {
-    type: Boolean,
-    default: true,
-  },
-  quietHours: {
-    type: Boolean,
-    default: false,
-  },
-  sound: {
-    type: Boolean,
-    default: true,
-  },
-  vibration: {
-    type: Boolean,
-    default: true,
-  },
-},
+    studentId: {
+      type: String,
+      required: function () {
+        return this.role === "student";
+      },
+    },
 
-  // SIGNUP EMAIL VERIFICATION
-  verificationToken: String,
-  verificationTokenExpiresAt: Date,
+    employeeId: {
+      type: String,
+      required: function () {
+        return this.role === "teacher";
+      },
+    },
 
-  // LOGIN OTP
-  loginOTP: String,
-  loginOTPExpiresAt: Date,
+    lastLogin: {
+      type: Date,
+      default: Date.now,
+    },
 
-  forgotPasswordOTP: String,
-  
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
 
-  // PASSWORD RESET
-  resetPasswordToken: String,
-  resetPasswordExpiresAt: Date,
+    notificationSettings: {
+      mute: {
+        type: Boolean,
+        default: false,
+      },
+      incidentUpdates: {
+        type: Boolean,
+        default: true,
+      },
+      guidanceMessages: {
+        type: Boolean,
+        default: true,
+      },
+      systemAnnouncements: {
+        type: Boolean,
+        default: true,
+      },
+      highRiskAlerts: {
+        type: Boolean,
+        default: true,
+      },
+      quietHours: {
+        type: Boolean,
+        default: false,
+      },
+      sound: {
+        type: Boolean,
+        default: true,
+      },
+      vibration: {
+        type: Boolean,
+        default: true,
+      },
+    },
 
-}, { timestamps: true });
+    // SIGNUP EMAIL VERIFICATION
+    verificationToken: String,
+    verificationTokenExpiresAt: Date,
+
+    // LOGIN OTP
+    loginOTP: String,
+    loginOTPExpiresAt: Date,
+
+    forgotPasswordOTP: String,
+
+    // PASSWORD RESET
+    resetPasswordToken: String,
+    resetPasswordExpiresAt: Date,
+  },
+  { timestamps: true },
+);
 
 export const User = mongoose.model("User", userSchema);
 export default User;

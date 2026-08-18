@@ -11,7 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { useTheme } from "../../assets/styles/theme/useTheme";
-import { API, useAuthStore } from "../../store/authStore";
+import { API, useAuthStore } from "../store/authStore";
 
 export default function IncidentHistory() {
   const { user } = useAuthStore();
