@@ -39,176 +39,104 @@ Notifications.setNotificationHandler({
 });
 
 /* =========================================================
-   REGISTER PUSH TOKEN
+   REGISTER PUSH NOTIFICATIONS
 ========================================================= */
 
-const registerForPushNotifications = async () => {
+const registerForPushNotificationsAsync = async () => {
   try {
-    /*
-      Push notifications require a physical device.
-    */
-
-    if (!Device.isDevice) {
-      console.log(
-        "⚠️ Push notifications require a physical device."
-      );
-
+    if (Platform.OS === "web") {
+      console.log("Push notifications are not supported on web.");
       return null;
     }
 
-    /*
-      ANDROID NOTIFICATION CHANNEL
-    */
+    /* ================= ANDROID CHANNEL ================= */
 
     if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync(
-        "default",
-        {
-          name: "default",
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          sound: "default",
-          lockscreenVisibility:
-            Notifications.AndroidNotificationVisibility.PUBLIC,
-        }
-      );
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "EduGuard Notifications",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        sound: "default",
+      });
     }
 
-    /*
-      CHECK PERMISSION
-    */
+    /* ================= CHECK PERMISSION ================= */
 
-    const {
-      status: existingStatus,
-    } = await Notifications.getPermissionsAsync();
+    const { status: existingStatus } =
+      await Notifications.getPermissionsAsync();
 
     let finalStatus = existingStatus;
 
-    /*
-      ASK USER FOR PERMISSION
-    */
-
     if (existingStatus !== "granted") {
-      const {
-        status,
-      } = await Notifications.requestPermissionsAsync();
+      const { status } = await Notifications.requestPermissionsAsync();
 
       finalStatus = status;
     }
 
     if (finalStatus !== "granted") {
-      console.log(
-        "⚠️ Notification permission was not granted."
-      );
-
+      console.log("❌ Push notification permission denied.");
       return null;
     }
 
-    /*
-      EXPO PROJECT ID
-    */
+    /* ================= GET PROJECT ID ================= */
 
     const projectId =
-      Constants.expoConfig?.extra?.eas?.projectId ||
-      Constants.easConfig?.projectId;
+      Constants?.expoConfig?.extra?.eas?.projectId ??
+      Constants?.easConfig?.projectId;
 
     if (!projectId) {
-      console.log(
-        "❌ Expo projectId not found."
-      );
-
+      console.log("❌ Expo projectId not found.");
       return null;
     }
 
-    /*
-      GET EXPO PUSH TOKEN
-    */
+    /* ================= GET EXPO TOKEN ================= */
 
-    const tokenResponse =
+    const token = (
       await Notifications.getExpoPushTokenAsync({
         projectId,
-      });
+      })
+    ).data;
 
-    const expoPushToken =
-      tokenResponse.data;
+    console.log("====================================");
+    console.log("📱 EXPO PUSH TOKEN:");
+    console.log(token);
+    console.log("====================================");
 
-    console.log(
-      "📱 EXPO PUSH TOKEN:",
-      expoPushToken
-    );
-
-    return expoPushToken;
-
+    return token;
   } catch (error) {
-    console.error(
-      "❌ REGISTER PUSH NOTIFICATION ERROR:",
-      error
-    );
+    console.error("❌ PUSH NOTIFICATION REGISTRATION ERROR:", error);
 
     return null;
   }
 };
 
-const registerPushTokenWithBackend = async () => {
+/* =========================================================
+   SAVE PUSH TOKEN TO BACKEND
+========================================================= */
+
+const savePushTokenToBackend = async () => {
   try {
-    const expoPushToken =
-      await registerForPushNotifications();
+    const token = await registerForPushNotificationsAsync();
 
-    if (!expoPushToken) {
-      return {
-        success: false,
-        error: "No Expo push token available.",
-      };
+    if (!token) {
+      console.log("⚠️ No Expo push token available.");
+      return false;
     }
 
-    const { data } = await API.post(
-      "/api/auth/push-token",
-      {
-        expoPushToken,
-      }
-    );
+    await API.post("/api/auth/save-push-token", {
+      expoPushToken: token,
+    });
 
-    console.log(
-      "✅ PUSH TOKEN REGISTERED:",
-      data
-    );
+    console.log("✅ Expo push token saved to backend.");
 
-    /*
-      Save locally too.
-    */
-
-    const storedUser =
-      await AsyncStorage.getItem("user");
-
-    if (storedUser) {
-      const user = JSON.parse(storedUser);
-
-      await AsyncStorage.setItem(
-        "user",
-        JSON.stringify({
-          ...user,
-          expoPushToken,
-        })
-      );
-    }
-
-    return {
-      success: true,
-      expoPushToken,
-    };
-
+    return true;
   } catch (error) {
     console.error(
       "❌ SAVE PUSH TOKEN ERROR:",
-      error.response?.data || error.message
+      error.response?.data || error.message,
     );
 
-    return {
-      success: false,
-      error:
-        error.response?.data?.message ||
-        error.message,
-    };
+    return false;
   }
 };
 
@@ -340,6 +268,46 @@ export const useAuthStore = create((set, get) => ({
        CHECK AUTH
     ===================================================== */
 
+    /* =====================================================
+   SAVE EXPO PUSH TOKEN
+===================================================== */
+
+saveExpoPushToken: async (expoPushToken) => {
+  try {
+    if (!expoPushToken) {
+      console.log("⚠️ No Expo push token provided.");
+
+      return {
+        success: false,
+        error: "No Expo push token.",
+      };
+    }
+
+    await API.post("/api/auth/save-push-token", {
+      expoPushToken,
+    });
+
+    console.log("✅ Expo push token saved.");
+
+    return {
+      success: true,
+    };
+  } catch (error) {
+    console.error(
+      "SAVE EXPO PUSH TOKEN ERROR:",
+      error.response?.data || error.message
+    );
+
+    return {
+      success: false,
+      error:
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to save push token.",
+    };
+  }
+},
+
   checkAuth: async () => {
     try {
       set({
@@ -459,8 +427,7 @@ export const useAuthStore = create((set, get) => ({
           );
         }
       } else if (data.user.role === "teacher") {
-
-      /* =================================================
+        /* =================================================
            TEACHER
         ================================================= */
         try {
@@ -517,7 +484,9 @@ export const useAuthStore = create((set, get) => ({
 
       connectSocketSafely(userData._id);
 
-      registerPushTokenWithBackend();
+      setTimeout(() => {
+        savePushTokenToBackend();
+      }, 500);
     } catch (error) {
       console.log(
         "CHECK AUTH ERROR:",
@@ -643,8 +612,7 @@ export const useAuthStore = create((set, get) => ({
           console.log("STUDENT PROFILE ERROR:", error.message);
         }
       } else if (data.user.role === "teacher") {
-
-      /* =================================================
+        /* =================================================
            TEACHER
         ================================================= */
         try {
@@ -696,7 +664,9 @@ export const useAuthStore = create((set, get) => ({
 
       connectSocketSafely(userData._id);
 
-      registerPushTokenWithBackend();
+      setTimeout(() => {
+        savePushTokenToBackend();
+      }, 500);
 
       return {
         success: true,
@@ -799,8 +769,7 @@ export const useAuthStore = create((set, get) => ({
           console.log("STUDENT OTP PROFILE ERROR:", error.message);
         }
       } else if (data.user.role === "teacher") {
-
-      /* =================================================
+        /* =================================================
            TEACHER
         ================================================= */
         try {
@@ -860,8 +829,9 @@ export const useAuthStore = create((set, get) => ({
         connectSocketSafely(userData._id);
       }, 150);
 
-      registerPushTokenWithBackend();
-
+      setTimeout(() => {
+        savePushTokenToBackend();
+      }, 700);
 
       Alert.alert("Success", "Login verified!");
 

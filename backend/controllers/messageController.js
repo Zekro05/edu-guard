@@ -1,7 +1,7 @@
 import Message from "../models/message.js";
 import { io } from "../server.js"; // ✅ IMPORT SOCKET
 import { User } from "../models/userModel.js";
-
+import { sendPushNotification } from "../utils/pushNotification.js";
 /* CREATE CHAT ID */
 const createChatId = (a, b) => [a, b].sort().join("-");
 
@@ -30,21 +30,93 @@ export const sendMessage = async (req, res) => {
 
     console.log("💾 Message saved:", message._id);
 
-    /* ================= LIVE MESSAGE ================= */
+    /* ================= GET SENDER ================= */
 
-    io.to(String(receiver)).emit("receive_message", message);
-
-    console.log("📩 receive_message sent to:", receiver);
-
-    /* ================= GET USERS ================= */
-
-    const senderUser = await User.findById(sender);
-    const receiverUser = await User.findById(receiver);
+    const senderUser = await User.findById(sender).select(
+      "name firstName lastName email"
+    );
 
     const senderName =
       senderUser?.name ||
       `${senderUser?.firstName || ""} ${senderUser?.lastName || ""}`.trim() ||
       "User";
+
+    /* ================= GET RECEIVER ================= */
+
+    const receiverUser = await User.findById(receiver).select(
+      "expoPushToken email name firstName lastName"
+    );
+
+    if (!receiverUser) {
+      return res.status(404).json({
+        message: "Receiver not found",
+      });
+    }
+
+    /* ================= LIVE MESSAGE ================= */
+
+    io.to(String(receiver)).emit(
+      "receive_message",
+      message
+    );
+
+    console.log(
+      "📩 receive_message sent to:",
+      receiver
+    );
+
+    /* ================= MESSAGE NOTIFICATION ================= */
+
+    io.to(String(receiver)).emit("newNotification", {
+      id: Date.now(),
+      title: `New message from ${senderName}`,
+      message: text.trim(),
+      type: "message",
+      priority: "medium",
+      isRead: false,
+      createdAt: new Date().toISOString(),
+      data: {
+        type: "message",
+        chatId,
+        senderId: sender,
+        receiverId: receiver,
+        messageId: message._id.toString(),
+      },
+    });
+
+    /* ================= PHONE PUSH NOTIFICATION ================= */
+
+    if (receiverUser.expoPushToken) {
+      try {
+        await sendPushNotification({
+          token: receiverUser.expoPushToken,
+          title: `💬 ${senderName}`,
+          body: text.trim(),
+          data: {
+            type: "message",
+            chatId,
+            senderId: sender,
+            receiverId: receiver,
+            messageId: message._id.toString(),
+          },
+        });
+
+        console.log(
+          "📱 Message push notification sent to:",
+          receiverUser.email
+        );
+      } catch (pushError) {
+        console.error(
+          "⚠️ MESSAGE PUSH ERROR:",
+          pushError.message
+        );
+      }
+    } else {
+      console.log(
+        "⚠️ Receiver has no Expo push token:",
+        receiverUser.email
+      );
+    }
 
     /* ================= ACTIVITY FEED ================= */
 
@@ -56,79 +128,12 @@ export const sendMessage = async (req, res) => {
 
     console.log("🔥 Activity feed emitted");
 
-    /* ================= DATABASE NOTIFICATION ================= */
+    return res.status(201).json(message);
 
-    if (receiverUser) {
-      await Notification.create({
-        userId: receiverUser._id,
-        title: "New Message",
-        message: `${senderName}: ${text.trim()}`,
-        type: "message",
-        priority: "medium",
-      });
-
-      console.log("🔔 Message notification saved for:", receiverUser.email);
-    }
-
-    /* ================= REAL-TIME NOTIFICATION ================= */
-
-    io.to(String(receiver)).emit("newNotification", {
-      id: Date.now(),
-      title: "New Message",
-      message: `${senderName}: ${text.trim()}`,
-      type: "message",
-      priority: "medium",
-      isRead: false,
-      createdAt: new Date().toISOString(),
-      data: {
-        type: "message",
-        messageId: message._id.toString(),
-        chatId,
-        senderId: sender,
-        receiverId: receiver,
-      },
-    });
-
-    console.log("🔔 Real-time notification sent to:", receiver);
-
-    /* ================= PHONE PUSH NOTIFICATION ================= */
-
-    if (receiverUser?.expoPushToken) {
-      try {
-        await sendPushNotification({
-          token: receiverUser.expoPushToken,
-
-          title: `New Message from ${senderName}`,
-
-          body: text.trim(),
-
-          data: {
-            type: "message",
-            messageId: message._id.toString(),
-            chatId,
-            senderId: String(sender),
-            receiverId: String(receiver),
-          },
-        });
-
-        console.log("📱 Push notification sent to:", receiverUser.email);
-      } catch (pushError) {
-        console.error("⚠️ Push notification failed:", pushError.message);
-      }
-    } else {
-      console.log(
-        "⚠️ Receiver has no Expo push token:",
-        receiverUser?.email || receiver,
-      );
-    }
-
-    /* ================= RESPONSE ================= */
-
-    res.status(201).json(message);
   } catch (err) {
     console.error("❌ SEND MESSAGE ERROR:", err);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: err.message,
     });
   }
