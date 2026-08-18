@@ -7,8 +7,6 @@ import { io } from "../server.js";
 import { getDisciplineAction } from "../utils/disciplineEngine.js";
 import Incident from "../models/incidentModel.js";
 
-
-
 const BASE_URL = "https://edu-guard-backend.onrender.com";
 
 // GET all reports by type
@@ -42,14 +40,36 @@ export const createReport = async (req, res) => {
     console.log("FILES:", files);
 
     if (files.length === 0) {
-      return res.status(400).json({ message: "No evidence uploaded via multer" });
+      return res
+        .status(400)
+        .json({ message: "No evidence uploaded via multer" });
+    }
+
+    // Prevent a student from reporting themselves
+    if (req.userId && studentId) {
+      const reporterUser = await User.findById(req.userId);
+
+      if (reporterUser?.role === "student") {
+        const reporterStudent = await Student.findOne({
+          studentId: reporterUser.studentId,
+        });
+
+        if (
+          reporterStudent &&
+          reporterStudent._id.toString() === studentId.toString()
+        ) {
+          return res.status(400).json({
+            message: "You cannot report yourself.",
+          });
+        }
+      }
     }
 
     const evidence = files.map((file) => ({
-  url: file.path, // ✅ Cloudinary URL
-  type: file.mimetype.startsWith("image") ? "image" : "document",
-  uploadedAt: new Date(),
-}));
+      url: file.path, // ✅ Cloudinary URL
+      type: file.mimetype.startsWith("image") ? "image" : "document",
+      uploadedAt: new Date(),
+    }));
 
     const report = await Report.create({
       studentId,
@@ -67,53 +87,52 @@ export const createReport = async (req, res) => {
 
     let targetUserId = null;
 
-if (report.studentId) {
-  const student = await Student.findById(report.studentId);
+    if (report.studentId) {
+      const student = await Student.findById(report.studentId);
 
-  if (student) {
-    const user = await User.findOne({ studentId: student.studentId });
+      if (student) {
+        const user = await User.findOne({ studentId: student.studentId });
 
-    if (user) targetUserId = user._id;
-  }
-}
+        if (user) targetUserId = user._id;
+      }
+    }
 
-if (report.teacherId && !targetUserId) {
-  const teacherUser = await User.findOne({ teacherId: report.teacherId });
-  if (teacherUser) targetUserId = teacherUser._id;
-}
+    if (report.teacherId && !targetUserId) {
+      const teacherUser = await User.findOne({ teacherId: report.teacherId });
+      if (teacherUser) targetUserId = teacherUser._id;
+    }
 
-if (targetUserId) {
-  await Notification.create({
-    userId: targetUserId,
-    title: "Report Notification",
-    message: `You have a report involving "${report.offense}".`,
-    type: "warning",
-    priority: "high",
-  });
+    if (targetUserId) {
+      await Notification.create({
+        userId: targetUserId,
+        title: "Report Notification",
+        message: `You have a report involving "${report.offense}".`,
+        type: "warning",
+        priority: "high",
+      });
 
-  io.to(targetUserId.toString()).emit("newNotification", {
-    id: Date.now(),
-    title: "Report Notification",
-    message: `You have a report involving "${report.offense}".`,
-    type: "warning",
-    priority: "high",
-    isRead: false,
-    timeAgo: "Just now",
-  });
-}
+      io.to(targetUserId.toString()).emit("newNotification", {
+        id: Date.now(),
+        title: "Report Notification",
+        message: `You have a report involving "${report.offense}".`,
+        type: "warning",
+        priority: "high",
+        isRead: false,
+        timeAgo: "Just now",
+      });
+    }
 
-const reporterName =
-  report.reporterId?.name || "Anonymous";
+    const reporterName = report.reporterId?.name || "Anonymous";
 
-io.emit("newNotification", {
-  id: report._id,
-  title: "New Report Submitted",
-  message: `${reporterName} submitted a report against ${report.studentName} for "${report.offense}"`,
-  type: "info",
-  priority: "high",
-  isRead: false,
-  createdAt: new Date().toISOString(),
-});
+    io.emit("newNotification", {
+      id: report._id,
+      title: "New Report Submitted",
+      message: `${reporterName} submitted a report against ${report.studentName} for "${report.offense}"`,
+      type: "info",
+      priority: "high",
+      isRead: false,
+      createdAt: new Date().toISOString(),
+    });
 
     return res.status(201).json(report);
   } catch (err) {
@@ -247,7 +266,7 @@ export const createGuestReport = async (req, res) => {
       date: new Date(date),
       time,
       reporter: reporter || "Guest",
-      reporterId: null,            // ✅ always null for guest
+      reporterId: null, // ✅ always null for guest
       reporterType: "guest",
       evidence,
     });
@@ -256,7 +275,6 @@ export const createGuestReport = async (req, res) => {
       message: "Guest report submitted successfully",
       report: newReport,
     });
-
   } catch (err) {
     console.error("GUEST REPORT ERROR:", err);
     return res.status(500).json({ message: err.message });
@@ -293,8 +311,7 @@ export const getReportById = async (req, res) => {
   try {
     const report = await Report.findById(req.params.id)
       .populate("studentId", "name")
-      .populate("reporterId", "firstName lastName name email");;
-
+      .populate("reporterId", "firstName lastName name email");
 
     if (!report) {
       return res.status(404).json({ message: "Report not found" });
@@ -312,9 +329,9 @@ export const getReports = async (req, res) => {
       .populate("studentId", "name section age gender")
       .populate("reporterId", "firstName lastName name email")
       .populate({
-    path: "incidentId",   // or whatever your field is
-    select: "status"
-  })
+        path: "incidentId", // or whatever your field is
+        select: "status",
+      })
       .sort({ createdAt: -1 });
 
     res.status(200).json(reports);
