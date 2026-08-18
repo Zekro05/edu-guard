@@ -1,12 +1,14 @@
 import mongoose from "mongoose";
 import Incident from "../models/incidentModel.js";
 import Student from "../models/studentModel.js";
+import Intervention from "../models/interventionModel.js";
 import Notification from "../models/Notification.js";
 import User from "../models/userModel.js";
 import Report from "../models/reportModel.js";
 import { io } from "../server.js";
 
 
+/* ================= GET INCIDENTS ================= */
 /* ================= GET INCIDENTS ================= */
 export const getIncidents = async (req, res) => {
   try {
@@ -16,7 +18,10 @@ export const getIncidents = async (req, res) => {
       });
     }
 
-    // Get logged-in user
+    // =====================================================
+    // GET LOGGED-IN USER
+    // =====================================================
+
     const user = await User.findById(req.userId).select(
       "role studentId email"
     );
@@ -29,7 +34,10 @@ export const getIncidents = async (req, res) => {
 
     let query = {};
 
-    // Students should only see their own incidents
+    // =====================================================
+    // STUDENT → ONLY THEIR OWN INCIDENTS
+    // =====================================================
+
     if (user.role === "student") {
       const student = await Student.findOne({
         studentId: user.studentId,
@@ -44,7 +52,10 @@ export const getIncidents = async (req, res) => {
       query.studentId = student._id;
     }
 
-    // Admins/Teachers see all incidents
+    // =====================================================
+    // GET INCIDENTS
+    // =====================================================
+
     const incidents = await Incident.find(query)
       .populate(
         "studentId",
@@ -58,9 +69,64 @@ export const getIncidents = async (req, res) => {
           select: "firstName lastName name email",
         },
       })
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    return res.status(200).json(incidents);
+    // =====================================================
+    // GET CONNECTED INTERVENTIONS
+    // =====================================================
+
+    const incidentIds = incidents.map((incident) => incident._id);
+
+    const interventions = await Intervention.find({
+      incidentId: { $in: incidentIds },
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // =====================================================
+    // ATTACH LATEST INTERVENTION TO EACH INCIDENT
+    // =====================================================
+
+    const formattedIncidents = incidents.map((incident) => {
+      const intervention = interventions.find(
+        (item) =>
+          String(item.incidentId) === String(incident._id)
+      );
+
+      return {
+        ...incident,
+
+        // =================================================
+        // CONNECTED INTERVENTION
+        // =================================================
+
+        intervention: intervention || null,
+
+        // =================================================
+        // EFFECTIVE STATUS
+        //
+        // Intervention status has priority.
+        // If no intervention exists, use incident status.
+        // =================================================
+
+        effectiveStatus: intervention
+          ? intervention.status
+          : incident.status,
+      };
+    });
+
+    console.log(
+      "✅ Incidents with interventions:",
+      formattedIncidents.map((item) => ({
+        incidentId: item._id,
+        incidentStatus: item.status,
+        interventionStatus: item.intervention?.status || null,
+        effectiveStatus: item.effectiveStatus,
+      }))
+    );
+
+    return res.status(200).json(formattedIncidents);
   } catch (err) {
     console.error("Get Incidents Error:", err);
 
@@ -181,28 +247,89 @@ console.log("✅ Notification sent to:", user._id.toString());
 /* ================= GET BY ID ================= */
 export const getIncidentById = async (req, res) => {
   try {
-    
-    const incident = await Incident.findById(req.params.id).populate(
-      "studentId",
-      "firstName middleName lastName grade gender studentId profilePhoto"
-    )
-     .populate({
-    path: "reportId",
-    populate: {
-      path: "reporterId",
-      model: "User",
-      select: "firstName lastName name email"
-    }
-  })
-    
+    // =====================================================
+    // GET INCIDENT
+    // =====================================================
+
+    const incident = await Incident.findById(req.params.id)
+      .populate(
+        "studentId",
+        "firstName middleName lastName grade gender studentId profilePhoto"
+      )
+      .populate({
+        path: "reportId",
+        populate: {
+          path: "reporterId",
+          model: "User",
+          select: "firstName lastName name email",
+        },
+      })
+      .lean();
 
     if (!incident) {
-      return res.status(404).json({ message: "Incident not found" });
+      return res.status(404).json({
+        message: "Incident not found",
+      });
     }
 
-    return res.json(incident);
+    // =====================================================
+    // GET CONNECTED INTERVENTION
+    // =====================================================
+
+    const intervention = await Intervention.findOne({
+      incidentId: incident._id,
+    })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // =====================================================
+    // EFFECTIVE STATUS
+    //
+    // Intervention takes priority.
+    // Incident status is fallback.
+    // =====================================================
+
+    const effectiveStatus = intervention
+      ? intervention.status
+      : incident.status;
+
+    // =====================================================
+    // DEBUG
+    // =====================================================
+
+    console.log(
+      "========== INCIDENT DETAILS STATUS =========="
+    );
+
+    console.log({
+      incidentId: incident._id,
+      incidentStatus: incident.status,
+      interventionStatus:
+        intervention?.status || null,
+      effectiveStatus,
+    });
+
+    console.log(
+      "============================================="
+    );
+
+    // =====================================================
+    // RETURN INCIDENT + INTERVENTION
+    // =====================================================
+
+    return res.json({
+      ...incident,
+
+      intervention: intervention || null,
+
+      effectiveStatus,
+    });
   } catch (err) {
-    return res.status(500).json({ message: err.message });
+    console.error("getIncidentById error:", err);
+
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };
 

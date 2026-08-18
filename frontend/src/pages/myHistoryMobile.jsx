@@ -25,69 +25,89 @@ export default function IncidentHistory() {
   // STATUS
   // =========================================================
 
-  const formatStatus = (status, action) => {
-    const s = status ? String(status).toLowerCase().trim() : "";
-    const a = action ? String(action).toLowerCase().trim() : "";
-
-    // =========================================================
-    // ACTION HAS PRIORITY
-    // =========================================================
-
-    // ADMIN ACCEPTED
-    if (a === "accepted" || a.includes("accepted")) {
-      return "Accepted";
-    }
-
-    // ADMIN REJECTED
-    if (a === "rejected" || a.includes("rejected")) {
-      return "Rejected";
-    }
-
-    // ACTION TAKEN / UNDER REVIEW
-    if (
-      a === "action taken" ||
-      a === "action_taken" ||
-      a === "taken" ||
-      a === "reviewing" ||
-      a === "review" ||
-      a === "under review" ||
-      a === "under_review"
-    ) {
-      return "Under Review";
-    }
-
-    // =========================================================
-    // FALLBACK TO INCIDENT STATUS
-    // =========================================================
-
-    if (s === "accepted" || s.includes("accepted")) {
-      return "Accepted";
-    }
-
-    if (s === "rejected" || s.includes("rejected")) {
-      return "Rejected";
-    }
-
-    if (s === "resolved" || s.includes("resolved")) {
-      return "Resolved";
-    }
-
-    if (
-      s === "reviewing" ||
-      s === "review" ||
-      s === "under review" ||
-      s === "under_review" ||
-      s.includes("review")
-    ) {
-      return "Under Review";
-    }
-
-    if (s === "pending" || s.includes("pending")) {
-      return "Pending";
-    }
-
+  const formatStatus = (status) => {
+  if (!status) {
     return "Pending";
-  };
+  }
+
+  const s = String(status)
+    .toLowerCase()
+    .trim();
+
+  // =====================================================
+  // COMPLETED
+  // =====================================================
+
+  if (s === "completed") {
+    return "Completed";
+  }
+
+  // =====================================================
+  // RESOLVED
+  // =====================================================
+
+  if (s === "resolved") {
+    return "Resolved";
+  }
+
+  // =====================================================
+  // ACTIVE INTERVENTION
+  // =====================================================
+
+  if (s === "active") {
+    return "Refer for Intervention";
+  }
+
+  // =====================================================
+  // REFER FOR INTERVENTION
+  // =====================================================
+
+  if (
+    s === "refer-for-intervention" ||
+    s === "refer_for_intervention" ||
+    s === "refer for intervention"
+  ) {
+    return "Refer for Intervention";
+  }
+
+  // =====================================================
+  // INTERVENTION READY
+  // =====================================================
+
+  if (
+    s === "intervention-ready" ||
+    s === "intervention_ready" ||
+    s === "intervention ready"
+  ) {
+    return "Refer for Intervention";
+  }
+
+  // =====================================================
+  // UNDER REVIEW
+  // =====================================================
+
+  if (
+    s === "reviewing" ||
+    s === "review" ||
+    s === "under review" ||
+    s === "under_review"
+  ) {
+    return "Under Review";
+  }
+
+  // =====================================================
+  // PENDING
+  // =====================================================
+
+  if (
+    s === "pending" ||
+    s === "received"
+  ) {
+    return "Pending";
+  }
+
+  return "Pending";
+};
 
   // =========================================================
   // FETCH INCIDENTS
@@ -118,7 +138,7 @@ export default function IncidentHistory() {
             : "No Date",
 
           // Status comes ONLY from incident.status
-          status: formatStatus(item.status, item.action),
+          status: formatStatus(item.effectiveStatus),
 
           risk: item.level ? `${item.level} Risk` : "Unknown Risk",
 
