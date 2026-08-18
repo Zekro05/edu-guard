@@ -645,7 +645,15 @@ export const saveExpoPushToken = async (req, res) => {
 
     if (!expoPushToken) {
       return res.status(400).json({
+        success: false,
         message: "Expo push token is required",
+      });
+    }
+
+    if (!expoPushToken.startsWith("ExponentPushToken[")) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Expo push token",
       });
     }
 
@@ -656,22 +664,35 @@ export const saveExpoPushToken = async (req, res) => {
       {
         expoPushToken,
       },
-      { new: true },
+      {
+        new: true,
+      }
     );
 
     if (!user) {
       return res.status(404).json({
+        success: false,
         message: "User not found",
       });
     }
 
+    console.log(
+      "✅ Expo push token saved for:",
+      user.email
+    );
+
     res.status(200).json({
+      success: true,
       message: "Push token saved successfully",
     });
   } catch (error) {
-    console.error("SAVE PUSH TOKEN ERROR:", error);
+    console.error(
+      "SAVE PUSH TOKEN ERROR:",
+      error
+    );
 
     res.status(500).json({
+      success: false,
       message: "Failed to save push token",
     });
   }
