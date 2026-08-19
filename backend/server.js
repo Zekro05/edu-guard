@@ -59,17 +59,9 @@ app.use(
 
         scriptSrc: ["'self'"],
 
-        styleSrc: [
-          "'self'",
-          "'unsafe-inline'",
-          "https://fonts.googleapis.com",
-        ],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
 
-        fontSrc: [
-          "'self'",
-          "https://fonts.gstatic.com",
-          "data:",
-        ],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
 
         imgSrc: [
           "'self'",
@@ -99,9 +91,7 @@ app.use(
         formAction: ["'self'"],
 
         upgradeInsecureRequests:
-          process.env.NODE_ENV === "production"
-            ? []
-            : null,
+          process.env.NODE_ENV === "production" ? [] : null,
       },
     },
 
@@ -136,7 +126,7 @@ app.use(
     crossOriginResourcePolicy: {
       policy: "cross-origin",
     },
-  })
+  }),
 );
 
 /* =========================================================
@@ -156,7 +146,7 @@ app.use((req, res, next) => {
       "magnetometer=()",
       "gyroscope=()",
       "accelerometer=()",
-    ].join(", ")
+    ].join(", "),
   );
 
   /* Prevent DNS prefetching */
@@ -175,14 +165,14 @@ app.use((req, res, next) => {
 app.use(
   express.json({
     limit: "10mb",
-  })
+  }),
 );
 
 app.use(
   express.urlencoded({
     extended: true,
     limit: "10mb",
-  })
+  }),
 );
 
 app.use(cookieParser());
@@ -222,22 +212,12 @@ app.use(
 
     credentials: true,
 
-    methods: [
-      "GET",
-      "POST",
-      "PUT",
-      "PATCH",
-      "DELETE",
-      "OPTIONS",
-    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-    ],
+    allowedHeaders: ["Content-Type", "Authorization"],
 
     exposedHeaders: [],
-  })
+  }),
 );
 
 /* =========================================================
@@ -281,8 +261,7 @@ const authLimiter = rateLimit({
 
   message: {
     success: false,
-    message:
-      "Too many authentication attempts. Please try again later.",
+    message: "Too many authentication attempts. Please try again later.",
   },
 });
 
@@ -319,15 +298,9 @@ app.use("/api/cases", caseRoutes);
 
 app.use("/api/upload", uploadRoutes);
 
-app.use(
-  "/api/notification-settings",
-  notificationSettingsRoutes
-);
+app.use("/api/notification-settings", notificationSettingsRoutes);
 
-app.use(
-  "/api/push-notifications",
-  pushNotificationRoutes
-);
+app.use("/api/push-notifications", pushNotificationRoutes);
 
 /* =========================================================
    USERS
@@ -416,10 +389,7 @@ const onlineUsers = new Map();
 export const sendNotification = (userId, payload) => {
   if (!userId) return;
 
-  io.to(String(userId)).emit(
-    "newNotification",
-    payload
-  );
+  io.to(String(userId)).emit("newNotification", payload);
 };
 
 /* =========================================================
@@ -445,9 +415,7 @@ io.on("connection", (socket) => {
 
     onlineUsers.set(userIdString, socket.id);
 
-    console.log(
-      `👤 User registered: ${userIdString}`
-    );
+    console.log(`👤 User registered: ${userIdString}`);
   });
 
   /* =======================================================
@@ -456,31 +424,17 @@ io.on("connection", (socket) => {
 
   socket.on("send_message", async (msg, callback) => {
     try {
-      console.log(
-        "📨 Socket message received:",
-        msg
-      );
+      console.log("📨 Socket message received:", msg);
 
-      const {
-        sender,
-        receiver,
-        text,
-      } = msg;
+      const { sender, receiver, text } = msg;
 
-      if (
-        !sender ||
-        !receiver ||
-        !text?.trim()
-      ) {
-        console.log(
-          "⚠️ Invalid message data"
-        );
+      if (!sender || !receiver || !text?.trim()) {
+        console.log("⚠️ Invalid message data");
 
         if (typeof callback === "function") {
           callback({
             error: true,
-            message:
-              "Missing sender, receiver, or message text.",
+            message: "Missing sender, receiver, or message text.",
           });
         }
 
@@ -491,17 +445,9 @@ io.on("connection", (socket) => {
          CREATE CHAT ID
       ===================================================== */
 
-      const chatId = [
-        String(sender),
-        String(receiver),
-      ]
-        .sort()
-        .join("-");
+      const chatId = [String(sender), String(receiver)].sort().join("-");
 
-      console.log(
-        "💬 Chat ID:",
-        chatId
-      );
+      console.log("💬 Chat ID:", chatId);
 
       /* =====================================================
          SAVE MESSAGE
@@ -519,59 +465,103 @@ io.on("connection", (socket) => {
         seen: false,
       });
 
-      console.log(
-        "💾 Message saved:",
-        message._id
-      );
+      console.log("💾 Message saved:", message._id);
 
       /* =====================================================
          SEND TO RECEIVER
       ===================================================== */
 
-      io.to(String(receiver)).emit(
-        "receive_message",
-        message
-      );
+      io.to(String(receiver)).emit("receive_message", message);
 
-      console.log(
-        "📩 receive_message sent to:",
-        receiver
-      );
+      console.log("📩 receive_message sent to:", receiver);
 
       /* =====================================================
          SEND BACK TO SENDER
       ===================================================== */
 
-      io.to(String(sender)).emit(
-        "receive_message",
-        message
-      );
+      io.to(String(sender)).emit("receive_message", message);
 
-      console.log(
-        "📤 receive_message sent back to sender:",
-        sender
-      );
+      console.log("📤 receive_message sent back to sender:", sender);
 
       /* =====================================================
          ACTIVITY FEED
       ===================================================== */
 
-      const senderUser =
-        await User.findById(sender);
+      /* =====================================================
+   GET SENDER + RECEIVER
+===================================================== */
+
+      const senderUser = await User.findById(sender).select(
+        "name firstName lastName email",
+      );
+
+      const receiverUser = await User.findById(receiver).select(
+        "expoPushToken email name firstName lastName",
+      );
+
+      /* =====================================================
+   SEND TO RECEIVER
+===================================================== */
+
+      io.to(String(receiver)).emit("receive_message", message);
+
+      console.log("📩 receive_message sent to:", receiver);
+
+      /* =====================================================
+   SEND BACK TO SENDER
+===================================================== */
+
+      io.to(String(sender)).emit("receive_message", message);
+
+      console.log("📤 receive_message sent back to sender:", sender);
+
+      /* =====================================================
+   PHONE PUSH NOTIFICATION
+===================================================== */
+
+      if (receiverUser?.expoPushToken) {
+        try {
+          await sendPushNotification({
+            token: receiverUser.expoPushToken,
+            title: `💬 ${
+              senderUser?.name ||
+              `${senderUser?.firstName || ""} ${senderUser?.lastName || ""}`.trim() ||
+              "New message"
+            }`,
+            body: text.trim(),
+            data: {
+              type: "message",
+              chatId,
+              senderId: sender,
+              receiverId: receiver,
+              messageId: message._id.toString(),
+            },
+          });
+
+          console.log(
+            "📱 Socket message push notification sent to:",
+            receiverUser.email,
+          );
+        } catch (pushError) {
+          console.error("⚠️ SOCKET MESSAGE PUSH ERROR:", pushError);
+        }
+      } else {
+        console.log("⚠️ Receiver has no Expo push token:", receiver);
+      }
+
+      /* =====================================================
+   ACTIVITY FEED
+===================================================== */
 
       io.emit("activity_feed", {
         type: "message",
 
-        message: `💬 ${
-          senderUser?.name || "User"
-        }: ${text.trim()}`,
+        message: `💬 ${senderUser?.name || "User"}: ${text.trim()}`,
 
         time: new Date(),
       });
 
-      console.log(
-        "🔥 Activity feed emitted"
-      );
+      console.log("🔥 Activity feed emitted");
 
       /* =====================================================
          CALLBACK
@@ -585,10 +575,7 @@ io.on("connection", (socket) => {
         });
       }
     } catch (err) {
-      console.error(
-        "❌ SOCKET SEND MESSAGE ERROR:",
-        err
-      );
+      console.error("❌ SOCKET SEND MESSAGE ERROR:", err);
 
       if (typeof callback === "function") {
         callback({
@@ -608,21 +595,13 @@ io.on("connection", (socket) => {
   ======================================================= */
 
   socket.on("disconnect", () => {
-    console.log(
-      "🔴 Socket disconnected:",
-      socket.id
-    );
+    console.log("🔴 Socket disconnected:", socket.id);
 
-    for (const [
-      userId,
-      socketId,
-    ] of onlineUsers.entries()) {
+    for (const [userId, socketId] of onlineUsers.entries()) {
       if (socketId === socket.id) {
         onlineUsers.delete(userId);
 
-        console.log(
-          `👤 User offline: ${userId}`
-        );
+        console.log(`👤 User offline: ${userId}`);
 
         break;
       }
@@ -644,10 +623,7 @@ app.use((err, req, res, next) => {
     });
   }
 
-  if (
-    err.message ===
-    "Not allowed by Socket.IO CORS"
-  ) {
+  if (err.message === "Not allowed by Socket.IO CORS") {
     return res.status(403).json({
       success: false,
       message: "Socket origin not allowed.",
@@ -674,28 +650,14 @@ app.set("io", io);
    START SERVER
 ========================================================= */
 
-server.listen(
-  PORT,
-  "0.0.0.0",
-  async () => {
-    try {
-      await connectDB();
+server.listen(PORT, "0.0.0.0", async () => {
+  try {
+    await connectDB();
 
-      console.log(
-        "🚀 Server running on port:",
-        PORT
-      );
+    console.log("🚀 Server running on port:", PORT);
 
-      console.log(
-        `🔐 Environment: ${
-          process.env.NODE_ENV || "development"
-        }`
-      );
-    } catch (error) {
-      console.error(
-        "❌ Database connection failed:",
-        error
-      );
-    }
+    console.log(`🔐 Environment: ${process.env.NODE_ENV || "development"}`);
+  } catch (error) {
+    console.error("❌ Database connection failed:", error);
   }
-);
+});
