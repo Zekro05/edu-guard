@@ -723,6 +723,43 @@ export const saveExpoPushToken = async (req, res) => {
   }
 };
 
+export const removePushToken = async (req, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    await User.findByIdAndUpdate(req.userId, {
+      $unset: {
+        expoPushToken: 1,
+      },
+    });
+
+    console.log(
+      "📱 Expo push token removed for user:",
+      req.userId
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Push token removed successfully",
+    });
+  } catch (error) {
+    console.error(
+      "❌ REMOVE PUSH TOKEN ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to remove push token",
+    });
+  }
+};
+
 //  FORGOT PASSWORD
 export const forgotPassword = async (req, res) => {
   try {

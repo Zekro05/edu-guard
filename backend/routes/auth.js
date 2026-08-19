@@ -15,6 +15,7 @@ import {
   resendForgotPasswordOTP,
   changePassword,
   saveExpoPushToken,
+  removePushToken,
 } from "../controllers/authController.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 import { upload } from "../middleware/upload.js";
@@ -51,6 +52,8 @@ router.post(
   verifyToken,
   saveExpoPushToken
 );
+
+router.post("/remove-push-token", verifyToken, removePushToken);
 
 // ---------------- FORGOT PASSWORD ----------------
 router.post("/forgot-password", forgotPassword);

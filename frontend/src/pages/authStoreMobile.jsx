@@ -175,6 +175,27 @@ const setToken = async (token) => {
   }
 };
 
+/* =====================================================
+   REMOVE EXPO PUSH TOKEN
+===================================================== */
+
+const removePushTokenFromBackend = async () => {
+  try {
+    await API.delete("/api/auth/remove-push-token");
+
+    console.log("✅ Expo push token removed from backend.");
+
+    return true;
+  } catch (error) {
+    console.error(
+      "❌ REMOVE EXPO PUSH TOKEN ERROR:",
+      error.response?.data || error.message,
+    );
+
+    return false;
+  }
+};
+
 /* =========================================================
    AXIOS TOKEN INTERCEPTOR
 ========================================================= */
@@ -268,45 +289,45 @@ export const useAuthStore = create((set, get) => ({
        CHECK AUTH
     ===================================================== */
 
-    /* =====================================================
+  /* =====================================================
    SAVE EXPO PUSH TOKEN
 ===================================================== */
 
-saveExpoPushToken: async (expoPushToken) => {
-  try {
-    if (!expoPushToken) {
-      console.log("⚠️ No Expo push token provided.");
+  saveExpoPushToken: async (expoPushToken) => {
+    try {
+      if (!expoPushToken) {
+        console.log("⚠️ No Expo push token provided.");
+
+        return {
+          success: false,
+          error: "No Expo push token.",
+        };
+      }
+
+      await API.post("/api/auth/save-push-token", {
+        expoPushToken,
+      });
+
+      console.log("✅ Expo push token saved.");
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      console.error(
+        "SAVE EXPO PUSH TOKEN ERROR:",
+        error.response?.data || error.message,
+      );
 
       return {
         success: false,
-        error: "No Expo push token.",
+        error:
+          error.response?.data?.message ||
+          error.message ||
+          "Failed to save push token.",
       };
     }
-
-    await API.post("/api/auth/save-push-token", {
-      expoPushToken,
-    });
-
-    console.log("✅ Expo push token saved.");
-
-    return {
-      success: true,
-    };
-  } catch (error) {
-    console.error(
-      "SAVE EXPO PUSH TOKEN ERROR:",
-      error.response?.data || error.message
-    );
-
-    return {
-      success: false,
-      error:
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to save push token.",
-    };
-  }
-},
+  },
 
   checkAuth: async () => {
     try {
@@ -909,48 +930,73 @@ saveExpoPushToken: async (expoPushToken) => {
     ===================================================== */
 
   logout: async () => {
+  try {
+    /*
+     * IMPORTANT:
+     * Remove the Expo push token BEFORE clearing
+     * the authentication token.
+     */
+    await removePushTokenFromBackend();
+
+    /* ================= DISCONNECT SOCKET ================= */
+
     try {
-      cachedToken = null;
+      const socketStore = useSocketStore?.getState?.();
 
-      socketConnected = false;
-
-      delete API.defaults.headers.common.Authorization;
-
-      await AsyncStorage.removeItem("user");
-
-      set({
-        user: null,
-
-        studentData: null,
-
-        teacherData: null,
-
-        isAuthenticated: false,
-
-        tempEmail: null,
-
-        otpRequired: false,
-
-        otpType: null,
-
-        otpCode: null,
-
-        error: null,
-      });
-
-      return {
-        success: true,
-      };
-    } catch (error) {
-      console.log("LOGOUT ERROR:", error.message);
-
-      return {
-        success: false,
-
-        error: error.message,
-      };
+      if (socketStore?.disconnectSocket) {
+        socketStore.disconnectSocket();
+      }
+    } catch (socketError) {
+      console.log(
+        "SOCKET DISCONNECT ERROR:",
+        socketError.message,
+      );
     }
-  },
+
+    socketConnected = false;
+
+    /* ================= CLEAR AUTH ================= */
+
+    cachedToken = null;
+
+    delete API.defaults.headers.common.Authorization;
+
+    await AsyncStorage.removeItem("user");
+
+    /* ================= CLEAR STORE ================= */
+
+    set({
+      user: null,
+
+      studentData: null,
+
+      teacherData: null,
+
+      isAuthenticated: false,
+
+      tempEmail: null,
+
+      otpRequired: false,
+
+      otpType: null,
+
+      otpCode: null,
+
+      error: null,
+    });
+
+    return {
+      success: true,
+    };
+  } catch (error) {
+    console.log("LOGOUT ERROR:", error.message);
+
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+},
 
   /* =====================================================
        FETCH STUDENT DATA
