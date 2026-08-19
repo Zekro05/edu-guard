@@ -624,19 +624,44 @@ export const checkAuth = async (req, res) => {
 
 //  LOGOUT
 export const logout = async (req, res) => {
-  if (req.userId) {
-    await createHistoryLog({
-      userId: req.userId,
-      role: "Admin",
-      action: "Logout",
-      category: "Auth",
-      details: "User logged out",
-      ipAddress: req.ip,
+  try {
+    if (req.userId) {
+      // Remove the Expo push token so this account
+      // stops receiving push notifications after logout
+      await User.findByIdAndUpdate(req.userId, {
+        $unset: {
+          expoPushToken: 1,
+        },
+      });
+
+      // Create logout history log
+      await createHistoryLog({
+        userId: req.userId,
+        role: "Admin",
+        action: "Logout",
+        category: "Auth",
+        details: "User logged out",
+        ipAddress: req.ip,
+      });
+    }
+
+    res.clearCookie("token", {
+      httpOnly: true,
+      sameSite: "lax",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (error) {
+    console.error("❌ LOGOUT ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Logout failed",
     });
   }
-
-  res.clearCookie("token", { httpOnly: true, sameSite: "lax" });
-  res.status(200).json({ success: true, message: "Logged out successfully" });
 };
 
 export const saveExpoPushToken = async (req, res) => {
