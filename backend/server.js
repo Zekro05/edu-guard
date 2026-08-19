@@ -26,7 +26,9 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import notificationSettingsRoutes from "./routes/notificationSettings.js";
 import pushNotificationRoutes from "./routes/pushNotificationRoutes.js";
 
+
 import { User } from "./models/userModel.js";
+import { sendPushNotification } from "./utils/pushNotification.js";
 
 import { fileURLToPath } from "url";
 
