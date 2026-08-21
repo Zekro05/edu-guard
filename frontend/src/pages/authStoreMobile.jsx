@@ -329,6 +329,31 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  removeExpoPushToken: async () => {
+  try {
+    await API.delete("/api/auth/remove-push-token");
+
+    console.log("✅ Expo push token removed from backend.");
+
+    return {
+      success: true,
+    };
+  } catch (error) {
+    console.error(
+      "REMOVE EXPO PUSH TOKEN ERROR:",
+      error.response?.data || error.message,
+    );
+
+    return {
+      success: false,
+      error:
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to remove push token.",
+    };
+  }
+},
+
   checkAuth: async () => {
     try {
       set({

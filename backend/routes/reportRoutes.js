@@ -18,6 +18,7 @@ import Notification from "../models/Notification.js";
 import { createGuestReport } from "../controllers/reportController.js";
 import { createDirectIncident } from "../controllers/reportController.js";
 import { getOffenseSeverity } from "../utils/offenseSeverity.js";
+import { sendPushNotification } from "../utils/sendPushNotification.js";
 
 const router = express.Router();
 
@@ -198,7 +199,7 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
 
     decision.level = severity;
 
-    await Incident.create({
+    const incident = await Incident.create({
       studentId,
       reportId: report._id,
       title: report.offense,
@@ -214,64 +215,170 @@ router.put("/:id/accept", verifyToken, async (req, res) => {
       riskLevel: decision.level,
     });
 
-    /* ================= FIND USER ================= */
+    /* =====================================================
+       NOTIFY STUDENT
+    ===================================================== */
+
     const student = await Student.findById(studentId);
-    if (!student) return res.json({ message: "Student not found" });
 
-    const user = await User.findOne({ studentId: student.studentId });
+    if (student) {
+      const user = await User.findOne({
+        studentId: student.studentId,
+      }).select("expoPushToken email name firstName lastName");
 
-    if (user) {
-      await Notification.create({
-        userId: user._id,
-        title: "Report Accepted",
-        message: `A report regarding "${report.offense}" was approved.`,
-        type: "warning",
-        priority: "high",
-      });
+      if (user) {
+        const notification = await Notification.create({
+          userId: user._id,
+          title: "Report Accepted",
+          message: `A report regarding "${report.offense}" was approved.`,
+          type: "warning",
+          priority: "high",
+          isRead: false,
+          data: {
+            type: "report_accepted",
+            reportId: report._id.toString(),
+            incidentId: incident._id.toString(),
+            studentId: student._id.toString(),
+          },
+        });
 
-      io.to(user._id.toString()).emit("newNotification", {
-        id: report._id,
-        title: "Report Accepted",
-        message: `A report regarding "${report.offense}" was approved.`,
-        type: "warning",
-        priority: "high",
-        isRead: false,
-        timeAgo: "Just now",
-      });
+        /* ================= SOCKET ================= */
 
-      console.log("✅ Notification sent to:", user._id.toString());
+        io.to(user._id.toString()).emit("newNotification", {
+          ...notification.toObject(),
+          id: notification._id.toString(),
+        });
+
+        console.log(
+          "🔔 Student realtime notification sent:",
+          user._id.toString(),
+        );
+
+        /* ================= EXPO PUSH ================= */
+
+        if (user.expoPushToken) {
+          try {
+            await sendPushNotification({
+              token: user.expoPushToken,
+
+              title: "⚠️ Report Accepted",
+
+              body: `A report regarding "${report.offense}" was approved.`,
+
+              data: {
+                type: "report_accepted",
+                reportId: report._id.toString(),
+                incidentId: incident._id.toString(),
+                studentId: student._id.toString(),
+                notificationId: notification._id.toString(),
+              },
+            });
+
+            console.log(
+              "📱 Report accepted push sent to:",
+              user.email || user._id.toString(),
+            );
+          } catch (pushError) {
+            console.error(
+              "⚠️ REPORT ACCEPTED PUSH ERROR:",
+              pushError,
+            );
+          }
+        } else {
+          console.log(
+            "⚠️ Student has no Expo push token:",
+            user._id.toString(),
+          );
+        }
+      }
     }
 
-    /* ================= NOTIFY REPORTER ================= */
+    /* =====================================================
+       NOTIFY REPORTER
+    ===================================================== */
+
     if (report.reporterId) {
-      await Notification.create({
+      const reporter = await User.findById(report.reporterId).select(
+        "expoPushToken email name firstName lastName",
+      );
+
+      const reporterNotification = await Notification.create({
         userId: report.reporterId,
         title: "Report Processed",
         message: `Your report about "${report.offense}" has been accepted and is being acted upon.`,
         type: "success",
         priority: "low",
-      });
-
-      io.to(report.reporterId.toString()).emit("newNotification", {
-        id: report._id,
-        title: "Report Processed",
-        message: `Your report about "${report.offense}" has been accepted and is being acted upon.`,
-        type: "success",
-        priority: "low",
         isRead: false,
-        timeAgo: "Just now",
+        data: {
+          type: "report_processed",
+          reportId: report._id.toString(),
+          incidentId: incident._id.toString(),
+        },
       });
 
-      console.log("✅ Reporter notified:", report.reporterId.toString());
+      /* ================= SOCKET ================= */
+
+      io.to(report.reporterId.toString()).emit(
+        "newNotification",
+        {
+          ...reporterNotification.toObject(),
+          id: reporterNotification._id.toString(),
+        },
+      );
+
+      console.log(
+        "🔔 Reporter realtime notification sent:",
+        report.reporterId.toString(),
+      );
+
+      /* ================= EXPO PUSH ================= */
+
+      if (reporter?.expoPushToken) {
+        try {
+          await sendPushNotification({
+            token: reporter.expoPushToken,
+
+            title: "✅ Report Processed",
+
+            body: `Your report about "${report.offense}" has been accepted and is being acted upon.`,
+
+            data: {
+              type: "report_processed",
+              reportId: report._id.toString(),
+              incidentId: incident._id.toString(),
+              notificationId: reporterNotification._id.toString(),
+            },
+          });
+
+          console.log(
+            "📱 Reporter push sent to:",
+            reporter.email || report.reporterId.toString(),
+          );
+        } catch (pushError) {
+          console.error(
+            "⚠️ REPORTER ACCEPTED PUSH ERROR:",
+            pushError,
+          );
+        }
+      } else {
+        console.log(
+          "⚠️ Reporter has no Expo push token:",
+          report.reporterId.toString(),
+        );
+      }
     }
 
     return res.json({
       message: "Report accepted & processed",
       decision,
+      incident,
     });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: err.message });
+    console.error("ACCEPT REPORT ERROR:", err);
+
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 });
 
@@ -285,67 +392,170 @@ router.put("/:id/reject", verifyToken, async (req, res) => {
     );
 
     if (!report) {
-      return res.status(404).json({ message: "Report not found" });
+      return res.status(404).json({
+        message: "Report not found",
+      });
     }
 
-    // =========================
-    // ONLY FOR REGISTERED STUDENTS
-    // =========================
+    /* =====================================================
+       NOTIFY STUDENT
+       ONLY FOR REGISTERED STUDENTS
+    ===================================================== */
+
     if (report.studentId) {
       const student = await Student.findById(report.studentId);
 
       if (student) {
-        const user = await User.findOne({ studentId: student.studentId });
+        const user = await User.findOne({
+          studentId: student.studentId,
+        }).select("expoPushToken email name firstName lastName");
 
         if (user) {
-          await Notification.create({
+          const notification = await Notification.create({
             userId: user._id,
             title: "Report Rejected",
             message: `A report regarding "${report.offense}" was rejected.`,
             type: "rejected",
             priority: "high",
+            isRead: false,
+            data: {
+              type: "report_rejected",
+              reportId: report._id.toString(),
+              studentId: student._id.toString(),
+            },
           });
 
+          /* ================= SOCKET ================= */
+
           io.to(user._id.toString()).emit("newNotification", {
-            id: report._id,
-            title: "Report Rejected",
-            message: `A report regarding "${report.offense}" was rejected.`,
-            type: "rejected",
-            priority: "high",
-            isRead: false,
-            timeAgo: "Just now",
+            ...notification.toObject(),
+            id: notification._id.toString(),
           });
+
+          console.log(
+            "🔔 Student rejection notification sent:",
+            user._id.toString(),
+          );
+
+          /* ================= EXPO PUSH ================= */
+
+          if (user.expoPushToken) {
+            try {
+              await sendPushNotification({
+                token: user.expoPushToken,
+
+                title: "❌ Report Rejected",
+
+                body: `A report regarding "${report.offense}" was rejected.`,
+
+                data: {
+                  type: "report_rejected",
+                  reportId: report._id.toString(),
+                  studentId: student._id.toString(),
+                  notificationId: notification._id.toString(),
+                },
+              });
+
+              console.log(
+                "📱 Report rejection push sent to:",
+                user.email || user._id.toString(),
+              );
+            } catch (pushError) {
+              console.error(
+                "⚠️ REPORT REJECTION PUSH ERROR:",
+                pushError,
+              );
+            }
+          } else {
+            console.log(
+              "⚠️ Student has no Expo push token:",
+              user._id.toString(),
+            );
+          }
         }
       }
     }
 
-    // =========================
-    // GUEST / REPORTER NOTIFICATION
-    // =========================
-    if (report.reporterId) {
-      await Notification.create({
-        userId: report.reporterId,
-        title: "Your Report Was Reviewed",
-        message: `Your report about "${report.offense}" was reviewed and rejected.`,
-        type: "rejected",
-        priority: "low", // keep valid enum
-      });
+    /* =====================================================
+       NOTIFY REPORTER
+    ===================================================== */
 
-      io.to(report.reporterId.toString()).emit("newNotification", {
-        id: report._id,
+    if (report.reporterId) {
+      const reporter = await User.findById(report.reporterId).select(
+        "expoPushToken email name firstName lastName",
+      );
+
+      const notification = await Notification.create({
+        userId: report.reporterId,
         title: "Your Report Was Reviewed",
         message: `Your report about "${report.offense}" was reviewed and rejected.`,
         type: "rejected",
         priority: "low",
         isRead: false,
-        timeAgo: "Just now",
+        data: {
+          type: "report_rejected",
+          reportId: report._id.toString(),
+        },
       });
+
+      /* ================= SOCKET ================= */
+
+      io.to(report.reporterId.toString()).emit(
+        "newNotification",
+        {
+          ...notification.toObject(),
+          id: notification._id.toString(),
+        },
+      );
+
+      console.log(
+        "🔔 Reporter rejection notification sent:",
+        report.reporterId.toString(),
+      );
+
+      /* ================= EXPO PUSH ================= */
+
+      if (reporter?.expoPushToken) {
+        try {
+          await sendPushNotification({
+            token: reporter.expoPushToken,
+
+            title: "❌ Your Report Was Reviewed",
+
+            body: `Your report about "${report.offense}" was reviewed and rejected.`,
+
+            data: {
+              type: "report_rejected",
+              reportId: report._id.toString(),
+              notificationId: notification._id.toString(),
+            },
+          });
+
+          console.log(
+            "📱 Reporter rejection push sent to:",
+            reporter.email || report.reporterId.toString(),
+          );
+        } catch (pushError) {
+          console.error(
+            "⚠️ REPORTER REJECTION PUSH ERROR:",
+            pushError,
+          );
+        }
+      } else {
+        console.log(
+          "⚠️ Reporter has no Expo push token:",
+          report.reporterId.toString(),
+        );
+      }
     }
 
     return res.json(report);
   } catch (err) {
     console.error("REJECT ERROR:", err);
-    return res.status(500).json({ message: err.message });
+
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 });
 

@@ -1,5 +1,10 @@
 import Intervention from "../models/interventionModel.js";
 import Incident from "../models/incidentModel.js";
+import Student from "../models/studentModel.js";
+import User from "../models/userModel.js";
+import Notification from "../models/Notification.js";
+import { io } from "../server.js";
+import { sendPushNotification } from "../utils/sendPushNotification.js";
 
 /* ================= CREATE INTERVENTION ================= */
 export const createIntervention = async (req, res) => {
@@ -13,7 +18,10 @@ export const createIntervention = async (req, res) => {
       approvedBy,
     } = req.body;
 
-    // Find the latest incident for this student
+    // ============================================
+    // FIND INCIDENT
+    // ============================================
+
     const incident = await Incident.findOne({
       _id: incidentId,
       studentId,
@@ -82,7 +90,132 @@ export const createIntervention = async (req, res) => {
 
     await incident.save();
 
-    console.log("✅ Incident action updated:", incident._id, incident.action);
+    console.log(
+      "✅ Incident action updated:",
+      incident._id,
+      incident.action,
+    );
+
+    // ============================================
+    // FIND STUDENT USER
+    // ============================================
+
+    let targetUserId = null;
+
+    if (studentId) {
+      const student = await Student.findById(studentId);
+
+      if (student) {
+        const studentUser = await User.findOne({
+          studentId: student.studentId,
+          role: "student",
+        });
+
+        if (studentUser) {
+          targetUserId = studentUser._id;
+        }
+      }
+    }
+
+    // ============================================
+    // NOTIFICATION
+    // ============================================
+
+    if (targetUserId) {
+      const targetUser = await User.findById(targetUserId).select(
+        "expoPushToken email name firstName lastName",
+      );
+
+      // ============================================
+      // SAVE NOTIFICATION TO DATABASE
+      // ============================================
+
+      const notification = await Notification.create({
+        userId: targetUserId,
+
+        title: "New Intervention",
+
+        message: `A ${actionName} intervention has been assigned to you${
+          description ? `: ${description}` : "."
+        }`,
+
+        type: "warning",
+
+        priority: "high",
+
+        isRead: false,
+
+        data: {
+          type: "intervention",
+          interventionId: intervention._id.toString(),
+          incidentId: incident._id.toString(),
+          studentId: studentId.toString(),
+        },
+      });
+
+      console.log(
+        "🔔 Intervention notification saved:",
+        notification._id,
+      );
+
+      // ============================================
+      // REALTIME SOCKET NOTIFICATION
+      // ============================================
+
+      io.to(targetUserId.toString()).emit("newNotification", {
+        ...notification.toObject(),
+        id: notification._id.toString(),
+      });
+
+      console.log(
+        "🔔 Realtime intervention notification sent to:",
+        targetUserId,
+      );
+
+      // ============================================
+      // PHONE PUSH NOTIFICATION
+      // ============================================
+
+      if (targetUser?.expoPushToken) {
+        try {
+          await sendPushNotification({
+            token: targetUser.expoPushToken,
+
+            title: "⚠️ New Intervention",
+
+            body: `A ${actionName} intervention has been assigned to you.`,
+
+            data: {
+              type: "intervention",
+              interventionId: intervention._id.toString(),
+              incidentId: incident._id.toString(),
+              studentId: studentId.toString(),
+              notificationId: notification._id.toString(),
+            },
+          });
+
+          console.log(
+            "📱 Intervention push notification sent to:",
+            targetUser.email,
+          );
+        } catch (pushError) {
+          console.error(
+            "⚠️ INTERVENTION PUSH NOTIFICATION ERROR:",
+            pushError,
+          );
+        }
+      } else {
+        console.log(
+          "⚠️ Target student has no Expo push token:",
+          targetUserId,
+        );
+      }
+    } else {
+      console.log(
+        "⚠️ No student User account found for:",
+        studentId,
+      );
+    }
 
     // ============================================
     // RESPONSE
@@ -153,7 +286,8 @@ export const resolveIntervention = async (req, res) => {
 
     intervention.status = "completed";
 
-    const completedByName = completedBy || req.user?.name || "Guidance Admin";
+    const completedByName =
+      completedBy || req.user?.name || "Guidance Admin";
 
     intervention.completedBy = completedByName;
 
@@ -178,7 +312,10 @@ export const resolveIntervention = async (req, res) => {
 
       await incident.save();
 
-      console.log("✅ Linked incident completed:", incident._id);
+      console.log(
+        "✅ Linked incident completed:",
+        incident._id,
+      );
     }
 
     // ============================================
@@ -207,12 +344,19 @@ export const deleteIntervention = async (req, res) => {
     const deleted = await Intervention.findByIdAndDelete(id);
 
     if (!deleted) {
-      return res.status(404).json({ message: "Intervention not found" });
+      return res.status(404).json({
+        message: "Intervention not found",
+      });
     }
 
-    return res.json({ message: "Intervention deleted" });
+    return res.json({
+      message: "Intervention deleted",
+    });
   } catch (err) {
     console.error("deleteIntervention error:", err);
-    return res.status(500).json({ message: err.message });
+
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };

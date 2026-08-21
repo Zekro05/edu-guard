@@ -6,6 +6,7 @@ import Notification from "../models/Notification.js";
 import { io } from "../server.js";
 import { getDisciplineAction } from "../utils/disciplineEngine.js";
 import Incident from "../models/incidentModel.js";
+import { sendPushNotification } from "../utils/sendPushNotification.js";
 
 const BASE_URL = "https://edu-guard-backend.onrender.com";
 
@@ -103,23 +104,72 @@ export const createReport = async (req, res) => {
     }
 
     if (targetUserId) {
-      await Notification.create({
+      // Get the user's push token
+      const targetUser = await User.findById(targetUserId).select(
+        "expoPushToken email name firstName lastName",
+      );
+
+      /* =====================================================
+     SAVE NOTIFICATION TO DATABASE
+     This is used by Notification.jsx
+  ===================================================== */
+
+      const notification = await Notification.create({
         userId: targetUserId,
         title: "Report Notification",
         message: `You have a report involving "${report.offense}".`,
         type: "warning",
         priority: "high",
+        isRead: false,
+        data: {
+          type: "report",
+          reportId: report._id.toString(),
+          studentId: report.studentId?.toString(),
+        },
       });
 
+      console.log("🔔 Report notification saved:", notification._id);
+
+      /* =====================================================
+     REALTIME SOCKET NOTIFICATION
+     This updates Notification.jsx immediately
+  ===================================================== */
+
       io.to(targetUserId.toString()).emit("newNotification", {
-        id: Date.now(),
-        title: "Report Notification",
-        message: `You have a report involving "${report.offense}".`,
-        type: "warning",
-        priority: "high",
-        isRead: false,
-        timeAgo: "Just now",
+        ...notification.toObject(),
+        id: notification._id.toString(),
       });
+
+      console.log("🔔 Realtime report notification sent to:", targetUserId);
+
+      /* =====================================================
+     PHONE PUSH NOTIFICATION
+  ===================================================== */
+
+      if (targetUser?.expoPushToken) {
+        try {
+          await sendPushNotification({
+            token: targetUser.expoPushToken,
+
+            title: "⚠️ Report Notification",
+
+            body: `You have a report involving "${report.offense}".`,
+
+            data: {
+              type: "report",
+              reportId: report._id.toString(),
+              studentId: report.studentId?.toString(),
+              notificationId: notification._id.toString(),
+            },
+          });
+
+          console.log("📱 Report push notification sent to:", targetUser.email);
+        } catch (pushError) {
+          console.error("⚠️ REPORT PUSH NOTIFICATION ERROR:", pushError);
+        }
+      } else {
+        console.log("⚠️ Target user has no Expo push token:", targetUserId);
+      }
     }
 
     const reporterName = report.reporterId?.name || "Anonymous";
