@@ -956,14 +956,24 @@ export const useAuthStore = create((set, get) => ({
 
   logout: async () => {
   try {
-    /*
-     * IMPORTANT:
-     * Remove the Expo push token BEFORE clearing
-     * the authentication token.
-     */
-    await removePushTokenFromBackend();
+    /* =================================================
+       REMOVE PUSH TOKEN FIRST
+    ================================================= */
 
-    /* ================= DISCONNECT SOCKET ================= */
+    try {
+      await API.delete("/api/auth/remove-push-token");
+
+      console.log("✅ Push token removed before logout.");
+    } catch (pushError) {
+      console.error(
+        "⚠️ FAILED TO REMOVE PUSH TOKEN:",
+        pushError.response?.data || pushError.message,
+      );
+    }
+
+    /* =================================================
+       DISCONNECT SOCKET
+    ================================================= */
 
     try {
       const socketStore = useSocketStore?.getState?.();
@@ -980,15 +990,15 @@ export const useAuthStore = create((set, get) => ({
 
     socketConnected = false;
 
-    /* ================= CLEAR AUTH ================= */
+    /* =================================================
+       CLEAR AUTH
+    ================================================= */
 
     cachedToken = null;
 
     delete API.defaults.headers.common.Authorization;
 
     await AsyncStorage.removeItem("user");
-
-    /* ================= CLEAR STORE ================= */
 
     set({
       user: null,

@@ -18,7 +18,7 @@ import Notification from "../models/Notification.js";
 import { createGuestReport } from "../controllers/reportController.js";
 import { createDirectIncident } from "../controllers/reportController.js";
 import { getOffenseSeverity } from "../utils/offenseSeverity.js";
-import { sendPushNotification } from "../utils/sendPushNotification.js";
+import { sendPushNotification } from "../utils/pushNotification.js";
 
 const router = express.Router();
 
