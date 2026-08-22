@@ -6,7 +6,7 @@ import Notification from "../models/Notification.js";
 import { io } from "../server.js";
 import { getDisciplineAction } from "../utils/disciplineEngine.js";
 import Incident from "../models/incidentModel.js";
-import { sendPushNotification } from "../utils/sendPushNotification.js";
+import { sendPushNotification } from "../utils/pushNotification.js";
 
 const BASE_URL = "https://edu-guard-backend.onrender.com";
 
