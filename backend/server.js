@@ -10,6 +10,7 @@ import rateLimit from "express-rate-limit";
 
 import { connectDB } from "./db/connectDB.js";
 import Message from "./models/message.js";
+import Notification from "./models/Notification.js";
 
 import authRoutes from "./routes/auth.js";
 import studentRoutes from "./routes/studentRoutes.js";
@@ -25,7 +26,6 @@ import caseRoutes from "./routes/caseRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import notificationSettingsRoutes from "./routes/notificationSettings.js";
 import pushNotificationRoutes from "./routes/pushNotificationRoutes.js";
-
 
 import { User } from "./models/userModel.js";
 import { sendPushNotification } from "./utils/pushNotification.js";
@@ -444,54 +444,30 @@ io.on("connection", (socket) => {
       }
 
       /* =====================================================
-         CREATE CHAT ID
-      ===================================================== */
+       CREATE CHAT ID
+    ===================================================== */
 
       const chatId = [String(sender), String(receiver)].sort().join("-");
 
       console.log("💬 Chat ID:", chatId);
 
       /* =====================================================
-         SAVE MESSAGE
-      ===================================================== */
+       SAVE MESSAGE
+    ===================================================== */
 
       const message = await Message.create({
         chatId,
-
         sender,
-
         receiver,
-
         text: text.trim(),
-
         seen: false,
       });
 
       console.log("💾 Message saved:", message._id);
 
       /* =====================================================
-         SEND TO RECEIVER
-      ===================================================== */
-
-      io.to(String(receiver)).emit("receive_message", message);
-
-      console.log("📩 receive_message sent to:", receiver);
-
-      /* =====================================================
-         SEND BACK TO SENDER
-      ===================================================== */
-
-      io.to(String(sender)).emit("receive_message", message);
-
-      console.log("📤 receive_message sent back to sender:", sender);
-
-      /* =====================================================
-         ACTIVITY FEED
-      ===================================================== */
-
-      /* =====================================================
-   GET SENDER + RECEIVER
-===================================================== */
+       GET SENDER + RECEIVER
+    ===================================================== */
 
       const senderUser = await User.findById(sender).select(
         "name firstName lastName email",
@@ -501,36 +477,73 @@ io.on("connection", (socket) => {
         "expoPushToken email name firstName lastName",
       );
 
+      const senderName =
+        senderUser?.name ||
+        `${senderUser?.firstName || ""} ${senderUser?.lastName || ""}`.trim() ||
+        "User";
+
       /* =====================================================
-   SEND TO RECEIVER
-===================================================== */
+       SAVE MESSAGE NOTIFICATION
+    ===================================================== */
+
+      const notification = await Notification.create({
+        userId: receiver,
+        title: `New message from ${senderName}`,
+        message: text.trim(),
+        type: "message",
+        priority: "low",
+        isRead: false,
+        data: {
+          type: "message",
+          chatId,
+          senderId: sender,
+          receiverId: receiver,
+          messageId: message._id.toString(),
+        },
+      });
+
+      console.log("🔔 Message notification saved:", notification._id);
+
+      /* =====================================================
+       SEND MESSAGE TO RECEIVER
+    ===================================================== */
 
       io.to(String(receiver)).emit("receive_message", message);
 
       console.log("📩 receive_message sent to:", receiver);
 
       /* =====================================================
-   SEND BACK TO SENDER
-===================================================== */
+       SEND MESSAGE BACK TO SENDER
+    ===================================================== */
 
       io.to(String(sender)).emit("receive_message", message);
 
       console.log("📤 receive_message sent back to sender:", sender);
 
       /* =====================================================
-   PHONE PUSH NOTIFICATION
-===================================================== */
+       REALTIME NOTIFICATION
+    ===================================================== */
+
+      io.to(String(receiver)).emit("newNotification", {
+        ...notification.toObject(),
+        id: notification._id.toString(),
+      });
+
+      console.log("🔔 Realtime notification sent to:", receiver);
+
+      /* =====================================================
+       PHONE PUSH NOTIFICATION
+    ===================================================== */
 
       if (receiverUser?.expoPushToken) {
         try {
           await sendPushNotification({
             token: receiverUser.expoPushToken,
-            title: `💬 ${
-              senderUser?.name ||
-              `${senderUser?.firstName || ""} ${senderUser?.lastName || ""}`.trim() ||
-              "New message"
-            }`,
+
+            title: `💬 ${senderName}`,
+
             body: text.trim(),
+
             data: {
               type: "message",
               chatId,
@@ -552,13 +565,13 @@ io.on("connection", (socket) => {
       }
 
       /* =====================================================
-   ACTIVITY FEED
-===================================================== */
+       ACTIVITY FEED
+    ===================================================== */
 
       io.emit("activity_feed", {
         type: "message",
 
-        message: `💬 ${senderUser?.name || "User"}: ${text.trim()}`,
+        message: `💬 ${senderName}: ${text.trim()}`,
 
         time: new Date(),
       });
@@ -566,13 +579,12 @@ io.on("connection", (socket) => {
       console.log("🔥 Activity feed emitted");
 
       /* =====================================================
-         CALLBACK
-      ===================================================== */
+       CALLBACK
+    ===================================================== */
 
       if (typeof callback === "function") {
         callback({
           success: true,
-
           message,
         });
       }
@@ -582,7 +594,6 @@ io.on("connection", (socket) => {
       if (typeof callback === "function") {
         callback({
           error: true,
-
           message:
             process.env.NODE_ENV === "production"
               ? "Failed to send message."
