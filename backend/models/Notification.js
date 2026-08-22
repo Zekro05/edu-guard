@@ -16,7 +16,7 @@ const notificationSchema = new mongoose.Schema(
     },
     priority: {
       type: String,
-      enum: ["low", "high"],
+      enum: ["low", "high", "medium"],
       default: "low",
     },
     isRead: {

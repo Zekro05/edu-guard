@@ -59,9 +59,25 @@ const notifyStudent = async ({
 
     /* ================= PHONE PUSH NOTIFICATION ================= */
 
+    /* ================= PHONE PUSH NOTIFICATION ================= */
+
+    console.log("========================================");
+    console.log("📱 EXPO PUSH NOTIFICATION DEBUG");
+    console.log("Notification Title:", title);
+    console.log("Notification Message:", message);
+    console.log("Notification Type:", type);
+    console.log("Status:", data?.status || "N/A");
+    console.log("Incident ID:", data?.incidentId || "N/A");
+    console.log("User:", user.email);
+    console.log("Expo Push Token:", user.expoPushToken || "NONE");
+    console.log("========================================");
+
     if (user.expoPushToken) {
       try {
-        await sendPushNotification({
+        console.log("📤 ATTEMPTING TO SEND EXPO PUSH...");
+        console.log("➡️ Status being sent:", data?.status || "N/A");
+
+        const pushResult = await sendPushNotification({
           token: user.expoPushToken,
           title: `EduGuard 🔔`,
           body: `${title}: ${message}`,
@@ -71,12 +87,22 @@ const notifyStudent = async ({
           },
         });
 
-        console.log("📱 Push notification sent to:", user.email);
+        console.log("✅ EXPO PUSH SEND SUCCESS");
+        console.log("📌 Status:", data?.status || "N/A");
+        console.log("📨 Expo Result:", pushResult);
+        console.log("========================================");
       } catch (pushError) {
-        console.error("⚠️ Push notification failed:", pushError.message);
+        console.error("❌ EXPO PUSH SEND FAILED");
+        console.error("📌 Status:", data?.status || "N/A");
+        console.error("❌ Error:", pushError);
+        console.error("❌ Error Message:", pushError.message);
+        console.log("========================================");
       }
     } else {
-      console.log("⚠️ No Expo push token for:", user.email);
+      console.log("❌ NO EXPO PUSH TOKEN");
+      console.log("📌 Status:", data?.status || "N/A");
+      console.log("👤 User:", user.email);
+      console.log("========================================");
     }
 
     console.log("✅ Notification created for:", user.email);
@@ -764,10 +790,18 @@ export const manualStudentStatement = async (req, res) => {
 
 /* ================= UPDATE STATUS ================= */
 export const updateIncidentStatus = async (req, res) => {
+  console.log("=================================");
+  console.log("🚨 UPDATE INCIDENT STATUS CALLED");
+  console.log("Incident ID:", req.params.id);
+  console.log("Requested status:", req.body.status);
+  console.log("=================================");
   try {
     const { status, note, escalationInfo } = req.body;
 
     const incident = await Incident.findById(req.params.id);
+
+    console.log("📌 CURRENT INCIDENT STATUS:", incident.status);
+    console.log("📌 REQUESTED NEW STATUS:", status);
 
     if (!incident) {
       return res.status(404).json({ message: "Not found" });
@@ -901,6 +935,14 @@ export const updateIncidentStatus = async (req, res) => {
       }
     }
 
+    console.log("========================================");
+    console.log("🚨 STATUS UPDATE → PUSH NOTIFICATION");
+    console.log("Incident:", incident._id.toString());
+    console.log("Previous Status:", incident.status);
+    console.log("New Status:", status);
+    console.log("📲 Calling notifyStudent()...");
+    console.log("========================================");
+
     await notifyStudent({
       studentId: incident.studentId,
       title: "Incident Update",
@@ -913,6 +955,11 @@ export const updateIncidentStatus = async (req, res) => {
         status,
       },
     });
+
+    console.log("========================================");
+    console.log("🏁 notifyStudent() FINISHED");
+    console.log("Status processed:", status);
+    console.log("========================================");
 
     console.log("✅ Notification sent to:", user._id.toString());
 
