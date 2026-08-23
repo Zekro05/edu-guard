@@ -53,7 +53,7 @@ router.post(
   saveExpoPushToken
 );
 
-router.post("/remove-push-token", verifyToken, removePushToken);
+router.delete("/remove-push-token", verifyToken, removePushToken);
 
 // ---------------- FORGOT PASSWORD ----------------
 router.post("/forgot-password", forgotPassword);
