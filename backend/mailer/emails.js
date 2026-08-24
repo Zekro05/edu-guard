@@ -9,7 +9,7 @@ client.authentications["api-key"].apiKey = process.env.BREVO_API_KEY;
 const emailApi = new SibApiV3Sdk.TransactionalEmailsApi();
 
 // -------------------- HELPER FUNCTION --------------------
-const sendEmail = async (to, subject, html) => {
+export const sendEmail = async (to, subject, html) => {
   try {
     await emailApi.sendTransacEmail({
       sender: {
@@ -98,4 +98,13 @@ export const sendResetSuccessEmail = async (email) => {
   `;
 
   await sendEmail(email, subject, html);
+};
+
+// -------------------- ADMIN/GUIDANCE NOTIFICATION EMAIL --------------------
+export const sendNotificationEmail = async ({
+  to,
+  subject,
+  html,
+}) => {
+  await sendEmail(to, subject, html);
 };

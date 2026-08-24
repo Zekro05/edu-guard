@@ -26,6 +26,7 @@ import caseRoutes from "./routes/caseRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import notificationSettingsRoutes from "./routes/notificationSettings.js";
 import pushNotificationRoutes from "./routes/pushNotificationRoutes.js";
+import settingsRoutes from "./routes/settings.js";
 
 import { User } from "./models/userModel.js";
 import { sendPushNotification } from "./utils/pushNotification.js";
@@ -304,6 +305,8 @@ app.use("/api/notification-settings", notificationSettingsRoutes);
 
 app.use("/api/push-notifications", pushNotificationRoutes);
 
+app.use("/api/settings", settingsRoutes);
+
 /* =========================================================
    USERS
 ========================================================= */
@@ -421,14 +424,14 @@ io.on("connection", (socket) => {
   });
 
   /* =======================================================
-     SEND MESSAGE
-  ======================================================= */
+   SEND MESSAGE
+======================================================= */
 
   socket.on("send_message", async (msg, callback) => {
     try {
       console.log("📨 Socket message received:", msg);
 
-      const { sender, receiver, text } = msg;
+      const { sender, receiver, text, clientMessageId } = msg;
 
       if (!sender || !receiver || !text?.trim()) {
         console.log("⚠️ Invalid message data");
@@ -452,6 +455,61 @@ io.on("connection", (socket) => {
       console.log("💬 Chat ID:", chatId);
 
       /* =====================================================
+       GET SENDER + RECEIVER
+    ===================================================== */
+
+      const senderUser = await User.findById(sender).select(
+        "name firstName middleName lastName email profilePhoto",
+      );
+
+      const receiverUser = await User.findById(receiver).select(
+        "expoPushToken email name firstName middleName lastName profilePhoto",
+      );
+
+      if (!senderUser) {
+        console.error("❌ Sender user not found:", sender);
+
+        if (typeof callback === "function") {
+          callback({
+            error: true,
+            message: "Sender account not found.",
+          });
+        }
+
+        return;
+      }
+
+      if (!receiverUser) {
+        console.error("❌ Receiver user not found:", receiver);
+
+        if (typeof callback === "function") {
+          callback({
+            error: true,
+            message: "Receiver account not found.",
+          });
+        }
+
+        return;
+      }
+
+      /* =====================================================
+       GET DISPLAY NAME
+    ===================================================== */
+
+      const senderName =
+        senderUser.name ||
+        [senderUser.firstName, senderUser.middleName, senderUser.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .trim() ||
+        "User";
+
+      const senderProfilePhoto = senderUser.profilePhoto || null;
+
+      console.log("👤 Sender:", senderName);
+      console.log("🖼️ Sender photo:", senderProfilePhoto);
+
+      /* =====================================================
        SAVE MESSAGE
     ===================================================== */
 
@@ -466,21 +524,31 @@ io.on("connection", (socket) => {
       console.log("💾 Message saved:", message._id);
 
       /* =====================================================
-       GET SENDER + RECEIVER
+       CREATE REALTIME MESSAGE
+
+       IMPORTANT:
+       We enrich the MongoDB message with the sender's
+       name and profile photo.
+
+       This means the frontend does NOT need to find
+       the sender inside /api/users just to display
+       a realtime message.
     ===================================================== */
 
-      const senderUser = await User.findById(sender).select(
-        "name firstName lastName email",
-      );
+      const realtimeMessage = {
+        ...message.toObject(),
 
-      const receiverUser = await User.findById(receiver).select(
-        "expoPushToken email name firstName lastName",
-      );
+        sender: String(sender),
+        receiver: String(receiver),
 
-      const senderName =
-        senderUser?.name ||
-        `${senderUser?.firstName || ""} ${senderUser?.lastName || ""}`.trim() ||
-        "User";
+        senderName,
+        senderProfilePhoto,
+
+        /* Used by the frontend to match an optimistic message */
+        clientMessageId: clientMessageId || null,
+      };
+
+      console.log("📡 Realtime message:", realtimeMessage);
 
       /* =====================================================
        SAVE MESSAGE NOTIFICATION
@@ -493,11 +561,12 @@ io.on("connection", (socket) => {
         type: "message",
         priority: "low",
         isRead: false,
+
         data: {
           type: "message",
           chatId,
-          senderId: sender,
-          receiverId: receiver,
+          senderId: String(sender),
+          receiverId: String(receiver),
           messageId: message._id.toString(),
         },
       });
@@ -508,15 +577,18 @@ io.on("connection", (socket) => {
        SEND MESSAGE TO RECEIVER
     ===================================================== */
 
-      io.to(String(receiver)).emit("receive_message", message);
+      io.to(String(receiver)).emit("receive_message", realtimeMessage);
 
-      console.log("📩 receive_message sent to:", receiver);
+      console.log("📩 receive_message sent to receiver:", receiver);
 
       /* =====================================================
        SEND MESSAGE BACK TO SENDER
+
+       This lets the sender's browser receive the actual
+       MongoDB message in realtime too.
     ===================================================== */
 
-      io.to(String(sender)).emit("receive_message", message);
+      io.to(String(sender)).emit("receive_message", realtimeMessage);
 
       console.log("📤 receive_message sent back to sender:", sender);
 
@@ -526,7 +598,19 @@ io.on("connection", (socket) => {
 
       io.to(String(receiver)).emit("newNotification", {
         ...notification.toObject(),
+
         id: notification._id.toString(),
+
+        senderName,
+        senderProfilePhoto,
+
+        data: {
+          type: "message",
+          chatId,
+          senderId: String(sender),
+          receiverId: String(receiver),
+          messageId: message._id.toString(),
+        },
       });
 
       console.log("🔔 Realtime notification sent to:", receiver);
@@ -547,8 +631,8 @@ io.on("connection", (socket) => {
             data: {
               type: "message",
               chatId,
-              senderId: sender,
-              receiverId: receiver,
+              senderId: String(sender),
+              receiverId: String(receiver),
               messageId: message._id.toString(),
             },
           });
@@ -585,7 +669,8 @@ io.on("connection", (socket) => {
       if (typeof callback === "function") {
         callback({
           success: true,
-          message,
+
+          message: realtimeMessage,
         });
       }
     } catch (err) {
@@ -594,29 +679,12 @@ io.on("connection", (socket) => {
       if (typeof callback === "function") {
         callback({
           error: true,
+
           message:
             process.env.NODE_ENV === "production"
               ? "Failed to send message."
               : err.message,
         });
-      }
-    }
-  });
-
-  /* =======================================================
-     DISCONNECT
-  ======================================================= */
-
-  socket.on("disconnect", () => {
-    console.log("🔴 Socket disconnected:", socket.id);
-
-    for (const [userId, socketId] of onlineUsers.entries()) {
-      if (socketId === socket.id) {
-        onlineUsers.delete(userId);
-
-        console.log(`👤 User offline: ${userId}`);
-
-        break;
       }
     }
   });

@@ -8,9 +8,9 @@ import {
   ShieldX,
   ChartNoAxesCombined,
   Settings,
-  Gavel,
   HandHelping,
   BriefcaseBusiness,
+  SlidersHorizontal,
 } from "lucide-react";
 
 import SchoolInformation from "../components/settings/SchoolInformation";
@@ -22,6 +22,7 @@ import BackupRecovery from "../components/settings/BackupRecovery";
 const SettingsPage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+
   const adminName =
     [user?.firstName, user?.middleName, user?.lastName]
       .filter(Boolean)
@@ -31,7 +32,11 @@ const SettingsPage = () => {
     "Admin";
 
   const adminPhoto =
-    user?.profilePhoto || user?.profilePicture || user?.photo || null;
+    user?.profilePhoto ||
+    user?.profilePicture ||
+    user?.photo ||
+    null;
+
   const [activeTab, setActiveTab] = useState("School Information");
 
   const tabs = [
@@ -46,103 +51,143 @@ const SettingsPage = () => {
     switch (activeTab) {
       case "School Information":
         return <SchoolInformation />;
+
       case "Notifications":
         return <Notifications />;
+
       case "Security":
         return <Security />;
+
       case "History / Logs":
         return <HistoryLogs />;
+
       case "Backup & Recovery":
         return <BackupRecovery />;
+
       default:
         return null;
     }
   };
 
   return (
-    <div className="h-screen w-screen flex bg-gray-50 text-gray-900">
-      {/* ================= SIDEBAR ================= */}
-      <aside className="w-72 bg-white/70 backdrop-blur-2xl border-r border-white/30 p-6 flex flex-col justify-between">
+    <div className="h-screen w-screen flex bg-[#F4F7FB] text-gray-900 overflow-hidden">
+
+      {/* =====================================================
+          SIDEBAR
+      ===================================================== */}
+      <aside
+        className="
+          hidden
+          lg:flex
+          w-[270px]
+          bg-white
+          border-r
+          border-gray-100
+          flex-col
+          justify-between
+          px-5
+          py-6
+          flex-shrink-0
+        "
+      >
+        {/* ===================================================
+            SIDEBAR TOP
+        =================================================== */}
         <div>
           {/* LOGO */}
-          <h1 className="text-2xl font-bold text-green-600">GuidEd</h1>
+          <div className="px-2 mb-8">
+            <h1 className="text-2xl font-black tracking-tight text-green-600">
+              GuidEd
+            </h1>
 
-          <p className="text-xs text-gray-500 mb-6">
-            Our Lady of the Holy Rosary School - General Trias Campus
-          </p>
+            <p className="text-[11px] leading-relaxed text-gray-400 mt-1">
+              Our Lady of the Holy Rosary School
+              <br />
+              General Trias Campus
+            </p>
+          </div>
 
           {/* NAVIGATION */}
-          <Nav
-            icon={<LayoutDashboard size={18} />}
-            label="Dashboard"
-            onClick={() => navigate("/dashboard")}
-          />
+          <nav className="space-y-1">
 
-          <Nav
-            icon={<Users size={18} />}
-            label="Students"
-            onClick={() => navigate("/students")}
-          />
+            <Nav
+              icon={<LayoutDashboard size={18} />}
+              label="Dashboard"
+              onClick={() => navigate("/dashboard")}
+            />
 
-          <Nav
-            icon={<ShieldX size={18} />}
-            label="Guidance"
-            onClick={() => navigate("/guidance")}
-          />
+            <Nav
+              icon={<Users size={18} />}
+              label="Students"
+              onClick={() => navigate("/students")}
+            />
 
-          <Nav
-            icon={<ChartNoAxesCombined size={18} />}
-            label="Reports"
-            onClick={() => navigate("/reports")}
-          />
+            <Nav
+              icon={<ShieldX size={18} />}
+              label="Guidance"
+              onClick={() => navigate("/guidance")}
+            />
 
-          <Nav
-            icon={<BriefcaseBusiness size={18} />}
-            label="Cases"
-            onClick={() => navigate("/cases")}
-          />
+            <Nav
+              icon={<ChartNoAxesCombined size={18} />}
+              label="Reports"
+              onClick={() => navigate("/reports")}
+            />
 
-          <Nav
-            icon={<HandHelping size={18} />}
-            label="Interventions"
-            onClick={() => navigate("/interventions")}
-          />
+            <Nav
+              icon={<BriefcaseBusiness size={18} />}
+              label="Cases"
+              onClick={() => navigate("/cases")}
+            />
 
-          <Nav icon={<Settings size={18} />} label="Settings" active />
+            <Nav
+              icon={<HandHelping size={18} />}
+              label="Interventions"
+              onClick={() => navigate("/interventions")}
+            />
+
+            <Nav
+              icon={<Settings size={18} />}
+              label="Settings"
+              active
+            />
+          </nav>
         </div>
 
-        {/* ================= SIDEBAR BOTTOM ================= */}
+        {/* ===================================================
+            SIDEBAR BOTTOM
+        =================================================== */}
         <div className="space-y-3">
+
           {/* ADMIN PROFILE */}
           <div
             className="
-          flex
-          items-center
-          gap-3
-          p-3
-          rounded-2xl
-          bg-gray-50/80
-          border border-gray-200/70
-          hover:bg-white
-          hover:shadow-sm
-          transition
-        "
+              flex
+              items-center
+              gap-3
+              p-3
+              rounded-2xl
+              bg-gray-50
+              border
+              border-gray-100
+            "
           >
             {/* PROFILE PHOTO */}
             <div
               className="
-            relative
-            w-11
-            h-11
-            rounded-xl
-            overflow-hidden
-            bg-green-100
-            border border-green-200
-            flex
-            items-center
-            justify-center
-            flex-shrink-0
-          "
+                relative
+                w-10
+                h-10
+                rounded-xl
+                overflow-hidden
+                bg-green-50
+                border
+                border-green-100
+                flex
+                items-center
+                justify-center
+                flex-shrink-0
+              "
             >
               {adminPhoto ? (
                 <img
@@ -154,7 +199,7 @@ const SettingsPage = () => {
                   }}
                 />
               ) : (
-                <span className="text-green-700 font-bold text-lg">
+                <span className="text-green-700 font-bold text-base">
                   {adminName.charAt(0).toUpperCase()}
                 </span>
               )}
@@ -162,16 +207,16 @@ const SettingsPage = () => {
               {/* ONLINE DOT */}
               <span
                 className="
-              absolute
-              bottom-0.5
-              right-0.5
-              w-2.5
-              h-2.5
-              rounded-full
-              bg-green-500
-              border-2
-              border-white
-            "
+                  absolute
+                  bottom-0.5
+                  right-0.5
+                  w-2.5
+                  h-2.5
+                  rounded-full
+                  bg-green-500
+                  border-2
+                  border-white
+                "
               />
             </div>
 
@@ -179,23 +224,24 @@ const SettingsPage = () => {
             <div className="min-w-0 flex-1">
               <p
                 className="
-              text-[10px]
-              uppercase
-              tracking-wider
-              text-gray-400
-              font-medium
-            "
+                  text-[9px]
+                  uppercase
+                  tracking-[0.12em]
+                  text-gray-400
+                  font-semibold
+                "
               >
                 Administrator
               </p>
 
               <p
                 className="
-              text-sm
-              font-bold
-              text-gray-900
-              truncate
-            "
+                  text-sm
+                  font-bold
+                  text-gray-900
+                  truncate
+                  mt-0.5
+                "
               >
                 {adminName}
               </p>
@@ -206,53 +252,220 @@ const SettingsPage = () => {
           <button
             onClick={logout}
             className="
-            w-full
-            bg-green-600
-            hover:bg-green-700
-            text-white
-            py-3
-            rounded-2xl
-            font-medium
-            shadow-sm
-            hover:shadow-md
-            transition
-          "
+              w-full
+              bg-green-600
+              hover:bg-green-700
+              text-white
+              py-2.5
+              rounded-xl
+              text-sm
+              font-semibold
+              shadow-sm
+              hover:shadow-md
+              transition-all
+              duration-200
+            "
           >
             Logout
           </button>
         </div>
       </aside>
 
-      {/* ================= MAIN ================= */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        {/* HEADER */}
-        <div className="mb-6">
-          <h2 className="text-4xl font-black tracking-tight">System Settings</h2>
-          <p className="text-sm text-gray-500">
-            Manage system configuration and security preferences
-          </p>
-        </div>
+      {/* =====================================================
+          MAIN CONTENT
+      ===================================================== */}
+      <main className="flex-1 min-w-0 overflow-y-auto">
 
-        {/* TABS */}
-        <div className="flex flex-wrap gap-2 bg-white border border-gray-200 rounded-2xl p-2 shadow-sm mb-6">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-xl text-sm transition ${
-                activeTab === tab
-                  ? "bg-green-50 text-green-700 border border-green-200"
-                  : "text-gray-500 hover:bg-gray-100"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+        {/* ===================================================
+            HEADER
+        =================================================== */}
+        <header
+          className="
+            sticky
+            top-0
+            z-30
+            bg-[#F4F7FB]/90
+            backdrop-blur-xl
+            border-b
+            border-gray-100
+            px-8
+            py-5
+          "
+        >
+          <div className="w-full">
 
-        {/* CONTENT */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-          {renderTab()}
+            {/* =================================================
+                BREADCRUMB
+            ================================================= */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xs font-medium text-gray-400">
+                Overview
+              </span>
+
+              <span className="text-xs text-gray-300">
+                /
+              </span>
+
+              <span className="text-xs font-semibold text-green-600">
+                Settings
+              </span>
+            </div>
+
+            {/* =================================================
+                PAGE HEADER ROW
+            ================================================= */}
+            <div className="flex items-center justify-between gap-6">
+
+              {/* PAGE TITLE */}
+              <div className="flex items-center gap-4 min-w-0">
+
+                {/* ICON */}
+                <div
+                  className="
+                    w-12
+                    h-12
+                    rounded-2xl
+                    bg-green-50
+                    text-green-600
+                    flex
+                    items-center
+                    justify-center
+                    border
+                    border-green-100
+                    flex-shrink-0
+                  "
+                >
+                  <SlidersHorizontal
+                    size={21}
+                    strokeWidth={2.2}
+                  />
+                </div>
+
+                {/* TITLE */}
+                <div className="min-w-0">
+                  <h2
+                    className="
+                      text-2xl
+                      font-black
+                      tracking-tight
+                      text-gray-900
+                      leading-tight
+                    "
+                  >
+                    System Settings
+                  </h2>
+
+                  <p className="text-gray-400 text-sm mt-1">
+                    Manage system configuration and security preferences
+                  </p>
+                </div>
+              </div>
+
+              {/* RIGHT SIDE */}
+              <div className="hidden sm:flex items-center gap-2">
+                <div
+                  className="
+                    flex
+                    items-center
+                    gap-2
+                    px-3
+                    py-2
+                    rounded-xl
+                    bg-white
+                    border
+                    border-gray-200
+                    text-xs
+                    font-medium
+                    text-gray-500
+                  "
+                >
+                  <span className="w-2 h-2 rounded-full bg-green-500" />
+                  System Settings
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* ===================================================
+            PAGE CONTENT
+        =================================================== */}
+        <div className="px-8 py-7">
+
+          {/* =================================================
+              SETTINGS NAVIGATION
+          ================================================= */}
+          <div
+            className="
+              bg-white
+              border
+              border-gray-100
+              rounded-2xl
+              p-2
+              shadow-sm
+              mb-6
+            "
+          >
+            <div className="flex flex-wrap gap-1">
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab;
+
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`
+                      px-4
+                      py-2.5
+                      rounded-xl
+                      text-sm
+                      font-medium
+                      transition-all
+                      duration-200
+                      border
+                      ${
+                        isActive
+                          ? `
+                            bg-green-50
+                            text-green-700
+                            border-green-100
+                            shadow-sm
+                          `
+                          : `
+                            bg-transparent
+                            text-gray-500
+                            border-transparent
+                            hover:bg-gray-50
+                            hover:text-gray-800
+                          `
+                      }
+                    `}
+                  >
+                    {tab}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* =================================================
+              CONTENT CARD
+          ================================================= */}
+          <section
+            className="
+              bg-white
+              border
+              border-gray-100
+              rounded-2xl
+              shadow-sm
+              overflow-hidden
+            "
+          >
+            <div className="p-7">
+              {renderTab()}
+            </div>
+          </section>
+
         </div>
       </main>
     </div>
@@ -261,17 +474,56 @@ const SettingsPage = () => {
 
 export default SettingsPage;
 
-/* ================= NAV ================= */
+/* =========================================================
+   SIDEBAR NAVIGATION
+========================================================= */
+
 const Nav = ({ icon, label, onClick, active }) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-3 px-4 py-3 rounded-xl w-full ${
-      active
-        ? "bg-green-50 text-green-700 font-medium"
-        : "text-gray-600 hover:bg-gray-100"
-    }`}
+    className={`
+      group
+      flex
+      items-center
+      gap-3
+      px-3.5
+      py-2.5
+      rounded-xl
+      w-full
+      text-sm
+      transition-all
+      duration-200
+      ${
+        active
+          ? `
+            bg-green-50
+            text-green-700
+            font-semibold
+          `
+          : `
+            text-gray-500
+            hover:bg-gray-50
+            hover:text-gray-900
+          `
+      }
+    `}
   >
-    {icon}
-    {label}
+    <span
+      className={`
+        flex
+        items-center
+        justify-center
+        transition-colors
+        ${
+          active
+            ? "text-green-600"
+            : "text-gray-400 group-hover:text-gray-700"
+        }
+      `}
+    >
+      {icon}
+    </span>
+
+    <span>{label}</span>
   </button>
 );

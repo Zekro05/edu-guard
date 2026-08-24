@@ -6,7 +6,8 @@ import { mapRoleForHistory } from "../utils/roleMapper.js";
 /* GET ALL STUDENTS */
 export const getStudents = async (req, res) => {
   try {
-    const students = await Student.find().sort({ createdAt: -1 });
+    const students = await Student.find()
+      .sort({ createdAt: -1 });
 
     res.status(200).json(students);
   } catch (error) {
@@ -42,7 +43,9 @@ export const getStudentById = async (req, res) => {
 /*  CREATE STUDENT  */
 export const createStudent = async (req, res) => {
   try {
-    const profilePhoto = req.file ? req.file.path : "";
+    const profilePhoto = req.file
+      ? `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`
+      : "";
 
     const student = new Student({
       ...req.body,
@@ -61,52 +64,115 @@ export const createStudent = async (req, res) => {
 
 /*  UPDATE STUDENT  */
 export const updateStudent = async (req, res) => {
-  const user = await User.findById(req.userId);
   try {
-    const studentId = req.params.id;
+    // User who is performing the update
+    const currentUser = await User.findById(req.userId);
 
-    // Find the existing student
-    const student = await Student.findById(studentId);
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
+    if (!currentUser) {
+      return res.status(404).json({
+        message: "Current user not found",
+      });
     }
 
-    // Handle profile photo
+    const studentId = req.params.id;
+
+    // =========================================================
+    // FIND STUDENT
+    // =========================================================
+
+    const student = await Student.findById(studentId);
+
+    if (!student) {
+      return res.status(404).json({
+        message: "Student not found",
+      });
+    }
+
+    // =========================================================
+    // HANDLE PROFILE PHOTO
+    // =========================================================
+
     let profilePhoto = student.profilePhoto;
 
     if (req.file) {
       profilePhoto = req.file.path;
+
+      console.log("📸 NEW PROFILE PHOTO:", profilePhoto);
     }
 
-    // Prepare updated data
+    // =========================================================
+    // UPDATE STUDENT COLLECTION
+    // =========================================================
+
     const updatedData = {
       ...req.body,
-      profilePhoto, // either new uploaded photo or existing
+      profilePhoto,
     };
 
-    // Update student
     const updatedStudent = await Student.findByIdAndUpdate(
       studentId,
       updatedData,
       {
         new: true,
         runValidators: true,
-      },
+      }
     );
 
+    // =========================================================
+    // UPDATE CORRESPONDING USER COLLECTION
+    // =========================================================
+
+    const studentUser = await User.findOne({
+      studentId: student.studentId,
+    });
+
+    if (studentUser) {
+      studentUser.profilePhoto = profilePhoto;
+
+      await studentUser.save();
+
+      console.log(
+        "✅ USER PROFILE PHOTO UPDATED:",
+        studentUser.profilePhoto
+      );
+    } else {
+      console.warn(
+        `⚠️ No User account found for studentId: ${student.studentId}`
+      );
+    }
+
+    // =========================================================
+    // HISTORY LOG
+    // =========================================================
+
     await createHistoryLog({
-      userId: user._id,
-      role: mapRoleForHistory(user.role),
+      userId: currentUser._id,
+      role: mapRoleForHistory(currentUser.role),
       action: "Update Student Details",
       category: "Student",
       details: `Student details updated: (Student ID: ${student.studentId})`,
       ipAddress: req.ip,
     });
 
-    res.status(200).json(updatedStudent);
+    // =========================================================
+    // RESPONSE
+    // =========================================================
+
+    return res.status(200).json({
+      success: true,
+      message: "Student updated successfully",
+      student: updatedStudent,
+      profilePhoto,
+    });
+
   } catch (error) {
     console.error("Failed to update student:", error);
-    res.status(400).json({ message: "Failed to update student" });
+
+    return res.status(400).json({
+      success: false,
+      message: "Failed to update student",
+      error: error.message,
+    });
   }
 };
 
@@ -114,7 +180,12 @@ export const updateMyProfile = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const { firstName, middleName, lastName, phone } = req.body;
+    const {
+      firstName,
+      middleName,
+      lastName,
+      phone,
+    } = req.body;
 
     // =========================================================
     // FIND LOGGED-IN USER
@@ -179,11 +250,14 @@ export const updateMyProfile = async (req, res) => {
 
     student.firstName = firstName.trim();
 
-    student.middleName = middleName?.trim() || "";
+    student.middleName =
+      middleName?.trim() || "";
 
-    student.lastName = lastName.trim();
+    student.lastName =
+      lastName.trim();
 
-    student.phone = phone?.trim() || "";
+    student.phone =
+      phone?.trim() || "";
 
     await student.save();
 
@@ -208,8 +282,12 @@ export const updateMyProfile = async (req, res) => {
         riskLevel: student.riskLevel,
       },
     });
+
   } catch (error) {
-    console.error("UPDATE MY PROFILE ERROR:", error);
+    console.error(
+      "UPDATE MY PROFILE ERROR:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
@@ -273,51 +351,16 @@ export const updateMyProfilePhoto = async (req, res) => {
       });
     }
 
-    // =========================================================
-    // CLOUDINARY URL
-    // =========================================================
+    // Cloudinary URL
+    student.profilePhoto = req.file.path;
 
-    const profilePhoto = req.file.path;
-
-    console.log(
-      "📸 NEW CLOUDINARY PROFILE PHOTO:",
-      profilePhoto
-    );
-
-    // =========================================================
-    // UPDATE BOTH COLLECTIONS
-    // =========================================================
-
-    student.profilePhoto = profilePhoto;
-    user.profilePhoto = profilePhoto;
-
-    await Promise.all([
-      student.save(),
-      user.save(),
-    ]);
-
-    // =========================================================
-    // RESPONSE
-    // =========================================================
+    await student.save();
 
     return res.status(200).json({
       success: true,
       message: "Profile photo updated successfully.",
-
-      profilePhoto,
-
-      student: {
-        _id: student._id,
-        studentId: student.studentId,
-        profilePhoto: student.profilePhoto,
-      },
-
-      user: {
-        _id: user._id,
-        profilePhoto: user.profilePhoto,
-      },
+      profilePhoto: student.profilePhoto,
     });
-
   } catch (error) {
     console.error(
       "UPDATE STUDENT PROFILE PHOTO ERROR:",
@@ -352,7 +395,7 @@ export const createStudentsBulk = async (req, res) => {
       "Grade 10": "Grade 11",
       "Grade 11": "Grade 12",
       "Grade 12": "Grade 12",
-      Grade12: "Graduated",
+      "Grade12" : "Graduated"
     };
 
     for (const s of students) {
@@ -390,7 +433,7 @@ export const createStudentsBulk = async (req, res) => {
           {
             new: true,
             runValidators: true,
-          },
+          }
         );
 
         if (updatedStudent) updated++;
@@ -471,21 +514,21 @@ export const previewBulkStudents = async (req, res) => {
 
       if (existing) {
         result.toUpdate.push({
-          studentId: s.studentId,
-          name: `${existing.firstName} ${existing.lastName}`,
-          oldGrade: existing.grade,
-          newGrade: s.grade,
-          email: s.email,
-          phone: s.phone,
-        });
+  studentId: s.studentId,
+  name: `${existing.firstName} ${existing.lastName}`,
+  oldGrade: existing.grade,
+  newGrade: s.grade,
+  email: s.email,
+  phone: s.phone,
+});
       } else {
         result.toInsert.push({
-          studentId: s.studentId,
-          name: `${s.firstName || ""} ${s.lastName || ""}`,
-          grade: s.grade,
-          email: s.email,
-          phone: s.phone,
-        });
+  studentId: s.studentId,
+  name: `${s.firstName || ""} ${s.lastName || ""}`,
+  grade: s.grade,
+  email: s.email,
+  phone: s.phone,
+});
       }
     }
 
@@ -508,25 +551,25 @@ export const getStudentTimeline = async (req, res) => {
     ]);
 
     const timeline = [
-      ...reports.map((r) => ({
+      ...reports.map(r => ({
         type: "REPORT",
         date: r.createdAt,
         data: r,
       })),
 
-      ...incidents.map((i) => ({
+      ...incidents.map(i => ({
         type: "INCIDENT",
         date: i.createdAt,
         data: i,
       })),
 
-      ...cases.map((c) => ({
+      ...cases.map(c => ({
         type: "CASE",
         date: c.createdAt,
         data: c,
       })),
 
-      ...interventions.map((i) => ({
+      ...interventions.map(i => ({
         type: "INTERVENTION",
         date: i.createdAt,
         data: i,
@@ -553,13 +596,13 @@ export const deleteStudent = async (req, res) => {
     }
 
     await createHistoryLog({
-      userId: user._id,
-      role: mapRoleForHistory(user.role),
-      action: "Update Student Details",
-      category: "Student",
-      details: `Student details deleted: (Student ID: ${student.studentId})`,
-      ipAddress: req.ip,
-    });
+          userId: user._id,
+          role: mapRoleForHistory(user.role),
+          action: "Update Student Details",
+          category: "Student",
+          details: `Student details deleted: (Student ID: ${student.studentId})`,
+          ipAddress: req.ip,
+        });
 
     res.status(200).json({ message: "Student deleted successfully" });
   } catch (error) {

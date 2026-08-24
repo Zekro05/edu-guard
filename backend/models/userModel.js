@@ -93,6 +93,40 @@ const userSchema = new mongoose.Schema(
         type: Boolean,
         default: true,
       },
+
+      emailAlerts: {
+        type: Boolean,
+        default: true,
+      },
+
+      highRiskAlerts: {
+        type: Boolean,
+        default: true,
+      },
+
+      aiPredictionAlerts: {
+        type: Boolean,
+        default: false,
+      },
+
+      securityWarnings: {
+        type: Boolean,
+        default: false,
+      },
+
+      adminEmail: {
+        type: String,
+        default: "",
+        trim: true,
+        lowercase: true,
+      },
+
+      guidanceEmail: {
+        type: String,
+        default: "",
+        trim: true,
+        lowercase: true,
+      },
     },
 
     // SIGNUP EMAIL VERIFICATION
