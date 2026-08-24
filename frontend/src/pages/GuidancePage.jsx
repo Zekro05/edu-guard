@@ -228,30 +228,106 @@ const GuidancePage = () => {
   };
 
   /* =========================================================
-     FETCH USERS + EXISTING CONVERSATIONS
-  ========================================================= */
+   FETCH USERS + EXISTING CONVERSATIONS
+   Also refresh user profile information periodically
+========================================================= */
 
-  useEffect(() => {
-    if (!user?._id) return;
+useEffect(() => {
+  if (!user?._id) return;
 
-    const loadUsersAndConversations = async () => {
-      try {
-        const res = await fetch(
-          "https://edu-guard-backend.onrender.com/api/users"
-        );
+  let cancelled = false;
 
-        if (!res.ok) {
-          throw new Error("Failed to fetch users");
+  const loadUsersAndConversations = async () => {
+    try {
+      const res = await fetch(
+        "https://edu-guard-backend.onrender.com/api/users",
+        {
+          cache: "no-store",
         }
+      );
 
-        const data = await res.json();
+      if (!res.ok) {
+        throw new Error("Failed to fetch users");
+      }
 
-        const otherUsers = data.filter(
-          (u) => u._id !== user._id
+      const data = await res.json();
+
+      if (!Array.isArray(data) || cancelled) return;
+
+      /*
+       * Normalize user data.
+       *
+       * Some accounts may have the photo under a different
+       * property depending on which model/controller returned them.
+       */
+      const normalizedUsers = data.map((u) => ({
+        ...u,
+
+        profilePhoto:
+          u.profilePhoto ||
+          u.profilePicture ||
+          u.photo ||
+          null,
+
+        name:
+          u.name ||
+          [u.firstName, u.middleName, u.lastName]
+            .filter(Boolean)
+            .join(" "),
+      }));
+
+      const otherUsers = normalizedUsers.filter(
+        (u) => u._id !== user._id
+      );
+
+      /*
+       * IMPORTANT:
+       * Update the users state even if conversations
+       * already exist.
+       *
+       * This makes profile-photo changes appear.
+       */
+      setUsers(otherUsers);
+
+      /*
+       * Update the users stored inside conversationUsers too.
+       *
+       * This is the part that fixes the issue where the
+       * conversation list keeps the OLD profilePhoto.
+       */
+      setConversationUsers((prev) =>
+        prev.map((existingUser) => {
+          const updatedUser = otherUsers.find(
+            (u) => u._id === existingUser._id
+          );
+
+          return updatedUser || existingUser;
+        })
+      );
+
+      /*
+       * If the currently opened chat changed its profile photo,
+       * update activeChat as well.
+       */
+      setActiveChat((prev) => {
+        if (!prev) return prev;
+
+        const updatedUser = otherUsers.find(
+          (u) => u._id === prev._id
         );
 
-        setUsers(otherUsers);
+        return updatedUser || prev;
+      });
 
+      /*
+       * Check existing conversations.
+       *
+       * NOTE:
+       * We still do this on the initial load.
+       * During periodic refreshes, we don't need to
+       * repeatedly fetch every conversation.
+       */
+      if (!cancelled) {
         const conversationChecks = await Promise.all(
           otherUsers.map(async (u) => {
             try {
@@ -260,13 +336,17 @@ const GuidancePage = () => {
                 .join("-");
 
               const response = await fetch(
-                `https://edu-guard-backend.onrender.com/api/messages/${chatId}`
+                `https://edu-guard-backend.onrender.com/api/messages/${chatId}`,
+                {
+                  cache: "no-store",
+                }
               );
 
               if (!response.ok) {
                 return {
                   user: u,
                   hasConversation: false,
+                  lastMessage: null,
                 };
               }
 
@@ -285,7 +365,8 @@ const GuidancePage = () => {
 
               return {
                 user: u,
-                hasConversation: chatMessages.length > 0,
+                hasConversation:
+                  chatMessages.length > 0,
                 lastMessage,
               };
             } catch (error) {
@@ -303,10 +384,50 @@ const GuidancePage = () => {
           })
         );
 
-        const existingConversations = conversationChecks
-          .filter((item) => item.hasConversation)
-          .map((item) => item.user);
+        if (cancelled) return;
 
+        const existingConversations =
+          conversationChecks
+            .filter((item) => item.hasConversation)
+            .map((item) => item.user);
+
+        /*
+         * IMPORTANT:
+         * Merge refreshed user information into the
+         * conversation list instead of replacing it
+         * with potentially stale objects.
+         */
+        setConversationUsers((prev) => {
+          const conversationIds = new Set(
+            existingConversations.map((u) => u._id)
+          );
+
+          const updated = prev
+            .map((oldUser) => {
+              const freshUser = otherUsers.find(
+                (u) => u._id === oldUser._id
+              );
+
+              return freshUser || oldUser;
+            })
+            .filter((u) => conversationIds.has(u._id));
+
+          existingConversations.forEach((freshUser) => {
+            const exists = updated.some(
+              (u) => u._id === freshUser._id
+            );
+
+            if (!exists) {
+              updated.push(freshUser);
+            }
+          });
+
+          return updated;
+        });
+
+        /*
+         * Build conversation metadata.
+         */
         const meta = {};
 
         conversationChecks.forEach((item) => {
@@ -317,22 +438,47 @@ const GuidancePage = () => {
           meta[item.user._id] = {
             lastMessage: message.text || "",
             lastMessageAt:
-              message.createdAt || message.updatedAt || null,
+              message.createdAt ||
+              message.updatedAt ||
+              null,
           };
         });
 
-        setConversationMeta(meta);
-        setConversationUsers(existingConversations);
-      } catch (error) {
+        setConversationMeta((prev) => ({
+          ...prev,
+          ...meta,
+        }));
+      }
+    } catch (error) {
+      if (!cancelled) {
         console.error(
           "Failed to load users and conversations:",
           error
         );
       }
-    };
+    }
+  };
 
+  /*
+   * Initial load
+   */
+  loadUsersAndConversations();
+
+  /*
+   * Refresh profiles every 10 seconds.
+   *
+   * This catches profile-photo changes made by
+   * another account while this page is open.
+   */
+  const interval = setInterval(() => {
     loadUsersAndConversations();
-  }, [user?._id]);
+  }, 10000);
+
+  return () => {
+    cancelled = true;
+    clearInterval(interval);
+  };
+}, [user?._id]);
 
   /* =========================================================
      SOCKET

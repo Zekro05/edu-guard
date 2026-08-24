@@ -38,8 +38,7 @@ import RiskBadge from "../components/RiskBadge";
 import ViewProfileModal from "../components/ViewProfileModal";
 
 const socket = io(
-  import.meta.env.VITE_SOCKET_URL ||
-    "https://edu-guard-backend.onrender.com",
+  import.meta.env.VITE_SOCKET_URL || "https://edu-guard-backend.onrender.com",
 );
 
 /* =========================================================
@@ -103,6 +102,17 @@ const StudentPage = () => {
 
       const res = await API.get("/api/students");
 
+      console.log("📸 STUDENTS FROM API:", res.data);
+
+      res.data.forEach((student) => {
+        console.log(
+          student.firstName,
+          student.studentId,
+          "PROFILE PHOTO:",
+          student.profilePhoto,
+        );
+      });
+
       setStudents(res.data || []);
     } catch (error) {
       console.error("Failed to fetch students:", error);
@@ -139,10 +149,9 @@ const StudentPage = () => {
 
     if (!query) return true;
 
-    const fullName =
-      `${student.firstName || ""} ${student.middleName || ""} ${
-        student.lastName || ""
-      }`.toLowerCase();
+    const fullName = `${student.firstName || ""} ${student.middleName || ""} ${
+      student.lastName || ""
+    }`.toLowerCase();
 
     const studentId = String(student.studentId || "").toLowerCase();
 
@@ -157,10 +166,7 @@ const StudentPage = () => {
 
   const pages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
 
-  const paginated = filtered.slice(
-    (page - 1) * PER_PAGE,
-    page * PER_PAGE,
-  );
+  const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   useEffect(() => {
     setPage(1);
@@ -179,17 +185,11 @@ const StudentPage = () => {
   const stats = {
     total: students.length,
 
-    high: students.filter(
-      (student) => student.riskLevel === "High",
-    ).length,
+    high: students.filter((student) => student.riskLevel === "High").length,
 
-    med: students.filter(
-      (student) => student.riskLevel === "Medium",
-    ).length,
+    med: students.filter((student) => student.riskLevel === "Medium").length,
 
-    low: students.filter(
-      (student) => student.riskLevel === "Low",
-    ).length,
+    low: students.filter((student) => student.riskLevel === "Low").length,
   };
 
   /* =========================================================
@@ -206,10 +206,7 @@ const StudentPage = () => {
 
       const data = JSON.parse(await file.text());
 
-      const res = await API.post(
-        "/api/students/bulk/preview",
-        data,
-      );
+      const res = await API.post("/api/students/bulk/preview", data);
 
       setPreview(res.data);
       setShowPreview(true);
@@ -254,10 +251,7 @@ const StudentPage = () => {
         })),
       ];
 
-      const res = await API.post(
-        "/api/students/bulk",
-        payload,
-      );
+      const res = await API.post("/api/students/bulk", payload);
 
       toast.success(
         `Import done: ${res.data.inserted} inserted, ${res.data.updated} updated`,
@@ -335,21 +329,16 @@ const StudentPage = () => {
 
   return (
     <div className="h-screen w-screen flex bg-[#F7F9F8] text-gray-900 overflow-hidden">
-
       {/* =====================================================
           SIDEBAR
       ===================================================== */}
 
       <aside className="hidden lg:flex w-[270px] bg-white border-r border-gray-100 flex-col justify-between px-5 py-6">
-
         <div>
-
           {/* BRAND */}
 
           <div className="px-3 mb-8">
-
             <div className="flex items-center gap-3">
-
               <div className="w-11 h-11 flex items-center justify-center">
                 <img
                   src="/school-logo.png"
@@ -367,7 +356,6 @@ const StudentPage = () => {
                   Student Guidance
                 </p>
               </div>
-
             </div>
 
             <p className="text-[11px] leading-relaxed text-gray-400 mt-4">
@@ -375,7 +363,6 @@ const StudentPage = () => {
               <br />
               General Trias Campus
             </p>
-
           </div>
 
           {/* NAVIGATION */}
@@ -385,18 +372,13 @@ const StudentPage = () => {
           </p>
 
           <div className="space-y-1">
-
             <Nav
               icon={<LayoutDashboard size={18} />}
               label="Dashboard"
               onClick={() => navigate("/dashboard")}
             />
 
-            <Nav
-              icon={<Users size={18} />}
-              label="Students"
-              active
-            />
+            <Nav icon={<Users size={18} />} label="Students" active />
 
             <Nav
               icon={<ShieldX size={18} />}
@@ -421,7 +403,6 @@ const StudentPage = () => {
               label="Interventions"
               onClick={() => navigate("/interventions")}
             />
-
           </div>
 
           <p className="px-3 mt-8 mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">
@@ -433,19 +414,14 @@ const StudentPage = () => {
             label="Settings"
             onClick={() => navigate("/settings")}
           />
-
         </div>
 
         {/* SIDEBAR FOOTER */}
 
         <div className="space-y-3">
-
           <div className="p-3 rounded-2xl bg-gray-50 border border-gray-100">
-
             <div className="flex items-center gap-3">
-
               <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-green-100 flex items-center justify-center flex-shrink-0">
-
                 {adminPhoto ? (
                   <img
                     src={adminPhoto}
@@ -462,11 +438,9 @@ const StudentPage = () => {
                 )}
 
                 <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white" />
-
               </div>
 
               <div className="min-w-0 flex-1">
-
                 <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400">
                   Administrator
                 </p>
@@ -474,11 +448,8 @@ const StudentPage = () => {
                 <p className="text-sm font-bold text-gray-900 truncate">
                   {adminName}
                 </p>
-
               </div>
-
             </div>
-
           </div>
 
           <button
@@ -505,9 +476,7 @@ const StudentPage = () => {
             <LogOut size={16} />
             Sign out
           </button>
-
         </div>
-
       </aside>
 
       {/* =====================================================
@@ -515,21 +484,15 @@ const StudentPage = () => {
       ===================================================== */}
 
       <main className="flex-1 min-w-0 overflow-y-auto">
-
         {/* HEADER */}
 
         <header className="sticky top-0 z-30 bg-[#F7F9F8]/90 backdrop-blur-xl border-b border-gray-100">
-
           <div className="px-6 md:px-10 py-5 flex items-center justify-between">
-
             <div>
-
               <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
                 <span>Management</span>
                 <ChevronRight size={12} />
-                <span className="text-green-600 font-medium">
-                  Students
-                </span>
+                <span className="text-green-600 font-medium">Students</span>
               </div>
 
               <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900">
@@ -539,42 +502,29 @@ const StudentPage = () => {
               <p className="text-sm text-gray-500 mt-1">
                 Manage student records and monitor behavioral risk.
               </p>
-
             </div>
 
             <div className="hidden md:flex items-center gap-2">
-
               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-gray-100">
-
-                <Database
-                  size={15}
-                  className="text-green-600"
-                />
+                <Database size={15} className="text-green-600" />
 
                 <span className="text-xs font-semibold text-gray-600">
                   {students.length} records
                 </span>
-
               </div>
-
             </div>
-
           </div>
-
         </header>
 
         {/* CONTENT */}
 
         <div className="px-6 md:px-10 py-8 space-y-8">
-
           {/* ===================================================
               OVERVIEW
           =================================================== */}
 
           <section>
-
             <div className="flex items-end justify-between mb-4">
-
               <div>
                 <h3 className="text-sm font-bold text-gray-900">
                   Student Overview
@@ -585,15 +535,10 @@ const StudentPage = () => {
                 </p>
               </div>
 
-              <Users
-                size={18}
-                className="text-gray-300"
-              />
-
+              <Users size={18} className="text-gray-300" />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-
               <StatCard
                 label="Total Students"
                 value={stats.total}
@@ -621,9 +566,7 @@ const StudentPage = () => {
                 type="low"
                 icon={<CheckCircle2 size={18} />}
               />
-
             </div>
-
           </section>
 
           {/* ===================================================
@@ -631,9 +574,7 @@ const StudentPage = () => {
           =================================================== */}
 
           <section>
-
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-4">
-
               <div>
                 <h3 className="text-sm font-bold text-gray-900">
                   Student Directory
@@ -645,7 +586,6 @@ const StudentPage = () => {
               </div>
 
               <div className="flex gap-2">
-
                 <input
                   ref={fileRef}
                   type="file"
@@ -710,14 +650,13 @@ const StudentPage = () => {
                   <Plus size={17} />
                   Add Student
                 </motion.button>
-
               </div>
-
             </div>
 
             {/* SEARCH */}
 
-            <div className="
+            <div
+              className="
               bg-white
               border
               border-gray-100
@@ -725,9 +664,10 @@ const StudentPage = () => {
               p-3
               shadow-[0_4px_24px_rgba(0,0,0,0.025)]
               mb-4
-            ">
-
-              <div className="
+            "
+            >
+              <div
+                className="
                 flex
                 items-center
                 gap-3
@@ -742,12 +682,9 @@ const StudentPage = () => {
                 focus-within:ring-4
                 focus-within:ring-green-50
                 transition
-              ">
-
-                <Search
-                  size={17}
-                  className="text-gray-400 flex-shrink-0"
-                />
+              "
+              >
+                <Search size={17} className="text-gray-400 flex-shrink-0" />
 
                 <input
                   value={search}
@@ -771,32 +708,27 @@ const StudentPage = () => {
                     <X size={16} />
                   </button>
                 )}
-
               </div>
-
             </div>
 
             {/* =================================================
                 TABLE
             ================================================= */}
 
-            <div className="
+            <div
+              className="
               bg-white
               border
               border-gray-100
               rounded-3xl
               overflow-hidden
               shadow-[0_4px_24px_rgba(0,0,0,0.025)]
-            ">
-
+            "
+            >
               <div className="overflow-x-auto">
-
                 <table className="w-full text-sm">
-
                   <thead>
-
                     <tr className="bg-gray-50/80 border-b border-gray-100">
-
                       <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">
                         Student
                       </th>
@@ -816,13 +748,10 @@ const StudentPage = () => {
                       <th className="px-6 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400">
                         Actions
                       </th>
-
                     </tr>
-
                   </thead>
 
                   <tbody>
-
                     {loading ? (
                       Array.from({ length: 6 }).map((_, index) => (
                         <SkeletonRow key={index} />
@@ -852,14 +781,12 @@ const StudentPage = () => {
                             transition
                           "
                         >
-
                           {/* STUDENT */}
 
                           <td className="px-6 py-4">
-
                             <div className="flex items-center gap-3">
-
-                              <div className="
+                              <div
+                                className="
                                 w-10
                                 h-10
                                 rounded-xl
@@ -871,8 +798,8 @@ const StudentPage = () => {
                                 items-center
                                 justify-center
                                 flex-shrink-0
-                              ">
-
+                              "
+                              >
                                 {student.profilePhoto ? (
                                   <img
                                     src={student.profilePhoto}
@@ -885,11 +812,9 @@ const StudentPage = () => {
                                     className="text-green-600"
                                   />
                                 )}
-
                               </div>
 
                               <div className="min-w-0">
-
                                 <p className="font-semibold text-gray-900 truncate">
                                   {student.firstName}{" "}
                                   {student.middleName
@@ -901,28 +826,23 @@ const StudentPage = () => {
                                 <p className="text-[11px] text-gray-400 mt-0.5">
                                   Student Profile
                                 </p>
-
                               </div>
-
                             </div>
-
                           </td>
 
                           {/* ID */}
 
                           <td className="px-6 py-4">
-
                             <span className="text-xs font-medium text-gray-500">
                               {student.studentId || "—"}
                             </span>
-
                           </td>
 
                           {/* GRADE */}
 
                           <td className="px-6 py-4 text-center">
-
-                            <span className="
+                            <span
+                              className="
                               inline-flex
                               items-center
                               px-2.5
@@ -934,28 +854,22 @@ const StudentPage = () => {
                               text-xs
                               font-semibold
                               text-gray-600
-                            ">
+                            "
+                            >
                               {student.grade || "—"}
                             </span>
-
                           </td>
 
                           {/* RISK */}
 
                           <td className="px-6 py-4 text-center">
-
-                            <RiskBadge
-                              level={student.riskLevel}
-                            />
-
+                            <RiskBadge level={student.riskLevel} />
                           </td>
 
                           {/* ACTIONS */}
 
                           <td className="px-6 py-4">
-
                             <div className="flex justify-end gap-1.5">
-
                               <Action
                                 label="View profile"
                                 icon={<Eye size={15} />}
@@ -979,23 +893,15 @@ const StudentPage = () => {
                                 label="Delete student"
                                 danger
                                 icon={<Trash2 size={15} />}
-                                onClick={() =>
-                                  setDeleteTarget(student)
-                                }
+                                onClick={() => setDeleteTarget(student)}
                               />
-
                             </div>
-
                           </td>
-
                         </motion.tr>
                       ))
                     )}
-
                   </tbody>
-
                 </table>
-
               </div>
 
               {/* =================================================
@@ -1003,7 +909,8 @@ const StudentPage = () => {
               ================================================= */}
 
               {!loading && (
-                <div className="
+                <div
+                  className="
                   px-6
                   py-4
                   border-t
@@ -1015,29 +922,22 @@ const StudentPage = () => {
                   items-center
                   justify-between
                   gap-3
-                ">
-
+                "
+                >
                   <p className="text-xs text-gray-400">
-
                     {filtered.length === 0
                       ? "No students found"
-                      : `Showing ${
-                          (page - 1) * PER_PAGE + 1
-                        }–${Math.min(
+                      : `Showing ${(page - 1) * PER_PAGE + 1}–${Math.min(
                           page * PER_PAGE,
                           filtered.length,
                         )} of ${filtered.length} students`}
-
                   </p>
 
                   <div className="flex items-center gap-2">
-
                     <button
                       disabled={page <= 1}
                       onClick={() =>
-                        setPage((current) =>
-                          Math.max(current - 1, 1),
-                        )
+                        setPage((current) => Math.max(current - 1, 1))
                       }
                       className="
                         w-9
@@ -1060,7 +960,8 @@ const StudentPage = () => {
                       <ChevronLeft size={16} />
                     </button>
 
-                    <div className="
+                    <div
+                      className="
                       min-w-9
                       h-9
                       px-3
@@ -1072,16 +973,15 @@ const StudentPage = () => {
                       justify-center
                       text-xs
                       font-bold
-                    ">
+                    "
+                    >
                       {page}
                     </div>
 
                     <button
                       disabled={page >= pages}
                       onClick={() =>
-                        setPage((current) =>
-                          Math.min(current + 1, pages),
-                        )
+                        setPage((current) => Math.min(current + 1, pages))
                       }
                       className="
                         w-9
@@ -1103,18 +1003,12 @@ const StudentPage = () => {
                     >
                       <ChevronRight size={16} />
                     </button>
-
                   </div>
-
                 </div>
               )}
-
             </div>
-
           </section>
-
         </div>
-
       </main>
 
       {/* =====================================================
@@ -1168,7 +1062,6 @@ const StudentPage = () => {
               p-4
             "
           >
-
             <motion.div
               initial={{
                 opacity: 0,
@@ -1192,10 +1085,10 @@ const StudentPage = () => {
                 border-gray-100
               "
             >
-
               {/* HEADER */}
 
-              <div className="
+              <div
+                className="
                 px-6
                 py-5
                 border-b
@@ -1203,11 +1096,11 @@ const StudentPage = () => {
                 flex
                 items-center
                 justify-between
-              ">
-
+              "
+              >
                 <div className="flex items-center gap-3">
-
-                  <div className="
+                  <div
+                    className="
                     w-10
                     h-10
                     rounded-xl
@@ -1216,22 +1109,18 @@ const StudentPage = () => {
                     flex
                     items-center
                     justify-center
-                  ">
+                  "
+                  >
                     <FileUp size={18} />
                   </div>
 
                   <div>
-
-                    <h2 className="font-bold text-gray-900">
-                      Import Preview
-                    </h2>
+                    <h2 className="font-bold text-gray-900">Import Preview</h2>
 
                     <p className="text-xs text-gray-400 mt-0.5">
                       Review changes before importing
                     </p>
-
                   </div>
-
                 </div>
 
                 <button
@@ -1253,13 +1142,11 @@ const StudentPage = () => {
                 >
                   <X size={17} />
                 </button>
-
               </div>
 
               {/* BODY */}
 
               <div className="p-6 overflow-y-auto max-h-[60vh]">
-
                 {/* INSERTS */}
 
                 <ImportSection
@@ -1268,7 +1155,6 @@ const StudentPage = () => {
                   color="green"
                   icon={<Plus size={15} />}
                 >
-
                   {preview.toInsert.length === 0 ? (
                     <EmptyImport text="No new students." />
                   ) : (
@@ -1281,7 +1167,6 @@ const StudentPage = () => {
                       />
                     ))
                   )}
-
                 </ImportSection>
 
                 {/* UPDATES */}
@@ -1292,7 +1177,6 @@ const StudentPage = () => {
                   color="amber"
                   icon={<Database size={15} />}
                 >
-
                   {preview.toUpdate.length === 0 ? (
                     <EmptyImport text="No student updates." />
                   ) : (
@@ -1305,7 +1189,6 @@ const StudentPage = () => {
                       />
                     ))
                   )}
-
                 </ImportSection>
 
                 {/* INVALID */}
@@ -1317,7 +1200,6 @@ const StudentPage = () => {
                     color="red"
                     icon={<AlertTriangle size={15} />}
                   >
-
                     {preview.invalid.map((student, index) => (
                       <ImportRow
                         key={index}
@@ -1326,15 +1208,14 @@ const StudentPage = () => {
                         subtitle="Missing student ID"
                       />
                     ))}
-
                   </ImportSection>
                 )}
-
               </div>
 
               {/* FOOTER */}
 
-              <div className="
+              <div
+                className="
                 px-6
                 py-4
                 border-t
@@ -1343,8 +1224,8 @@ const StudentPage = () => {
                 flex
                 justify-end
                 gap-2
-              ">
-
+              "
+              >
                 <button
                   onClick={() => {
                     setShowPreview(false);
@@ -1383,11 +1264,8 @@ const StudentPage = () => {
                 >
                   {importing ? "Importing..." : "Confirm Import"}
                 </button>
-
               </div>
-
             </motion.div>
-
           </motion.div>
         )}
       </AnimatePresence>
@@ -1414,7 +1292,6 @@ const StudentPage = () => {
               p-4
             "
           >
-
             <motion.div
               initial={{
                 opacity: 0,
@@ -1435,10 +1312,9 @@ const StudentPage = () => {
                 border-gray-100
               "
             >
-
               <div className="flex items-start gap-3">
-
-                <div className="
+                <div
+                  className="
                   w-11
                   h-11
                   rounded-xl
@@ -1448,12 +1324,12 @@ const StudentPage = () => {
                   items-center
                   justify-center
                   flex-shrink-0
-                ">
+                "
+                >
                   <Trash2 size={19} />
                 </div>
 
                 <div>
-
                   <h2 className="text-lg font-bold text-gray-900">
                     Delete Student
                   </h2>
@@ -1461,46 +1337,34 @@ const StudentPage = () => {
                   <p className="text-xs text-gray-400 mt-1">
                     This action cannot be undone.
                   </p>
-
                 </div>
-
               </div>
 
-              <div className="
+              <div
+                className="
                 mt-5
                 p-4
                 rounded-2xl
                 bg-red-50
                 border
                 border-red-100
-              ">
-
-                <p className="text-xs text-red-600">
-                  You are deleting
-                </p>
+              "
+              >
+                <p className="text-xs text-red-600">You are deleting</p>
 
                 <p className="text-sm font-bold text-red-800 mt-1">
-                  {deleteTarget.firstName}{" "}
-                  {deleteTarget.lastName}
+                  {deleteTarget.firstName} {deleteTarget.lastName}
                 </p>
-
               </div>
 
               <p className="text-sm text-gray-500 mt-5">
-
-                Type{" "}
-                <span className="font-bold text-red-600">
-                  DELETE
-                </span>{" "}
-                to confirm.
-
+                Type <span className="font-bold text-red-600">DELETE</span> to
+                confirm.
               </p>
 
               <input
                 value={deleteConfirmText}
-                onChange={(e) =>
-                  setDeleteConfirmText(e.target.value)
-                }
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
                 placeholder="Type DELETE here..."
                 className="
                   w-full
@@ -1522,7 +1386,6 @@ const StudentPage = () => {
               />
 
               <div className="flex justify-end gap-2 mt-5">
-
                 <button
                   onClick={() => {
                     setDeleteTarget(null);
@@ -1561,15 +1424,11 @@ const StudentPage = () => {
                 >
                   Delete Student
                 </button>
-
               </div>
-
             </motion.div>
-
           </motion.div>
         )}
       </AnimatePresence>
-
     </div>
   );
 };
@@ -1578,12 +1437,7 @@ const StudentPage = () => {
    NAV
 ========================================================= */
 
-const Nav = ({
-  icon,
-  label,
-  onClick,
-  active,
-}) => (
+const Nav = ({ icon, label, onClick, active }) => (
   <button
     onClick={onClick}
     className={`
@@ -1604,15 +1458,10 @@ const Nav = ({
       }
     `}
   >
-
     <span
       className={`
         transition
-        ${
-          active
-            ? "text-green-600"
-            : "text-gray-400 group-hover:text-gray-700"
-        }
+        ${active ? "text-green-600" : "text-gray-400 group-hover:text-gray-700"}
       `}
     >
       {icon}
@@ -1623,7 +1472,6 @@ const Nav = ({
     {active && (
       <span className="ml-auto w-1.5 h-1.5 rounded-full bg-green-600" />
     )}
-
   </button>
 );
 
@@ -1631,13 +1479,7 @@ const Nav = ({
    STAT CARD
 ========================================================= */
 
-const StatCard = ({
-  label,
-  value,
-  type,
-  icon,
-}) => {
-
+const StatCard = ({ label, value, type, icon }) => {
   const styles = {
     total: {
       icon: "bg-gray-100 text-gray-700",
@@ -1682,14 +1524,9 @@ const StatCard = ({
         shadow-[0_4px_24px_rgba(0,0,0,0.025)]
       "
     >
-
       <div className="flex items-start justify-between">
-
         <div>
-
-          <p className="text-xs font-semibold text-gray-400">
-            {label}
-          </p>
+          <p className="text-xs font-semibold text-gray-400">{label}</p>
 
           <p
             className={`
@@ -1702,7 +1539,6 @@ const StatCard = ({
           >
             {value}
           </p>
-
         </div>
 
         <div
@@ -1718,7 +1554,6 @@ const StatCard = ({
         >
           {icon}
         </div>
-
       </div>
 
       <div
@@ -1730,7 +1565,6 @@ const StatCard = ({
           ${style.line}
         `}
       />
-
     </motion.div>
   );
 };
@@ -1741,20 +1575,15 @@ const StatCard = ({
 
 const SkeletonRow = () => (
   <tr className="border-b border-gray-50 animate-pulse">
-
     <td className="px-6 py-4">
-
       <div className="flex items-center gap-3">
-
         <div className="w-10 h-10 rounded-xl bg-gray-100" />
 
         <div className="space-y-2">
           <div className="h-3 w-32 bg-gray-100 rounded" />
           <div className="h-2 w-20 bg-gray-100 rounded" />
         </div>
-
       </div>
-
     </td>
 
     <td className="px-6 py-4">
@@ -1776,7 +1605,6 @@ const SkeletonRow = () => (
         <div className="w-9 h-9 bg-gray-100 rounded-xl" />
       </div>
     </td>
-
   </tr>
 );
 
@@ -1786,13 +1614,9 @@ const SkeletonRow = () => (
 
 const EmptyState = ({ search }) => (
   <tr>
-
-    <td
-      colSpan="5"
-      className="px-6 py-16 text-center"
-    >
-
-      <div className="
+    <td colSpan="5" className="px-6 py-16 text-center">
+      <div
+        className="
         w-14
         h-14
         rounded-2xl
@@ -1802,26 +1626,17 @@ const EmptyState = ({ search }) => (
         justify-center
         mx-auto
         mb-4
-      ">
-
+      "
+      >
         {search ? (
-          <Search
-            size={22}
-            className="text-gray-300"
-          />
+          <Search size={22} className="text-gray-300" />
         ) : (
-          <GraduationCap
-            size={22}
-            className="text-gray-300"
-          />
+          <GraduationCap size={22} className="text-gray-300" />
         )}
-
       </div>
 
       <p className="font-semibold text-gray-700">
-        {search
-          ? "No students found"
-          : "No students yet"}
+        {search ? "No students found" : "No students yet"}
       </p>
 
       <p className="text-xs text-gray-400 mt-1">
@@ -1829,9 +1644,7 @@ const EmptyState = ({ search }) => (
           ? "Try searching with another name, ID, or grade."
           : "Add a student to start building your directory."}
       </p>
-
     </td>
-
   </tr>
 );
 
@@ -1839,14 +1652,7 @@ const EmptyState = ({ search }) => (
    IMPORT SECTION
 ========================================================= */
 
-const ImportSection = ({
-  title,
-  count,
-  color,
-  icon,
-  children,
-}) => {
-
+const ImportSection = ({ title, count, color, icon, children }) => {
   const styles = {
     green: {
       icon: "bg-green-50 text-green-600",
@@ -1868,11 +1674,8 @@ const ImportSection = ({
 
   return (
     <div className="mb-6 last:mb-0">
-
       <div className="flex items-center justify-between mb-3">
-
         <div className="flex items-center gap-2">
-
           <div
             className={`
               w-8
@@ -1887,10 +1690,7 @@ const ImportSection = ({
             {icon}
           </div>
 
-          <h3 className="text-sm font-bold text-gray-800">
-            {title}
-          </h3>
-
+          <h3 className="text-sm font-bold text-gray-800">{title}</h3>
         </div>
 
         <span
@@ -1905,13 +1705,9 @@ const ImportSection = ({
         >
           {count}
         </span>
-
       </div>
 
-      <div className="space-y-2">
-        {children}
-      </div>
-
+      <div className="space-y-2">{children}</div>
     </div>
   );
 };
@@ -1920,12 +1716,7 @@ const ImportSection = ({
    IMPORT ROW
 ========================================================= */
 
-const ImportRow = ({
-  title,
-  subtitle,
-  color,
-}) => {
-
+const ImportRow = ({ title, subtitle, color }) => {
   const styles = {
     green: "bg-green-50/50 border-green-100",
     amber: "bg-amber-50/50 border-amber-100",
@@ -1945,19 +1736,11 @@ const ImportRow = ({
         ${styles[color]}
       `}
     >
-
       <div className="min-w-0">
+        <p className="text-sm font-semibold text-gray-800 truncate">{title}</p>
 
-        <p className="text-sm font-semibold text-gray-800 truncate">
-          {title}
-        </p>
-
-        <p className="text-[11px] text-gray-400 mt-0.5">
-          {subtitle}
-        </p>
-
+        <p className="text-[11px] text-gray-400 mt-0.5">{subtitle}</p>
       </div>
-
     </div>
   );
 };
@@ -1967,7 +1750,8 @@ const ImportRow = ({
 ========================================================= */
 
 const EmptyImport = ({ text }) => (
-  <div className="
+  <div
+    className="
     p-4
     rounded-xl
     bg-gray-50
@@ -1975,10 +1759,10 @@ const EmptyImport = ({ text }) => (
     border-gray-100
     text-xs
     text-gray-400
-  ">
+  "
+  >
     {text}
   </div>
 );
 
 export default StudentPage;
-

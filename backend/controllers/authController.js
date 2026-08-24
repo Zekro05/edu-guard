@@ -935,19 +935,38 @@ export const getChatUsers = async (req, res) => {
     const { userId } = req.query;
 
     if (!userId) {
-      return res.status(400).json({ message: "userId is required" });
+      return res.status(400).json({
+        message: "userId is required",
+      });
     }
 
     const users = await User.find({
       _id: { $ne: userId },
-    }).select("firstName lastName name email profilePhoto role");
+    }).select(
+      "firstName lastName name email profilePhoto role"
+    );
+
+    console.log("====================================");
+    console.log("🔥 GET CHAT USERS");
+    console.log("User requesting:", userId);
+
+    users.forEach((u) => {
+      console.log(
+        `${u._id} | ${u.name} | ${u.profilePhoto}`
+      );
+    });
+
+    console.log("====================================");
 
     res.status(200).json({
       users,
     });
   } catch (err) {
     console.log("GET CHAT USERS ERROR:", err);
-    res.status(500).json({ message: err.message });
+
+    res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
