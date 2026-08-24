@@ -16,8 +16,12 @@ import {
   ChartNoAxesCombined,
   Settings,
   Gavel,
-  Bell, Sparkles
+  Bell,
+  Sparkles,
+  BriefcaseBusiness,
+  HandHelping,
 } from "lucide-react";
+import { useAuthStore } from "../store/authStore";
 
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -28,19 +32,18 @@ import { getFileUrl } from "../utils/getBaseUrl";
 /* ================= SOCKET ================= */
 const socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000");
 
-
 /* ================= NAV COMPONENT ================= */
 const Nav = ({ icon, label, onClick, active }) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left transition ${
+    className={`flex items-center gap-3 px-4 py-3 rounded-xl w-full ${
       active
         ? "bg-green-50 text-green-700 font-medium"
         : "text-gray-600 hover:bg-gray-100"
     }`}
   >
     {icon}
-    <span className="text-sm">{label}</span>
+    {label}
   </button>
 );
 
@@ -142,22 +145,14 @@ const offenseMap = {
   ],
 };
 
-const normalize = (str = "") =>
-  str.toLowerCase().trim();
+const normalize = (str = "") => str.toLowerCase().trim();
 
 const findMatch = (text, list = []) =>
   list.find((item) => text.includes(normalize(item)));
 
 const classifyCase = (c = {}) => {
   const text = normalize(
-    [
-      c.offense,
-      c.category,
-      c.title,
-      c.description,
-    ]
-      .filter(Boolean)
-      .join(" ")
+    [c.offense, c.category, c.title, c.description].filter(Boolean).join(" "),
   );
 
   const matchedMajor = findMatch(text, offenseMap.MAJOR);
@@ -178,9 +173,7 @@ const classifyCase = (c = {}) => {
     "threatening",
   ];
 
-  const isCritical = criticalKeywords.some((k) =>
-    text.includes(normalize(k))
-  );
+  const isCritical = criticalKeywords.some((k) => text.includes(normalize(k)));
 
   if (matchedMajor && isCritical) {
     return {
@@ -218,8 +211,7 @@ const classifyCase = (c = {}) => {
   return {
     risk: "LOW",
     severity: "UNCLASSIFIED",
-    insight:
-      "No direct policy match found. Manual review recommended.",
+    insight: "No direct policy match found. Manual review recommended.",
   };
 };
 
@@ -232,11 +224,9 @@ const flow = [
   "intervention-ready",
 ];
 
-
 const stepIndex = (status) => flow.indexOf(status);
 
-const canSaveStatement = (c) =>
-  getStatus(c) === "received";
+const canSaveStatement = (c) => getStatus(c) === "received";
 
 const canReview = (c) => {
   const status = getStatus(c);
@@ -245,11 +235,9 @@ const canReview = (c) => {
   return status === "saved-student-statement";
 };
 
-const canEscalate = (c) =>
-  getStatus(c) === "reviewing";
+const canEscalate = (c) => getStatus(c) === "reviewing";
 
-const canIntervene = (c) =>
-  getStatus(c) === "refer-for-intervention";
+const canIntervene = (c) => getStatus(c) === "refer-for-intervention";
 
 const statusUI = {
   received: "from-blue-300 to-cyan-200",
@@ -278,9 +266,7 @@ const normalizeCase = (c) => {
 
             return {
               url: urlMatch?.[0],
-              type: urlMatch?.[0]?.includes("video")
-                ? "video"
-                : "image",
+              type: urlMatch?.[0]?.includes("video") ? "video" : "image",
             };
           }
 
@@ -305,23 +291,12 @@ const normalizeCase = (c) => {
       c.title ||
       "Unknown Offense",
 
-    category:
-      c.category ||
-      c.reportId?.category ||
-      c.report?.category ||
-      "",
+    category: c.category || c.reportId?.category || c.report?.category || "",
 
-    title:
-      c.title ||
-      c.reportId?.title ||
-      c.report?.title ||
-      "",
+    title: c.title || c.reportId?.title || c.report?.title || "",
 
     description:
-      c.description ||
-      c.reportId?.description ||
-      c.report?.description ||
-      "",
+      c.description || c.reportId?.description || c.report?.description || "",
 
     // =========================
     // STUDENT
@@ -362,9 +337,11 @@ const normalizeCase = (c) => {
 /* ================= UI HELPERS ================= */
 const categoryColor = (cat = "") => {
   const c = cat.toLowerCase();
-  if (c.includes("bully")) return "bg-purple-100 text-purple-700 border-purple-200";
+  if (c.includes("bully"))
+    return "bg-purple-100 text-purple-700 border-purple-200";
   if (c.includes("fight")) return "bg-red-100 text-red-700 border-red-200";
-  if (c.includes("theft")) return "bg-orange-100 text-orange-700 border-orange-200";
+  if (c.includes("theft"))
+    return "bg-orange-100 text-orange-700 border-orange-200";
   return "bg-gray-100 text-gray-700 border-gray-200";
 };
 
@@ -394,6 +371,18 @@ const normalizeEvidenceUrl = (url) => {
 /* ================= MAIN ================= */
 export default function CaseManagement() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+
+  const adminName =
+    [user?.firstName, user?.middleName, user?.lastName]
+      .filter(Boolean)
+      .join(" ") ||
+    user?.name ||
+    user?.fullName ||
+    "Admin";
+
+  const adminPhoto =
+    user?.profilePhoto || user?.profilePicture || user?.photo || null;
 
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -404,37 +393,35 @@ export default function CaseManagement() {
   const [requestSent, setRequestSent] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [notifications, setNotifications] = useState([]);
-const [openNotif, setOpenNotif] = useState(false);
-const [search, setSearch] = useState("");
+  const [openNotif, setOpenNotif] = useState(false);
+  const [search, setSearch] = useState("");
 
-const [involvedPersons, setInvolvedPersons] = useState("");
-const [additionalParticipants, setAdditionalParticipants] = useState("");
-const [approvalDetails, setApprovalDetails] = useState("");
+  const [involvedPersons, setInvolvedPersons] = useState("");
+  const [additionalParticipants, setAdditionalParticipants] = useState("");
+  const [approvalDetails, setApprovalDetails] = useState("");
 
-const [sortMode, setSortMode] = useState("newest");
+  const [sortMode, setSortMode] = useState("newest");
 
-const getSortedCases = (list) => {
-  const getTime = (c) =>
-    new Date(c.createdAt || c.updatedAt || 0).getTime();
+  const getSortedCases = (list) => {
+    const getTime = (c) => new Date(c.createdAt || c.updatedAt || 0).getTime();
 
-  const getRisk = (c) => {
-    const ai = classifyCase(c);
-    if (ai.risk === "HIGH") return 3;
-    if (ai.risk === "MEDIUM") return 2;
-    return 1;
-  };
+    const getRisk = (c) => {
+      const ai = classifyCase(c);
+      if (ai.risk === "HIGH") return 3;
+      if (ai.risk === "MEDIUM") return 2;
+      return 1;
+    };
 
-  const sorted = [...list];
+    const sorted = [...list];
 
-  switch (sortMode) {
-    case "high":
-      return sorted.sort(
-        (a, b) => getRisk(b) - getRisk(a) || getTime(b) - getTime(a)
-      );
+    switch (sortMode) {
+      case "high":
+        return sorted.sort(
+          (a, b) => getRisk(b) - getRisk(a) || getTime(b) - getTime(a),
+        );
 
-    case "medium":
-      return sorted.sort(
-        (a, b) => {
+      case "medium":
+        return sorted.sort((a, b) => {
           const riskA = getRisk(a);
           const riskB = getRisk(b);
 
@@ -443,60 +430,57 @@ const getSortedCases = (list) => {
           const scoreB = riskB === 2 ? 3 : riskB;
 
           return scoreB - scoreA || getTime(b) - getTime(a);
-        }
-      );
+        });
 
-    case "low":
-      return sorted.sort(
-        (a, b) => getRisk(a) - getRisk(b) || getTime(b) - getTime(a)
-      );
+      case "low":
+        return sorted.sort(
+          (a, b) => getRisk(a) - getRisk(b) || getTime(b) - getTime(a),
+        );
 
-    case "newest":
-    default:
-      return sorted.sort((a, b) => getTime(b) - getTime(a));
-  }
-};
+      case "newest":
+      default:
+        return sorted.sort((a, b) => getTime(b) - getTime(a));
+    }
+  };
 
   const actionLabels = {
-  received: "Case Created",
-  reviewing: "Reviewed Case",
-  waiting_for_student: "Student Statement Requested",
-  "saved-student-statement": "Saved Student Statement",
-  "refer-for-intervention": "Refer for Intervention",
-  "intervention-ready": "Deemed Intervention Ready",
-  completed: "Case Completed",
-};
+    received: "Case Created",
+    reviewing: "Reviewed Case",
+    waiting_for_student: "Student Statement Requested",
+    "saved-student-statement": "Saved Student Statement",
+    "refer-for-intervention": "Refer for Intervention",
+    "intervention-ready": "Deemed Intervention Ready",
+    completed: "Case Completed",
+  };
 
-const actionColors = {
-  received: "text-gray-600 bg-gray-100",
-  reviewing: "text-orange-600 bg-orange-100",
-  waiting_for_student: "text-blue-600 bg-blue-100",
-  "refer-for-intervention": "text-red-600 bg-red-100",
-  "intervention-ready": "text-green-600 bg-green-100",
-  completed: "text-purple-600 bg-purple-100",
-};
+  const actionColors = {
+    received: "text-gray-600 bg-gray-100",
+    reviewing: "text-orange-600 bg-orange-100",
+    waiting_for_student: "text-blue-600 bg-blue-100",
+    "refer-for-intervention": "text-red-600 bg-red-100",
+    "intervention-ready": "text-green-600 bg-green-100",
+    completed: "text-purple-600 bg-purple-100",
+  };
 
+  const getLatestLog = (logs = []) =>
+    [...logs].sort((a, b) => new Date(b.time) - new Date(a.time))[0];
 
-const getLatestLog = (logs = []) =>
-  [...logs].sort((a, b) => new Date(b.time) - new Date(a.time))[0];
+  const lastLog = getLatestLog(selected?.caseLogs);
 
-const lastLog = getLatestLog(selected?.caseLogs);
+  const action = lastLog
+    ? {
+        text: `${actionLabels[lastLog.stage] || lastLog.stage} by ${
+          lastLog.changedByName || "N/A"
+        }`,
+        color: actionColors[lastLog.stage] || "text-gray-600 bg-gray-100",
+      }
+    : {
+        text: "No Actions Yet",
+        color: "text-gray-500 bg-gray-100",
+      };
 
-const action = lastLog
-  ? {
-      text: `${actionLabels[lastLog.stage] || lastLog.stage} by ${
-        lastLog.changedByName || "N/A"
-      }`,
-      color: actionColors[lastLog.stage] || "text-gray-600 bg-gray-100",
-    }
-  : {
-      text: "No Actions Yet",
-      color: "text-gray-500 bg-gray-100",
-    };
-  
   const loggedInUser =
-  JSON.parse(localStorage.getItem("user"))?.name ||
-  "Zekro Admin";
+    JSON.parse(localStorage.getItem("user"))?.name || "Zekro Admin";
 
   const close = () => {
     setSelected(null);
@@ -539,13 +523,9 @@ const action = lastLog
     socket.on("caseUpdated", (updatedCase) => {
       const norm = normalizeCase(updatedCase);
 
-      setCases((prev) =>
-        prev.map((c) => (c._id === norm._id ? norm : c))
-      );
+      setCases((prev) => prev.map((c) => (c._id === norm._id ? norm : c)));
 
-      setSelected((prev) =>
-        prev && prev._id === norm._id ? norm : prev
-      );
+      setSelected((prev) => (prev && prev._id === norm._id ? norm : prev));
     });
 
     socket.on("caseCreated", (newCase) => {
@@ -555,16 +535,14 @@ const action = lastLog
     socket.on("caseLogAdded", ({ caseId, log }) => {
       setCases((prev) =>
         prev.map((c) =>
-          c._id === caseId
-            ? { ...c, logs: [...(c.logs || []), log] }
-            : c
-        )
+          c._id === caseId ? { ...c, logs: [...(c.logs || []), log] } : c,
+        ),
       );
 
       setSelected((prev) =>
         prev && prev._id === caseId
           ? { ...prev, logs: [...(prev.logs || []), log] }
-          : prev
+          : prev,
       );
     });
 
@@ -572,22 +550,20 @@ const action = lastLog
   }, []);
 
   const ai = useMemo(() => {
-  if (!selected) return null;
-  return classifyCase(selected);
-}, [selected]);
+    if (!selected) return null;
+    return classifyCase(selected);
+  }, [selected]);
 
   const getStatus = (c) => c?.status || "received";
 
   const stepIndex = (status) => flow.indexOf(status);
 
-  const canSaveStatement = (selected) =>
-    getStatus(selected) === "received";
+  const canSaveStatement = (selected) => getStatus(selected) === "received";
 
   const canReview = (selected) =>
     getStatus(selected) === "saved-student-statement";
 
-  const canEscalate = (selected) =>
-    getStatus(selected) === "reviewing";
+  const canEscalate = (selected) => getStatus(selected) === "reviewing";
 
   const canIntervene = (selected) =>
     getStatus(selected) === "refer-for-intervention";
@@ -595,163 +571,296 @@ const action = lastLog
   const progressIndex = (status) => flow.indexOf(status);
 
   const updateStatus = async (status) => {
-  if (!note.trim()) {
-    return alert("Admin note required.");
-  }
+    if (!note.trim()) {
+      return alert("Admin note required.");
+    }
 
-  const payload = {
-    status,
-    note,
-    changedByName: loggedInUser,
-  };
-
-  // ONLY include escalation info when referring for intervention
-  if (status === "refer-for-intervention") {
-    payload.escalationInfo = {
-      involvedPersons,
-      additionalParticipants,
-      approvalDetails,
+    const payload = {
+      status,
+      note,
+      changedByName: loggedInUser,
     };
-  }
 
-  const res = await API.put(
-    `/api/incidents/${selected._id}/status`,
-    payload
-  );
+    // ONLY include escalation info when referring for intervention
+    if (status === "refer-for-intervention") {
+      payload.escalationInfo = {
+        involvedPersons,
+        additionalParticipants,
+        approvalDetails,
+      };
+    }
 
-  const updated = normalizeCase(res.data.incident);
+    const res = await API.put(`/api/incidents/${selected._id}/status`, payload);
 
-  setSelected(updated);
+    const updated = normalizeCase(res.data.incident);
 
-  setCases((prev) =>
-    prev.map((c) => (c._id === updated._id ? updated : c))
-  );
+    setSelected(updated);
 
-  // reset fields
-  setNote("");
-  setInvolvedPersons("");
-  setAdditionalParticipants("");
-  setApprovalDetails("");
-};
+    setCases((prev) => prev.map((c) => (c._id === updated._id ? updated : c)));
+
+    // reset fields
+    setNote("");
+    setInvolvedPersons("");
+    setAdditionalParticipants("");
+    setApprovalDetails("");
+  };
 
   const requestStudentStatement = async () => {
     const res = await API.put(
       `/api/incidents/${selected._id}/request-statement`,
-      { note, changedByName: loggedInUser }
+      { note, changedByName: loggedInUser },
     );
 
     const updated = normalizeCase(res.data.incident);
 
     setSelected(updated);
-    setCases((prev) =>
-      prev.map((c) => (c._id === updated._id ? updated : c))
-    );
+    setCases((prev) => prev.map((c) => (c._id === updated._id ? updated : c)));
 
     setRequestSent(true);
     setNote("");
   };
 
   const saveStudentStatement = async () => {
-  try {
-    if (!studentInput.trim()) {
-      alert("Statement cannot be empty");
-      return;
+    try {
+      if (!studentInput.trim()) {
+        alert("Statement cannot be empty");
+        return;
+      }
+
+      const res = await API.put(
+        `/api/incidents/${selected._id}/manual-statement`,
+        {
+          statement: studentInput,
+          changedByName: loggedInUser,
+          stage: "student_statement_saved",
+        },
+      );
+
+      const updated = normalizeCase(res.data.incident);
+
+      setSelected(updated);
+
+      setCases((prev) =>
+        prev.map((c) => (c._id === updated._id ? updated : c)),
+      );
+
+      setStudentInput("");
+
+      console.log("✅ Statement saved:", updated);
+    } catch (err) {
+      console.error("❌ Save failed:", err);
+      alert(err?.response?.data?.message || "Failed to save statement");
     }
-
-    const res = await API.put(
-      `/api/incidents/${selected._id}/manual-statement`,
-      { statement: studentInput, changedByName: loggedInUser,stage: "student_statement_saved"
- }
-    );
-
-    const updated = normalizeCase(res.data.incident);
-
-    setSelected(updated);
-
-    setCases((prev) =>
-      prev.map((c) => (c._id === updated._id ? updated : c))
-    );
-
-    setStudentInput("");
-
-    console.log("✅ Statement saved:", updated);
-  } catch (err) {
-    console.error("❌ Save failed:", err);
-    alert(err?.response?.data?.message || "Failed to save statement");
-  }
-};
-
-const flowWithMeta = flow.map((step) => {
-  const log = (selected?.logs || [])
-    .filter((l) => l.stage === step)
-    .sort((a, b) => new Date(b.time) - new Date(a.time))[0];
-
-  return {
-    key: step,
-    label: actionLabels?.[step] || step,
-    time: log?.time,
-    by: log?.changedByName,
-    done: stepIndex(getStatus(selected)) >= stepIndex(step),
   };
-});
+
+  const flowWithMeta = flow.map((step) => {
+    const log = (selected?.logs || [])
+      .filter((l) => l.stage === step)
+      .sort((a, b) => new Date(b.time) - new Date(a.time))[0];
+
+    return {
+      key: step,
+      label: actionLabels?.[step] || step,
+      time: log?.time,
+      by: log?.changedByName,
+      done: stepIndex(getStatus(selected)) >= stepIndex(step),
+    };
+  });
 
   return (
     <div className="h-screen w-screen bg-gray-50 text-gray-900 flex">
-
-      {/* SIDEBAR */}
-      <aside className="w-72 h-full bg-white p-6 flex flex-col justify-between border-r border-gray-200">
+      {/* ================= SIDEBAR ================= */}
+      <aside className="w-72 bg-white/70 backdrop-blur-2xl border-r border-white/30 p-6 flex flex-col justify-between">
         <div>
+          {/* LOGO */}
           <h1 className="text-2xl font-bold text-green-600">GuidEd</h1>
 
-          <p className="text-xs text-gray-500 mb-6">
-            Our Lady of the Holy Rosary - General Trias Cavite
-          </p>
+          <p className="text-xs text-gray-500 mb-6">Our Lady of the Holy Rosary School - General Trias Campus</p>
 
-          <Nav icon={<LayoutDashboard />} label="Dashboard" onClick={() => navigate("/dashboard")} />
-          <Nav icon={<Users />} label="Students" onClick={() => navigate("/students")} />
-          <Nav icon={<ShieldX />} label="Guidance" onClick={() => navigate("/guidance")} />
-          <Nav icon={<ChartNoAxesCombined />} label="Cases" active />
-          <Nav icon={<Gavel size={18} />} label="Interventions" onClick={() => navigate("/interventions")} />
-          <Nav icon={<Settings />} label="Settings" onClick={() => navigate("/settings")} />
+          {/* NAVIGATION */}
+          <div>
+            <Nav
+              icon={<LayoutDashboard size={18} />}
+              label="Dashboard"
+              onClick={() => navigate("/dashboard")}
+            />
+
+            <Nav icon={<Users size={18} />} 
+              label="Students"
+              onClick={() => navigate("/students")}/>
+
+            <Nav
+              icon={<ShieldX size={18} />}
+              label="Guidance"
+              onClick={() => navigate("/guidance")}
+            />
+
+            <Nav
+              icon={<ChartNoAxesCombined size={18} />}
+              label="Reports"
+              onClick={() => navigate("/reports")}
+            />
+
+            <Nav
+              icon={<BriefcaseBusiness size={18} />}
+              label="Cases" active
+            />
+
+            <Nav
+              icon={<HandHelping size={18} />}
+              label="Interventions"
+              onClick={() => navigate("/interventions")}
+            />
+
+            <Nav
+              icon={<Settings size={18} />}
+              label="Settings"
+              onClick={() => navigate("/settings")}
+            />
+          </div>
         </div>
 
-        <button onClick={logout} className="bg-green-500 text-white py-2 rounded-xl">
-          Logout
-        </button>
+        {/* ================= SIDEBAR BOTTOM ================= */}
+        <div className="space-y-3">
+          {/* ADMIN PROFILE */}
+          <div
+            className="
+        flex
+        items-center
+        gap-3
+        p-3
+        rounded-2xl
+        bg-gray-50/80
+        border border-gray-200/70
+        hover:bg-white
+        hover:shadow-sm
+        transition
+      "
+          >
+            {/* PROFILE PHOTO */}
+            <div
+              className="
+          relative
+          w-11
+          h-11
+          rounded-xl
+          overflow-hidden
+          bg-green-100
+          border border-green-200
+          flex
+          items-center
+          justify-center
+          flex-shrink-0
+        "
+            >
+              {adminPhoto ? (
+                <img
+                  src={adminPhoto}
+                  alt={adminName}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : (
+                <span className="text-green-700 font-bold text-lg">
+                  {adminName.charAt(0).toUpperCase()}
+                </span>
+              )}
+
+              {/* ONLINE DOT */}
+              <span
+                className="
+            absolute
+            bottom-0.5
+            right-0.5
+            w-2.5
+            h-2.5
+            rounded-full
+            bg-green-500
+            border-2
+            border-white
+          "
+              />
+            </div>
+
+            {/* ADMIN INFO */}
+            <div className="min-w-0 flex-1">
+              <p
+                className="
+            text-[10px]
+            uppercase
+            tracking-wider
+            text-gray-400
+            font-medium
+          "
+              >
+                Administrator
+              </p>
+
+              <p
+                className="
+            text-sm
+            font-bold
+            text-gray-900
+            truncate
+          "
+              >
+                {adminName}
+              </p>
+            </div>
+          </div>
+
+          {/* LOGOUT */}
+          <button
+            onClick={logout}
+            className="
+        w-full
+        bg-green-600
+        hover:bg-green-700
+        text-white
+        py-3
+        rounded-2xl
+        font-medium
+        shadow-sm
+        hover:shadow-md
+        transition
+      "
+          >
+            Logout
+          </button>
+        </div>
       </aside>
 
       {/* MAIN */}
       <main className="flex-1 p-8 overflow-y-auto">
-
         {/* HEADER (INTERVENTION STYLE) */}
-<div
-  className="
+        <div
+          className="
      top-0 z-30
     px-8 py-6
     border-b border-white/20
     bg-white/50 backdrop-blur-2xl
   "
->
-  <div className="flex justify-between items-start">
+        >
+          <div className="flex justify-between items-start">
+            {/* TITLE */}
+            <div>
+              <h2 className="text-4xl font-black tracking-tight">
+                Case Management
+              </h2>
 
-    {/* TITLE */}
-    <div>
-      <h2 className="text-4xl font-black tracking-tight">
-        Case Management
-      </h2>
+              <p className="text-gray-500 mt-2">
+                Manage student incidents, case progress, evidence, and
+                escalation workflows
+              </p>
+            </div>
 
-      <p className="text-gray-500 mt-2">
-        Manage student incidents, case progress,
-        evidence, and escalation workflows
-      </p>
-    </div>
-
-    {/* NOTIFICATIONS */}
-    <div className="relative">
-
-      <button
-        onClick={() => setOpenNotif(!openNotif)}
-        className="
+            {/* NOTIFICATIONS */}
+            <div className="relative">
+              <button
+                onClick={() => setOpenNotif(!openNotif)}
+                className="
           w-12 h-12 rounded-2xl
           bg-white/60 backdrop-blur-xl
           border border-white/30
@@ -759,100 +868,95 @@ const flowWithMeta = flow.map((step) => {
           flex items-center justify-center
           hover:scale-105 transition
         "
-      >
-        <Bell size={18} />
-      </button>
+              >
+                <Bell size={18} />
+              </button>
 
-      {notifications.length > 0 && (
-        <span
-          className="
+              {notifications.length > 0 && (
+                <span
+                  className="
             absolute -top-1 -right-1
             min-w-[20px] h-5 px-1
             rounded-full bg-red-500 text-white
             text-[11px] font-bold
             flex items-center justify-center
           "
-        >
-          {notifications.length}
-        </span>
-      )}
+                >
+                  {notifications.length}
+                </span>
+              )}
 
-      <AnimatePresence>
-        {openNotif && (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="
+              <AnimatePresence>
+                {openNotif && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="
               absolute right-0 mt-4 w-96
               bg-white/70 backdrop-blur-2xl
               border border-white/30
               rounded-3xl overflow-hidden
               shadow-2xl z-50
             "
-          >
-            <div className="p-5 border-b border-white/20 flex justify-between items-center">
-              <div>
-                <h3 className="font-bold text-gray-900">
-                  Notifications
-                </h3>
-                <p className="text-xs text-gray-500">
-                  Case updates
-                </p>
-              </div>
+                  >
+                    <div className="p-5 border-b border-white/20 flex justify-between items-center">
+                      <div>
+                        <h3 className="font-bold text-gray-900">
+                          Notifications
+                        </h3>
+                        <p className="text-xs text-gray-500">Case updates</p>
+                      </div>
 
-              <Sparkles size={16} className="text-green-600" />
-            </div>
+                      <Sparkles size={16} className="text-green-600" />
+                    </div>
 
-            <div className="max-h-[400px] overflow-y-auto">
-              {notifications.length === 0 ? (
-                <div className="p-10 text-center text-gray-500 text-sm">
-                  No notifications
-                </div>
-              ) : (
-                notifications.map((n) => (
-                  <motion.div
-                    key={n.id}
-                    whileHover={{ x: 4 }}
-                    className="
+                    <div className="max-h-[400px] overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-10 text-center text-gray-500 text-sm">
+                          No notifications
+                        </div>
+                      ) : (
+                        notifications.map((n) => (
+                          <motion.div
+                            key={n.id}
+                            whileHover={{ x: 4 }}
+                            className="
                       p-5 border-b border-white/20
                       hover:bg-white/30 transition
                     "
-                  >
-                    <p className="font-semibold text-sm text-gray-900">
-                      {n.title}
-                    </p>
+                          >
+                            <p className="font-semibold text-sm text-gray-900">
+                              {n.title}
+                            </p>
 
-                    <p className="text-sm text-gray-600 mt-1">
-                      {n.text}
-                    </p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {n.text}
+                            </p>
 
-                    <div className="flex justify-between mt-3">
-                      <span className="text-xs text-green-700 font-medium">
-                        {n.student}
-                      </span>
+                            <div className="flex justify-between mt-3">
+                              <span className="text-xs text-green-700 font-medium">
+                                {n.student}
+                              </span>
 
-                      <span className="text-xs text-gray-400">
-                        {new Date(n.time).toLocaleTimeString()}
-                      </span>
+                              <span className="text-xs text-gray-400">
+                                {new Date(n.time).toLocaleTimeString()}
+                              </span>
+                            </div>
+                          </motion.div>
+                        ))
+                      )}
                     </div>
                   </motion.div>
-                ))
-              )}
+                )}
+              </AnimatePresence>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </div>
+        </div>
 
-    </div>
-  </div>
-</div>
-
-
-
-{/* SEARCH BAR */}
-<div
-  className="
+        {/* SEARCH BAR */}
+        <div
+          className="
     flex items-center gap-3
     px-5 py-4 mb-6
     rounded-2xl
@@ -860,198 +964,198 @@ const flowWithMeta = flow.map((step) => {
     border border-white/30
     max-w-xl
   "
->
-  <Search size={18} className="text-gray-400" />
+        >
+          <Search size={18} className="text-gray-400" />
 
-  <input
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-    placeholder="Search student, offense, or status..."
-    className="w-full bg-transparent outline-none text-sm"
-  />
-</div>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search student, offense, or status..."
+            className="w-full bg-transparent outline-none text-sm"
+          />
+        </div>
 
-{/* STATS (INTERVENTION STYLE) */}
-<div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+        {/* STATS (INTERVENTION STYLE) */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+          <div className="bg-white/45 backdrop-blur-2xl border border-white/30 rounded-[2rem] p-6 shadow-sm">
+            <p className="text-sm text-gray-500">Total Cases</p>
+            <h2 className="text-3xl font-black mt-2">{cases.length}</h2>
+          </div>
 
-  <div className="bg-white/45 backdrop-blur-2xl border border-white/30 rounded-[2rem] p-6 shadow-sm">
-    <p className="text-sm text-gray-500">Total Cases</p>
-    <h2 className="text-3xl font-black mt-2">{cases.length}</h2>
-  </div>
+          <div className="bg-white/45 backdrop-blur-2xl border border-white/30 rounded-[2rem] p-6 shadow-sm">
+            <p className="text-sm text-gray-500">Ongoing</p>
+            <h2 className="text-3xl font-black mt-2 text-yellow-600">
+              {
+                cases.filter(
+                  (c) =>
+                    getStatus(c) === "reviewing" || getStatus(c) === "received",
+                ).length
+              }
+            </h2>
+          </div>
 
-  <div className="bg-white/45 backdrop-blur-2xl border border-white/30 rounded-[2rem] p-6 shadow-sm">
-    <p className="text-sm text-gray-500">Ongoing</p>
-    <h2 className="text-3xl font-black mt-2 text-yellow-600">
-      {cases.filter(c => getStatus(c) === "reviewing" || getStatus(c) === "received").length}
-    </h2>
-  </div>
+          <div className="bg-white/45 backdrop-blur-2xl border border-white/30 rounded-[2rem] p-6 shadow-sm">
+            <p className="text-sm text-gray-500">Refer for Intervention</p>
+            <h2 className="text-3xl font-black mt-2 text-red-600">
+              {
+                cases.filter((c) => getStatus(c) === "refer-for-intervention")
+                  .length
+              }
+            </h2>
+          </div>
 
-  <div className="bg-white/45 backdrop-blur-2xl border border-white/30 rounded-[2rem] p-6 shadow-sm">
-    <p className="text-sm text-gray-500">Refer for Intervention</p>
-    <h2 className="text-3xl font-black mt-2 text-red-600">
-      {cases.filter(c => getStatus(c) === "refer-for-intervention").length}
-    </h2>
-  </div>
+          <div className="bg-white/45 backdrop-blur-2xl border border-white/30 rounded-[2rem] p-6 shadow-sm">
+            <p className="text-sm text-gray-500">Intervention Ready</p>
+            <h2 className="text-3xl font-black mt-2 text-green-600">
+              {
+                cases.filter((c) => getStatus(c) === "intervention-ready")
+                  .length
+              }
+            </h2>
+          </div>
+        </div>
 
-  <div className="bg-white/45 backdrop-blur-2xl border border-white/30 rounded-[2rem] p-6 shadow-sm">
-    <p className="text-sm text-gray-500">Intervention Ready</p>
-    <h2 className="text-3xl font-black mt-2 text-green-600">
-      {cases.filter(c => getStatus(c) === "intervention-ready").length}
-    </h2>
-  </div>
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setSortMode("newest")}
+            className={`px-3 py-1 rounded-lg text-sm ${
+              sortMode === "newest" ? "bg-green-500 text-white" : "bg-gray-100"
+            }`}
+          >
+            Newest
+          </button>
 
-</div>
+          <button
+            onClick={() => setSortMode("high")}
+            className={`px-3 py-1 rounded-lg text-sm ${
+              sortMode === "high" ? "bg-red-500 text-white" : "bg-gray-100"
+            }`}
+          >
+            High Risk
+          </button>
 
-<div className="flex gap-2 mb-4">
-  <button
-    onClick={() => setSortMode("newest")}
-    className={`px-3 py-1 rounded-lg text-sm ${
-      sortMode === "newest"
-        ? "bg-green-500 text-white"
-        : "bg-gray-100"
-    }`}
-  >
-    Newest
-  </button>
+          <button
+            onClick={() => setSortMode("medium")}
+            className={`px-3 py-1 rounded-lg text-sm ${
+              sortMode === "medium" ? "bg-yellow-500 text-white" : "bg-gray-100"
+            }`}
+          >
+            Medium Priority
+          </button>
 
-  <button
-    onClick={() => setSortMode("high")}
-    className={`px-3 py-1 rounded-lg text-sm ${
-      sortMode === "high"
-        ? "bg-red-500 text-white"
-        : "bg-gray-100"
-    }`}
-  >
-    High Risk
-  </button>
-
-  <button
-    onClick={() => setSortMode("medium")}
-    className={`px-3 py-1 rounded-lg text-sm ${
-      sortMode === "medium"
-        ? "bg-yellow-500 text-white"
-        : "bg-gray-100"
-    }`}
-  >
-    Medium Priority
-  </button>
-
-  <button
-    onClick={() => setSortMode("low")}
-    className={`px-3 py-1 rounded-lg text-sm ${
-      sortMode === "low"
-        ? "bg-blue-500 text-white"
-        : "bg-gray-100"
-    }`}
-  >
-    Low Priority
-  </button>
-</div>
+          <button
+            onClick={() => setSortMode("low")}
+            className={`px-3 py-1 rounded-lg text-sm ${
+              sortMode === "low" ? "bg-blue-500 text-white" : "bg-gray-100"
+            }`}
+          >
+            Low Priority
+          </button>
+        </div>
 
         {loading ? (
           <p className="text-gray-500">Loading cases...</p>
         ) : (
           <div className="grid grid-cols-3 gap-5">
-
-            
             {[...cases]
-  .filter((c) => {
-    const keyword = search.toLowerCase();
+              .filter((c) => {
+                const keyword = search.toLowerCase();
 
-    return (
-      c.student?.name?.toLowerCase().includes(keyword) ||
-      c.offense?.toLowerCase().includes(keyword) ||
-      c.status?.toLowerCase().includes(keyword)
-    );
-  })
-  .sort((a, b) => {
-    const getTime = (c) =>
-      new Date(c.createdAt || c.updatedAt || 0).getTime();
+                return (
+                  c.student?.name?.toLowerCase().includes(keyword) ||
+                  c.offense?.toLowerCase().includes(keyword) ||
+                  c.status?.toLowerCase().includes(keyword)
+                );
+              })
+              .sort((a, b) => {
+                const getTime = (c) =>
+                  new Date(c.createdAt || c.updatedAt || 0).getTime();
 
-    const getRisk = (c) => {
-      const ai = classifyCase(c);
-      if (ai.risk === "HIGH") return 3;
-      if (ai.risk === "MEDIUM") return 2;
-      return 1;
-    };
+                const getRisk = (c) => {
+                  const ai = classifyCase(c);
+                  if (ai.risk === "HIGH") return 3;
+                  if (ai.risk === "MEDIUM") return 2;
+                  return 1;
+                };
 
-    if (sortMode === "high") {
-      return getRisk(b) - getRisk(a) || getTime(b) - getTime(a);
-    }
+                if (sortMode === "high") {
+                  return getRisk(b) - getRisk(a) || getTime(b) - getTime(a);
+                }
 
-    if (sortMode === "medium") {
-      const score = (c) => (getRisk(c) === 2 ? 3 : getRisk(c));
-      return score(b) - score(a) || getTime(b) - getTime(a);
-    }
+                if (sortMode === "medium") {
+                  const score = (c) => (getRisk(c) === 2 ? 3 : getRisk(c));
+                  return score(b) - score(a) || getTime(b) - getTime(a);
+                }
 
-    if (sortMode === "low") {
-      return getRisk(a) - getRisk(b) || getTime(b) - getTime(a);
-    }
+                if (sortMode === "low") {
+                  return getRisk(a) - getRisk(b) || getTime(b) - getTime(a);
+                }
 
-    // default: newest
-    return getTime(b) - getTime(a);
-  })
-  .map((c) => {
-              const ai = classifyCase(c);
-              const severity = ai.risk;
-              const student = c.student || {};
-              const status = getStatus(c);
+                // default: newest
+                return getTime(b) - getTime(a);
+              })
+              .map((c) => {
+                const ai = classifyCase(c);
+                const severity = ai.risk;
+                const student = c.student || {};
+                const status = getStatus(c);
 
-              return (
-                <div
-                  key={c._id}
-                  onClick={() => setSelected(c)}
-                  className="p-5 rounded-xl bg-white border border-gray-200 cursor-pointer hover:bg-gray-50"
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={student.avatar || DEFAULT_AVATAR}
-                      className="w-11 h-11 rounded-full object-cover"
-                    />
-                    <div>
-                      <p className="font-semibold">{student.name}</p>
-                      <p className="text-xs text-gray-500">{c.offense}</p>
+                return (
+                  <div
+                    key={c._id}
+                    onClick={() => setSelected(c)}
+                    className="p-5 rounded-xl bg-white border border-gray-200 cursor-pointer hover:bg-gray-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={student.avatar || DEFAULT_AVATAR}
+                        className="w-11 h-11 rounded-full object-cover"
+                      />
+                      <div>
+                        <p className="font-semibold">{student.name}</p>
+                        <p className="text-xs text-gray-500">{c.offense}</p>
+                      </div>
                     </div>
+
+                    <div className="mt-3 text-xs text-gray-500">
+                      AI Risk:
+                      <span
+                        className={`ml-1 font-semibold ${
+                          severity === "HIGH"
+                            ? "text-red-500"
+                            : severity === "MEDIUM"
+                              ? "text-yellow-500"
+                              : "text-green-500"
+                        }`}
+                      >
+                        {severity}
+                      </span>
+                    </div>
+
+                    <div
+                      className={`mt-3 h-1 w-full rounded-full bg-gradient-to-r ${statusUI[status]}`}
+                    />
+                    <p className="text-[10px] mt-2 text-gray-500 uppercase">
+                      {status}
+                    </p>
                   </div>
-
-                  <div className="mt-3 text-xs text-gray-500">
-  AI Risk:
-  <span
-    className={`ml-1 font-semibold ${
-      severity === "HIGH"
-        ? "text-red-500"
-        : severity === "MEDIUM"
-        ? "text-yellow-500"
-        : "text-green-500"
-    }`}
-  >
-    {severity}
-  </span>
-</div>
-
-                  <div className={`mt-3 h-1 w-full rounded-full bg-gradient-to-r ${statusUI[status]}`} />
-                  <p className="text-[10px] mt-2 text-gray-500 uppercase">
-                    {status}
-                  </p>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         )}
       </main>
 
       {/* ================= MODAL (FULL ORIGINAL RESTORED) ================= */}
-      
+
       {selected && (
         <div
           className="fixed inset-0 bg-black/30 backdrop-blur-md flex items-center justify-center p-6"
           onClick={close}
         >
           <div
-  className="w-[1000px] max-h-[90vh] overflow-y-auto bg-white border border-gray-200 rounded-2xl p-6 shadow-2xl relative"
-  onClick={(e) => e.stopPropagation()}
->
-
+            className="w-[1000px] max-h-[90vh] overflow-y-auto bg-white border border-gray-200 rounded-2xl p-6 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={close}
               className="absolute right-6 top-6 text-gray-500 hover:text-black"
@@ -1059,11 +1163,9 @@ const flowWithMeta = flow.map((step) => {
               <X />
             </button>
 
-           <div className={`mb-4 p-2 rounded-lg ${action.color}`}>
-  <p className="text-xs">
-    {action.text}
-  </p>
-</div>
+            <div className={`mb-4 p-2 rounded-lg ${action.color}`}>
+              <p className="text-xs">{action.text}</p>
+            </div>
 
             {/* HEADER */}
             <div className="flex justify-between items-start">
@@ -1082,11 +1184,11 @@ const flowWithMeta = flow.map((step) => {
                     {selected.student?.grade} • {selected.student?.studentId}
                   </p>
 
-                  <p className={`text-xs mt-1 font-semibold ${severityColor(ai?.risk)}`}>
+                  <p
+                    className={`text-xs mt-1 font-semibold ${severityColor(ai?.risk)}`}
+                  >
                     Severity: {ai?.risk}
                   </p>
-
-                   
                 </div>
               </div>
 
@@ -1096,81 +1198,74 @@ const flowWithMeta = flow.map((step) => {
                   {getStatus(selected)}
                 </p>
 
-                <p className="text-sm font-semibold">
-                  {selected.title}
-                </p>
+                <p className="text-sm font-semibold">{selected.title}</p>
 
-                <span className={`text-xs px-2 py-1 rounded-full border inline-block mt-1 ${categoryColor(selected.category)}`}>
+                <span
+                  className={`text-xs px-2 py-1 rounded-full border inline-block mt-1 ${categoryColor(selected.category)}`}
+                >
                   {selected.location}
                 </span>
               </div>
             </div>
 
-            
-
             {/* FLOW (ENHANCED TIMELINE) */}
-<div className="mt-6 relative">
+            <div className="mt-6 relative">
+              <div className="flex items-start justify-between gap-4">
+                {flowWithMeta.map((step, i) => (
+                  <div
+                    key={step.key}
+                    className="flex-1 flex flex-col items-center text-center"
+                  >
+                    {/* DOT + LINE */}
+                    <div className="flex items-center w-full">
+                      <div
+                        className={`w-3 h-3 rounded-full z-10 ${
+                          step.done ? "bg-green-500" : "bg-gray-300"
+                        }`}
+                      />
 
-  <div className="flex items-start justify-between gap-4">
-    {flowWithMeta.map((step, i) => (
-      <div key={step.key} className="flex-1 flex flex-col items-center text-center">
+                      {i !== flowWithMeta.length - 1 && (
+                        <div
+                          className={`h-[2px] flex-1 ${
+                            step.done ? "bg-green-400" : "bg-gray-200"
+                          }`}
+                        />
+                      )}
+                    </div>
 
-        {/* DOT + LINE */}
-        <div className="flex items-center w-full">
-          <div
-            className={`w-3 h-3 rounded-full z-10 ${
-              step.done ? "bg-green-500" : "bg-gray-300"
-            }`}
-          />
+                    {/* LABEL */}
+                    <p className="text-[11px] font-semibold mt-2 text-gray-700">
+                      {step.label}
+                    </p>
 
-          {i !== flowWithMeta.length - 1 && (
-            <div
-              className={`h-[2px] flex-1 ${
-                step.done ? "bg-green-400" : "bg-gray-200"
-              }`}
-            />
-          )}
-        </div>
+                    {/* DATE */}
+                    {step.time ? (
+                      <p className="text-[10px] text-gray-400">
+                        {new Date(step.time).toLocaleString()}
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-gray-300">No date</p>
+                    )}
 
-        {/* LABEL */}
-        <p className="text-[11px] font-semibold mt-2 text-gray-700">
-          {step.label}
-        </p>
-
-        {/* DATE */}
-        {step.time ? (
-          <p className="text-[10px] text-gray-400">
-            {new Date(step.time).toLocaleString()}
-          </p>
-        ) : (
-          <p className="text-[10px] text-gray-300">No date</p>
-        )}
-
-        {/* BY */}
-        {step.by && (
-          <p className="text-[10px] text-gray-400">
-            by {step.by}
-          </p>
-        )}
-      </div>
-    ))}
-  </div>
-
-</div>
+                    {/* BY */}
+                    {step.by && (
+                      <p className="text-[10px] text-gray-400">by {step.by}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
 
             {/* AI */}
             <div className="mt-6 p-4 rounded-xl border border-gray-200 bg-gray-50">
               <p className="text-xs text-gray-500 flex items-center gap-2">
                 <Brain size={14} /> AI Analysis
               </p>
-              <p className="mt-2 text-sm text-gray-800">
-                {ai?.insight}
-              </p>
+              <p className="mt-2 text-sm text-gray-800">{ai?.insight}</p>
             </div>
 
             {/* GRID */}
             <div className="grid grid-cols-2 gap-4 mt-6">
-
               <div className="p-4 rounded-xl bg-white border border-gray-200">
                 <p className="text-xs text-gray-500 mb-2">Reporter</p>
                 <p className="text-sm">{selected.reporter}</p>
@@ -1186,93 +1281,93 @@ const flowWithMeta = flow.map((step) => {
                   <Image size={14} /> Evidence
                 </p>
 
-                {Array.isArray(selected.evidence) && selected.evidence.length > 0 ? (
-  <div className="grid grid-cols-3 gap-2">
-    {selected.evidence.map((e, i) => {
-      let parsed = e;
+                {Array.isArray(selected.evidence) &&
+                selected.evidence.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {selected.evidence.map((e, i) => {
+                      let parsed = e;
 
-      // CASE 1: already object
-      if (typeof e === "object" && e !== null) {
-        parsed = e;
-      }
+                      // CASE 1: already object
+                      if (typeof e === "object" && e !== null) {
+                        parsed = e;
+                      }
 
-      // CASE 2: malformed string from MongoDB
-      else if (typeof e === "string") {
-        // extract cloudinary/local URL
-        const urlMatch = e.match(/https?:\/\/[^\s'"}]+/);
+                      // CASE 2: malformed string from MongoDB
+                      else if (typeof e === "string") {
+                        // extract cloudinary/local URL
+                        const urlMatch = e.match(/https?:\/\/[^\s'"}]+/);
 
-        // detect type
-        const typeMatch = e.match(/type:\s*'([^']+)'/);
+                        // detect type
+                        const typeMatch = e.match(/type:\s*'([^']+)'/);
 
-        parsed = {
-          url: urlMatch?.[0] || null,
-          type: typeMatch?.[1] || "image",
-        };
-      }
+                        parsed = {
+                          url: urlMatch?.[0] || null,
+                          type: typeMatch?.[1] || "image",
+                        };
+                      }
 
-      if (!parsed?.url) return null;
+                      if (!parsed?.url) return null;
 
-      const isImage =
-        parsed.type === "image" ||
-        /\.(jpg|jpeg|png|webp|gif)$/i.test(parsed.url);
+                      const isImage =
+                        parsed.type === "image" ||
+                        /\.(jpg|jpeg|png|webp|gif)$/i.test(parsed.url);
 
-      return (
-        <div key={i} className="relative">
-          {isImage ? (
-            <img
-  src={parsed.url}
-  alt="evidence"
-  onClick={() => setPreviewImage(parsed.url)}
-  className="w-full h-24 object-cover rounded-lg border border-gray-200 cursor-pointer hover:scale-105 transition"
-/>
-          ) : (
-            <a
-              href={parsed.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center h-24 rounded-lg border border-gray-200 bg-gray-100 text-sm text-gray-600"
-            >
-              Open File
-            </a>
-          )}
-        </div>
-      );
-    })}
-  </div>
-) : (
-  <p className="text-xs text-gray-500">No evidence attached</p>
-)}
+                      return (
+                        <div key={i} className="relative">
+                          {isImage ? (
+                            <img
+                              src={parsed.url}
+                              alt="evidence"
+                              onClick={() => setPreviewImage(parsed.url)}
+                              className="w-full h-24 object-cover rounded-lg border border-gray-200 cursor-pointer hover:scale-105 transition"
+                            />
+                          ) : (
+                            <a
+                              href={parsed.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center justify-center h-24 rounded-lg border border-gray-200 bg-gray-100 text-sm text-gray-600"
+                            >
+                              Open File
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500">No evidence attached</p>
+                )}
               </div>
             </div>
 
-            
-
             {/* IMAGE PREVIEW MODAL */}
-{previewImage && (
-  <div
-    className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
-    onClick={() => setPreviewImage(null)}
-  >
-    {/* CLOSE BUTTON */}
-    <button
-      onClick={() => setPreviewImage(null)}
-      className="absolute top-6 right-6 text-white hover:text-gray-300"
-    >
-      <X size={32} />
-    </button>
+            {previewImage && (
+              <div
+                className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6"
+                onClick={() => setPreviewImage(null)}
+              >
+                {/* CLOSE BUTTON */}
+                <button
+                  onClick={() => setPreviewImage(null)}
+                  className="absolute top-6 right-6 text-white hover:text-gray-300"
+                >
+                  <X size={32} />
+                </button>
 
-    {/* IMAGE */}
-    <img
-      src={previewImage}
-      alt="Preview"
-      onClick={(e) => e.stopPropagation()}
-      className="max-w-[95vw] max-h-[90vh] rounded-2xl shadow-2xl object-contain"
-    />
-  </div>
-)}
+                {/* IMAGE */}
+                <img
+                  src={previewImage}
+                  alt="Preview"
+                  onClick={(e) => e.stopPropagation()}
+                  className="max-w-[95vw] max-h-[90vh] rounded-2xl shadow-2xl object-contain"
+                />
+              </div>
+            )}
 
             {/* REQUEST */}
-            {(getStatus(selected) === "reviewing" || getStatus(selected) === "received") && (
+            {(getStatus(selected) === "reviewing" ||
+              getStatus(selected) === "received") && (
               <button
                 onClick={requestStudentStatement}
                 className="mt-5 px-4 py-2 bg-purple-500 text-white rounded-xl"
@@ -1289,154 +1384,150 @@ const flowWithMeta = flow.map((step) => {
             )}
 
             {/* MANUAL INPUT */}
-{selected.statementStatus !== "manual_entry" && !selected.studentStatement && (
-  <div className="mt-5">
-    <p className="text-xs text-gray-500 mb-2">
-      Manual Student Statement Entry
-    </p>
+            {selected.statementStatus !== "manual_entry" &&
+              !selected.studentStatement && (
+                <div className="mt-5">
+                  <p className="text-xs text-gray-500 mb-2">
+                    Manual Student Statement Entry
+                  </p>
 
-    <textarea
-      value={studentInput}
-      onChange={(e) => setStudentInput(e.target.value)}
-      className="w-full p-3 rounded-xl border border-gray-200 text-sm"
-      placeholder="Write student statement..."
-    />
+                  <textarea
+                    value={studentInput}
+                    onChange={(e) => setStudentInput(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-gray-200 text-sm"
+                    placeholder="Write student statement..."
+                  />
 
-    <button
-      onClick={saveStudentStatement}
-      className="mt-3 px-4 py-2 bg-blue-500 text-white rounded-xl"
-    >
-      Save Statement
-    </button>
-  </div>
-)}
+                  <button
+                    onClick={saveStudentStatement}
+                    className="mt-3 px-4 py-2 bg-blue-500 text-white rounded-xl"
+                  >
+                    Save Statement
+                  </button>
+                </div>
+              )}
 
-          {/* LOGS + ESCALATION WRAPPER */}
-<div className="mt-6 grid grid-cols-2 gap-6 items-start">
+            {/* LOGS + ESCALATION WRAPPER */}
+            <div className="mt-6 grid grid-cols-2 gap-6 items-start">
+              {/* LOGS (LEFT - 2 columns) */}
+              <div className="col-span-1">
+                <div className="p-4 rounded-2xl border border-gray-200 bg-white h-full">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-4">
+                    Case Logs
+                  </h3>
 
-  {/* LOGS (LEFT - 2 columns) */}
-  <div className="col-span-1">
-    <div className="p-4 rounded-2xl border border-gray-200 bg-white h-full">
+                  <div className="space-y-4">
+                    {(selected.logs || []).map((l, i) => (
+                      <div key={i} className="border-l-2 border-gray-200 pl-4">
+                        <p className="text-sm font-medium text-gray-800">
+                          {l.stage}
+                        </p>
+                        <p className="text-xs text-gray-500">{l.note}</p>
+                        <p className="text-[10px] text-gray-400">
+                          {l.changedByName ? `By ${l.changedByName} • ` : ""}
+                          {new Date(l.time).toLocaleString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
-      <h3 className="text-sm font-semibold text-gray-700 mb-4">
-        Case Logs
-      </h3>
+              {/* ESCALATION (RIGHT - 1 column) */}
+              {getStatus(selected) === "intervention-ready" && (
+                <div className="col-span-1 p-4 rounded-2xl border border-red-200 bg-red-50 h-fit">
+                  <div className="flex items-center gap-2 mb-4">
+                    <AlertTriangle className="text-red-500" size={18} />
+                    <h3 className="font-semibold text-red-700">
+                      Escalation Details
+                    </h3>
+                  </div>
 
-      <div className="space-y-4">
-        {(selected.logs || []).map((l, i) => (
-          <div key={i} className="border-l-2 border-gray-200 pl-4">
-            <p className="text-sm font-medium text-gray-800">{l.stage}</p>
-            <p className="text-xs text-gray-500">{l.note}</p>
-            <p className="text-[10px] text-gray-400">
-              {l.changedByName ? `By ${l.changedByName} • ` : ""}
-              {new Date(l.time).toLocaleString()}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs text-gray-500">Involved Persons</p>
+                      <p className="text-sm text-gray-800 mt-1">
+                        {selected?.escalationInfo?.involvedPersons || "N/A"}
+                      </p>
+                    </div>
 
-  {/* ESCALATION (RIGHT - 1 column) */}
-  {getStatus(selected) === "intervention-ready" && (
-  <div className="col-span-1 p-4 rounded-2xl border border-red-200 bg-red-50 h-fit">
+                    <div>
+                      <p className="text-xs text-gray-500">
+                        Additional Participants
+                      </p>
+                      <p className="text-sm text-gray-800 mt-1">
+                        {selected?.escalationInfo?.additionalParticipants ||
+                          "N/A"}
+                      </p>
+                    </div>
 
-    <div className="flex items-center gap-2 mb-4">
-      <AlertTriangle className="text-red-500" size={18} />
-      <h3 className="font-semibold text-red-700">
-        Escalation Details
-      </h3>
-    </div>
-
-    <div className="space-y-4">
-      <div>
-        <p className="text-xs text-gray-500">Involved Persons</p>
-        <p className="text-sm text-gray-800 mt-1">
-          {selected?.escalationInfo?.involvedPersons || "N/A"}
-        </p>
-      </div>
-
-      <div>
-        <p className="text-xs text-gray-500">Additional Participants</p>
-        <p className="text-sm text-gray-800 mt-1">
-          {selected?.escalationInfo?.additionalParticipants || "N/A"}
-        </p>
-      </div>
-
-      <div>
-        <p className="text-xs text-gray-500">Approval Details</p>
-        <p className="text-sm text-gray-800 mt-1">
-          {selected?.escalationInfo?.approvalDetails || "N/A"}
-        </p>
-      </div>
-    </div>
-
-  </div>
-)}
-
-</div>
+                    <div>
+                      <p className="text-xs text-gray-500">Approval Details</p>
+                      <p className="text-sm text-gray-800 mt-1">
+                        {selected?.escalationInfo?.approvalDetails || "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             {/* ESCALATION INFORMATION */}
-{canEscalate(selected) && (
-  <div className="mt-6 p-5 rounded-2xl border border-red-200 bg-red-50">
-    
-    <div className="flex items-center gap-2 mb-4">
-      <AlertTriangle className="text-red-500" size={18} />
-      <h3 className="font-semibold text-red-700">
-        Escalation Information
-      </h3>
-    </div>
+            {canEscalate(selected) && (
+              <div className="mt-6 p-5 rounded-2xl border border-red-200 bg-red-50">
+                <div className="flex items-center gap-2 mb-4">
+                  <AlertTriangle className="text-red-500" size={18} />
+                  <h3 className="font-semibold text-red-700">
+                    Escalation Information
+                  </h3>
+                </div>
 
-    <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-4">
+                  {/* INVOLVED PERSONS */}
+                  <div>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Involved Persons
+                    </p>
 
-      {/* INVOLVED PERSONS */}
-      <div>
-        <p className="text-xs text-gray-500 mb-2">
-          Involved Persons
-        </p>
+                    <textarea
+                      value={involvedPersons}
+                      onChange={(e) => setInvolvedPersons(e.target.value)}
+                      placeholder="List primary involved persons..."
+                      className="w-full p-3 rounded-xl border border-gray-200 text-sm"
+                    />
+                  </div>
 
-        <textarea
-          value={involvedPersons}
-          onChange={(e) => setInvolvedPersons(e.target.value)}
-          placeholder="List primary involved persons..."
-          className="w-full p-3 rounded-xl border border-gray-200 text-sm"
-        />
-      </div>
+                  {/* ADDITIONAL PARTICIPANTS */}
+                  <div>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Additional Participants
+                    </p>
 
-      {/* ADDITIONAL PARTICIPANTS */}
-      <div>
-        <p className="text-xs text-gray-500 mb-2">
-          Additional Participants
-        </p>
+                    <textarea
+                      value={additionalParticipants}
+                      onChange={(e) =>
+                        setAdditionalParticipants(e.target.value)
+                      }
+                      placeholder="Witnesses, classmates, faculty, etc..."
+                      className="w-full p-3 rounded-xl border border-gray-200 text-sm"
+                    />
+                  </div>
 
-        <textarea
-          value={additionalParticipants}
-          onChange={(e) =>
-            setAdditionalParticipants(e.target.value)
-          }
-          placeholder="Witnesses, classmates, faculty, etc..."
-          className="w-full p-3 rounded-xl border border-gray-200 text-sm"
-        />
-      </div>
+                  {/* APPROVAL DETAILS */}
+                  <div>
+                    <p className="text-xs text-gray-500 mb-2">
+                      Approval Details
+                    </p>
 
-      {/* APPROVAL DETAILS */}
-      <div>
-        <p className="text-xs text-gray-500 mb-2">
-          Approval Details
-        </p>
-
-        <textarea
-          value={approvalDetails}
-          onChange={(e) => setApprovalDetails(e.target.value)}
-          placeholder="Guidance approval / dean approval / remarks..."
-          className="w-full p-3 rounded-xl border border-gray-200 text-sm"
-        />
-      </div>
-
-    </div>
-  </div>
-)}
-
-
+                    <textarea
+                      value={approvalDetails}
+                      onChange={(e) => setApprovalDetails(e.target.value)}
+                      placeholder="Guidance approval / dean approval / remarks..."
+                      className="w-full p-3 rounded-xl border border-gray-200 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* ACTIONS */}
             <textarea
@@ -1447,7 +1538,6 @@ const flowWithMeta = flow.map((step) => {
             />
 
             <div className="grid grid-cols-3 gap-3 mt-4">
-
               <button
                 onClick={() => updateStatus("reviewing")}
                 disabled={!canReview(selected)}
@@ -1469,7 +1559,8 @@ const flowWithMeta = flow.map((step) => {
                     : "bg-gray-300 cursor-not-allowed"
                 }`}
               >
-                <AlertTriangle size={14} className="inline mr-1" /> Refer Intervention
+                <AlertTriangle size={14} className="inline mr-1" /> Refer
+                Intervention
               </button>
 
               <button
@@ -1483,9 +1574,7 @@ const flowWithMeta = flow.map((step) => {
               >
                 <CheckCircle size={14} className="inline mr-1" /> Intervention
               </button>
-
             </div>
-
           </div>
         </div>
       )}

@@ -12,7 +12,7 @@ import {
   updateMyProfile,
   updateMyProfilePhoto
 } from "../controllers/studentController.js";
-import { upload } from "../middleware/upload.js";
+import { profileUpload, upload } from "../middleware/upload.js";
 
 const router = express.Router();
 
@@ -29,7 +29,7 @@ router.put("/:id", verifyToken, upload.single("profilePhoto"), updateStudent);
 router.put(
   "/profile/photo",
   verifyToken,
-  upload.single("profilePhoto"),
+  profileUpload.single("profilePhoto"),
   updateMyProfilePhoto
 );
 router.delete("/:id", verifyToken, deleteStudent);

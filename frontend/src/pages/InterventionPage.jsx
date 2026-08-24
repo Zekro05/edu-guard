@@ -20,10 +20,25 @@ import {
   CheckCircle2,
   AlertTriangle,
   FileText,
+  HandHelping,
+  BriefcaseBusiness,
 } from "lucide-react";
+
+import { useAuthStore } from "../store/authStore";
 
 const InterventionPage = () => {
   const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
+  const adminName =
+    [user?.firstName, user?.middleName, user?.lastName]
+      .filter(Boolean)
+      .join(" ") ||
+    user?.name ||
+    user?.fullName ||
+    "Admin";
+
+  const adminPhoto =
+    user?.profilePhoto || user?.profilePicture || user?.photo || null;
 
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -266,71 +281,165 @@ const InterventionPage = () => {
 
   return (
     <div className="h-screen w-screen flex bg-[#F4F7FB] text-gray-900 overflow-hidden">
-      {/* =========================================================
-         SIDEBAR
-      ========================================================= */}
-      <aside className="w-72 bg-white border-r border-gray-200 p-6 flex flex-col justify-between">
-        <div>
-          <div className="mb-10">
-            <h1 className="text-2xl font-bold text-green-600">GuidEd</h1>
-
-            <p className="text-xs text-gray-500 mt-1">
-              Case & Intervention System
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Nav
-              icon={<LayoutDashboard size={18} />}
-              label="Dashboard"
-              onClick={() => navigate("/dashboard")}
-            />
-
-            <Nav
-              icon={<Users size={18} />}
-              label="Students"
-              onClick={() => navigate("/students")}
-            />
-
-            <Nav
-              icon={<ShieldX size={18} />}
-              label="Guidance"
-              onClick={() => navigate("/guidance")}
-            />
-
-            <Nav
-              icon={<ChartNoAxesCombined size={18} />}
-              label="Reports"
-              onClick={() => navigate("/reports")}
-            />
-
-            <Nav
-              icon={<Gavel size={18} />}
-              label="Cases"
-              onClick={() => navigate("/cases")}
-            />
-
-            <Nav icon={<Gavel size={18} />} label="Intervention" active />
-
-            <Nav
-              icon={<Settings size={18} />}
-              label="Settings"
-              onClick={() => navigate("/settings")}
-            />
-          </div>
-        </div>
-
-        <button
-          className="
-            w-full bg-green-600 text-white
-            py-3 rounded-2xl
-            hover:bg-green-700 transition
-            font-medium
+      {/* ================= SIDEBAR ================= */}
+            <aside className="w-72 bg-white/70 backdrop-blur-2xl border-r border-white/30 p-6 flex flex-col justify-between">
+              <div>
+                {/* LOGO */}
+                <h1 className="text-2xl font-bold text-green-600">GuidEd</h1>
+      
+                <p className="text-xs text-gray-500 mb-6">Our Lady of the Holy Rosary School - General Trias Campus</p>
+      
+                {/* NAVIGATION */}
+                <Nav icon={<LayoutDashboard size={18} />} label="Dashboard"
+                onClick={() => navigate("/dashboard")}/>
+      
+                <Nav
+                  icon={<Users size={18} />}
+                  label="Students"
+                  onClick={() => navigate("/students")}
+                />
+      
+                <Nav
+                  icon={<ShieldX size={18} />}
+                  label="Guidance"
+                  onClick={() => navigate("/guidance")}
+                />
+      
+                <Nav
+                  icon={<ChartNoAxesCombined size={18} />}
+                  label="Reports"
+                  onClick={() => navigate("/reports")}
+                />
+      
+                <Nav
+                  icon={<BriefcaseBusiness size={18} />}
+                  label="Cases"
+                  onClick={() => navigate("/cases")}
+                />
+      
+                <Nav
+                  icon={<HandHelping size={18} />}
+                  label="Interventions" active
+                />
+      
+                <Nav
+                  icon={<Settings size={18} />}
+                  label="Settings"
+                  onClick={() => navigate("/settings")}
+                />
+              </div>
+      
+              {/* ================= SIDEBAR BOTTOM ================= */}
+              <div className="space-y-3">
+                {/* ADMIN PROFILE */}
+                <div
+                  className="
+          flex
+          items-center
+          gap-3
+          p-3
+          rounded-2xl
+          bg-gray-50/80
+          border border-gray-200/70
+          hover:bg-white
+          hover:shadow-sm
+          transition
+        "
+                >
+                  {/* PROFILE PHOTO */}
+                  <div
+                    className="
+            relative
+            w-11
+            h-11
+            rounded-xl
+            overflow-hidden
+            bg-green-100
+            border border-green-200
+            flex
+            items-center
+            justify-center
+            flex-shrink-0
           "
-        >
-          Logout
-        </button>
-      </aside>
+                  >
+                    {adminPhoto ? (
+                      <img
+                        src={adminPhoto}
+                        alt={adminName}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <span className="text-green-700 font-bold text-lg">
+                        {adminName.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+      
+                    {/* ONLINE DOT */}
+                    <span
+                      className="
+              absolute
+              bottom-0.5
+              right-0.5
+              w-2.5
+              h-2.5
+              rounded-full
+              bg-green-500
+              border-2
+              border-white
+            "
+                    />
+                  </div>
+      
+                  {/* ADMIN INFO */}
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="
+              text-[10px]
+              uppercase
+              tracking-wider
+              text-gray-400
+              font-medium
+            "
+                    >
+                      Administrator
+                    </p>
+      
+                    <p
+                      className="
+              text-sm
+              font-bold
+              text-gray-900
+              truncate
+            "
+                    >
+                      {adminName}
+                    </p>
+                  </div>
+                </div>
+      
+                {/* LOGOUT */}
+                <button
+                  onClick={logout}
+                  className="
+            w-full
+            bg-green-600
+            hover:bg-green-700
+            text-white
+            py-3
+            rounded-2xl
+            font-medium
+            shadow-sm
+            hover:shadow-md
+            transition
+          "
+                >
+                  Logout
+                </button>
+              </div>
+            </aside>
 
       {/* =========================================================
          MAIN
@@ -997,15 +1106,14 @@ const InterventionPage = () => {
 const Nav = ({ icon, label, onClick, active }) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-3 px-4 py-3 rounded-2xl w-full transition-all duration-200 ${
+    className={`flex items-center gap-3 px-4 py-3 rounded-xl w-full ${
       active
-        ? "bg-green-50 text-green-700 font-semibold shadow-sm"
+        ? "bg-green-50 text-green-700 font-medium"
         : "text-gray-600 hover:bg-gray-100"
     }`}
   >
     {icon}
-
-    <span className="text-sm">{label}</span>
+    {label}
   </button>
 );
 

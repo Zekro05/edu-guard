@@ -1,12 +1,6 @@
 import { useNavigate } from "react-router-dom";
-import { useAuthStore} from "../store/authStore";
-import {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-} from "react";
+import { useAuthStore } from "../store/authStore";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 import { API } from "../lib/api";
 
@@ -33,6 +27,8 @@ import {
   FileWarning,
   Activity,
   Brain,
+  BriefcaseBusiness,
+  HandHelping,
 } from "lucide-react";
 
 /* =========================================================
@@ -46,6 +42,17 @@ const socket = io(import.meta.env.VITE_SOCKET_URL, {
 const ReportPage = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+
+  const adminName =
+    [user?.firstName, user?.middleName, user?.lastName]
+      .filter(Boolean)
+      .join(" ") ||
+    user?.name ||
+    user?.fullName ||
+    "Admin";
+
+  const adminPhoto =
+    user?.profilePhoto || user?.profilePicture || user?.photo || null;
 
   const [activeTab, setActiveTab] = useState("mobile");
   const [reports, setReports] = useState([]);
@@ -63,21 +70,21 @@ const ReportPage = () => {
      FETCH REPORTS
   ========================================================= */
   const fetchReports = useCallback(
-  async (customSearch = search) => {
-    setLoading(true);
+    async (customSearch = search) => {
+      setLoading(true);
 
-    try {
-      const res = await API.get(
-        `/api/reports?status=pending&search=${customSearch}`
-      );
+      try {
+        const res = await API.get(
+          `/api/reports?status=pending&search=${customSearch}`,
+        );
 
-      setReports(res.data.reports || []);
-    } finally {
-      setLoading(false);
-    }
-  },
-  [search]
-);
+        setReports(res.data.reports || []);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [search],
+  );
 
   useEffect(() => {
     fetchReports();
@@ -94,24 +101,17 @@ const ReportPage = () => {
     socket.emit("register", user._id);
 
     socket.on("newNotification", (data) => {
-
       setReports((prev) => [data.report, ...prev]);
 
       const notif = {
         id: data.report?._id || Date.now(),
         title: "New Student Report",
-        text:
-          data.report?.offense ||
-          "A new incident report was submitted.",
-        student:
-          data.report?.studentName || "Unknown Student",
+        text: data.report?.offense || "A new incident report was submitted.",
+        student: data.report?.studentName || "Unknown Student",
         time: new Date().toISOString(),
       };
 
-      setNotifications((prev) => [
-        notif,
-        ...prev.slice(0, 15),
-      ]);
+      setNotifications((prev) => [notif, ...prev.slice(0, 15)]);
 
       setToastNotif(notif);
 
@@ -121,11 +121,7 @@ const ReportPage = () => {
     });
 
     socket.on("update-report", (data) => {
-      setReports((prev) =>
-        prev.map((r) =>
-          r._id === data._id ? data : r
-        )
-      );
+      setReports((prev) => prev.map((r) => (r._id === data._id ? data : r)));
     });
 
     return () => socket.disconnect();
@@ -149,11 +145,9 @@ const ReportPage = () => {
   ========================================================= */
   const filteredReports = useMemo(() => {
     return (reports || []).filter((r) => {
-      const name =
-        r?.studentName?.toLowerCase() || "";
+      const name = r?.studentName?.toLowerCase() || "";
 
-      const offense =
-        r?.offense?.toLowerCase() || "";
+      const offense = r?.offense?.toLowerCase() || "";
 
       return (
         name.includes(search.toLowerCase()) ||
@@ -167,39 +161,23 @@ const ReportPage = () => {
   ========================================================= */
   const stats = {
     total: reports.length,
-    pending: reports.filter(
-      (r) => r.status === "pending"
-    ).length,
-    accepted: reports.filter(
-      (r) => r.status === "accepted"
-    ).length,
-    rejected: reports.filter(
-      (r) => r.status === "rejected"
-    ).length,
+    pending: reports.filter((r) => r.status === "pending").length,
+    accepted: reports.filter((r) => r.status === "accepted").length,
+    rejected: reports.filter((r) => r.status === "rejected").length,
   };
 
   return (
     <div className="h-screen w-screen flex bg-[#F4F7FB] text-gray-900 overflow-hidden">
-
-      {/* =========================================================
-         SIDEBAR
-      ========================================================= */}
-      <aside className="w-72 bg-white border-r border-gray-200 p-6 flex flex-col justify-between">
-
+      {/* ================= SIDEBAR ================= */}
+      <aside className="w-72 bg-white/70 backdrop-blur-2xl border-r border-white/30 p-6 flex flex-col justify-between">
         <div>
+          {/* LOGO */}
+          <h1 className="text-2xl font-bold text-green-600">GuidEd</h1>
 
-          <div className="mb-10">
-            <h1 className="text-2xl font-bold text-green-600">
-              GuidEd
-            </h1>
+          <p className="text-xs text-gray-500 mb-6">Our Lady of the Holy Rosary School - General Trias Campus</p>
 
-            <p className="text-xs text-gray-500 mt-1">
-              Case & Report Management System
-            </p>
-          </div>
-
-          <div className="space-y-2">
-
+          {/* NAVIGATION */}
+          <div>
             <Nav
               icon={<LayoutDashboard size={18} />}
               label="Dashboard"
@@ -220,16 +198,19 @@ const ReportPage = () => {
 
             <Nav
               icon={<ChartNoAxesCombined size={18} />}
-              label="Reports"
-              active
+              label="Reports" active
             />
 
             <Nav
-              icon={<Gavel size={18} />}
+              icon={<BriefcaseBusiness size={18} />}
+              label="Cases"
+              onClick={() => navigate("/cases")}
+            />
+
+            <Nav
+              icon={<HandHelping size={18} />}
               label="Interventions"
-              onClick={() =>
-                navigate("/interventions")
-              }
+              onClick={() => navigate("/interventions")}
             />
 
             <Nav
@@ -237,62 +218,152 @@ const ReportPage = () => {
               label="Settings"
               onClick={() => navigate("/settings")}
             />
-
           </div>
-
         </div>
 
-        <button
-          onClick={logout}
-          className="
-            w-full bg-green-600 text-white
-            py-3 rounded-2xl
-            hover:bg-green-700 transition
+        {/* ================= SIDEBAR BOTTOM ================= */}
+        <div className="space-y-3">
+          {/* ADMIN PROFILE */}
+          <div
+            className="
+        flex
+        items-center
+        gap-3
+        p-3
+        rounded-2xl
+        bg-gray-50/80
+        border border-gray-200/70
+        hover:bg-white
+        hover:shadow-sm
+        transition
+      "
+          >
+            {/* PROFILE PHOTO */}
+            <div
+              className="
+          relative
+          w-11
+          h-11
+          rounded-xl
+          overflow-hidden
+          bg-green-100
+          border border-green-200
+          flex
+          items-center
+          justify-center
+          flex-shrink-0
+        "
+            >
+              {adminPhoto ? (
+                <img
+                  src={adminPhoto}
+                  alt={adminName}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : (
+                <span className="text-green-700 font-bold text-lg">
+                  {adminName.charAt(0).toUpperCase()}
+                </span>
+              )}
+
+              {/* ONLINE DOT */}
+              <span
+                className="
+            absolute
+            bottom-0.5
+            right-0.5
+            w-2.5
+            h-2.5
+            rounded-full
+            bg-green-500
+            border-2
+            border-white
+          "
+              />
+            </div>
+
+            {/* ADMIN INFO */}
+            <div className="min-w-0 flex-1">
+              <p
+                className="
+            text-[10px]
+            uppercase
+            tracking-wider
+            text-gray-400
             font-medium
           "
-        >
-          Logout
-        </button>
+              >
+                Administrator
+              </p>
 
+              <p
+                className="
+            text-sm
+            font-bold
+            text-gray-900
+            truncate
+          "
+              >
+                {adminName}
+              </p>
+            </div>
+          </div>
+
+          {/* LOGOUT */}
+          <button
+            onClick={logout}
+            className="
+        w-full
+        bg-green-600
+        hover:bg-green-700
+        text-white
+        py-3
+        rounded-2xl
+        font-medium
+        shadow-sm
+        hover:shadow-md
+        transition
+      "
+          >
+            Logout
+          </button>
+        </div>
       </aside>
 
       {/* =========================================================
          MAIN
       ========================================================= */}
       <main className="flex-1 overflow-y-auto">
-
         {/* =========================================================
            HEADER
         ========================================================= */}
-        <div className="
+        <div
+          className="
           sticky top-0 z-30
           px-8 py-6
           border-b border-white/20
           bg-white/50 backdrop-blur-2xl
-        ">
-
+        "
+        >
           <div className="flex justify-between items-start">
-
             <div>
-
               <h2 className="text-4xl font-black tracking-tight">
                 Reports Management
               </h2>
 
               <p className="text-gray-500 mt-2">
-                Review, monitor, and manage student
-                incident reports in real-time
+                Review, monitor, and manage student incident reports in
+                real-time
               </p>
-
             </div>
 
             {/* NOTIF */}
             <div className="relative">
-
               <button
-                onClick={() =>
-                  setOpenNotif(!openNotif)
-                }
+                onClick={() => setOpenNotif(!openNotif)}
                 className="
                   w-12 h-12 rounded-2xl
                   bg-white/60 backdrop-blur-xl
@@ -306,21 +377,22 @@ const ReportPage = () => {
               </button>
 
               {notifications.length > 0 && (
-                <span className="
+                <span
+                  className="
                   absolute -top-1 -right-1
                   min-w-[20px] h-5
                   px-1 rounded-full
                   bg-red-500 text-white
                   text-[11px] font-bold
                   flex items-center justify-center
-                ">
+                "
+                >
                   {notifications.length}
                 </span>
               )}
 
               {/* PANEL */}
               <AnimatePresence>
-
                 {openNotif && (
                   <motion.div
                     initial={{
@@ -346,11 +418,8 @@ const ReportPage = () => {
                       shadow-2xl z-50
                     "
                   >
-
                     <div className="p-5 border-b border-white/20 flex justify-between items-center">
-
                       <div>
-
                         <h3 className="font-bold text-gray-900">
                           Notifications
                         </h3>
@@ -358,20 +427,13 @@ const ReportPage = () => {
                         <p className="text-xs text-gray-500">
                           Live report updates
                         </p>
-
                       </div>
 
-                      <Sparkles
-                        size={16}
-                        className="text-green-600"
-                      />
-
+                      <Sparkles size={16} className="text-green-600" />
                     </div>
 
                     <div className="max-h-[400px] overflow-y-auto">
-
-                      {notifications.length ===
-                      0 ? (
+                      {notifications.length === 0 ? (
                         <div className="p-10 text-center text-gray-500 text-sm">
                           No notifications
                         </div>
@@ -385,7 +447,6 @@ const ReportPage = () => {
                               hover:bg-white/30 transition
                             "
                           >
-
                             <p className="font-semibold text-sm text-gray-900">
                               {n.title}
                             </p>
@@ -395,46 +456,33 @@ const ReportPage = () => {
                             </p>
 
                             <div className="flex justify-between mt-3">
-
                               <span className="text-xs text-green-700 font-medium">
                                 {n.student}
                               </span>
 
                               <span className="text-xs text-gray-400">
-                                {new Date(
-                                  n.time
-                                ).toLocaleTimeString()}
+                                {new Date(n.time).toLocaleTimeString()}
                               </span>
-
                             </div>
-
                           </motion.div>
                         ))
                       )}
-
                     </div>
-
                   </motion.div>
                 )}
-
               </AnimatePresence>
-
             </div>
-
           </div>
-
         </div>
 
         {/* =========================================================
            CONTENT
         ========================================================= */}
         <div className="p-8">
-
           {/* =========================================================
              STATS
           ========================================================= */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
-
             <StatCard
               icon={<FileWarning size={18} />}
               label="Total Reports"
@@ -461,32 +509,30 @@ const ReportPage = () => {
               value={stats.rejected}
               color="text-red-500"
             />
-
           </div>
 
           {/* =========================================================
              SEARCH + TABS
           ========================================================= */}
-          <div className="
+          <div
+            className="
             bg-white/45 backdrop-blur-2xl
             border border-white/30
             rounded-[2rem]
             p-6 shadow-sm mb-8
-          ">
-
+          "
+          >
             {/* SEARCH */}
-            <div className="
+            <div
+              className="
               flex items-center gap-3
               px-5 py-4 rounded-2xl
               bg-white/60 backdrop-blur-xl
               border border-white/30
               max-w-xl mb-6
-            ">
-
-              <Search
-                size={18}
-                className="text-gray-400"
-              />
+            "
+            >
+              <Search size={18} className="text-gray-400" />
 
               <input
                 className="
@@ -494,47 +540,35 @@ const ReportPage = () => {
                   w-full text-sm
                 "
                 value={search}
-                onChange={(e) =>
-                  setSearch(e.target.value)
-                }
+                onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search student or offense..."
               />
-
             </div>
 
             {/* TABS */}
             <div className="flex flex-wrap gap-3">
-
               <Tab
                 label="Mobile Pending"
                 active={activeTab === "mobile"}
-                onClick={() =>
-                  setActiveTab("mobile")
-                }
+                onClick={() => setActiveTab("mobile")}
               />
 
               <Tab
                 label="Incident"
                 active={activeTab === "incident"}
-                onClick={() =>
-                  setActiveTab("incident")
-                }
+                onClick={() => setActiveTab("incident")}
               />
 
               <Tab
                 label="Complaint"
                 active={activeTab === "complaint"}
-                onClick={() =>
-                  setActiveTab("complaint")
-                }
+                onClick={() => setActiveTab("complaint")}
               />
 
               <Tab
                 label="Overview"
                 active={activeTab === "overview"}
-                onClick={() =>
-                  setActiveTab("overview")
-                }
+                onClick={() => setActiveTab("overview")}
               />
 
               <Tab
@@ -542,9 +576,7 @@ const ReportPage = () => {
                 active={activeTab === "ai"}
                 onClick={() => setActiveTab("ai")}
               />
-
             </div>
-
           </div>
 
           {/* =========================================================
@@ -559,91 +591,71 @@ const ReportPage = () => {
               p-7 shadow-sm min-h-[500px]
             "
           >
-
             {/* MOBILE */}
             {activeTab === "mobile" && (
               <>
                 {loading ? (
                   <div className="flex justify-center items-center py-20">
-                    <div className="
+                    <div
+                      className="
                       w-12 h-12 rounded-full
                       border-4 border-green-500
                       border-t-transparent
                       animate-spin
-                    " />
+                    "
+                    />
                   </div>
                 ) : filteredReports.length ? (
                   <div className="grid gap-5">
-
-                    {filteredReports.map(
-                      (report) => (
-                        <motion.div
-                          key={report._id}
-                          whileHover={{ y: -2 }}
-                          className="
+                    {filteredReports.map((report) => (
+                      <motion.div
+                        key={report._id}
+                        whileHover={{ y: -2 }}
+                        className="
                             bg-white/60 backdrop-blur-xl
                             border border-white/30
                             rounded-3xl
                             p-5 shadow-sm
                           "
-                        >
-
-                          <MobileReport
-                            report={report}
-                            onAccept={handleAccept}
-                            onReject={handleReject}
-                          />
-
-                        </motion.div>
-                      )
-                    )}
-
+                      >
+                        <MobileReport
+                          report={report}
+                          onAccept={handleAccept}
+                          onReject={handleReject}
+                        />
+                      </motion.div>
+                    ))}
                   </div>
                 ) : (
                   <div className="py-20 text-center">
-
                     <p className="text-lg font-semibold text-gray-700">
                       No reports found
                     </p>
 
                     <p className="text-sm text-gray-500 mt-2">
-                      Try adjusting your search
-                      filters.
+                      Try adjusting your search filters.
                     </p>
-
                   </div>
                 )}
               </>
             )}
 
             {/* OTHER TABS */}
-            {activeTab === "incident" && (
-              <IncidentReport />
-            )}
+            {activeTab === "incident" && <IncidentReport />}
 
-            {activeTab === "complaint" && (
-              <ComplaintReport />
-            )}
+            {activeTab === "complaint" && <ComplaintReport />}
 
-            {activeTab === "overview" && (
-              <Overview />
-            )}
+            {activeTab === "overview" && <Overview />}
 
-            {activeTab === "ai" && (
-              <AIPredictions />
-            )}
-
+            {activeTab === "ai" && <AIPredictions />}
           </motion.div>
-
         </div>
-
       </main>
 
       {/* =========================================================
          TOAST
       ========================================================= */}
       <AnimatePresence>
-
         {toastNotif && (
           <motion.div
             initial={{
@@ -670,50 +682,38 @@ const ReportPage = () => {
               overflow-hidden
             "
           >
-
             <div className="p-5 flex gap-4">
-
-              <div className="
+              <div
+                className="
                 w-12 h-12 rounded-2xl
                 bg-green-100 text-green-700
                 flex items-center justify-center
-              ">
+              "
+              >
                 <Bell size={18} />
               </div>
 
               <div className="flex-1">
-
                 <p className="font-semibold text-gray-900">
                   {toastNotif.title}
                 </p>
 
-                <p className="text-sm text-gray-700 mt-1">
-                  {toastNotif.text}
-                </p>
+                <p className="text-sm text-gray-700 mt-1">{toastNotif.text}</p>
 
                 <div className="flex justify-between mt-3">
-
                   <span className="text-xs text-green-700 font-medium">
                     {toastNotif.student}
                   </span>
 
                   <span className="text-xs text-gray-400">
-                    {new Date(
-                      toastNotif.time
-                    ).toLocaleTimeString()}
+                    {new Date(toastNotif.time).toLocaleTimeString()}
                   </span>
-
                 </div>
-
               </div>
-
             </div>
-
           </motion.div>
         )}
-
       </AnimatePresence>
-
     </div>
   );
 };
@@ -721,35 +721,24 @@ const ReportPage = () => {
 /* =========================================================
    NAV
 ========================================================= */
-const Nav = ({
-  icon,
-  label,
-  onClick,
-  active,
-}) => (
+const Nav = ({ icon, label, onClick, active }) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-3 px-4 py-3 rounded-2xl w-full transition-all duration-200 ${
+    className={`flex items-center gap-3 px-4 py-3 rounded-xl w-full ${
       active
-        ? "bg-green-50 text-green-700 font-semibold shadow-sm"
+        ? "bg-green-50 text-green-700 font-medium"
         : "text-gray-600 hover:bg-gray-100"
     }`}
   >
     {icon}
-    <span className="text-sm">
-      {label}
-    </span>
+    {label}
   </button>
 );
 
 /* =========================================================
    TAB
 ========================================================= */
-const Tab = ({
-  label,
-  active,
-  onClick,
-}) => (
+const Tab = ({ label, active, onClick }) => (
   <motion.button
     whileTap={{ scale: 0.97 }}
     onClick={onClick}
@@ -766,12 +755,7 @@ const Tab = ({
 /* =========================================================
    STAT CARD
 ========================================================= */
-const StatCard = ({
-  icon,
-  label,
-  value,
-  color = "text-gray-900",
-}) => (
+const StatCard = ({ icon, label, value, color = "text-gray-900" }) => (
   <motion.div
     whileHover={{ y: -3 }}
     className="
@@ -781,23 +765,19 @@ const StatCard = ({
       p-6 shadow-sm
     "
   >
-
-    <div className="
+    <div
+      className="
       w-12 h-12 rounded-2xl
       bg-green-100 text-green-700
       flex items-center justify-center mb-5
-    ">
+    "
+    >
       {icon}
     </div>
 
-    <p className="text-sm text-gray-500">
-      {label}
-    </p>
+    <p className="text-sm text-gray-500">{label}</p>
 
-    <h2 className={`text-3xl font-black mt-2 ${color}`}>
-      {value}
-    </h2>
-
+    <h2 className={`text-3xl font-black mt-2 ${color}`}>{value}</h2>
   </motion.div>
 );
 
