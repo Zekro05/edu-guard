@@ -21,11 +21,11 @@ router.put("/profile", verifyToken, updateMyProfile);
 // PROTECTED ROUTES
 router.get("/search", searchStudents);
 router.get("/", verifyToken, getStudents);
-router.post("/", verifyToken, upload.single("profilePhoto"), createStudent);
+router.post("/", verifyToken, profileUpload.single("profilePhoto"), createStudent);
 router.get("/:id", verifyToken, getStudentById);
 router.post("/bulk", verifyToken, createStudentsBulk);
 router.post("/bulk/preview",verifyToken, previewBulkStudents);
-router.put("/:id", verifyToken, upload.single("profilePhoto"), updateStudent);
+router.put("/:id", verifyToken, profileUpload.single("profilePhoto"), updateStudent);
 router.put(
   "/profile/photo",
   verifyToken,
