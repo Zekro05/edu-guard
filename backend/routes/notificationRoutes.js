@@ -1,7 +1,14 @@
 import express from "express";
 import Notification from "../models/Notification.js";
+import { saveFCMToken } from "../controllers/notificationController.js";
+import { verifyToken } from "../middleware/verifyToken.js";
+
+
 
 const router = express.Router();
+
+router.post("/fcm-token", verifyToken, saveFCMToken);
+
 
 /**
  * GET USER NOTIFICATIONS

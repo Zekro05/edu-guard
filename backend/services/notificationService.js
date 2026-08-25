@@ -6,12 +6,11 @@ export const sendPushNotification = async ({
   body,
   data = {},
 }) => {
-  if (!token) {
-    console.log("No FCM token provided.");
-    return null;
-  }
-
   try {
+    if (!token) {
+      return null;
+    }
+
     const message = {
       token,
 
@@ -49,7 +48,7 @@ export const sendPushNotification = async ({
 
     return response;
   } catch (error) {
-    console.error("FCM notification error:", error);
+    console.error("FCM SEND ERROR:", error);
 
     return null;
   }

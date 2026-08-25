@@ -5,7 +5,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
-import Constants from "expo-constants";
 
 /* =========================================================
    API
@@ -22,13 +21,17 @@ export const API = axios.create({
 let cachedToken = null;
 
 /* =========================================================
-   PUSH NOTIFICATIONS
+   CURRENT DEVICE PUSH TOKEN CACHE
 ========================================================= */
 
-/*
-  Controls how notifications behave while the app
-  is currently open.
-*/
+let cachedPushToken = null;
+
+const PUSH_TOKEN_STORAGE_KEY = "eduGuardPushToken";
+
+/* =========================================================
+   PUSH NOTIFICATION HANDLER
+========================================================= */
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -39,74 +42,260 @@ Notifications.setNotificationHandler({
 });
 
 /* =========================================================
-   REGISTER PUSH NOTIFICATIONS
+   REGISTER NATIVE PUSH NOTIFICATIONS
 ========================================================= */
 
 const registerForPushNotificationsAsync = async () => {
   try {
+    /* =====================================================
+       WEB CHECK
+    ===================================================== */
+
     if (Platform.OS === "web") {
-      console.log("Push notifications are not supported on web.");
+      console.log(
+        "⚠️ Push notifications are not supported on web."
+      );
+
       return null;
     }
 
-    /* ================= ANDROID CHANNEL ================= */
+    /* =====================================================
+       PHYSICAL DEVICE CHECK
+    ===================================================== */
 
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "EduGuard Notifications",
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        sound: "default",
-      });
+    if (!Device.isDevice) {
+      console.log(
+        "❌ Push notifications require a physical device."
+      );
+
+      return null;
     }
 
-    /* ================= CHECK PERMISSION ================= */
+    /* =====================================================
+       ANDROID CHANNEL
+    ===================================================== */
 
-    const { status: existingStatus } =
-      await Notifications.getPermissionsAsync();
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync(
+        "default",
+        {
+          name: "EduGuard Notifications",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          sound: "default",
+        }
+      );
+
+      console.log(
+        "✅ Android notification channel ready."
+      );
+    }
+
+    /* =====================================================
+       PERMISSION
+    ===================================================== */
+
+    const {
+      status: existingStatus,
+    } = await Notifications.getPermissionsAsync();
+
+    console.log(
+      "🔔 Existing notification permission:",
+      existingStatus
+    );
 
     let finalStatus = existingStatus;
 
     if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
+      console.log(
+        "🔔 Requesting notification permission..."
+      );
+
+      const {
+        status,
+      } = await Notifications.requestPermissionsAsync();
 
       finalStatus = status;
     }
 
     if (finalStatus !== "granted") {
-      console.log("❌ Push notification permission denied.");
+      console.log(
+        "❌ Push notification permission denied."
+      );
+
       return null;
     }
 
-    /* ================= GET PROJECT ID ================= */
+    console.log(
+      "✅ Push notification permission granted."
+    );
 
-    const projectId =
-      Constants?.expoConfig?.extra?.eas?.projectId ??
-      Constants?.easConfig?.projectId;
+    /* =====================================================
+       GET NATIVE DEVICE TOKEN
 
-    if (!projectId) {
-      console.log("❌ Expo projectId not found.");
+       Android → FCM
+       iOS     → APNs
+
+       IMPORTANT:
+       This is NOT an Expo Push Token.
+    ===================================================== */
+
+    console.log(
+      "📱 Requesting native device push token..."
+    );
+
+    const devicePushToken =
+      await Notifications.getDevicePushTokenAsync();
+
+    const token = devicePushToken?.data;
+
+    if (!token) {
+      console.log(
+        "❌ Native push token not available."
+      );
+
       return null;
     }
 
-    /* ================= GET EXPO TOKEN ================= */
+    console.log(
+      "===================================="
+    );
 
-    const token = (
-      await Notifications.getExpoPushTokenAsync({
-        projectId,
-      })
-    ).data;
+    console.log(
+      "🔥 NATIVE PUSH TOKEN:"
+    );
 
-    console.log("====================================");
-    console.log("📱 EXPO PUSH TOKEN:");
     console.log(token);
-    console.log("====================================");
+
+    console.log(
+      "TOKEN TYPE:",
+      devicePushToken?.type
+    );
+
+    console.log(
+      "===================================="
+    );
 
     return token;
   } catch (error) {
-    console.error("❌ PUSH NOTIFICATION REGISTRATION ERROR:", error);
+    console.error(
+      "===================================="
+    );
+
+    console.error(
+      "❌ PUSH REGISTRATION ERROR"
+    );
+
+    console.error(
+      error?.response?.data ||
+        error?.message ||
+        error
+    );
+
+    console.error(
+      "===================================="
+    );
 
     return null;
+  }
+};
+
+/* =========================================================
+   GET PLATFORM
+========================================================= */
+
+const getPushPlatform = () => {
+  if (Platform.OS === "android") {
+    return "android";
+  }
+
+  if (Platform.OS === "ios") {
+    return "ios";
+  }
+
+  return "web";
+};
+
+/* =========================================================
+   GET / CACHE CURRENT DEVICE PUSH TOKEN
+========================================================= */
+
+const getCurrentPushToken = async () => {
+  try {
+    /* =====================================================
+       MEMORY CACHE
+    ===================================================== */
+
+    if (cachedPushToken) {
+      return cachedPushToken;
+    }
+
+    /* =====================================================
+       LOCAL STORAGE
+    ===================================================== */
+
+    const storedToken =
+      await AsyncStorage.getItem(
+        PUSH_TOKEN_STORAGE_KEY
+      );
+
+    if (storedToken) {
+      cachedPushToken = storedToken;
+
+      return storedToken;
+    }
+
+    return null;
+  } catch (error) {
+    console.log(
+      "GET CURRENT PUSH TOKEN ERROR:",
+      error?.message
+    );
+
+    return null;
+  }
+};
+
+/* =========================================================
+   SAVE CURRENT DEVICE PUSH TOKEN LOCALLY
+========================================================= */
+
+const cachePushToken = async (token) => {
+  try {
+    if (!token) {
+      return;
+    }
+
+    cachedPushToken = token;
+
+    await AsyncStorage.setItem(
+      PUSH_TOKEN_STORAGE_KEY,
+      token
+    );
+  } catch (error) {
+    console.log(
+      "CACHE PUSH TOKEN ERROR:",
+      error?.message
+    );
+  }
+};
+
+/* =========================================================
+   CLEAR CURRENT DEVICE PUSH TOKEN LOCALLY
+========================================================= */
+
+const clearCachedPushToken = async () => {
+  try {
+    cachedPushToken = null;
+
+    await AsyncStorage.removeItem(
+      PUSH_TOKEN_STORAGE_KEY
+    );
+  } catch (error) {
+    console.log(
+      "CLEAR PUSH TOKEN ERROR:",
+      error?.message
+    );
   }
 };
 
@@ -116,24 +305,217 @@ const registerForPushNotificationsAsync = async () => {
 
 const savePushTokenToBackend = async () => {
   try {
-    const token = await registerForPushNotificationsAsync();
+    /* =====================================================
+       DON'T REGISTER WITHOUT AUTH
+    ===================================================== */
 
-    if (!token) {
-      console.log("⚠️ No Expo push token available.");
+    if (!cachedToken) {
+      console.log(
+        "⚠️ Cannot save push token: user is not authenticated."
+      );
+
       return false;
     }
 
-    await API.post("/api/auth/save-push-token", {
-      expoPushToken: token,
-    });
+    console.log(
+      "===================================="
+    );
 
-    console.log("✅ Expo push token saved to backend.");
+    console.log(
+      "🔥 REGISTERING NATIVE PUSH TOKEN"
+    );
+
+    console.log(
+      "===================================="
+    );
+
+    const token =
+      await registerForPushNotificationsAsync();
+
+    if (!token) {
+      console.log(
+        "⚠️ No native push token available."
+      );
+
+      return false;
+    }
+
+    /* =====================================================
+       CACHE CURRENT DEVICE TOKEN
+    ===================================================== */
+
+    await cachePushToken(token);
+
+    const platform =
+      getPushPlatform();
+
+    console.log(
+      "📡 Saving push token to backend..."
+    );
+
+    console.log(
+      "Platform:",
+      platform
+    );
+
+    console.log(
+      "Provider: fcm"
+    );
+
+    const response =
+      await API.post(
+        "/api/auth/save-push-token",
+        {
+          token,
+          platform,
+          provider: "fcm",
+        }
+      );
+
+    console.log(
+      "===================================="
+    );
+
+    console.log(
+      "✅ PUSH TOKEN SAVED"
+    );
+
+    console.log(
+      response.data
+    );
+
+    console.log(
+      "===================================="
+    );
 
     return true;
   } catch (error) {
     console.error(
-      "❌ SAVE PUSH TOKEN ERROR:",
-      error.response?.data || error.message,
+      "===================================="
+    );
+
+    console.error(
+      "❌ SAVE PUSH TOKEN ERROR"
+    );
+
+    console.error(
+      error?.response?.data ||
+        error?.message ||
+        error
+    );
+
+    console.error(
+      "===================================="
+    );
+
+    return false;
+  }
+};
+
+/* =========================================================
+   REMOVE CURRENT DEVICE PUSH TOKEN FROM BACKEND
+========================================================= */
+
+const removePushTokenFromBackend = async () => {
+  try {
+    /* =====================================================
+       DON'T TRY WITHOUT AUTH
+    ===================================================== */
+
+    if (!cachedToken) {
+      console.log(
+        "⚠️ No authentication token. Push token removal skipped."
+      );
+
+      return true;
+    }
+
+    /* =====================================================
+       GET CURRENT DEVICE TOKEN
+    ===================================================== */
+
+    const token =
+      await getCurrentPushToken();
+
+    if (!token) {
+      console.log(
+        "⚠️ No current device push token found."
+      );
+
+      return true;
+    }
+
+    console.log(
+      "===================================="
+    );
+
+    console.log(
+      "🗑️ REMOVING CURRENT DEVICE PUSH TOKEN"
+    );
+
+    console.log(
+      "===================================="
+    );
+
+    console.log(
+      "TOKEN:",
+      token
+    );
+
+    /* =====================================================
+       REMOVE ONLY THIS DEVICE TOKEN
+    ===================================================== */
+
+    const response =
+      await API.delete(
+        "/api/auth/remove-push-token",
+        {
+          data: {
+            token,
+          },
+        }
+      );
+
+    console.log(
+      "===================================="
+    );
+
+    console.log(
+      "✅ CURRENT DEVICE PUSH TOKEN REMOVED"
+    );
+
+    console.log(
+      response.data
+    );
+
+    console.log(
+      "===================================="
+    );
+
+    /* =====================================================
+       CLEAR LOCAL TOKEN ONLY AFTER BACKEND SUCCESS
+    ===================================================== */
+
+    await clearCachedPushToken();
+
+    return true;
+  } catch (error) {
+    console.error(
+      "===================================="
+    );
+
+    console.error(
+      "❌ REMOVE PUSH TOKEN ERROR"
+    );
+
+    console.error(
+      error?.response?.data ||
+        error?.message ||
+        error
+    );
+
+    console.error(
+      "===================================="
     );
 
     return false;
@@ -154,83 +536,81 @@ const setToken = async (token) => {
   cachedToken = token || null;
 
   if (token) {
-    API.defaults.headers.common.Authorization = `Bearer ${token}`;
+    API.defaults.headers.common.Authorization =
+      `Bearer ${token}`;
   } else {
     delete API.defaults.headers.common.Authorization;
   }
 
   try {
-    const storedUser = await AsyncStorage.getItem("user");
+    const storedUser =
+      await AsyncStorage.getItem("user");
 
-    const user = storedUser ? JSON.parse(storedUser) : {};
+    const user = storedUser
+      ? JSON.parse(storedUser)
+      : {};
 
     const updatedUser = {
       ...user,
       token: token || null,
     };
 
-    await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
-  } catch (error) {
-    console.log("SET TOKEN ERROR:", error.message);
-  }
-};
-
-/* =====================================================
-   REMOVE EXPO PUSH TOKEN
-===================================================== */
-
-const removePushTokenFromBackend = async () => {
-  try {
-    await API.delete("/api/auth/remove-push-token");
-
-    console.log("✅ Expo push token removed from backend.");
-
-    return true;
-  } catch (error) {
-    console.error(
-      "❌ REMOVE EXPO PUSH TOKEN ERROR:",
-      error.response?.data || error.message,
+    await AsyncStorage.setItem(
+      "user",
+      JSON.stringify(updatedUser)
     );
-
-    return false;
+  } catch (error) {
+    console.log(
+      "SET TOKEN ERROR:",
+      error.message
+    );
   }
 };
 
 /* =========================================================
-   AXIOS TOKEN INTERCEPTOR
+   API AUTH INTERCEPTOR
 ========================================================= */
 
-API.interceptors.request.use(async (config) => {
-  try {
-    if (!config.headers) {
-      config.headers = {};
-    }
-
-    let token = cachedToken;
-
-    if (!token) {
-      const storedUser = await AsyncStorage.getItem("user");
-
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-
-        token = user?.token || null;
+API.interceptors.request.use(
+  async (config) => {
+    try {
+      if (!config.headers) {
+        config.headers = {};
       }
+
+      let token = cachedToken;
+
+      if (!token) {
+        const storedUser =
+          await AsyncStorage.getItem("user");
+
+        if (storedUser) {
+          const user =
+            JSON.parse(storedUser);
+
+          token =
+            user?.token || null;
+        }
+      }
+
+      if (token) {
+        cachedToken = token;
+
+        config.headers.Authorization =
+          `Bearer ${token}`;
+      }
+
+      return config;
+    } catch (error) {
+      console.log(
+        "INTERCEPTOR ERROR:",
+        error.message
+      );
+
+      return config;
     }
-
-    if (token) {
-      cachedToken = token;
-
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    return config;
-  } catch (error) {
-    console.log("INTERCEPTOR ERROR:", error.message);
-
-    return config;
   }
-});
+);
 
 /* =========================================================
    SOCKET CONNECTION
@@ -238,7 +618,8 @@ API.interceptors.request.use(async (config) => {
 
 const connectSocketSafely = (userId) => {
   try {
-    const socketStore = useSocketStore?.getState?.();
+    const socketStore =
+      useSocketStore?.getState?.();
 
     if (!socketStore?.connectSocket) {
       return;
@@ -250,7 +631,10 @@ const connectSocketSafely = (userId) => {
       socketStore.connectSocket(userId);
     }
   } catch (error) {
-    console.log("SOCKET ERROR:", error.message);
+    console.log(
+      "SOCKET ERROR:",
+      error.message
+    );
   }
 };
 
@@ -258,1361 +642,1888 @@ const connectSocketSafely = (userId) => {
    AUTH STORE
 ========================================================= */
 
-export const useAuthStore = create((set, get) => ({
-  /* =====================================================
+export const useAuthStore = create(
+  (set, get) => ({
+    /* =====================================================
        STATE
     ===================================================== */
 
-  user: null,
+    user: null,
 
-  tempEmail: null,
+    tempEmail: null,
 
-  otpRequired: false,
+    otpRequired: false,
 
-  otpType: null,
+    otpType: null,
 
-  error: null,
+    error: null,
 
-  isLoading: false,
+    isLoading: false,
 
-  isAuthenticated: false,
+    isAuthenticated: false,
 
-  isCheckingAuth: true,
+    isCheckingAuth: true,
 
-  studentData: null,
+    studentData: null,
 
-  teacherData: null,
+    teacherData: null,
 
-  otpCode: null,
+    otpCode: null,
 
-  /* =====================================================
+    /* =====================================================
+       SAVE PUSH TOKEN
+    ===================================================== */
+
+    savePushToken: async (token) => {
+      try {
+        if (!token) {
+          return {
+            success: false,
+            error: "No push token.",
+          };
+        }
+
+        if (!cachedToken) {
+          return {
+            success: false,
+            error: "User is not authenticated.",
+          };
+        }
+
+        const platform =
+          getPushPlatform();
+
+        await API.post(
+          "/api/auth/save-push-token",
+          {
+            token,
+            platform,
+            provider: "fcm",
+          }
+        );
+
+        await cachePushToken(token);
+
+        console.log(
+          "✅ Push token saved."
+        );
+
+        return {
+          success: true,
+        };
+      } catch (error) {
+        console.error(
+          "SAVE PUSH TOKEN ERROR:",
+          error?.response?.data ||
+            error?.message ||
+            error
+        );
+
+        return {
+          success: false,
+          error:
+            error?.response?.data?.message ||
+            error?.message ||
+            "Failed to save push token.",
+        };
+      }
+    },
+
+    /* =====================================================
+       REGISTER CURRENT DEVICE
+    ===================================================== */
+
+    registerPushNotifications:
+      async () => {
+        try {
+          if (!get().isAuthenticated) {
+            console.log(
+              "⚠️ Cannot register push notifications: user is not authenticated."
+            );
+
+            return {
+              success: false,
+              error:
+                "User is not authenticated.",
+            };
+          }
+
+          const success =
+            await savePushTokenToBackend();
+
+          return {
+            success,
+          };
+        } catch (error) {
+          console.error(
+            "REGISTER PUSH NOTIFICATIONS ERROR:",
+            error
+          );
+
+          return {
+            success: false,
+            error:
+              error?.message ||
+              "Failed to register push notifications.",
+          };
+        }
+      },
+
+    /* =====================================================
+       REMOVE CURRENT DEVICE PUSH TOKEN
+    ===================================================== */
+
+    removePushToken: async () => {
+      const success =
+        await removePushTokenFromBackend();
+
+      return {
+        success,
+        ...(success
+          ? {}
+          : {
+              error:
+                "Failed to remove push token.",
+            }),
+      };
+    },
+
+    /* =====================================================
+       BACKWARD COMPATIBILITY
+    ===================================================== */
+
+    removeExpoPushToken: async () => {
+      const success =
+        await removePushTokenFromBackend();
+
+      return {
+        success,
+        ...(success
+          ? {}
+          : {
+              error:
+                "Failed to remove push token.",
+            }),
+      };
+    },
+
+    /* =====================================================
        CHECK AUTH
     ===================================================== */
 
-  /* =====================================================
-   SAVE EXPO PUSH TOKEN
-===================================================== */
-
-  saveExpoPushToken: async (expoPushToken) => {
-    try {
-      if (!expoPushToken) {
-        console.log("⚠️ No Expo push token provided.");
-
-        return {
-          success: false,
-          error: "No Expo push token.",
-        };
-      }
-
-      await API.post("/api/auth/save-push-token", {
-        expoPushToken,
-      });
-
-      console.log("✅ Expo push token saved.");
-
-      return {
-        success: true,
-      };
-    } catch (error) {
-      console.error(
-        "SAVE EXPO PUSH TOKEN ERROR:",
-        error.response?.data || error.message,
-      );
-
-      return {
-        success: false,
-        error:
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to save push token.",
-      };
-    }
-  },
-
-  removeExpoPushToken: async () => {
-  try {
-    await API.delete("/api/auth/remove-push-token");
-
-    console.log("✅ Expo push token removed from backend.");
-
-    return {
-      success: true,
-    };
-  } catch (error) {
-    console.error(
-      "REMOVE EXPO PUSH TOKEN ERROR:",
-      error.response?.data || error.message,
-    );
-
-    return {
-      success: false,
-      error:
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to remove push token.",
-    };
-  }
-},
-
-  checkAuth: async () => {
-    try {
-      set({
-        isCheckingAuth: true,
-      });
-
-      const storedUser = await AsyncStorage.getItem("user");
-
-      if (!storedUser) {
-        cachedToken = null;
-
+    checkAuth: async () => {
+      try {
         set({
-          user: null,
-          studentData: null,
-          teacherData: null,
-          isAuthenticated: false,
+          isCheckingAuth: true,
         });
 
-        return;
-      }
+        const storedUser =
+          await AsyncStorage.getItem("user");
 
-      const parsedUser = JSON.parse(storedUser);
+        if (!storedUser) {
+          cachedToken = null;
 
-      cachedToken = parsedUser?.token || null;
+          delete API.defaults.headers
+            .common.Authorization;
 
-      if (!cachedToken) {
-        console.log("NO SAVED TOKEN FOUND.");
+          set({
+            user: null,
+            studentData: null,
+            teacherData: null,
+            isAuthenticated: false,
+          });
 
-        await AsyncStorage.removeItem("user");
+          return;
+        }
 
-        set({
-          user: null,
-          studentData: null,
-          teacherData: null,
-          isAuthenticated: false,
-        });
+        const parsedUser =
+          JSON.parse(storedUser);
 
-        return;
-      }
+        cachedToken =
+          parsedUser?.token || null;
 
-      /* =================================================
+        if (!cachedToken) {
+          console.log(
+            "NO SAVED TOKEN FOUND."
+          );
+
+          await AsyncStorage.removeItem(
+            "user"
+          );
+
+          delete API.defaults.headers
+            .common.Authorization;
+
+          set({
+            user: null,
+            studentData: null,
+            teacherData: null,
+            isAuthenticated: false,
+          });
+
+          return;
+        }
+
+        /* =================================================
            CHECK TOKEN
         ================================================= */
 
-      const { data } = await API.get("/api/auth/check-auth");
+        const {
+          data,
+        } = await API.get(
+          "/api/auth/check-auth"
+        );
 
-      if (!data.authenticated || !data.user) {
-        console.log("SAVED TOKEN IS NO LONGER VALID.");
+        if (
+          !data.authenticated ||
+          !data.user
+        ) {
+          console.log(
+            "SAVED TOKEN IS NO LONGER VALID."
+          );
 
-        cachedToken = null;
+          cachedToken = null;
 
-        await AsyncStorage.removeItem("user");
+          delete API.defaults.headers
+            .common.Authorization;
 
-        set({
-          user: null,
-          studentData: null,
-          teacherData: null,
-          isAuthenticated: false,
-        });
+          await AsyncStorage.removeItem(
+            "user"
+          );
 
-        return;
-      }
+          set({
+            user: null,
+            studentData: null,
+            teacherData: null,
+            isAuthenticated: false,
+          });
 
-      /* =================================================
+          return;
+        }
+
+        /* =================================================
            BASIC USER DATA
         ================================================= */
 
-      let userData = {
-        _id: data.user._id,
-        email: data.user.email,
-        role: data.user.role,
-        token: parsedUser.token,
-        studentId: data.user.studentId,
-        employeeId: data.user.employeeId,
-      };
+        let userData = {
+          _id: data.user._id,
+          email: data.user.email,
+          role: data.user.role,
+          token: parsedUser.token,
+          studentId:
+            data.user.studentId,
+          employeeId:
+            data.user.employeeId,
+        };
 
-      let studentData = null;
-      let teacherData = null;
+        let studentData = null;
+        let teacherData = null;
 
-      /* =================================================
+        /* =================================================
            STUDENT
         ================================================= */
 
-      if (data.user.role === "student") {
-        try {
-          if (data.user.studentId) {
-            const { data: student } = await API.get(
-              `/api/students/${data.user.studentId}`,
+        if (
+          data.user.role === "student"
+        ) {
+          try {
+            if (data.user.studentId) {
+              const {
+                data: student,
+              } = await API.get(
+                `/api/students/${data.user.studentId}`
+              );
+
+              studentData = student;
+
+              userData = {
+                ...userData,
+
+                firstName:
+                  student.firstName,
+
+                middleName:
+                  student.middleName,
+
+                lastName:
+                  student.lastName,
+
+                name: `${student.firstName} ${student.lastName}`,
+
+                studentId:
+                  student.studentId,
+
+                grade:
+                  student.grade,
+
+                phone:
+                  student.phone,
+
+                profilePhoto:
+                  student.profilePhoto ||
+                  "",
+              };
+            }
+          } catch (error) {
+            console.log(
+              "STUDENT PROFILE FETCH FAILED:",
+              error?.response?.data ||
+                error?.message
             );
-
-            studentData = student;
-
-            userData = {
-              ...userData,
-
-              firstName: student.firstName,
-
-              middleName: student.middleName,
-
-              lastName: student.lastName,
-
-              name: `${student.firstName} ${student.lastName}`,
-
-              studentId: student.studentId,
-
-              grade: student.grade,
-
-              phone: student.phone,
-
-              profilePhoto: student.profilePhoto || "",
-            };
           }
-        } catch (error) {
-          console.log(
-            "STUDENT PROFILE FETCH FAILED:",
-            error.response?.data || error.message,
-          );
         }
-      } else if (data.user.role === "teacher") {
+
         /* =================================================
            TEACHER
         ================================================= */
-        try {
-          if (data.user.employeeId) {
-            const { data: teacher } = await API.get(
-              `/api/teacher-reports/${data.user.employeeId}`,
-            );
 
-            teacherData = teacher;
+        else if (
+          data.user.role === "teacher"
+        ) {
+          try {
+            if (data.user.employeeId) {
+              const {
+                data: teacher,
+              } = await API.get(
+                `/api/teacher-reports/${data.user.employeeId}`
+              );
+
+              teacherData = teacher;
+
+              userData = {
+                ...userData,
+
+                firstName:
+                  teacher.firstName,
+
+                middleName:
+                  teacher.middleName,
+
+                lastName:
+                  teacher.lastName,
+
+                name: `${teacher.firstName} ${teacher.lastName}`,
+
+                employeeId:
+                  teacher.employeeId,
+
+                department:
+                  teacher.department,
+
+                phone:
+                  teacher.phone,
+
+                profilePhoto:
+                  teacher.profilePhoto ||
+                  "",
+              };
+            }
+          } catch (error) {
+            console.log(
+              "TEACHER PROFILE FETCH FAILED:",
+              error?.response?.data ||
+                error?.message
+            );
+          }
+        }
+
+        /* =================================================
+           RESTORE SESSION
+        ================================================= */
+
+        set({
+          user: userData,
+
+          studentData,
+
+          teacherData,
+
+          isAuthenticated: true,
+        });
+
+        await AsyncStorage.setItem(
+          "user",
+          JSON.stringify(userData)
+        );
+
+        connectSocketSafely(
+          userData._id
+        );
+
+        /* =================================================
+           RE-REGISTER CURRENT DEVICE
+        ================================================= */
+
+        setTimeout(() => {
+          savePushTokenToBackend();
+        }, 500);
+      } catch (error) {
+        console.log(
+          "CHECK AUTH ERROR:",
+          error?.response?.status,
+          error?.response?.data ||
+            error?.message
+        );
+
+        if (
+          error?.response?.status === 401
+        ) {
+          cachedToken = null;
+
+          delete API.defaults.headers
+            .common.Authorization;
+
+          await AsyncStorage.removeItem(
+            "user"
+          );
+
+          set({
+            user: null,
+            studentData: null,
+            teacherData: null,
+            isAuthenticated: false,
+          });
+        } else {
+          set({
+            isAuthenticated: true,
+          });
+        }
+      } finally {
+        set({
+          isCheckingAuth: false,
+        });
+      }
+    },
+
+    /* =====================================================
+       CANCEL OTP
+    ===================================================== */
+
+    cancelOTP: () =>
+      set({
+        tempEmail: null,
+        otpCode: null,
+        otpRequired: false,
+        otpType: null,
+        error: null,
+      }),
+
+    /* =====================================================
+       LOGIN
+    ===================================================== */
+
+    mobileLogin: async (
+      email,
+      password,
+      accountType
+    ) => {
+      set({
+        isLoading: true,
+        error: null,
+      });
+
+      try {
+        const {
+          data,
+        } = await API.post(
+          "/api/auth/mobile-login",
+          {
+            email,
+            password,
+            accountType,
+          }
+        );
+
+        if (
+          data.requiresOTP &&
+          data.success !== false
+        ) {
+          set({
+            tempEmail: email,
+            otpRequired: true,
+            otpType: "login",
+          });
+
+          return {
+            success: true,
+            requiresOTP: true,
+          };
+        }
+
+        /* =================================================
+           SAVE TOKEN
+        ================================================= */
+
+        cachedToken = data.token;
+
+        await setToken(
+          data.token
+        );
+
+        let userData = {
+          _id: data.user._id,
+          email: data.user.email,
+          role: data.user.role,
+          token: data.token,
+          studentId:
+            data.user.studentId,
+          employeeId:
+            data.user.employeeId,
+        };
+
+        /* =================================================
+           STUDENT
+        ================================================= */
+
+        if (
+          data.user.role === "student"
+        ) {
+          try {
+            const studentRes =
+              await API.get(
+                `/api/students/${data.user.studentId}`
+              );
+
+            const student =
+              studentRes.data;
 
             userData = {
               ...userData,
 
-              firstName: teacher.firstName,
+              firstName:
+                student.firstName,
 
-              middleName: teacher.middleName,
+              middleName:
+                student.middleName,
 
-              lastName: teacher.lastName,
+              lastName:
+                student.lastName,
+
+              name: `${student.firstName} ${student.lastName}`,
+
+              studentId:
+                student.studentId,
+
+              grade:
+                student.grade,
+
+              phone:
+                student.phone,
+
+              profilePhoto:
+                student.profilePhoto ||
+                "",
+            };
+          } catch (error) {
+            console.log(
+              "STUDENT PROFILE ERROR:",
+              error?.message
+            );
+          }
+        }
+
+        /* =================================================
+           TEACHER
+        ================================================= */
+
+        else if (
+          data.user.role === "teacher"
+        ) {
+          try {
+            const teacherRes =
+              await API.get(
+                `/api/teacher-reports/${data.user.employeeId}`
+              );
+
+            const teacher =
+              teacherRes.data;
+
+            userData = {
+              ...userData,
+
+              firstName:
+                teacher.firstName,
+
+              middleName:
+                teacher.middleName,
+
+              lastName:
+                teacher.lastName,
 
               name: `${teacher.firstName} ${teacher.lastName}`,
 
-              employeeId: teacher.employeeId,
+              employeeId:
+                teacher.employeeId,
 
-              department: teacher.department,
+              department:
+                teacher.department,
 
-              phone: teacher.phone,
+              phone:
+                teacher.phone,
 
-              profilePhoto: teacher.profilePhoto || "",
+              profilePhoto:
+                teacher.profilePhoto ||
+                "",
             };
+          } catch (error) {
+            console.log(
+              "TEACHER PROFILE ERROR:",
+              error?.message
+            );
           }
-        } catch (error) {
-          console.log(
-            "TEACHER PROFILE FETCH FAILED:",
-            error.response?.data || error.message,
-          );
         }
-      }
 
-      /* =================================================
-           RESTORE
+        /* =================================================
+           SAVE USER
         ================================================= */
 
+        set({
+          user: userData,
+
+          isAuthenticated: true,
+
+          otpRequired: false,
+
+          tempEmail: null,
+
+          otpType: null,
+        });
+
+        await AsyncStorage.setItem(
+          "user",
+          JSON.stringify(userData)
+        );
+
+        connectSocketSafely(
+          userData._id
+        );
+
+        /* =================================================
+           REGISTER PUSH
+        ================================================= */
+
+        setTimeout(() => {
+          savePushTokenToBackend();
+        }, 500);
+
+        return {
+          success: true,
+        };
+      } catch (error) {
+        return {
+          success: false,
+
+          error:
+            error?.response?.data?.message ||
+            error?.message,
+        };
+      } finally {
+        set({
+          isLoading: false,
+        });
+      }
+    },
+
+    /* =====================================================
+       VERIFY OTP
+    ===================================================== */
+
+    verifyOTP: async (code) => {
       set({
-        user: userData,
-
-        studentData,
-
-        teacherData,
-
-        isAuthenticated: true,
+        isLoading: true,
+        error: null,
       });
 
-      await AsyncStorage.setItem("user", JSON.stringify(userData));
+      try {
+        const {
+          tempEmail,
+          otpType,
+        } = get();
 
-      connectSocketSafely(userData._id);
+        if (!tempEmail) {
+          throw new Error(
+            "No email found."
+          );
+        }
 
-      setTimeout(() => {
-        savePushTokenToBackend();
-      }, 500);
-    } catch (error) {
-      console.log(
-        "CHECK AUTH ERROR:",
-        error.response?.status,
-        error.response?.data || error.message,
-      );
+        const url =
+          otpType === "signup"
+            ? "/api/auth/verify-email"
+            : "/api/auth/verify-mobile-login-otp";
 
-      if (error.response?.status === 401) {
+        const payload =
+          otpType === "signup"
+            ? {
+                email: tempEmail,
+                code,
+                client: "mobile",
+              }
+            : {
+                email: tempEmail,
+                code,
+              };
+
+        const {
+          data,
+        } = await API.post(
+          url,
+          payload
+        );
+
+        cachedToken = data.token;
+
+        await setToken(
+          data.token
+        );
+
+        let userData = {
+          _id: data.user._id,
+          email: data.user.email,
+          role: data.user.role,
+          token: data.token,
+          studentId:
+            data.user.studentId,
+          employeeId:
+            data.user.employeeId,
+        };
+
+        let studentData = null;
+        let teacherData = null;
+
+        /* =================================================
+           STUDENT
+        ================================================= */
+
+        if (
+          data.user.role === "student"
+        ) {
+          try {
+            const studentRes =
+              await API.get(
+                `/api/students/${data.user.studentId}`
+              );
+
+            studentData =
+              studentRes.data;
+
+            userData = {
+              ...userData,
+
+              firstName:
+                studentData.firstName,
+
+              middleName:
+                studentData.middleName,
+
+              lastName:
+                studentData.lastName,
+
+              name: `${studentData.firstName} ${studentData.lastName}`,
+
+              studentId:
+                studentData.studentId,
+
+              grade:
+                studentData.grade,
+
+              phone:
+                studentData.phone,
+
+              profilePhoto:
+                studentData.profilePhoto ||
+                "",
+            };
+          } catch (error) {
+            console.log(
+              "STUDENT OTP PROFILE ERROR:",
+              error?.message
+            );
+          }
+        }
+
+        /* =================================================
+           TEACHER
+        ================================================= */
+
+        else if (
+          data.user.role === "teacher"
+        ) {
+          try {
+            const teacherRes =
+              await API.get(
+                `/api/teacher-reports/${data.user.employeeId}`
+              );
+
+            teacherData =
+              teacherRes.data;
+
+            userData = {
+              ...userData,
+
+              firstName:
+                teacherData.firstName,
+
+              middleName:
+                teacherData.middleName,
+
+              lastName:
+                teacherData.lastName,
+
+              name: `${teacherData.firstName} ${teacherData.lastName}`,
+
+              employeeId:
+                teacherData.employeeId,
+
+              department:
+                teacherData.department,
+
+              phone:
+                teacherData.phone,
+
+              profilePhoto:
+                teacherData.profilePhoto ||
+                "",
+            };
+          } catch (error) {
+            console.log(
+              "TEACHER OTP PROFILE ERROR:",
+              error?.message
+            );
+          }
+        }
+
+        /* =================================================
+           SAVE
+        ================================================= */
+
+        set({
+          user: userData,
+
+          studentData,
+
+          teacherData,
+
+          isAuthenticated: true,
+
+          otpRequired: false,
+
+          tempEmail: null,
+
+          otpType: null,
+        });
+
+        await AsyncStorage.setItem(
+          "user",
+          JSON.stringify(userData)
+        );
+
+        setTimeout(() => {
+          connectSocketSafely(
+            userData._id
+          );
+        }, 150);
+
+        /* =================================================
+           REGISTER PUSH AFTER OTP
+        ================================================= */
+
+        setTimeout(() => {
+          savePushTokenToBackend();
+        }, 700);
+
+        Alert.alert(
+          "Success",
+          "Login verified!"
+        );
+
+        return {
+          verified: true,
+          role: userData.role,
+        };
+      } catch (error) {
+        const message =
+          error?.response?.data?.message ||
+          error?.message;
+
+        set({
+          error: message,
+        });
+
+        return {
+          verified: false,
+          error: message,
+        };
+      } finally {
+        set({
+          isLoading: false,
+        });
+      }
+    },
+
+    /* =====================================================
+       RESEND OTP
+    ===================================================== */
+
+    resendOTP: async () => {
+      set({
+        isLoading: true,
+        error: null,
+      });
+
+      try {
+        const {
+          tempEmail,
+          otpType,
+        } = get();
+
+        if (!tempEmail) {
+          throw new Error(
+            "No email found."
+          );
+        }
+
+        const url =
+          otpType === "signup"
+            ? "/api/auth/resend-email-otp"
+            : "/api/auth/resend-login-otp";
+
+        await API.post(
+          url,
+          {
+            email: tempEmail,
+          }
+        );
+
+        return {
+          success: true,
+        };
+      } catch (error) {
+        const message =
+          error?.response?.data?.message ||
+          error?.message;
+
+        set({
+          error: message,
+        });
+
+        return {
+          success: false,
+          error: message,
+        };
+      } finally {
+        set({
+          isLoading: false,
+        });
+      }
+    },
+
+    /* =====================================================
+       LOGOUT
+    ===================================================== */
+
+    logout: async () => {
+      try {
+        /* =================================================
+           REMOVE ONLY THIS DEVICE'S PUSH TOKEN
+           
+           IMPORTANT:
+           JWT is still available here.
+           
+           Therefore:
+           
+           DELETE /remove-push-token
+           {
+             token: currentDeviceToken
+           }
+           
+           Only this phone is removed.
+        ================================================= */
+
+        const pushRemoved =
+          await removePushTokenFromBackend();
+
+        if (pushRemoved) {
+          console.log(
+            "✅ Current device push token removed before logout."
+          );
+        } else {
+          console.warn(
+            "⚠️ Current device push token could not be removed."
+          );
+        }
+
+        /* =================================================
+           DISCONNECT SOCKET
+        ================================================= */
+
+        try {
+          const socketStore =
+            useSocketStore?.getState?.();
+
+          if (
+            socketStore?.disconnectSocket
+          ) {
+            socketStore.disconnectSocket();
+          }
+        } catch (socketError) {
+          console.log(
+            "SOCKET DISCONNECT ERROR:",
+            socketError?.message
+          );
+        }
+
+        socketConnected = false;
+
+        /* =================================================
+           CLEAR AUTH
+        ================================================= */
+
         cachedToken = null;
 
-        await AsyncStorage.removeItem("user");
+        delete API.defaults.headers
+          .common.Authorization;
+
+        await AsyncStorage.removeItem(
+          "user"
+        );
+
+        /* =================================================
+           CLEAR LOCAL DEVICE PUSH TOKEN
+        ================================================= */
+
+        await clearCachedPushToken();
+
+        set({
+          user: null,
+
+          studentData: null,
+
+          teacherData: null,
+
+          isAuthenticated: false,
+
+          tempEmail: null,
+
+          otpRequired: false,
+
+          otpType: null,
+
+          otpCode: null,
+
+          error: null,
+        });
+
+        console.log(
+          "✅ USER LOGGED OUT"
+        );
+
+        return {
+          success: true,
+          pushTokenRemoved: pushRemoved,
+        };
+      } catch (error) {
+        console.log(
+          "LOGOUT ERROR:",
+          error?.message
+        );
+
+        /* =================================================
+           EVEN IF SOMETHING FAILS,
+           CLEAR LOCAL AUTH
+        ================================================= */
+
+        cachedToken = null;
+
+        delete API.defaults.headers
+          .common.Authorization;
+
+        try {
+          await AsyncStorage.removeItem(
+            "user"
+          );
+        } catch {}
+
+        await clearCachedPushToken();
+
+        socketConnected = false;
 
         set({
           user: null,
           studentData: null,
           teacherData: null,
           isAuthenticated: false,
-        });
-      } else {
-        set({
-          isAuthenticated: true,
-        });
-      }
-    } finally {
-      set({
-        isCheckingAuth: false,
-      });
-    }
-  },
-
-  /* =====================================================
-       CANCEL OTP
-    ===================================================== */
-
-  cancelOTP: () =>
-    set({
-      tempEmail: null,
-      otpCode: null,
-      otpRequired: false,
-      otpType: null,
-      error: null,
-    }),
-
-  /* =====================================================
-       LOGIN
-    ===================================================== */
-
-  mobileLogin: async (email, password, accountType) => {
-    set({
-      isLoading: true,
-      error: null,
-    });
-
-    try {
-      const { data } = await API.post("/api/auth/mobile-login", {
-        email,
-        password,
-        accountType,
-      });
-
-      if (data.requiresOTP && data.success !== false) {
-        set({
-          tempEmail: email,
-          otpRequired: true,
-          otpType: "login",
+          tempEmail: null,
+          otpRequired: false,
+          otpType: null,
+          otpCode: null,
+          error: null,
         });
 
         return {
-          success: true,
-          requiresOTP: true,
+          success: false,
+          error:
+            error?.message ||
+            "Logout failed.",
         };
       }
+    },
 
-      /* =================================================
-           SAVE TOKEN
-        ================================================= */
-
-      cachedToken = data.token;
-
-      await setToken(data.token);
-
-      let userData = {
-        _id: data.user._id,
-        email: data.user.email,
-        role: data.user.role,
-        token: data.token,
-        studentId: data.user.studentId,
-        employeeId: data.user.employeeId,
-      };
-
-      /* =================================================
-           STUDENT
-        ================================================= */
-
-      if (data.user.role === "student") {
-        try {
-          const studentRes = await API.get(
-            `/api/students/${data.user.studentId}`,
-          );
-
-          const student = studentRes.data;
-
-          userData = {
-            ...userData,
-
-            firstName: student.firstName,
-
-            middleName: student.middleName,
-
-            lastName: student.lastName,
-
-            name: `${student.firstName} ${student.lastName}`,
-
-            studentId: student.studentId,
-
-            grade: student.grade,
-
-            phone: student.phone,
-
-            profilePhoto: student.profilePhoto || "",
-          };
-        } catch (error) {
-          console.log("STUDENT PROFILE ERROR:", error.message);
-        }
-      } else if (data.user.role === "teacher") {
-        /* =================================================
-           TEACHER
-        ================================================= */
-        try {
-          const teacherRes = await API.get(
-            `/api/teacher-reports/${data.user.employeeId}`,
-          );
-
-          const teacher = teacherRes.data;
-
-          userData = {
-            ...userData,
-
-            firstName: teacher.firstName,
-
-            middleName: teacher.middleName,
-
-            lastName: teacher.lastName,
-
-            name: `${teacher.firstName} ${teacher.lastName}`,
-
-            employeeId: teacher.employeeId,
-
-            department: teacher.department,
-
-            phone: teacher.phone,
-
-            profilePhoto: teacher.profilePhoto || "",
-          };
-        } catch (error) {
-          console.log("TEACHER PROFILE ERROR:", error.message);
-        }
-      }
-
-      /* =================================================
-           SAVE USER
-        ================================================= */
-
-      set({
-        user: userData,
-
-        isAuthenticated: true,
-
-        otpRequired: false,
-
-        tempEmail: null,
-      });
-
-      await AsyncStorage.setItem("user", JSON.stringify(userData));
-
-      connectSocketSafely(userData._id);
-
-      setTimeout(() => {
-        savePushTokenToBackend();
-      }, 500);
-
-      return {
-        success: true,
-      };
-    } catch (error) {
-      return {
-        success: false,
-
-        error: error.response?.data?.message || error.message,
-      };
-    } finally {
-      set({
-        isLoading: false,
-      });
-    }
-  },
-
-  /* =====================================================
-       VERIFY OTP
-    ===================================================== */
-
-  verifyOTP: async (code) => {
-    set({
-      isLoading: true,
-      error: null,
-    });
-
-    try {
-      const { tempEmail, otpType } = get();
-
-      if (!tempEmail) {
-        throw new Error("No email found.");
-      }
-
-      const url =
-        otpType === "signup"
-          ? "/api/auth/verify-email"
-          : "/api/auth/verify-mobile-login-otp";
-
-      const payload =
-        otpType === "signup"
-          ? {
-              email: tempEmail,
-              code,
-              client: "mobile",
-            }
-          : {
-              email: tempEmail,
-              code,
-            };
-
-      const { data } = await API.post(url, payload);
-
-      cachedToken = data.token;
-
-      await setToken(data.token);
-
-      let userData = {
-        _id: data.user._id,
-        email: data.user.email,
-        role: data.user.role,
-        token: data.token,
-      };
-
-      let studentData = null;
-      let teacherData = null;
-
-      /* =================================================
-           STUDENT
-        ================================================= */
-
-      if (data.user.role === "student") {
-        try {
-          const studentRes = await API.get(
-            `/api/students/${data.user.studentId}`,
-          );
-
-          studentData = studentRes.data;
-
-          userData = {
-            ...userData,
-
-            firstName: studentData.firstName,
-
-            middleName: studentData.middleName,
-
-            lastName: studentData.lastName,
-
-            name: `${studentData.firstName} ${studentData.lastName}`,
-
-            studentId: studentData.studentId,
-
-            grade: studentData.grade,
-
-            phone: studentData.phone,
-
-            profilePhoto: studentData.profilePhoto || "",
-          };
-        } catch (error) {
-          console.log("STUDENT OTP PROFILE ERROR:", error.message);
-        }
-      } else if (data.user.role === "teacher") {
-        /* =================================================
-           TEACHER
-        ================================================= */
-        try {
-          const teacherRes = await API.get(
-            `/api/teacher-reports/${data.user.employeeId}`,
-          );
-
-          teacherData = teacherRes.data;
-
-          userData = {
-            ...userData,
-
-            firstName: teacherData.firstName,
-
-            middleName: teacherData.middleName,
-
-            lastName: teacherData.lastName,
-
-            name: `${teacherData.firstName} ${teacherData.lastName}`,
-
-            employeeId: teacherData.employeeId,
-
-            department: teacherData.department,
-
-            phone: teacherData.phone,
-
-            profilePhoto: teacherData.profilePhoto || "",
-          };
-        } catch (error) {
-          console.log("TEACHER OTP PROFILE ERROR:", error.message);
-        }
-      }
-
-      /* =================================================
-           SAVE
-        ================================================= */
-
-      set({
-        user: userData,
-
-        studentData,
-
-        teacherData,
-
-        isAuthenticated: true,
-
-        otpRequired: false,
-
-        tempEmail: null,
-
-        otpType: null,
-      });
-
-      await AsyncStorage.setItem("user", JSON.stringify(userData));
-
-      setTimeout(() => {
-        connectSocketSafely(userData._id);
-      }, 150);
-
-      setTimeout(() => {
-        savePushTokenToBackend();
-      }, 700);
-
-      Alert.alert("Success", "Login verified!");
-
-      return {
-        verified: true,
-        role: userData.role,
-      };
-    } catch (error) {
-      const message = error.response?.data?.message || error.message;
-
-      set({
-        error: message,
-      });
-
-      return {
-        verified: false,
-        error: message,
-      };
-    } finally {
-      set({
-        isLoading: false,
-      });
-    }
-  },
-
-  /* =====================================================
-       RESEND OTP
-    ===================================================== */
-
-  resendOTP: async () => {
-    set({
-      isLoading: true,
-      error: null,
-    });
-
-    try {
-      const { tempEmail, otpType } = get();
-
-      if (!tempEmail) {
-        throw new Error("No email found.");
-      }
-
-      const url =
-        otpType === "signup"
-          ? "/api/auth/resend-email-otp"
-          : "/api/auth/resend-login-otp";
-
-      await API.post(url, {
-        email: tempEmail,
-      });
-
-      return {
-        success: true,
-      };
-    } catch (error) {
-      const message = error.response?.data?.message || error.message;
-
-      set({
-        error: message,
-      });
-
-      return {
-        success: false,
-        error: message,
-      };
-    } finally {
-      set({
-        isLoading: false,
-      });
-    }
-  },
-
-  /* =====================================================
-       LOGOUT
-    ===================================================== */
-
-  logout: async () => {
-  try {
-    /* =================================================
-       REMOVE PUSH TOKEN FIRST
-    ================================================= */
-
-    try {
-      await API.delete("/api/auth/remove-push-token");
-
-      console.log("✅ Push token removed before logout.");
-    } catch (pushError) {
-      console.error(
-        "⚠️ FAILED TO REMOVE PUSH TOKEN:",
-        pushError.response?.data || pushError.message,
-      );
-    }
-
-    /* =================================================
-       DISCONNECT SOCKET
-    ================================================= */
-
-    try {
-      const socketStore = useSocketStore?.getState?.();
-
-      if (socketStore?.disconnectSocket) {
-        socketStore.disconnectSocket();
-      }
-    } catch (socketError) {
-      console.log(
-        "SOCKET DISCONNECT ERROR:",
-        socketError.message,
-      );
-    }
-
-    socketConnected = false;
-
-    /* =================================================
-       CLEAR AUTH
-    ================================================= */
-
-    cachedToken = null;
-
-    delete API.defaults.headers.common.Authorization;
-
-    await AsyncStorage.removeItem("user");
-
-    set({
-      user: null,
-
-      studentData: null,
-
-      teacherData: null,
-
-      isAuthenticated: false,
-
-      tempEmail: null,
-
-      otpRequired: false,
-
-      otpType: null,
-
-      otpCode: null,
-
-      error: null,
-    });
-
-    return {
-      success: true,
-    };
-  } catch (error) {
-    console.log("LOGOUT ERROR:", error.message);
-
-    return {
-      success: false,
-      error: error.message,
-    };
-  }
-},
-
-  /* =====================================================
+    /* =====================================================
        FETCH STUDENT DATA
     ===================================================== */
 
-  fetchStudentData: async () => {
-    try {
-      const { user } = get();
+    fetchStudentData: async () => {
+      try {
+        const {
+          user,
+        } = get();
 
-      if (!user?.studentId) {
-        return;
+        if (!user?.studentId) {
+          return;
+        }
+
+        const {
+          data,
+        } = await API.get(
+          `/api/students/${user.studentId}`
+        );
+
+        const updatedUser = {
+          ...user,
+
+          firstName:
+            data.firstName,
+
+          middleName:
+            data.middleName,
+
+          lastName:
+            data.lastName,
+
+          name: `${data.firstName} ${data.lastName}`,
+
+          studentId:
+            data.studentId,
+
+          grade:
+            data.grade,
+
+          phone:
+            data.phone,
+
+          profilePhoto:
+            data.profilePhoto || "",
+        };
+
+        set({
+          studentData: data,
+          user: updatedUser,
+        });
+
+        await AsyncStorage.setItem(
+          "user",
+          JSON.stringify(updatedUser)
+        );
+      } catch (error) {
+        console.log(
+          "FETCH STUDENT DATA ERROR:",
+          error?.response?.data ||
+            error?.message
+        );
       }
+    },
 
-      const { data } = await API.get(`/api/students/${user.studentId}`);
-
-      const updatedUser = {
-        ...user,
-
-        firstName: data.firstName,
-
-        middleName: data.middleName,
-
-        lastName: data.lastName,
-
-        name: `${data.firstName} ${data.lastName}`,
-
-        studentId: data.studentId,
-
-        grade: data.grade,
-
-        phone: data.phone,
-
-        profilePhoto: data.profilePhoto || "",
-      };
-
-      set({
-        studentData: data,
-        user: updatedUser,
-      });
-
-      await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
-    } catch (error) {
-      console.log(
-        "FETCH STUDENT DATA ERROR:",
-        error.response?.data || error.message,
-      );
-    }
-  },
-
-  /* =====================================================
+    /* =====================================================
        FETCH TEACHER DATA
     ===================================================== */
 
-  fetchTeacherData: async () => {
-    try {
-      const { user } = get();
+    fetchTeacherData: async () => {
+      try {
+        const {
+          user,
+        } = get();
 
-      if (!user?.employeeId) {
-        return;
+        if (!user?.employeeId) {
+          return;
+        }
+
+        const {
+          data,
+        } = await API.get(
+          `/api/teacher-reports/${user.employeeId}`
+        );
+
+        const updatedUser = {
+          ...user,
+
+          firstName:
+            data.firstName,
+
+          middleName:
+            data.middleName,
+
+          lastName:
+            data.lastName,
+
+          name: `${data.firstName} ${data.lastName}`,
+
+          employeeId:
+            data.employeeId,
+
+          department:
+            data.department,
+
+          phone:
+            data.phone,
+
+          profilePhoto:
+            data.profilePhoto || "",
+        };
+
+        set({
+          teacherData: data,
+          user: updatedUser,
+        });
+
+        await AsyncStorage.setItem(
+          "user",
+          JSON.stringify(updatedUser)
+        );
+      } catch (error) {
+        console.log(
+          "FETCH TEACHER DATA ERROR:",
+          error?.response?.data ||
+            error?.message
+        );
       }
+    },
 
-      const { data } = await API.get(`/api/teacher-reports/${user.employeeId}`);
-
-      const updatedUser = {
-        ...user,
-
-        firstName: data.firstName,
-
-        middleName: data.middleName,
-
-        lastName: data.lastName,
-
-        name: `${data.firstName} ${data.lastName}`,
-
-        employeeId: data.employeeId,
-
-        department: data.department,
-
-        phone: data.phone,
-
-        profilePhoto: data.profilePhoto || "",
-      };
-
-      set({
-        teacherData: data,
-        user: updatedUser,
-      });
-
-      await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
-    } catch (error) {
-      console.log(
-        "FETCH TEACHER DATA ERROR:",
-        error.response?.data || error.message,
-      );
-    }
-  },
-
-  /* =====================================================
+    /* =====================================================
        UPDATE STUDENT PROFILE
     ===================================================== */
 
-  updateStudentProfile: async (profileData) => {
-    try {
-      const response = await API.put("/api/students/profile", profileData);
+    updateStudentProfile: async (
+      profileData
+    ) => {
+      try {
+        const response =
+          await API.put(
+            "/api/students/profile",
+            profileData
+          );
 
-      if (response.data?.success) {
-        const updatedStudent = response.data.student;
+        if (
+          response.data?.success
+        ) {
+          const updatedStudent =
+            response.data.student;
 
-        const currentUser = get().user;
+          const currentUser =
+            get().user;
 
-        const updatedUser = {
-          ...currentUser,
+          const updatedUser = {
+            ...currentUser,
 
-          ...updatedStudent,
+            ...updatedStudent,
 
-          name: `${updatedStudent.firstName} ${updatedStudent.lastName}`,
-        };
+            name: `${updatedStudent.firstName} ${updatedStudent.lastName}`,
+          };
 
-        set({
-          studentData: updatedStudent,
+          set({
+            studentData:
+              updatedStudent,
 
-          user: updatedUser,
-        });
+            user: updatedUser,
+          });
 
-        await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+          await AsyncStorage.setItem(
+            "user",
+            JSON.stringify(updatedUser)
+          );
 
-        return {
-          success: true,
-          student: updatedStudent,
-        };
-      }
+          return {
+            success: true,
+            student: updatedStudent,
+          };
+        }
 
-      return {
-        success: false,
-
-        error: response.data?.message || "Failed to update profile.",
-      };
-    } catch (error) {
-      console.error(
-        "UPDATE STUDENT PROFILE ERROR:",
-        error.response?.data || error,
-      );
-
-      return {
-        success: false,
-
-        error:
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to update profile.",
-      };
-    }
-  },
-
-  /* =====================================================
-       UPDATE STUDENT PROFILE PHOTO
-       
-       ANDROID + IOS
-    ===================================================== */
-
-  updateStudentProfilePhoto: async (asset) => {
-    try {
-      if (!asset?.uri) {
         return {
           success: false,
-          error: "No image selected.",
+
+          error:
+            response.data?.message ||
+            "Failed to update profile.",
         };
-      }
-
-      const formData = new FormData();
-
-      const uri = asset.uri;
-
-      const fileName = asset.fileName || `profile-photo-${Date.now()}.jpg`;
-
-      const mimeType = asset.mimeType || "image/jpeg";
-
-      formData.append("profilePhoto", {
-        uri: uri,
-        name: fileName,
-        type: mimeType,
-      });
-
-      const response = await API.put("/api/students/profile/photo", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
-      if (response.data?.success) {
-        const profilePhoto = response.data.profilePhoto;
-
-        const currentUser = get().user;
-
-        const currentStudent = get().studentData;
-
-        const updatedUser = {
-          ...currentUser,
-
-          profilePhoto,
-        };
-
-        const updatedStudent = {
-          ...currentStudent,
-
-          profilePhoto,
-        };
-
-        set({
-          user: updatedUser,
-
-          studentData: updatedStudent,
-        });
-
-        await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+      } catch (error) {
+        console.error(
+          "UPDATE STUDENT PROFILE ERROR:",
+          error?.response?.data ||
+            error
+        );
 
         return {
-          success: true,
-          profilePhoto,
+          success: false,
+
+          error:
+            error?.response?.data?.message ||
+            error?.message ||
+            "Failed to update profile.",
         };
       }
+    },
 
-      return {
-        success: false,
+    /* =====================================================
+       UPDATE STUDENT PROFILE PHOTO
+    ===================================================== */
 
-        error: response.data?.message || "Failed to update profile photo.",
-      };
-    } catch (error) {
-      console.error(
-        "UPDATE STUDENT PROFILE PHOTO ERROR:",
-        error.response?.data || error,
-      );
+    updateStudentProfilePhoto:
+      async (asset) => {
+        try {
+          if (!asset?.uri) {
+            return {
+              success: false,
+              error: "No image selected.",
+            };
+          }
 
-      return {
-        success: false,
+          const formData =
+            new FormData();
 
-        error:
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to update profile photo.",
-      };
-    }
-  },
+          formData.append(
+            "profilePhoto",
+            {
+              uri: asset.uri,
 
-  /* =====================================================
+              name:
+                asset.fileName ||
+                `profile-photo-${Date.now()}.jpg`,
+
+              type:
+                asset.mimeType ||
+                "image/jpeg",
+            }
+          );
+
+          const response =
+            await API.put(
+              "/api/students/profile/photo",
+              formData,
+              {
+                headers: {
+                  "Content-Type":
+                    "multipart/form-data",
+                },
+              }
+            );
+
+          if (
+            response.data?.success
+          ) {
+            const profilePhoto =
+              response.data.profilePhoto;
+
+            const currentUser =
+              get().user;
+
+            const currentStudent =
+              get().studentData;
+
+            const updatedUser = {
+              ...currentUser,
+
+              profilePhoto,
+            };
+
+            const updatedStudent = {
+              ...currentStudent,
+
+              profilePhoto,
+            };
+
+            set({
+              user: updatedUser,
+
+              studentData:
+                updatedStudent,
+            });
+
+            await AsyncStorage.setItem(
+              "user",
+              JSON.stringify(updatedUser)
+            );
+
+            return {
+              success: true,
+              profilePhoto,
+            };
+          }
+
+          return {
+            success: false,
+
+            error:
+              response.data?.message ||
+              "Failed to update profile photo.",
+          };
+        } catch (error) {
+          console.error(
+            "UPDATE STUDENT PROFILE PHOTO ERROR:",
+            error?.response?.data ||
+              error
+          );
+
+          return {
+            success: false,
+
+            error:
+              error?.response?.data?.message ||
+              error?.message ||
+              "Failed to update profile photo.",
+          };
+        }
+      },
+
+    /* =====================================================
        UPDATE TEACHER PROFILE
     ===================================================== */
 
-  updateTeacherProfile: async (profileData) => {
-    try {
-      const response = await API.put(
-        "/api/teacher-reports/profile",
-        profileData,
-      );
+    updateTeacherProfile:
+      async (profileData) => {
+        try {
+          const response =
+            await API.put(
+              "/api/teacher-reports/profile",
+              profileData
+            );
 
-      if (response.data?.success) {
-        const updatedTeacher = response.data.teacher;
+          if (
+            response.data?.success
+          ) {
+            const updatedTeacher =
+              response.data.teacher;
 
-        const currentUser = get().user;
+            const currentUser =
+              get().user;
 
-        const updatedUser = {
-          ...currentUser,
+            const updatedUser = {
+              ...currentUser,
 
-          ...updatedTeacher,
+              ...updatedTeacher,
 
-          name: `${updatedTeacher.firstName} ${updatedTeacher.lastName}`,
-        };
+              name: `${updatedTeacher.firstName} ${updatedTeacher.lastName}`,
+            };
 
-        set({
-          teacherData: updatedTeacher,
+            set({
+              teacherData:
+                updatedTeacher,
 
-          user: updatedUser,
-        });
+              user: updatedUser,
+            });
 
-        await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+            await AsyncStorage.setItem(
+              "user",
+              JSON.stringify(updatedUser)
+            );
 
-        return {
-          success: true,
+            return {
+              success: true,
+              teacher: updatedTeacher,
+            };
+          }
 
-          teacher: updatedTeacher,
-        };
-      }
+          return {
+            success: false,
 
-      return {
-        success: false,
+            error:
+              response.data?.message ||
+              "Failed to update teacher profile.",
+          };
+        } catch (error) {
+          console.error(
+            "UPDATE TEACHER PROFILE ERROR:",
+            error?.response?.data ||
+              error
+          );
 
-        error: response.data?.message || "Failed to update teacher profile.",
-      };
-    } catch (error) {
-      console.error(
-        "UPDATE TEACHER PROFILE ERROR:",
-        error.response?.data || error,
-      );
+          return {
+            success: false,
 
-      return {
-        success: false,
+            error:
+              error?.response?.data?.message ||
+              error?.message ||
+              "Failed to update teacher profile.",
+          };
+        }
+      },
 
-        error:
-          error.response?.data?.message || "Failed to update teacher profile.",
-      };
-    }
-  },
-
-  /* =====================================================
+    /* =====================================================
        UPDATE TEACHER PROFILE PHOTO
     ===================================================== */
 
-  updateTeacherProfilePhoto: async (asset) => {
-    try {
-      if (!asset?.uri) {
-        return {
-          success: false,
-          error: "No image selected.",
-        };
-      }
+    updateTeacherProfilePhoto:
+      async (asset) => {
+        try {
+          if (!asset?.uri) {
+            return {
+              success: false,
+              error: "No image selected.",
+            };
+          }
 
-      const formData = new FormData();
+          const formData =
+            new FormData();
 
-      formData.append("profilePhoto", {
-        uri: asset.uri,
+          formData.append(
+            "profilePhoto",
+            {
+              uri: asset.uri,
 
-        name: asset.fileName || `profile-photo-${Date.now()}.jpg`,
+              name:
+                asset.fileName ||
+                `profile-photo-${Date.now()}.jpg`,
 
-        type: asset.mimeType || "image/jpeg",
-      });
+              type:
+                asset.mimeType ||
+                "image/jpeg",
+            }
+          );
 
-      const response = await API.put(
-        "/api/teacher-reports/profile/photo",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        },
-      );
+          const response =
+            await API.put(
+              "/api/teacher-reports/profile/photo",
+              formData,
+              {
+                headers: {
+                  "Content-Type":
+                    "multipart/form-data",
+                },
+              }
+            );
 
-      if (response.data?.success) {
-        const profilePhoto = response.data.profilePhoto;
+          if (
+            response.data?.success
+          ) {
+            const profilePhoto =
+              response.data.profilePhoto;
 
-        const currentUser = get().user;
+            const currentUser =
+              get().user;
 
-        const updatedUser = {
-          ...currentUser,
+            const updatedUser = {
+              ...currentUser,
 
-          profilePhoto,
-        };
+              profilePhoto,
+            };
 
-        set({
-          user: updatedUser,
+            set({
+              user: updatedUser,
 
-          teacherData: {
-            ...get().teacherData,
+              teacherData: {
+                ...get().teacherData,
 
-            profilePhoto,
-          },
-        });
+                profilePhoto,
+              },
+            });
 
-        await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+            await AsyncStorage.setItem(
+              "user",
+              JSON.stringify(updatedUser)
+            );
 
-        return {
-          success: true,
+            return {
+              success: true,
+              profilePhoto,
+            };
+          }
 
-          profilePhoto,
-        };
-      }
+          return {
+            success: false,
 
-      return {
-        success: false,
+            error:
+              response.data?.message ||
+              "Failed to update profile photo.",
+          };
+        } catch (error) {
+          console.error(
+            "UPDATE TEACHER PROFILE PHOTO ERROR:",
+            error?.response?.data ||
+              error
+          );
 
-        error: response.data?.message || "Failed to update profile photo.",
-      };
-    } catch (error) {
-      console.error(
-        "UPDATE TEACHER PROFILE PHOTO ERROR:",
-        error.response?.data || error,
-      );
+          return {
+            success: false,
 
-      return {
-        success: false,
+            error:
+              error?.response?.data?.message ||
+              error?.message ||
+              "Failed to update profile photo.",
+          };
+        }
+      },
 
-        error:
-          error.response?.data?.message ||
-          error.message ||
-          "Failed to update profile photo.",
-      };
-    }
-  },
-
-  /* =====================================================
+    /* =====================================================
        SIGNUP
     ===================================================== */
 
-  signup: async (formData) => {
-    set({
-      isLoading: true,
-    });
-
-    try {
-      const email = formData.email;
-
-      await API.post("/api/auth/signup", formData);
-
+    signup: async (formData) => {
       set({
-        otpRequired: true,
-
-        otpType: "signup",
-
-        tempEmail: email,
-      });
-
-      return {
-        success: true,
-      };
-    } catch (error) {
-      return {
-        success: false,
-
-        error: error.response?.data?.message || error.message,
-      };
-    } finally {
-      set({
-        isLoading: false,
-      });
-    }
-  },
-
-  /* =====================================================
-       FORGOT PASSWORD
-    ===================================================== */
-
-  forgotPassword: async (email) => {
-    set({
-      isLoading: true,
-      error: null,
-    });
-
-    try {
-      const { data } = await API.post("/api/auth/forgot-password", {
-        email,
-      });
-
-      set({
-        tempEmail: email,
-      });
-
-      return {
-        success: true,
-        data,
-      };
-    } catch (error) {
-      const message =
-        error.response?.data?.message || error.message || "Server error";
-
-      set({
-        error: message,
-      });
-
-      return {
-        success: false,
-        error: message,
-      };
-    } finally {
-      set({
-        isLoading: false,
-      });
-    }
-  },
-
-  /* =====================================================
-       VERIFY FORGOT PASSWORD OTP
-    ===================================================== */
-
-  verifyForgotPasswordOTP: async (code) => {
-    set({
-      isLoading: true,
-    });
-
-    try {
-      const { tempEmail } = get();
-
-      await API.post("/api/auth/verify-forgot-password-otp", {
-        email: tempEmail,
-        code,
-      });
-
-      set({
-        otpCode: code,
-      });
-
-      Alert.alert("Success");
-    } catch (error) {
-      console.error(
-        "VERIFY FORGOT PASSWORD OTP ERROR:",
-        error.response?.data || error.message,
-      );
-    } finally {
-      set({
-        isLoading: false,
-      });
-    }
-  },
-
-  /* =====================================================
-       CHANGE PASSWORD
-    ===================================================== */
-
-  changePassword: async (oldPassword, newPassword) => {
-    set({
-      isLoading: true,
-      error: null,
-    });
-
-    try {
-      const { data } = await API.post("/api/auth/change-password", {
-        oldPassword,
-        newPassword,
-      });
-
-      return {
-        success: true,
-
-        message: data.message,
-      };
-    } catch (error) {
-      const message = error.response?.data?.message || error.message;
-
-      set({
-        error: message,
-      });
-
-      Alert.alert("Error", message);
-
-      return {
-        success: false,
-        error: message,
-      };
-    } finally {
-      set({
-        isLoading: false,
-      });
-    }
-  },
-
-  /* =====================================================
-       RESET PASSWORD
-    ===================================================== */
-
-  resetPassword: async (newPassword) => {
-    const { tempEmail, otpCode } = get();
-
-    try {
-      const { data } = await API.post("/api/auth/reset-password", {
-        email: tempEmail,
-
-        newPassword,
-
-        code: otpCode,
-      });
-
-      set({
-        tempEmail: null,
-
-        otpCode: null,
-
-        otpRequired: false,
-
-        otpType: null,
-
+        isLoading: true,
         error: null,
       });
 
-      return {
-        success: true,
-        data,
-      };
-    } catch (error) {
-      return {
-        success: false,
+      try {
+        const email =
+          formData.email;
 
-        error: error.response?.data?.message || error.message,
-      };
-    }
-  },
-}));
+        await API.post(
+          "/api/auth/signup",
+          formData
+        );
+
+        set({
+          otpRequired: true,
+
+          otpType: "signup",
+
+          tempEmail: email,
+        });
+
+        return {
+          success: true,
+        };
+      } catch (error) {
+        return {
+          success: false,
+
+          error:
+            error?.response?.data?.message ||
+            error?.message,
+        };
+      } finally {
+        set({
+          isLoading: false,
+        });
+      }
+    },
+
+    /* =====================================================
+       FORGOT PASSWORD
+    ===================================================== */
+
+    forgotPassword: async (
+      email
+    ) => {
+      set({
+        isLoading: true,
+        error: null,
+      });
+
+      try {
+        const {
+          data,
+        } = await API.post(
+          "/api/auth/forgot-password",
+          {
+            email,
+          }
+        );
+
+        set({
+          tempEmail: email,
+        });
+
+        return {
+          success: true,
+          data,
+        };
+      } catch (error) {
+        const message =
+          error?.response?.data?.message ||
+          error?.message ||
+          "Server error";
+
+        set({
+          error: message,
+        });
+
+        return {
+          success: false,
+          error: message,
+        };
+      } finally {
+        set({
+          isLoading: false,
+        });
+      }
+    },
+
+    /* =====================================================
+       VERIFY FORGOT PASSWORD OTP
+    ===================================================== */
+
+    verifyForgotPasswordOTP:
+      async (code) => {
+        set({
+          isLoading: true,
+          error: null,
+        });
+
+        try {
+          const {
+            tempEmail,
+          } = get();
+
+          await API.post(
+            "/api/auth/verify-forgot-password-otp",
+            {
+              email: tempEmail,
+              code,
+            }
+          );
+
+          set({
+            otpCode: code,
+          });
+
+          Alert.alert(
+            "Success"
+          );
+
+          return {
+            success: true,
+          };
+        } catch (error) {
+          const message =
+            error?.response?.data?.message ||
+            error?.message;
+
+          set({
+            error: message,
+          });
+
+          console.error(
+            "VERIFY FORGOT PASSWORD OTP ERROR:",
+            error?.response?.data ||
+              error?.message
+          );
+
+          return {
+            success: false,
+            error: message,
+          };
+        } finally {
+          set({
+            isLoading: false,
+          });
+        }
+      },
+
+    /* =====================================================
+       CHANGE PASSWORD
+    ===================================================== */
+
+    changePassword:
+      async (
+        oldPassword,
+        newPassword
+      ) => {
+        set({
+          isLoading: true,
+          error: null,
+        });
+
+        try {
+          const {
+            data,
+          } = await API.post(
+            "/api/auth/change-password",
+            {
+              oldPassword,
+              newPassword,
+            }
+          );
+
+          return {
+            success: true,
+
+            message:
+              data.message,
+          };
+        } catch (error) {
+          const message =
+            error?.response?.data?.message ||
+            error?.message;
+
+          set({
+            error: message,
+          });
+
+          Alert.alert(
+            "Error",
+            message
+          );
+
+          return {
+            success: false,
+            error: message,
+          };
+        } finally {
+          set({
+            isLoading: false,
+          });
+        }
+      },
+
+    /* =====================================================
+       RESET PASSWORD
+    ===================================================== */
+
+    resetPassword:
+      async (newPassword) => {
+        const {
+          tempEmail,
+          otpCode,
+        } = get();
+
+        try {
+          const {
+            data,
+          } = await API.post(
+            "/api/auth/reset-password",
+            {
+              email: tempEmail,
+
+              newPassword,
+
+              code: otpCode,
+            }
+          );
+
+          set({
+            tempEmail: null,
+
+            otpCode: null,
+
+            otpRequired: false,
+
+            otpType: null,
+
+            error: null,
+          });
+
+          return {
+            success: true,
+            data,
+          };
+        } catch (error) {
+          return {
+            success: false,
+
+            error:
+              error?.response?.data?.message ||
+              error?.message,
+          };
+        }
+      },
+  })
+);

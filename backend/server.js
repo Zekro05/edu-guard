@@ -28,6 +28,8 @@ import notificationSettingsRoutes from "./routes/notificationSettings.js";
 import pushNotificationRoutes from "./routes/pushNotificationRoutes.js";
 import settingsRoutes from "./routes/settings.js";
 
+
+
 import { User } from "./models/userModel.js";
 import { sendPushNotification } from "./utils/pushNotification.js";
 

@@ -26,10 +26,31 @@ const userSchema = new mongoose.Schema(
       default: "student",
     },
 
-    expoPushToken: {
-      type: String,
-      default: null,
-    },
+    pushTokens: [
+      {
+        token: {
+          type: String,
+          required: true,
+        },
+
+        platform: {
+          type: String,
+          enum: ["android", "ios", "web"],
+          required: true,
+        },
+
+        provider: {
+          type: String,
+          enum: ["fcm", "expo"],
+          default: "fcm",
+        },
+
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
 
     profilePhoto: {
       type: String,
@@ -74,10 +95,6 @@ const userSchema = new mongoose.Schema(
         default: true,
       },
       systemAnnouncements: {
-        type: Boolean,
-        default: true,
-      },
-      highRiskAlerts: {
         type: Boolean,
         default: true,
       },

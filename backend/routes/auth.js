@@ -14,7 +14,7 @@ import {
   resendLoginOTP,
   resendForgotPasswordOTP,
   changePassword,
-  saveExpoPushToken,
+  savePushToken,
   removePushToken,
 } from "../controllers/authController.js";
 import { verifyToken } from "../middleware/verifyToken.js";
@@ -50,7 +50,7 @@ router.post("/verify-mobile-login-otp", verifyMobileLoginOTP);
 router.post(
   "/save-push-token",
   verifyToken,
-  saveExpoPushToken
+  savePushToken
 );
 
 router.delete("/remove-push-token", verifyToken, removePushToken);

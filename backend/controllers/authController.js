@@ -630,7 +630,7 @@ export const logout = async (req, res) => {
       // stops receiving push notifications after logout
       await User.findByIdAndUpdate(req.userId, {
         $unset: {
-          expoPushToken: 1,
+          fcmToken: 1,
         },
       });
 
@@ -664,35 +664,65 @@ export const logout = async (req, res) => {
   }
 };
 
-export const saveExpoPushToken = async (req, res) => {
+export const savePushToken = async (req, res) => {
   try {
-    const { expoPushToken } = req.body;
+    const {
+      token,
+      platform,
+      provider = "fcm",
+    } = req.body;
 
-    if (!expoPushToken) {
+    /* =====================================================
+       VALIDATION
+    ===================================================== */
+
+    if (!token) {
       return res.status(400).json({
         success: false,
-        message: "Expo push token is required",
+        message: "Push token is required",
       });
     }
 
-    if (!expoPushToken.startsWith("ExponentPushToken[")) {
+    if (!platform) {
       return res.status(400).json({
         success: false,
-        message: "Invalid Expo push token",
+        message: "Platform is required",
       });
     }
 
-    const userId = req.user._id;
+    if (!["android", "ios", "web"].includes(platform)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid platform",
+      });
+    }
 
-    const user = await User.findByIdAndUpdate(
-      userId,
-      {
-        expoPushToken,
-      },
-      {
-        new: true,
-      }
-    );
+    if (!["fcm", "expo"].includes(provider)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid push notification provider",
+      });
+    }
+
+    /* =====================================================
+       AUTHENTICATION
+    ===================================================== */
+
+    const userId =
+      req.userId || req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    /* =====================================================
+       FIND USER
+    ===================================================== */
+
+    const user = await User.findById(userId);
 
     if (!user) {
       return res.status(404).json({
@@ -701,51 +731,163 @@ export const saveExpoPushToken = async (req, res) => {
       });
     }
 
+    /* =====================================================
+       REMOVE EXISTING COPY OF THIS TOKEN
+       
+       This prevents duplicate tokens if:
+       - app starts again
+       - user logs in again
+       - FCM token registration runs multiple times
+       - checkAuth re-registers the token
+    ===================================================== */
+
+    user.pushTokens = user.pushTokens.filter(
+      (pushToken) =>
+        pushToken.token !== token
+    );
+
+    /* =====================================================
+       ADD CURRENT DEVICE TOKEN
+    ===================================================== */
+
+    user.pushTokens.push({
+      token,
+      platform,
+      provider,
+      createdAt: new Date(),
+    });
+
+    await user.save();
+
+    /* =====================================================
+       LOG
+    ===================================================== */
+
     console.log(
-      "✅ Expo push token saved for:",
+      "===================================="
+    );
+
+    console.log(
+      "🔥 PUSH TOKEN SAVED"
+    );
+
+    console.log(
+      "USER:",
       user.email
     );
 
-    res.status(200).json({
+    console.log(
+      "USER ID:",
+      user._id
+    );
+
+    console.log(
+      "PLATFORM:",
+      platform
+    );
+
+    console.log(
+      "PROVIDER:",
+      provider
+    );
+
+    console.log(
+      "TOKEN:",
+      token
+    );
+
+    console.log(
+      "TOTAL USER DEVICES:",
+      user.pushTokens.length
+    );
+
+    console.log(
+      "===================================="
+    );
+
+    /* =====================================================
+       RESPONSE
+    ===================================================== */
+
+    return res.status(200).json({
       success: true,
-      message: "Push token saved successfully",
+      message:
+        "Push token saved successfully",
     });
   } catch (error) {
     console.error(
-      "SAVE PUSH TOKEN ERROR:",
-      error
+      "===================================="
     );
 
-    res.status(500).json({
+    console.error(
+      "❌ SAVE PUSH TOKEN ERROR:"
+    );
+
+    console.error(error);
+
+    console.error(
+      "===================================="
+    );
+
+    return res.status(500).json({
       success: false,
-      message: "Failed to save push token",
+      message:
+        "Failed to save push token",
     });
   }
 };
 
 export const removePushToken = async (req, res) => {
   try {
-    if (!req.userId) {
+    const userId = req.userId || req.user?._id;
+
+    if (!userId) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized",
       });
     }
 
-    await User.findByIdAndUpdate(req.userId, {
-      $unset: {
-        expoPushToken: 1,
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Push token is required.",
+      });
+    }
+
+    const result = await User.findByIdAndUpdate(
+      userId,
+      {
+        $pull: {
+          pushTokens: {
+            token,
+          },
+        },
       },
-    });
+      {
+        new: true,
+      }
+    );
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
 
     console.log(
-      "📱 Expo push token removed for user:",
-      req.userId
+      "📱 Push token removed:",
+      token.substring(0, 20) + "...",
+      "for user:",
+      userId
     );
 
     return res.status(200).json({
       success: true,
-      message: "Push token removed successfully",
+      message: "Push token removed successfully.",
     });
   } catch (error) {
     console.error(
@@ -755,7 +897,7 @@ export const removePushToken = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Failed to remove push token",
+      message: "Failed to remove push token.",
     });
   }
 };

@@ -17,6 +17,7 @@ import GuidancePage from "./pages/GuidancePage.jsx";
 import InterventionPage from "./pages/InterventionPage.jsx";
 import CaseManagement from "./pages/CaseManagement.jsx";
 import { useAuthStore } from "./store/authStore.js";
+import { registerWebFCM } from "./services/fcmService.js";
 
 
 
@@ -58,6 +59,7 @@ function App() {
     checkAuth,
     isCheckingAuth,
     isAuthenticated,
+    user,
     startInactivityTimer,
     resetInactivityTimer,
   } = useAuthStore();
@@ -68,6 +70,40 @@ function App() {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // =====================================================
+  // REGISTER WEB FCM
+  // =====================================================
+
+  useEffect(() => {
+  const registerFCM = async () => {
+    if (!isAuthenticated || !user?._id) {
+      console.log("⛔ Web FCM registration skipped");
+      return;
+    }
+
+    try {
+      console.log("====================================");
+      console.log("🔥 WEB FCM REGISTRATION");
+      console.log("USER:", user._id);
+      console.log("====================================");
+
+      const result = await registerWebFCM();
+
+      console.log("🔥 Web FCM registration result:", result);
+    } catch (error) {
+      console.error(
+        "❌ WEB FCM REGISTRATION ERROR:",
+        error?.response?.data ||
+          error?.message ||
+          error
+      );
+    }
+  };
+
+  registerFCM();
+}, [isAuthenticated, user?._id]);
+
 
   // 2️⃣ Setup inactivity auto-logout only once for authenticated users
   useEffect(() => {

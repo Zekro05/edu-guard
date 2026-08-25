@@ -1,334 +1,1081 @@
 import { create } from "zustand";
-import axios from "axios";
 import { toast } from "react-hot-toast";
-import {API} from "../lib/api"
+import { API } from "../lib/api";
 
 
+/* =========================================================
+   ATTACH TOKEN AUTOMATICALLY
+========================================================= */
 
-//  ATTACH TOKEN AUTOMATICALLY 
 API.interceptors.request.use((config) => {
-  const user = JSON.parse(localStorage.getItem("user"));
+  try {
+    const user = JSON.parse(
+      localStorage.getItem("user")
+    );
 
-  if (user?.token) {
-    config.headers.Authorization = `Bearer ${user.token}`;
+    if (user?.token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization =
+        `Bearer ${user.token}`;
+    }
+  } catch (error) {
+    console.error(
+      "AUTH INTERCEPTOR ERROR:",
+      error
+    );
   }
 
   return config;
 });
 
-export const useAuthStore = create((set, get) => ({
-  user: null,
-  tempEmail: null,
-  otpRequired: false,
-  otpType: null,
-  error: null,
-  isLoading: false,
+/* =========================================================
+   REMOVE WEB FCM TOKEN
+========================================================= */
 
-  isAuthenticated: false,
-  isCheckingAuth: true,
+const removeWebPushToken = async () => {
+  try {
+    const storedUser =
+      JSON.parse(
+        localStorage.getItem("user")
+      );
 
- autoLogoutTimer: null,
-  countdownInterval: null,
-  countdown: 0,
-  warningActive: false, // NEW: signal to React
+    if (!storedUser?.token) {
+      console.log(
+        "⚠️ No authentication token. FCM removal skipped."
+      );
 
- startInactivityTimer: (onLogoutCallback) => {
-  clearTimeout(get().inactivityTimer);
-
-  const inactivityMinutes = 10; // 10 minutes
-  const warningSeconds = 30;   // show toast when 30 sec left
-  let remaining = inactivityMinutes * 60;
-
-  const tick = () => {
-    if (remaining === warningSeconds) {
-      toast("You will be logged out in 30 seconds due to inactivity", {
-        style: { background: "#FBBF24", color: "#000" }
-      });
+      return true;
     }
 
-    if (remaining <= 0) {
-      get().logout();
-      if (onLogoutCallback) onLogoutCallback();
-      return;
-    }
+    console.log(
+      "===================================="
+    );
 
-    set({ countdown: remaining });
-    remaining -= 1;
-    get().inactivityTimer = setTimeout(tick, 1000);
-  };
+    console.log(
+      "🗑️ REMOVING WEB FCM TOKEN"
+    );
 
-  tick();
-},
+    console.log(
+      "===================================="
+    );
 
-  resetInactivityTimer: () => {
-    clearTimeout(get().inactivityTimer);
-    get().startInactivityTimer();
-  },
+    const response =
+      await API.delete(
+        "/api/auth/remove-push-token"
+      );
 
-  clearInactivityTimer: () => {
-    const { inactivityInterval } = get();
-    if (inactivityInterval) clearInterval(inactivityInterval);
-  },
+    console.log(
+      "===================================="
+    );
 
-  logout: (callback) => {
-    set({ user: null, isAuthenticated: false, countdown: 0, warningActive: false });
-    localStorage.removeItem("user");
-    if (callback) callback(); // navigate after logout
-    toast.success("You have been logged out due to inactivity");
-  },
+    console.log(
+      "✅ WEB FCM TOKEN REMOVED"
+    );
 
-  checkAuth: async () => {
-    try {
-      set({ isCheckingAuth: true });
+    console.log(
+      response.data
+    );
 
-      const { data } = await API.get("/api/auth/check-auth");
+    console.log(
+      "===================================="
+    );
 
-      if (data.authenticated) {
+    return true;
+  } catch (error) {
+    console.error(
+      "===================================="
+    );
+
+    console.error(
+      "❌ WEB FCM TOKEN REMOVAL ERROR"
+    );
+
+    console.error(
+      error?.response?.data ||
+        error?.message ||
+        error
+    );
+
+    console.error(
+      "===================================="
+    );
+
+    return false;
+  }
+};
+
+/* =========================================================
+   AUTH STORE
+========================================================= */
+
+export const useAuthStore = create(
+  (set, get) => ({
+
+    /* =====================================================
+       STATE
+    ===================================================== */
+
+    user: null,
+
+    tempEmail: null,
+
+    otpRequired: false,
+
+    otpType: null,
+
+    otpCode: null,
+
+    error: null,
+
+    isLoading: false,
+
+    isAuthenticated: false,
+
+    isCheckingAuth: true,
+
+    autoLogoutTimer: null,
+
+    countdownInterval: null,
+
+    inactivityTimer: null,
+
+    countdown: 0,
+
+    warningActive: false,
+
+    /* =====================================================
+       PUSH NOTIFICATIONS
+    ===================================================== */
+
+    registerPushNotifications: async () => {
+      const success =
+        await registerWebPushToken();
+
+      return {
+        success,
+        ...(success
+          ? {}
+          : {
+              error:
+                "Failed to register web push notifications.",
+            }),
+      };
+    },
+
+    removePushToken: async () => {
+      const success =
+        await removeWebPushToken();
+
+      return {
+        success,
+        ...(success
+          ? {}
+          : {
+              error:
+                "Failed to remove web push token.",
+            }),
+      };
+    },
+
+    /* =====================================================
+       INACTIVITY TIMER
+    ===================================================== */
+
+    startInactivityTimer: (
+      onLogoutCallback
+    ) => {
+      clearTimeout(
+        get().inactivityTimer
+      );
+
+      const inactivityMinutes = 10;
+      const warningSeconds = 30;
+
+      let remaining =
+        inactivityMinutes * 60;
+
+      const tick = () => {
+        if (
+          remaining === warningSeconds
+        ) {
+          toast(
+            "You will be logged out in 30 seconds due to inactivity",
+            {
+              style: {
+                background: "#FBBF24",
+                color: "#000",
+              },
+            }
+          );
+        }
+
+        if (remaining <= 0) {
+          get().logout();
+
+          if (onLogoutCallback) {
+            onLogoutCallback();
+          }
+
+          return;
+        }
+
         set({
-          user: data.user,
-          isAuthenticated: true,
+          countdown: remaining,
         });
-      } else {
+
+        remaining -= 1;
+
+        const timer =
+          setTimeout(
+            tick,
+            1000
+          );
+
+        set({
+          inactivityTimer: timer,
+        });
+      };
+
+      tick();
+    },
+
+    resetInactivityTimer: () => {
+      clearTimeout(
+        get().inactivityTimer
+      );
+
+      get().startInactivityTimer();
+    },
+
+    clearInactivityTimer: () => {
+      clearTimeout(
+        get().inactivityTimer
+      );
+
+      set({
+        inactivityTimer: null,
+        countdown: 0,
+      });
+    },
+
+    /* =====================================================
+       CHECK AUTH
+    ===================================================== */
+
+    checkAuth: async () => {
+      try {
+        set({
+          isCheckingAuth: true,
+        });
+
+        const {
+          data,
+        } = await API.get(
+          "/api/auth/check-auth"
+        );
+
+        if (
+          data.authenticated &&
+          data.user
+        ) {
+          const storedUser =
+            JSON.parse(
+              localStorage.getItem("user") ||
+                "null"
+            );
+
+          const userData = {
+            ...data.user,
+
+            ...(storedUser?.token
+              ? {
+                  token:
+                    storedUser.token,
+                }
+              : {}),
+          };
+
+          set({
+            user: userData,
+            isAuthenticated: true,
+          });
+
+          localStorage.setItem(
+            "user",
+            JSON.stringify(userData)
+          );
+
+          /* ===============================================
+             RE-REGISTER WEB FCM TOKEN
+          =============================================== */
+
+          setTimeout(() => {
+            registerWebPushToken();
+          }, 500);
+        } else {
+          set({
+            user: null,
+            isAuthenticated: false,
+          });
+
+          localStorage.removeItem(
+            "user"
+          );
+        }
+      } catch (err) {
+        console.error(
+          "CHECK AUTH ERROR:",
+          err?.response?.data ||
+            err?.message
+        );
+
         set({
           user: null,
           isAuthenticated: false,
         });
+      } finally {
+        set({
+          isCheckingAuth: false,
+        });
       }
-    } catch (err) {
+    },
+
+    /* =====================================================
+       SIGNUP
+    ===================================================== */
+
+    signup: async (
+      formData
+    ) => {
       set({
-        user: null,
-        isAuthenticated: false,
+        isLoading: true,
+        error: null,
       });
-    } finally {
-      set({ isCheckingAuth: false });
-    }
-  },
 
- signup: async (formData) => {
-  set({ isLoading: true, error: null });
-  try {
-    const { data } = await API.post("/api/auth/signup", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    set({
-      tempEmail: formData.get("email"),
-      otpRequired: true,
-      otpType: "signup",
-    });
-    toast.success(data.message);
-  } catch (err) {
-    set({ error: err.response?.data?.message || err.message });
-    throw err;
-  } finally {
-    set({ isLoading: false });
-  }
-},
+      try {
+        const {
+          data,
+        } = await API.post(
+          "/api/auth/signup",
+          formData,
+          {
+            headers: {
+              "Content-Type":
+                "multipart/form-data",
+            },
+          }
+        );
 
+        set({
+          tempEmail:
+            formData.get("email"),
 
-  login: async (email, password) => {
-    set({ isLoading: true, error: null });
-    try {
-      const { data } = await API.post("/api/auth/login", { email, password });
+          otpRequired: true,
 
-      if (data.requiresOTP) {
+          otpType: "signup",
+        });
+
+        toast.success(
+          data.message
+        );
+      } catch (err) {
+        set({
+          error:
+            err.response?.data
+              ?.message ||
+            err.message,
+        });
+
+        throw err;
+      } finally {
+        set({
+          isLoading: false,
+        });
+      }
+    },
+
+    /* =====================================================
+       LOGIN
+    ===================================================== */
+
+    login: async (
+      email,
+      password
+    ) => {
+      set({
+        isLoading: true,
+        error: null,
+      });
+
+      try {
+        const {
+          data,
+        } = await API.post(
+          "/api/auth/login",
+          {
+            email,
+            password,
+          }
+        );
+
+        if (data.requiresOTP) {
+          set({
+            tempEmail: email,
+
+            otpRequired: true,
+
+            otpType: "login",
+          });
+
+          toast.success(
+            "OTP sent to your email"
+          );
+
+          return {
+            success: true,
+            requiresOTP: true,
+          };
+        }
+
+        /* ===============================================
+           SAVE AUTH
+        =============================================== */
+
+        const userData = {
+          ...data.user,
+          token: data.token,
+        };
+
+        set({
+          user: userData,
+
+          isAuthenticated: true,
+
+          otpRequired: false,
+
+          tempEmail: null,
+
+          otpType: null,
+        });
+
+        localStorage.setItem(
+          "user",
+          JSON.stringify(userData)
+        );
+
+        toast.success(
+          "Logged in successfully"
+        );
+
+        /* ===============================================
+           REGISTER WEB FCM
+        =============================================== */
+
+        setTimeout(() => {
+          registerWebPushToken();
+        }, 500);
+
+        return {
+          success: true,
+        };
+      } catch (err) {
+        set({
+          error:
+            err.response?.data
+              ?.message ||
+            err.message,
+        });
+
+        throw err;
+      } finally {
+        set({
+          isLoading: false,
+        });
+      }
+    },
+
+    /* =====================================================
+       VERIFY OTP
+    ===================================================== */
+
+    verifyOTP: async (
+      code
+    ) => {
+      set({
+        isLoading: true,
+        error: null,
+      });
+
+      try {
+        const {
+          tempEmail,
+          otpType,
+        } = get();
+
+        if (!tempEmail) {
+          throw new Error(
+            "No email found for OTP verification"
+          );
+        }
+
+        const url =
+          otpType === "signup"
+            ? "/api/auth/verify-email"
+            : "/api/auth/verify-login-otp";
+
+        const {
+          data,
+        } = await API.post(
+          url,
+          {
+            email: tempEmail,
+            code,
+          }
+        );
+
+        /* ===============================================
+           LOGIN OTP
+        =============================================== */
+
+        if (
+          otpType === "login"
+        ) {
+          const userData = {
+            ...data.user,
+            token: data.token,
+          };
+
+          set({
+            user: userData,
+
+            isAuthenticated: true,
+
+            otpRequired: false,
+
+            tempEmail: null,
+
+            otpType: null,
+          });
+
+          localStorage.setItem(
+            "user",
+            JSON.stringify(userData)
+          );
+
+          toast.success(
+            "Logged in successfully"
+          );
+
+          /* =============================================
+             REGISTER WEB FCM
+          ============================================= */
+
+          setTimeout(() => {
+            registerWebPushToken();
+          }, 500);
+
+          return {
+            success: true,
+            verified: true,
+          };
+        }
+
+        /* ===============================================
+           SIGNUP OTP
+        =============================================== */
+
+        if (
+          otpType === "signup"
+        ) {
+          set({
+            otpRequired: false,
+
+            tempEmail: null,
+
+            otpType: null,
+          });
+
+          toast.success(
+            "Signup verified! You can now login."
+          );
+
+          return {
+            success: true,
+            verified: true,
+          };
+        }
+      } catch (err) {
+        set({
+          error:
+            err.response?.data
+              ?.message ||
+            err.message,
+        });
+
+        throw err;
+      } finally {
+        set({
+          isLoading: false,
+        });
+      }
+    },
+
+    /* =====================================================
+       RESEND OTP
+    ===================================================== */
+
+    resendOTP: async () => {
+      set({
+        isLoading: true,
+        error: null,
+      });
+
+      try {
+        const {
+          tempEmail,
+          otpType,
+        } = get();
+
+        if (!tempEmail) {
+          throw new Error(
+            "No email found for OTP"
+          );
+        }
+
+        let url;
+
+        switch (otpType) {
+          case "signup":
+            url =
+              "/api/auth/resend-signup-otp";
+            break;
+
+          case "login":
+            url =
+              "/api/auth/resend-login-otp";
+            break;
+
+          case "forgot":
+            url =
+              "/api/auth/resend-forgot-password-otp";
+            break;
+
+          default:
+            throw new Error(
+              "Invalid OTP type"
+            );
+        }
+
+        const {
+          data,
+        } = await API.post(
+          url,
+          {
+            email: tempEmail,
+          }
+        );
+
+        toast.success(
+          data.message
+        );
+
+        return {
+          success: true,
+        };
+      } catch (err) {
+        const message =
+          err.response?.data
+            ?.message ||
+          err.message;
+
+        set({
+          error: message,
+        });
+
+        toast.error(
+          message
+        );
+
+        throw err;
+      } finally {
+        set({
+          isLoading: false,
+        });
+      }
+    },
+
+    /* =====================================================
+       FORGOT PASSWORD
+    ===================================================== */
+
+    forgotPassword: async (
+      email
+    ) => {
+      set({
+        isLoading: true,
+        error: null,
+      });
+
+      try {
+        await API.post(
+          "/api/auth/forgot-password",
+          {
+            email,
+          }
+        );
+
         set({
           tempEmail: email,
+
           otpRequired: true,
-          otpType: "login",
+
+          otpType: "forgot",
         });
-        toast.success("OTP sent to your email");
-      } else {
-        // ✅ Save both user info AND token
+
+        return {
+          success: true,
+        };
+      } catch (err) {
+        const message =
+          err.response?.data
+            ?.message ||
+          err.message;
+
         set({
-          user: { ...data.user, token: data.token },
-          isAuthenticated: true,
+          error: message,
         });
-        localStorage.setItem("user", JSON.stringify({ ...data.user, token: data.token }));
-        toast.success("Logged in successfully");
+
+        toast.error(
+          message
+        );
+
+        throw err;
+      } finally {
+        set({
+          isLoading: false,
+        });
       }
-    } catch (err) {
-      set({ error: err.response?.data?.message || err.message });
-      throw err;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
+    },
 
-  verifyOTP: async (code) => {
-    set({ isLoading: true, error: null });
-    try {
-      const { tempEmail, otpType } = get();
-      if (!tempEmail) throw new Error("No email found for OTP verification");
+    /* =====================================================
+       VERIFY FORGOT PASSWORD OTP
+    ===================================================== */
 
-      const url =
-        otpType === "signup"
-          ? "/api/auth/verify-email"
-          : "/api/auth/verify-login-otp";
-
-      const { data } = await API.post(url, { email: tempEmail, code });
-
-      if (otpType === "login") {
-        // Only login OTP → set user as authenticated
+    verifyForgotPasswordOTP:
+      async (code) => {
         set({
-          user: { ...data.user, token: data.token },
-          isAuthenticated: true,
-          otpRequired: false,
+          isLoading: true,
+          error: null,
+        });
+
+        try {
+          const {
+            tempEmail,
+          } = get();
+
+          if (!tempEmail) {
+            throw new Error(
+              "No email found for OTP verification"
+            );
+          }
+
+          await API.post(
+            "/api/auth/verify-forgot-password-otp",
+            {
+              email: tempEmail,
+              code,
+            }
+          );
+
+          set({
+            otpRequired: false,
+            otpCode: code,
+          });
+
+          toast.success(
+            "OTP verified! You can now set your new password."
+          );
+
+          return {
+            success: true,
+          };
+        } catch (err) {
+          const message =
+            err.response?.data
+              ?.message ||
+            err.message;
+
+          set({
+            error: message,
+          });
+
+          toast.error(
+            message
+          );
+
+          throw err;
+        } finally {
+          set({
+            isLoading: false,
+          });
+        }
+      },
+
+    /* =====================================================
+       RESET PASSWORD
+    ===================================================== */
+
+    resetPassword: async (
+      newPassword
+    ) => {
+      const {
+        tempEmail,
+        otpCode,
+      } = get();
+
+      set({
+        isLoading: true,
+        error: null,
+      });
+
+      try {
+        if (!otpCode) {
+          throw new Error(
+            "OTP not found. Please verify OTP first."
+          );
+        }
+
+        await API.post(
+          "/api/auth/reset-password",
+          {
+            email: tempEmail,
+
+            newPassword,
+
+            code: otpCode,
+          }
+        );
+
+        set({
           tempEmail: null,
+
+          otpCode: null,
+
+          otpRequired: false,
+
           otpType: null,
         });
-        localStorage.setItem("user", JSON.stringify({ ...data.user, token: data.token }));
-      } else if (otpType === "signup") {
+
+        toast.success(
+          "Password reset successfully"
+        );
+
+        return {
+          success: true,
+        };
+      } catch (err) {
+        const message =
+          err.response?.data
+            ?.message ||
+          err.message;
+
         set({
-          otpRequired: false,
-          tempEmail: null,
-          otpType: null,
+          error: message,
         });
-        toast.success("Signup verified! You can now login.");
+
+        toast.error(
+          message
+        );
+
+        throw err;
+      } finally {
+        set({
+          isLoading: false,
+        });
       }
-    } catch (err) {
-      set({ error: err.response?.data?.message || err.message });
-      throw err;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
+    },
 
-  logout: async (callback) => {
-  try {
-    await API.post("/api/auth/logout");
-  } catch {}
+    /* =====================================================
+       CHANGE PASSWORD
+    ===================================================== */
 
-  set({
-    user: null,
-    isAuthenticated: false,
-    countdown: 0,
-    warningActive: false,
-  });
-
-  localStorage.removeItem("user");
-
-  if (callback) callback();
-  toast.success("Logged out successfully");
-},
-
-  resendOTP: async () => {
-  set({ isLoading: true, error: null });
-  try {
-    const { tempEmail, otpType } = get();
-    if (!tempEmail) throw new Error("No email found for OTP");
-
-    let url;
-
-    switch (otpType) {
-      case "signup":
-        url = "/api/auth/resend-signup-otp";
-        break;
-      case "login":
-        url = "/api/auth/resend-login-otp";
-        break;
-      case "forgot":
-        url = "/api/auth/resend-forgot-password-otp";
-        break;
-      default:
-        throw new Error("Invalid OTP type");
-    }
-
-    const { data } = await API.post(url, { email: tempEmail });
-
-    toast.success(data.message);
-  } catch (err) {
-    set({ error: err.response?.data?.message || err.message });
-    toast.error(err.response?.data?.message || err.message);
-    throw err;
-  } finally {
-    set({ isLoading: false });
-  }
-},
-
-  forgotPassword: async (email) => {
-    set({ isLoading: true, error: null });
-    try {
-      await API.post("/api/auth/forgot-password", { email });
-      set({ 
-      tempEmail: email,
-      otpRequired: true,
-      otpType: "forgot"   // 🔥 ADD THIS
-    });
-    } catch (err) {
-      toast.error(err.response?.data?.message || err.message);
-      throw err;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
-  verifyForgotPasswordOTP: async (code) => {
-  set({ isLoading: true, error: null });
-  try {
-    const { tempEmail } = get();
-    if (!tempEmail) throw new Error("No email found for OTP verification");
-
-    await API.post("/api/auth/verify-forgot-password-otp", {
-      email: tempEmail,
-      code,
-    });
-
-    // store OTP temporarily for reset
-    set({ otpRequired: false, otpCode: code });
-
-    toast.success("OTP verified! You can now set your new password.");
-  } catch (err) {
-    set({ error: err.response?.data?.message || err.message });
-    toast.error(err.response?.data?.message || err.message);
-    throw err;
-  } finally {
-    set({ isLoading: false });
-  }
-},
-
-  resetPassword: async (newPassword) => {
-  const { tempEmail, otpCode } = get();
-
-  set({ isLoading: true, error: null });
-  try {
-    if (!otpCode) throw new Error("OTP not found. Please verify OTP first.");
-
-    await API.post("/api/auth/reset-password", {
-      email: tempEmail,
-      newPassword,
-      code: otpCode,
-    });
-
-    // Clear temp data after reset
-    set({ tempEmail: null, otpCode: null });
-
-    toast.success("Password reset successfully");
-  } catch (err) {
-    toast.error(err.response?.data?.message || err.message);
-    throw err;
-  } finally {
-    set({ isLoading: false });
-  }
-},
-changePassword: async (oldPassword, newPassword) => {
-  set({ isLoading: true, error: null });
-
-  try {
-    const { data } = await API.post("/api/auth/change-password", {
+    changePassword: async (
       oldPassword,
-      newPassword,
-    });
+      newPassword
+    ) => {
+      set({
+        isLoading: true,
+        error: null,
+      });
 
-    toast.success(data.message);
+      try {
+        const {
+          data,
+        } = await API.post(
+          "/api/auth/change-password",
+          {
+            oldPassword,
+            newPassword,
+          }
+        );
 
-    return data;
-  } catch (err) {
-    const message = err.response?.data?.message || "Failed to change password";
-    set({ error: message });
-    toast.error(message);
-    throw err;
-  } finally {
-    set({ isLoading: false });
-  }
-},
-}));
+        toast.success(
+          data.message
+        );
+
+        return data;
+      } catch (err) {
+        const message =
+          err.response?.data
+            ?.message ||
+          "Failed to change password";
+
+        set({
+          error: message,
+        });
+
+        toast.error(
+          message
+        );
+
+        throw err;
+      } finally {
+        set({
+          isLoading: false,
+        });
+      }
+    },
+
+    /* =====================================================
+       LOGOUT
+    ===================================================== */
+
+    logout: async (
+      callback
+    ) => {
+      try {
+        /* ===============================================
+           IMPORTANT:
+           Remove FCM token BEFORE clearing local JWT.
+        =============================================== */
+
+        const pushRemoved =
+          await removeWebPushToken();
+
+        if (pushRemoved) {
+          console.log(
+            "✅ Web FCM token removed before logout."
+          );
+        } else {
+          console.warn(
+            "⚠️ Web FCM token could not be removed."
+          );
+        }
+
+        /* ===============================================
+           BACKEND LOGOUT
+        =============================================== */
+
+        try {
+          await API.post(
+            "/api/auth/logout"
+          );
+        } catch (error) {
+          console.log(
+            "BACKEND LOGOUT ERROR:",
+            error?.response?.data ||
+              error?.message
+          );
+        }
+
+        /* ===============================================
+           CLEAR LOCAL AUTH
+        =============================================== */
+
+        set({
+          user: null,
+
+          isAuthenticated: false,
+
+          countdown: 0,
+
+          warningActive: false,
+
+          tempEmail: null,
+
+          otpRequired: false,
+
+          otpType: null,
+
+          otpCode: null,
+
+          error: null,
+        });
+
+        localStorage.removeItem(
+          "user"
+        );
+
+        if (callback) {
+          callback();
+        }
+
+        toast.success(
+          "Logged out successfully"
+        );
+
+        return {
+          success: true,
+
+          pushTokenRemoved:
+            pushRemoved,
+        };
+      } catch (error) {
+        console.error(
+          "LOGOUT ERROR:",
+          error
+        );
+
+        /* ===============================================
+           ALWAYS CLEAR LOCAL AUTH
+        =============================================== */
+
+        set({
+          user: null,
+
+          isAuthenticated: false,
+
+          countdown: 0,
+
+          warningActive: false,
+
+          tempEmail: null,
+
+          otpRequired: false,
+
+          otpType: null,
+
+          otpCode: null,
+
+          error: null,
+        });
+
+        localStorage.removeItem(
+          "user"
+        );
+
+        if (callback) {
+          callback();
+        }
+
+        return {
+          success: false,
+
+          error:
+            error?.message ||
+            "Logout failed.",
+        };
+      }
+    },
+  })
+);
