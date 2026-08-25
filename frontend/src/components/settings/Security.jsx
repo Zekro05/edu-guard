@@ -1,7 +1,18 @@
 import { useState } from "react";
-import { ShieldCheck } from "lucide-react";
+import {
+  ShieldCheck,
+  LockKeyhole,
+  Clock3,
+  KeyRound,
+  CheckCircle2,
+  ShieldAlert,
+} from "lucide-react";
 import { toast } from "react-hot-toast";
-import { useAuthStore } from "../../store/authStore"; // Adjust path if needed
+import { useAuthStore } from "../../store/authStore";
+
+/* =========================================================
+   TOGGLE
+========================================================= */
 
 const Toggle = ({ defaultChecked = false }) => (
   <label className="relative inline-flex items-center cursor-pointer">
@@ -12,16 +23,38 @@ const Toggle = ({ defaultChecked = false }) => (
     />
 
     <div
-      className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full
-      peer-checked:bg-green-500 transition"
-    ></div>
+      className="
+        w-11
+        h-6
+        rounded-full
+        bg-gray-200
+        peer-checked:bg-green-600
+        transition-all
+        duration-200
+      "
+    />
 
     <div
-      className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm
-      transition peer-checked:translate-x-5"
-    ></div>
+      className="
+        absolute
+        left-0.5
+        top-0.5
+        w-5
+        h-5
+        rounded-full
+        bg-white
+        shadow-sm
+        transition-transform
+        duration-200
+        peer-checked:translate-x-5
+      "
+    />
   </label>
 );
+
+/* =========================================================
+   SECURITY
+========================================================= */
 
 const Security = () => {
   const { changePassword, isLoading } = useAuthStore();
@@ -67,104 +100,446 @@ const Security = () => {
     }
   };
 
+  const securityOptions = [
+    {
+      label: "Two-Factor Authentication",
+      description:
+        "Add an additional verification step when signing in.",
+      icon: <ShieldCheck size={18} />,
+      enabled: true,
+      status: "Protected",
+    },
+    {
+      label: "Session Timeout Protection",
+      description:
+        "Automatically protect inactive administrator sessions.",
+      icon: <Clock3 size={18} />,
+      enabled: true,
+      status: "Enabled",
+    },
+    {
+      label: "Password Recovery Options",
+      description:
+        "Allow account recovery through configured recovery methods.",
+      icon: <KeyRound size={18} />,
+      enabled: false,
+      status: "Disabled",
+    },
+  ];
+
   return (
-    <div className="flex-1 w-full h-full bg-gray-50 text-gray-900 p-6 overflow-y-auto">
-      {/* HEADER */}
-      <div className="mb-6 flex items-start gap-4">
-        <div className="p-3 bg-white border border-gray-200 rounded-xl shadow-sm">
-          <ShieldCheck className="text-green-600" size={20} />
+    <div className="w-full text-gray-900">
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
+
+      <div className="flex items-start justify-between gap-6 mb-7">
+        <div className="flex items-start gap-4">
+          <div
+            className="
+              w-12
+              h-12
+              rounded-2xl
+              bg-green-50
+              text-green-600
+              flex
+              items-center
+              justify-center
+              border
+              border-green-100
+              flex-shrink-0
+            "
+          >
+            <ShieldCheck size={21} strokeWidth={2.2} />
+          </div>
+
+          <div>
+            <h1 className="text-xl font-extrabold tracking-tight text-gray-900">
+              Security & Protection
+            </h1>
+
+            <p className="text-sm text-gray-400 mt-1">
+              Manage authentication, sessions, and account protection.
+            </p>
+          </div>
         </div>
 
-        <div>
-          <h1 className="text-2xl font-semibold">Security Settings</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Manage authentication, session rules, and account protection.
-          </p>
+        {/* SECURITY STATUS */}
+
+        <div
+          className="
+            hidden
+            sm:flex
+            items-center
+            gap-2
+            px-3
+            py-2
+            rounded-xl
+            bg-green-50
+            border
+            border-green-100
+            text-xs
+            font-semibold
+            text-green-700
+          "
+        >
+          <span className="w-2 h-2 rounded-full bg-green-500" />
+          Security Active
         </div>
       </div>
 
-      {/* MAIN CARD */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
-        {/* SECURITY OPTIONS */}
-        <div className="space-y-3 mb-8">
-          {[
-            {
-              label: "Two-Factor Authentication",
-              enabled: true,
-            },
-            {
-              label: "Session Timeout Protection",
-              enabled: true,
-            },
-            {
-              label: "Password Recovery Options",
-              enabled: false,
-            },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="flex items-center justify-between px-4 py-4 rounded-xl border border-gray-100 bg-gray-50 hover:bg-gray-100 transition"
-            >
-              <span className="text-sm font-medium text-gray-700">
-                {item.label}
-              </span>
+      {/* =====================================================
+          SECURITY OVERVIEW
+      ===================================================== */}
 
-              <Toggle defaultChecked={item.enabled} />
-            </div>
+      <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-7">
+        <SecuritySummary
+          icon={<ShieldCheck size={18} />}
+          label="Account Protection"
+          value="Protected"
+          description="Your security controls are active."
+        />
+
+        <SecuritySummary
+          icon={<LockKeyhole size={18} />}
+          label="Authentication"
+          value="Secure"
+          description="Additional authentication is enabled."
+        />
+
+        <SecuritySummary
+          icon={<Clock3 size={18} />}
+          label="Session Security"
+          value="Enabled"
+          description="Inactive sessions are protected."
+        />
+      </div>
+
+      {/* =====================================================
+          SECURITY CONTROLS
+      ===================================================== */}
+
+      <section
+        className="
+          bg-white
+          border
+          border-gray-100
+          rounded-3xl
+          p-6
+          shadow-[0_4px_24px_rgba(0,0,0,0.025)]
+          mb-7
+        "
+      >
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-sm font-bold text-gray-900">
+              Security Controls
+            </h2>
+
+            <p className="text-xs text-gray-400 mt-1">
+              Configure the protection features available to your account.
+            </p>
+          </div>
+
+          <ShieldAlert
+            size={19}
+            className="text-gray-300"
+          />
+        </div>
+
+        <div className="space-y-2">
+          {securityOptions.map((item) => (
+            <SecurityOption
+              key={item.label}
+              {...item}
+            />
           ))}
         </div>
+      </section>
 
-        {/* PASSWORD SECTION */}
-        <div className="border-t border-gray-100 pt-6">
-          <h3 className="text-sm font-semibold text-green-700 uppercase tracking-wide mb-4">
-            Change Password
-          </h3>
+      {/* =====================================================
+          CHANGE PASSWORD
+      ===================================================== */}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <Field
-              label="Current Password"
-              type="password"
-              name="oldPassword"
-              value={formData.oldPassword}
-              onChange={handleChange}
-            />
+      <section
+        className="
+          bg-white
+          border
+          border-gray-100
+          rounded-3xl
+          p-6
+          shadow-[0_4px_24px_rgba(0,0,0,0.025)]
+        "
+      >
+        {/* SECTION HEADER */}
 
-            <Field
-              label="New Password"
-              type="password"
-              name="newPassword"
-              value={formData.newPassword}
-              onChange={handleChange}
-            />
-
-            <Field
-              label="Confirm Password"
-              type="password"
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleChange}
-            />
+        <div className="flex items-start gap-3 mb-6">
+          <div
+            className="
+              w-10
+              h-10
+              rounded-xl
+              bg-gray-100
+              text-gray-600
+              flex
+              items-center
+              justify-center
+              flex-shrink-0
+            "
+          >
+            <LockKeyhole size={18} />
           </div>
 
-          {/* ACTION */}
-          <div className="mt-8 flex justify-end">
-            <button
-              onClick={handleUpdatePassword}
-              disabled={isLoading}
-              className="bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white font-medium px-6 py-2 rounded-xl shadow-sm transition"
-            >
-              {isLoading ? "Updating..." : "Update Password"}
-            </button>
+          <div>
+            <h2 className="text-sm font-bold text-gray-900">
+              Change Password
+            </h2>
+
+            <p className="text-xs text-gray-400 mt-1">
+              Update your administrator password to keep your account secure.
+            </p>
           </div>
         </div>
-      </div>
+
+        {/* PASSWORD FIELDS */}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <Field
+            label="Current Password"
+            type="password"
+            name="oldPassword"
+            value={formData.oldPassword}
+            onChange={handleChange}
+          />
+
+          <Field
+            label="New Password"
+            type="password"
+            name="newPassword"
+            value={formData.newPassword}
+            onChange={handleChange}
+          />
+
+          <Field
+            label="Confirm Password"
+            type="password"
+            name="confirmPassword"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+          />
+        </div>
+
+        {/* PASSWORD REQUIREMENT */}
+
+        <div
+          className="
+            mt-5
+            flex
+            items-center
+            gap-2
+            px-4
+            py-3
+            rounded-2xl
+            bg-gray-50
+            border
+            border-gray-100
+          "
+        >
+          <CheckCircle2
+            size={15}
+            className="text-green-500 flex-shrink-0"
+          />
+
+          <p className="text-xs text-gray-500">
+            Password must contain at least 6 characters.
+          </p>
+        </div>
+
+        {/* ACTION */}
+
+        <div className="mt-6 pt-5 border-t border-gray-100 flex justify-end">
+          <button
+            onClick={handleUpdatePassword}
+            disabled={isLoading}
+            className="
+              flex
+              items-center
+              justify-center
+              gap-2
+              px-5
+              py-2.5
+              rounded-xl
+              bg-green-600
+              hover:bg-green-700
+              disabled:bg-green-400
+              disabled:cursor-not-allowed
+              text-white
+              text-sm
+              font-semibold
+              shadow-sm
+              hover:shadow-md
+              transition-all
+              duration-200
+            "
+          >
+            <LockKeyhole size={16} />
+
+            {isLoading ? "Updating..." : "Update Password"}
+          </button>
+        </div>
+      </section>
     </div>
   );
 };
 
 export default Security;
 
-/* ================= FIELD ================= */
+/* =========================================================
+   SECURITY SUMMARY
+========================================================= */
+
+const SecuritySummary = ({
+  icon,
+  label,
+  value,
+  description,
+}) => (
+  <div
+    className="
+      bg-white
+      border
+      border-gray-100
+      rounded-3xl
+      p-5
+      shadow-[0_4px_24px_rgba(0,0,0,0.025)]
+    "
+  >
+    <div className="flex items-start justify-between">
+      <div>
+        <p className="text-xs font-semibold text-gray-400">
+          {label}
+        </p>
+
+        <p className="text-lg font-extrabold text-green-600 mt-2">
+          {value}
+        </p>
+      </div>
+
+      <div
+        className="
+          w-10
+          h-10
+          rounded-xl
+          bg-green-50
+          text-green-600
+          flex
+          items-center
+          justify-center
+        "
+      >
+        {icon}
+      </div>
+    </div>
+
+    <p className="text-[11px] text-gray-400 mt-4">
+      {description}
+    </p>
+
+    <div className="mt-4 h-1 w-10 rounded-full bg-green-500" />
+  </div>
+);
+
+/* =========================================================
+   SECURITY OPTION
+========================================================= */
+
+const SecurityOption = ({
+  label,
+  description,
+  icon,
+  enabled,
+  status,
+}) => (
+  <div
+    className="
+      group
+      flex
+      items-center
+      justify-between
+      gap-4
+      p-4
+      rounded-2xl
+      border
+      border-gray-100
+      bg-gray-50/70
+      hover:bg-white
+      hover:border-green-100
+      hover:shadow-sm
+      transition-all
+      duration-200
+    "
+  >
+    <div className="flex items-center gap-3 min-w-0">
+      <div
+        className={`
+          w-10
+          h-10
+          rounded-xl
+          flex
+          items-center
+          justify-center
+          flex-shrink-0
+          ${
+            enabled
+              ? "bg-green-50 text-green-600"
+              : "bg-gray-100 text-gray-400"
+          }
+        `}
+      >
+        {icon}
+      </div>
+
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold text-gray-800">
+            {label}
+          </p>
+
+          <span
+            className={`
+              hidden
+              sm:inline-flex
+              px-2
+              py-0.5
+              rounded-md
+              text-[9px]
+              font-bold
+              uppercase
+              tracking-wide
+              ${
+                enabled
+                  ? "bg-green-50 text-green-600"
+                  : "bg-gray-100 text-gray-400"
+              }
+            `}
+          >
+            {status}
+          </span>
+        </div>
+
+        <p className="text-[11px] text-gray-400 mt-1">
+          {description}
+        </p>
+      </div>
+    </div>
+
+    <Toggle defaultChecked={enabled} />
+  </div>
+);
+
+/* =========================================================
+   FIELD
+========================================================= */
 
 const Field = ({
   label,
@@ -175,7 +550,7 @@ const Field = ({
 }) => {
   return (
     <div>
-      <label className="text-sm text-gray-600 font-medium">
+      <label className="block text-xs font-semibold text-gray-500 mb-2">
         {label}
       </label>
 
@@ -185,9 +560,25 @@ const Field = ({
         value={value}
         onChange={onChange}
         placeholder="••••••••"
-        className="mt-2 w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm
-        text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2
-        focus:ring-green-500 focus:border-green-500 transition"
+        className="
+          w-full
+          bg-gray-50
+          border
+          border-gray-200
+          rounded-xl
+          px-4
+          py-3
+          text-sm
+          text-gray-900
+          placeholder-gray-400
+          focus:outline-none
+          focus:ring-2
+          focus:ring-green-500/20
+          focus:border-green-500
+          focus:bg-white
+          transition-all
+          duration-200
+        "
       />
     </div>
   );

@@ -11,6 +11,7 @@ import {
   HandHelping,
   BriefcaseBusiness,
   SlidersHorizontal,
+  LogOut,
 } from "lucide-react";
 
 import SchoolInformation from "../components/settings/SchoolInformation";
@@ -32,10 +33,7 @@ const SettingsPage = () => {
     "Admin";
 
   const adminPhoto =
-    user?.profilePhoto ||
-    user?.profilePicture ||
-    user?.photo ||
-    null;
+    user?.profilePhoto || user?.profilePicture || user?.photo || null;
 
   const [activeTab, setActiveTab] = useState("School Information");
 
@@ -71,45 +69,47 @@ const SettingsPage = () => {
 
   return (
     <div className="h-screen w-screen flex bg-[#F4F7FB] text-gray-900 overflow-hidden">
-
       {/* =====================================================
-          SIDEBAR
-      ===================================================== */}
-      <aside
-        className="
-          hidden
-          lg:flex
-          w-[270px]
-          bg-white
-          border-r
-          border-gray-100
-          flex-col
-          justify-between
-          px-5
-          py-6
-          flex-shrink-0
-        "
-      >
-        {/* ===================================================
-            SIDEBAR TOP
-        =================================================== */}
-        <div>
-          {/* LOGO */}
-          <div className="px-2 mb-8">
-            <h1 className="text-2xl font-black tracking-tight text-green-600">
-              GuidEd
-            </h1>
+    SIDEBAR
+===================================================== */}
 
-            <p className="text-[11px] leading-relaxed text-gray-400 mt-1">
+      <aside className="hidden lg:flex w-[270px] bg-white border-r border-gray-100 flex-col justify-between px-5 py-6">
+        <div>
+          {/* BRAND */}
+          <div className="px-3 mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 flex items-center justify-center">
+                <img
+                  src="/school-logo.png"
+                  alt="School Logo"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+
+              <div>
+                <h1 className="text-xl font-extrabold tracking-tight text-gray-900">
+                  Guid<span className="text-green-600">Ed</span>
+                </h1>
+
+                <p className="text-[9px] uppercase tracking-widest text-gray-400 font-semibold">
+                  Student Guidance
+                </p>
+              </div>
+            </div>
+
+            <p className="text-[11px] leading-relaxed text-gray-400 mt-4">
               Our Lady of the Holy Rosary School
               <br />
               General Trias Campus
             </p>
           </div>
 
-          {/* NAVIGATION */}
-          <nav className="space-y-1">
+          {/* MAIN MENU */}
+          <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+            Main Menu
+          </p>
 
+          <div className="space-y-1">
             <Nav
               icon={<LayoutDashboard size={18} />}
               label="Dashboard"
@@ -145,128 +145,79 @@ const SettingsPage = () => {
               label="Interventions"
               onClick={() => navigate("/interventions")}
             />
+          </div>
 
-            <Nav
-              icon={<Settings size={18} />}
-              label="Settings"
-              active
-            />
-          </nav>
+          {/* SYSTEM */}
+          <p className="px-3 mt-8 mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+            System
+          </p>
+
+          <Nav icon={<Settings size={18} />} label="Settings" active />
         </div>
 
-        {/* ===================================================
-            SIDEBAR BOTTOM
-        =================================================== */}
+        {/* SIDEBAR FOOTER */}
         <div className="space-y-3">
-
           {/* ADMIN PROFILE */}
-          <div
-            className="
-              flex
-              items-center
-              gap-3
-              p-3
-              rounded-2xl
-              bg-gray-50
-              border
-              border-gray-100
-            "
-          >
-            {/* PROFILE PHOTO */}
-            <div
-              className="
-                relative
-                w-10
-                h-10
-                rounded-xl
-                overflow-hidden
-                bg-green-50
-                border
-                border-green-100
-                flex
-                items-center
-                justify-center
-                flex-shrink-0
-              "
-            >
-              {adminPhoto ? (
-                <img
-                  src={adminPhoto}
-                  alt={adminName}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : (
-                <span className="text-green-700 font-bold text-base">
-                  {adminName.charAt(0).toUpperCase()}
-                </span>
-              )}
+          <div className="p-3 rounded-2xl bg-gray-50 border border-gray-100">
+            <div className="flex items-center gap-3">
+              {/* PROFILE PHOTO */}
+              <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-green-100 flex items-center justify-center flex-shrink-0">
+                {adminPhoto ? (
+                  <img
+                    src={adminPhoto}
+                    alt={adminName}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <span className="text-green-700 font-bold">
+                    {adminName.charAt(0).toUpperCase()}
+                  </span>
+                )}
 
-              {/* ONLINE DOT */}
-              <span
-                className="
-                  absolute
-                  bottom-0.5
-                  right-0.5
-                  w-2.5
-                  h-2.5
-                  rounded-full
-                  bg-green-500
-                  border-2
-                  border-white
-                "
-              />
-            </div>
+                {/* ONLINE DOT */}
+                <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white" />
+              </div>
 
-            {/* ADMIN INFO */}
-            <div className="min-w-0 flex-1">
-              <p
-                className="
-                  text-[9px]
-                  uppercase
-                  tracking-[0.12em]
-                  text-gray-400
-                  font-semibold
-                "
-              >
-                Administrator
-              </p>
+              {/* ADMIN INFO */}
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400">
+                  Administrator
+                </p>
 
-              <p
-                className="
-                  text-sm
-                  font-bold
-                  text-gray-900
-                  truncate
-                  mt-0.5
-                "
-              >
-                {adminName}
-              </p>
+                <p className="text-sm font-bold text-gray-900 truncate">
+                  {adminName}
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* LOGOUT */}
+          {/* SIGN OUT */}
           <button
             onClick={logout}
             className="
-              w-full
-              bg-green-600
-              hover:bg-green-700
-              text-white
-              py-2.5
-              rounded-xl
-              text-sm
-              font-semibold
-              shadow-sm
-              hover:shadow-md
-              transition-all
-              duration-200
-            "
+        w-full
+        flex
+        items-center
+        justify-center
+        gap-2
+        py-2.5
+        rounded-xl
+        text-sm
+        font-semibold
+        text-gray-600
+        border
+        border-gray-200
+        hover:bg-red-50
+        hover:text-red-600
+        hover:border-red-100
+        transition
+      "
           >
-            Logout
+            <LogOut size={16} />
+            Sign out
           </button>
         </div>
       </aside>
@@ -275,7 +226,6 @@ const SettingsPage = () => {
           MAIN CONTENT
       ===================================================== */}
       <main className="flex-1 min-w-0 overflow-y-auto">
-
         {/* ===================================================
             HEADER
         =================================================== */}
@@ -293,7 +243,6 @@ const SettingsPage = () => {
           "
         >
           <div className="w-full">
-
             {/* =================================================
                 BREADCRUMB
             ================================================= */}
@@ -302,9 +251,7 @@ const SettingsPage = () => {
                 Overview
               </span>
 
-              <span className="text-xs text-gray-300">
-                /
-              </span>
+              <span className="text-xs text-gray-300">/</span>
 
               <span className="text-xs font-semibold text-green-600">
                 Settings
@@ -315,10 +262,8 @@ const SettingsPage = () => {
                 PAGE HEADER ROW
             ================================================= */}
             <div className="flex items-center justify-between gap-6">
-
               {/* PAGE TITLE */}
               <div className="flex items-center gap-4 min-w-0">
-
                 {/* ICON */}
                 <div
                   className="
@@ -335,10 +280,7 @@ const SettingsPage = () => {
                     flex-shrink-0
                   "
                 >
-                  <SlidersHorizontal
-                    size={21}
-                    strokeWidth={2.2}
-                  />
+                  <SlidersHorizontal size={21} strokeWidth={2.2} />
                 </div>
 
                 {/* TITLE */}
@@ -391,7 +333,6 @@ const SettingsPage = () => {
             PAGE CONTENT
         =================================================== */}
         <div className="px-8 py-7">
-
           {/* =================================================
               SETTINGS NAVIGATION
           ================================================= */}
@@ -461,11 +402,8 @@ const SettingsPage = () => {
               overflow-hidden
             "
           >
-            <div className="p-7">
-              {renderTab()}
-            </div>
+            <div className="p-7">{renderTab()}</div>
           </section>
-
         </div>
       </main>
     </div>
@@ -491,29 +429,17 @@ const Nav = ({ icon, label, onClick, active }) => (
       rounded-xl
       w-full
       text-sm
-      transition-all
-      duration-200
+      transition
       ${
         active
-          ? `
-            bg-green-50
-            text-green-700
-            font-semibold
-          `
-          : `
-            text-gray-500
-            hover:bg-gray-50
-            hover:text-gray-900
-          `
+          ? "bg-green-50 text-green-700 font-semibold"
+          : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
       }
     `}
   >
     <span
       className={`
-        flex
-        items-center
-        justify-center
-        transition-colors
+        transition
         ${
           active
             ? "text-green-600"
@@ -524,6 +450,10 @@ const Nav = ({ icon, label, onClick, active }) => (
       {icon}
     </span>
 
-    <span>{label}</span>
+    {label}
+
+    {active && (
+      <span className="ml-auto w-1.5 h-1.5 rounded-full bg-green-600" />
+    )}
   </button>
 );

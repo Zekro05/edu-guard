@@ -1,4 +1,10 @@
-import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
 import { useEffect } from "react";
 import { Toaster } from "react-hot-toast";
 
@@ -16,113 +22,212 @@ import SettingsPage from "./pages/SettingsPage.jsx";
 import GuidancePage from "./pages/GuidancePage.jsx";
 import InterventionPage from "./pages/InterventionPage.jsx";
 import CaseManagement from "./pages/CaseManagement.jsx";
+
+import GlobalNotifications from "./components/GlobalNotifications.jsx";
+
 import { useAuthStore } from "./store/authStore.js";
-import { registerWebFCM } from "./services/fcmService.js";
 
+/* =========================================================
+   PROTECTED ROUTE
+========================================================= */
 
-
-// ================== PROTECTED ROUTE ==================
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, user, isCheckingAuth } = useAuthStore();
+  const {
+    isAuthenticated,
+    user,
+    isCheckingAuth,
+  } = useAuthStore();
 
   if (isCheckingAuth) {
-    return <div className="text-white text-center mt-20">Checking authentication...</div>;
+    return (
+      <div className="text-white text-center mt-20">
+        Checking authentication...
+      </div>
+    );
   }
 
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!user?.isVerified) return <Navigate to="/verify-email" replace />;
+  if (!isAuthenticated) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
+  }
+
+  if (!user?.isVerified) {
+    return (
+      <Navigate
+        to="/verify-email"
+        replace
+      />
+    );
+  }
 
   return children;
 };
 
-// ================== REDIRECT AUTHENTICATED USERS ==================
-const RedirectAuthenticatedUser = ({ children }) => {
-  const { isAuthenticated, user, isCheckingAuth } = useAuthStore();
+/* =========================================================
+   REDIRECT AUTHENTICATED USERS
+========================================================= */
+
+const RedirectAuthenticatedUser = ({
+  children,
+}) => {
+  const {
+    isAuthenticated,
+    user,
+    isCheckingAuth,
+  } = useAuthStore();
+
   const location = useLocation();
 
   if (isCheckingAuth) {
-    return <div className="text-white text-center mt-20">Checking authentication...</div>;
+    return (
+      <div className="text-white text-center mt-20">
+        Checking authentication...
+      </div>
+    );
   }
 
-  // Allow /signup page to render even if user is authenticated
-  if (location.pathname === "/signup") return children;
+  /*
+   * Allow signup even if a user is already authenticated.
+   */
+  if (
+    location.pathname === "/signup"
+  ) {
+    return children;
+  }
 
-  // Redirect authenticated & verified users away from login/signup
-  if (isAuthenticated && user?.isVerified) return <Navigate to="/dashboard" replace />;
+  /*
+   * Redirect authenticated and verified users
+   * away from login/auth pages.
+   */
+  if (
+    isAuthenticated &&
+    user?.isVerified
+  ) {
+    return (
+      <Navigate
+        to="/dashboard"
+        replace
+      />
+    );
+  }
 
   return children;
 };
 
+/* =========================================================
+   APP
+========================================================= */
 
 function App() {
   const {
     checkAuth,
     isCheckingAuth,
     isAuthenticated,
-    user,
     startInactivityTimer,
     resetInactivityTimer,
   } = useAuthStore();
 
   const navigate = useNavigate();
 
-  // 1️⃣ Check authentication on app load
+  /* =======================================================
+     CHECK AUTHENTICATION ON APP LOAD
+  ======================================================= */
+
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
 
-  // =====================================================
-  // REGISTER WEB FCM
-  // =====================================================
+  /* =======================================================
+     GLOBAL WEB FCM NOTIFICATION REGISTRATION
+     
+     This component stays mounted regardless of which
+     protected page the admin is currently viewing.
+
+     Therefore web FCM notifications can be received on:
+
+     /dashboard
+     /students
+     /guidance
+     /reports
+     /cases
+     /interventions
+     /settings
+  ======================================================= */
 
   useEffect(() => {
-  const registerFCM = async () => {
-    if (!isAuthenticated || !user?._id) {
-      console.log("⛔ Web FCM registration skipped");
+    if (!isAuthenticated) {
+      console.log(
+        "🔕 Global FCM listener waiting for authentication..."
+      );
+
       return;
     }
 
-    try {
-      console.log("====================================");
-      console.log("🔥 WEB FCM REGISTRATION");
-      console.log("USER:", user._id);
-      console.log("====================================");
+    console.log(
+      "🌐 Admin authenticated - global notification system active."
+    );
+  }, [isAuthenticated]);
 
-      const result = await registerWebFCM();
+  /* =======================================================
+     INACTIVITY AUTO-LOGOUT
+  ======================================================= */
 
-      console.log("🔥 Web FCM registration result:", result);
-    } catch (error) {
-      console.error(
-        "❌ WEB FCM REGISTRATION ERROR:",
-        error?.response?.data ||
-          error?.message ||
-          error
-      );
-    }
-  };
-
-  registerFCM();
-}, [isAuthenticated, user?._id]);
-
-
-  // 2️⃣ Setup inactivity auto-logout only once for authenticated users
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      return;
+    }
 
-    const activityEvents = ["mousemove", "keydown", "click", "scroll", "touchstart"];
-    const handleActivity = () => resetInactivityTimer();
+    const activityEvents = [
+      "mousemove",
+      "keydown",
+      "click",
+      "scroll",
+      "touchstart",
+    ];
 
-    activityEvents.forEach((event) => window.addEventListener(event, handleActivity));
+    const handleActivity = () => {
+      resetInactivityTimer();
+    };
 
-    // Start inactivity timer with redirect callback
-    startInactivityTimer(() => navigate("/login", { replace: true }));
+    activityEvents.forEach((event) => {
+      window.addEventListener(
+        event,
+        handleActivity
+      );
+    });
+
+    startInactivityTimer(() => {
+      navigate(
+        "/login",
+        {
+          replace: true,
+        }
+      );
+    });
 
     return () => {
-      activityEvents.forEach((event) => window.removeEventListener(event, handleActivity));
+      activityEvents.forEach((event) => {
+        window.removeEventListener(
+          event,
+          handleActivity
+        );
+      });
     };
-  }, [isAuthenticated, navigate]); // ✅ only runs when auth state changes
+  }, [
+    isAuthenticated,
+    navigate,
+    resetInactivityTimer,
+    startInactivityTimer,
+  ]);
 
-  // Show loading until auth is confirmed
+  /* =======================================================
+     SHOW LOADING UNTIL AUTH IS CONFIRMED
+  ======================================================= */
+
   if (isCheckingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white text-lg">
@@ -131,13 +236,43 @@ function App() {
     );
   }
 
+  /* =======================================================
+     APP RENDER
+  ======================================================= */
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-green-900 to-emerald-900 flex items-center justify-center relative overflow-hidden">
-      {/* Floating Shapes */}
+
+      {/* ===================================================
+          FLOATING BACKGROUND
+      =================================================== */}
+
       <FloatingShape />
 
-      {/* Routes */}
+      {/* ===================================================
+          GLOBAL WEB FCM NOTIFICATIONS
+
+          IMPORTANT:
+          This is OUTSIDE <Routes>.
+
+          It will therefore remain mounted while navigating
+          around the entire authenticated web application.
+      =================================================== */}
+
+      {isAuthenticated && (
+        <GlobalNotifications />
+      )}
+
+      {/* ===================================================
+          ROUTES
+      =================================================== */}
+
       <Routes>
+
+        {/* =================================================
+            DASHBOARD
+        ================================================= */}
+
         <Route
           path="/dashboard"
           element={
@@ -146,6 +281,11 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* =================================================
+            STUDENTS
+        ================================================= */}
+
         <Route
           path="/students"
           element={
@@ -155,6 +295,10 @@ function App() {
           }
         />
 
+        {/* =================================================
+            GUIDANCE
+        ================================================= */}
+
         <Route
           path="/guidance"
           element={
@@ -163,6 +307,11 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* =================================================
+            REPORTS
+        ================================================= */}
+
         <Route
           path="/reports"
           element={
@@ -172,15 +321,22 @@ function App() {
           }
         />
 
+        {/* =================================================
+            CASES
+        ================================================= */}
+
         <Route
           path="/cases"
           element={
             <ProtectedRoute>
-              <CaseManagement/>
+              <CaseManagement />
             </ProtectedRoute>
           }
         />
 
+        {/* =================================================
+            INTERVENTIONS
+        ================================================= */}
 
         <Route
           path="/interventions"
@@ -190,6 +346,11 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* =================================================
+            SETTINGS
+        ================================================= */}
+
         <Route
           path="/settings"
           element={
@@ -199,6 +360,10 @@ function App() {
           }
         />
 
+        {/* =================================================
+            SIGNUP
+        ================================================= */}
+
         <Route
           path="/signup"
           element={
@@ -207,6 +372,11 @@ function App() {
             </RedirectAuthenticatedUser>
           }
         />
+
+        {/* =================================================
+            LOGIN
+        ================================================= */}
+
         <Route
           path="/login"
           element={
@@ -215,6 +385,11 @@ function App() {
             </RedirectAuthenticatedUser>
           }
         />
+
+        {/* =================================================
+            FORGOT PASSWORD
+        ================================================= */}
+
         <Route
           path="/forgot-password"
           element={
@@ -223,6 +398,11 @@ function App() {
             </RedirectAuthenticatedUser>
           }
         />
+
+        {/* =================================================
+            RESET PASSWORD
+        ================================================= */}
+
         <Route
           path="/reset-password"
           element={
@@ -231,6 +411,11 @@ function App() {
             </RedirectAuthenticatedUser>
           }
         />
+
+        {/* =================================================
+            NEW PASSWORD
+        ================================================= */}
+
         <Route
           path="/reset-password/new"
           element={
@@ -239,9 +424,51 @@ function App() {
             </RedirectAuthenticatedUser>
           }
         />
-        <Route path="/verify-email" element={<EmailVerificationPage />} />
+
+        {/* =================================================
+            EMAIL VERIFICATION
+        ================================================= */}
+
+        <Route
+          path="/verify-email"
+          element={
+            <EmailVerificationPage />
+          }
+        />
+
+        {/* =================================================
+            DEFAULT ROUTE
+        ================================================= */}
+
+        <Route
+          path="*"
+          element={
+            isAuthenticated ? (
+              <Navigate
+                to="/dashboard"
+                replace
+              />
+            ) : (
+              <Navigate
+                to="/login"
+                replace
+              />
+            )
+          }
+        />
+
       </Routes>
-      <Toaster />
+
+      {/* ===================================================
+          TOAST
+      =================================================== */}
+
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+        }}
+      />
     </div>
   );
 }
