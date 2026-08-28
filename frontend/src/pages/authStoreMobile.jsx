@@ -5,13 +5,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert, Platform } from "react-native";
 
 import {
-  messaging,
   requestPermission,
+  registerRemoteMessages,
   getToken,
   onMessage,
   onTokenRefresh,
   AuthorizationStatus,
-} from "../config/firebase";
+} from "../../config/firebase.js";
 
 /* =========================================================
    API
@@ -33,7 +33,8 @@ let cachedToken = null;
 
 let cachedPushToken = null;
 
-const PUSH_TOKEN_STORAGE_KEY = "eduGuardPushToken";
+const PUSH_TOKEN_STORAGE_KEY =
+  "eduGuardPushToken";
 
 /* =========================================================
    FCM LISTENER CLEANUP
@@ -44,92 +45,127 @@ let unsubscribeFCMMessage = null;
 
 /* =========================================================
    REGISTER FCM TOKEN
+   ANDROID + IOS
 ========================================================= */
 
-const registerForPushNotificationsAsync = async () => {
-  try {
-    console.log("====================================");
-    console.log("🔥 REGISTERING FCM");
-    console.log("====================================");
+const registerForPushNotificationsAsync =
+  async () => {
+    try {
+      console.log("====================================");
+      console.log("🔥 REGISTERING FCM");
+      console.log("====================================");
 
-    /* =====================================================
-       WEB CHECK
-    ===================================================== */
+      /* =====================================================
+         WEB CHECK
+      ===================================================== */
 
-    if (Platform.OS === "web") {
+      if (Platform.OS === "web") {
+        console.log(
+          "⚠️ FCM push notifications are not supported in this mobile setup on web."
+        );
+
+        return null;
+      }
+
+      /* =====================================================
+         REGISTER DEVICE FOR REMOTE MESSAGES
+
+         Required for native Firebase messaging.
+         Works for Android and iOS.
+      ===================================================== */
+
       console.log(
-        "⚠️ FCM push notifications are not supported in this mobile setup on web."
+        "📱 Registering device for remote messages..."
       );
+
+      const registered =
+        await registerRemoteMessages();
+
+      if (!registered) {
+        console.log(
+          "❌ Failed to register device for remote messages."
+        );
+
+        return null;
+      }
+
+      console.log(
+        "✅ Device registered for remote messages."
+      );
+
+      /* =====================================================
+         REQUEST NOTIFICATION PERMISSION
+      ===================================================== */
+
+      console.log(
+        "🔔 Requesting notification permission..."
+      );
+
+      const authStatus =
+        await requestPermission();
+
+      const enabled =
+        authStatus ===
+          AuthorizationStatus.AUTHORIZED ||
+        authStatus ===
+          AuthorizationStatus.PROVISIONAL;
+
+      console.log(
+        "🔔 FCM authorization status:",
+        authStatus
+      );
+
+      if (!enabled) {
+        console.log(
+          "❌ FCM notification permission denied."
+        );
+
+        return null;
+      }
+
+      console.log(
+        "✅ FCM notification permission granted."
+      );
+
+      /* =====================================================
+         GET FCM REGISTRATION TOKEN
+
+         Same FCM token mechanism for Android + iOS.
+      ===================================================== */
+
+      console.log(
+        "📱 Requesting FCM registration token..."
+      );
+
+      const token = await getToken();
+
+      if (!token) {
+        console.log(
+          "❌ FCM token was not generated."
+        );
+
+        return null;
+      }
+
+      console.log("====================================");
+      console.log("🔥 FCM TOKEN:");
+      console.log(token);
+      console.log("====================================");
+
+      return token;
+    } catch (error) {
+      console.error("====================================");
+      console.error("❌ FCM REGISTRATION ERROR");
+      console.error(
+        error?.response?.data ||
+          error?.message ||
+          error
+      );
+      console.error("====================================");
 
       return null;
     }
-
-    /* =====================================================
-       REQUEST NOTIFICATION PERMISSION
-    ===================================================== */
-
-    const authStatus = await requestPermission(
-      messaging
-    );
-
-    const enabled =
-      authStatus === AuthorizationStatus.AUTHORIZED ||
-      authStatus === AuthorizationStatus.PROVISIONAL;
-
-    console.log(
-      "🔔 FCM authorization status:",
-      authStatus
-    );
-
-    if (!enabled) {
-      console.log(
-        "❌ FCM notification permission denied."
-      );
-
-      return null;
-    }
-
-    console.log(
-      "✅ FCM notification permission granted."
-    );
-
-    /* =====================================================
-       GET FCM REGISTRATION TOKEN
-    ===================================================== */
-
-    console.log(
-      "📱 Requesting FCM registration token..."
-    );
-
-    const token = await getToken(messaging);
-
-    if (!token) {
-      console.log(
-        "❌ FCM token was not generated."
-      );
-
-      return null;
-    }
-
-    console.log("====================================");
-    console.log("🔥 FCM TOKEN:");
-    console.log(token);
-    console.log("====================================");
-
-    return token;
-  } catch (error) {
-    console.error("====================================");
-    console.error("❌ FCM REGISTRATION ERROR");
-    console.error(
-      error?.response?.data ||
-        error?.message ||
-        error
-    );
-    console.error("====================================");
-
-    return null;
-  }
-};
+  };
 
 /* =========================================================
    GET PLATFORM
@@ -348,7 +384,7 @@ const removePushTokenFromBackend = async () => {
     }
 
     /* =====================================================
-       GET CURRENT DEVICE TOKEN
+       GET CURRENT DEVICE FCM TOKEN
     ===================================================== */
 
     const token =
@@ -438,7 +474,6 @@ const setupFCMTokenRefresh = () => {
 
     unsubscribeFCMTokenRefresh =
       onTokenRefresh(
-        messaging,
         async (newToken) => {
           console.log("====================================");
           console.log(
@@ -530,7 +565,6 @@ const setupFCMMessageListener = () => {
 
     unsubscribeFCMMessage =
       onMessage(
-        messaging,
         async (remoteMessage) => {
           console.log("====================================");
           console.log(
@@ -708,20 +742,29 @@ const connectSocketSafely = (userId) => {
    SETUP FCM AFTER AUTHENTICATION
 ========================================================= */
 
-const setupFCMAfterAuthentication = async () => {
-  try {
-    await savePushTokenToBackend();
+const setupFCMAfterAuthentication =
+  async () => {
+    try {
+      /* =================================================
+         START LISTENERS FIRST
+      ================================================= */
 
-    setupFCMTokenRefresh();
+      setupFCMTokenRefresh();
 
-    setupFCMMessageListener();
-  } catch (error) {
-    console.log(
-      "SETUP FCM AFTER AUTH ERROR:",
-      error?.message
-    );
-  }
-};
+      setupFCMMessageListener();
+
+      /* =================================================
+         REGISTER DEVICE + SAVE TOKEN
+      ================================================= */
+
+      await savePushTokenToBackend();
+    } catch (error) {
+      console.log(
+        "SETUP FCM AFTER AUTH ERROR:",
+        error?.message
+      );
+    }
+  };
 
 /* =========================================================
    AUTH STORE
@@ -836,13 +879,20 @@ export const useAuthStore = create(
             };
           }
 
+          /* ===============================================
+             SETUP LISTENERS
+          =============================================== */
+
+          setupFCMTokenRefresh();
+
+          setupFCMMessageListener();
+
+          /* ===============================================
+             REGISTER + SAVE TOKEN
+          =============================================== */
+
           const success =
             await savePushTokenToBackend();
-
-          if (success) {
-            setupFCMTokenRefresh();
-            setupFCMMessageListener();
-          }
 
           return {
             success,
@@ -1707,7 +1757,7 @@ export const useAuthStore = create(
       try {
         /* =================================================
            REMOVE CURRENT DEVICE FCM TOKEN
-           
+
            JWT IS STILL AVAILABLE HERE.
         ================================================= */
 
@@ -2608,3 +2658,4 @@ export const useAuthStore = create(
       },
   })
 );
+

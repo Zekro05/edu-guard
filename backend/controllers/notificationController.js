@@ -1,5 +1,9 @@
 import User from "../models/userModel.js";
 
+/* =========================================================
+   SAVE FCM TOKEN
+========================================================= */
+
 export const saveFCMToken = async (req, res) => {
   try {
     const { token, platform, provider = "fcm" } = req.body;
@@ -27,22 +31,16 @@ export const saveFCMToken = async (req, res) => {
       });
     }
 
-    /*
-    =====================================================
-    REMOVE DUPLICATE TOKEN
-    =====================================================
-    */
+    if (!Array.isArray(user.pushTokens)) {
+      user.pushTokens = [];
+    }
 
+    /* Remove duplicate token */
     user.pushTokens = user.pushTokens.filter(
       (item) => item.token !== token
     );
 
-    /*
-    =====================================================
-    SAVE TOKEN
-    =====================================================
-    */
-
+    /* Save new token */
     user.pushTokens.push({
       token,
       platform,
@@ -64,11 +62,27 @@ export const saveFCMToken = async (req, res) => {
     });
   }
 };
-/* ================= GET SETTINGS ================= */
+
+
+/* =========================================================
+   GET NOTIFICATION SETTINGS
+   Shared by:
+   - Admin Web
+   - Teacher Mobile
+   - Student Mobile
+========================================================= */
+
 export const getNotificationSettings = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select(
-      "notificationSettings"
+    if (!req.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const user = await User.findById(req.userId).select(
+      "notificationSettings role"
     );
 
     if (!user) {
@@ -78,24 +92,42 @@ export const getNotificationSettings = async (req, res) => {
       });
     }
 
-    res.json({
+    return res.status(200).json({
       success: true,
-      settings: user.notificationSettings,
+      settings: user.notificationSettings || {},
     });
   } catch (err) {
-    console.error(err);
+    console.error(
+      "GET NOTIFICATION SETTINGS ERROR:",
+      err
+    );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: err.message,
+      message: err.message || "Failed to load notification settings",
     });
   }
 };
 
-/* ================= UPDATE SETTINGS ================= */
+
+/* =========================================================
+   UPDATE NOTIFICATION SETTINGS
+   Shared by:
+   - Admin Web
+   - Teacher Mobile
+   - Student Mobile
+========================================================= */
+
 export const updateNotificationSettings = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    if (!req.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const user = await User.findById(req.userId);
 
     if (!user) {
       return res.status(404).json({
@@ -104,23 +136,132 @@ export const updateNotificationSettings = async (req, res) => {
       });
     }
 
+    if (!req.body || typeof req.body !== "object") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid notification settings",
+      });
+    }
+
+    /*
+    =====================================================
+    ALLOWED SETTINGS
+
+    These are shared between student, teacher, and admin.
+    Admin-specific settings are also allowed because this
+    controller is shared.
+    =====================================================
+    */
+
+    const allowedSettings = [
+      "mute",
+      "incidentUpdates",
+      "guidanceMessages",
+      "systemAnnouncements",
+      "highRiskAlerts",
+      "quietHours",
+      "sound",
+      "vibration",
+
+      // Admin settings
+      "emailAlerts",
+      "aiPredictionAlerts",
+      "securityWarnings",
+
+      // Optional email destinations
+      "adminEmail",
+      "guidanceEmail",
+    ];
+
+    const updates = {};
+
+    for (const key of allowedSettings) {
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          key
+        )
+      ) {
+        updates[key] = req.body[key];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid notification settings provided",
+      });
+    }
+
+    /*
+    =====================================================
+    TYPE VALIDATION
+
+    Boolean settings must actually be booleans.
+    =====================================================
+    */
+
+    const booleanSettings = [
+      "mute",
+      "incidentUpdates",
+      "guidanceMessages",
+      "systemAnnouncements",
+      "highRiskAlerts",
+      "quietHours",
+      "sound",
+      "vibration",
+      "emailAlerts",
+      "aiPredictionAlerts",
+      "securityWarnings",
+    ];
+
+    for (const key of booleanSettings) {
+      if (
+        Object.prototype.hasOwnProperty.call(
+          updates,
+          key
+        ) &&
+        typeof updates[key] !== "boolean"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: `${key} must be a boolean`,
+        });
+      }
+    }
+
+    /*
+    =====================================================
+    UPDATE ONLY THE PROVIDED SETTINGS
+
+    This prevents one mobile setting from accidentally
+    deleting the other settings.
+    =====================================================
+    */
+
     user.notificationSettings = {
-      ...user.notificationSettings,
-      ...req.body,
+      ...(user.notificationSettings || {}),
+      ...updates,
     };
 
     await user.save();
 
-    res.json({
+    return res.status(200).json({
       success: true,
+      message: "Notification settings updated successfully",
       settings: user.notificationSettings,
     });
   } catch (err) {
-    console.error(err);
+    console.error(
+      "UPDATE NOTIFICATION SETTINGS ERROR:",
+      err
+    );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: err.message,
+      message:
+        err.message ||
+        "Failed to update notification settings",
     });
   }
 };
