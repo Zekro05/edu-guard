@@ -220,6 +220,35 @@ const statusLabels = {
 };
 
 /* =========================================================
+   GET CASE DATE
+========================================================= */
+
+/*
+  Some incident records may not have a top-level `date`.
+  Depending on how the incident/report was created, the date
+  may instead be stored as `incidentDate`, `createdAt`, or
+  inside the populated report/reportId object.
+
+  We resolve all supported locations here so the printable
+  report and PDF always receive one normalized `date` value.
+*/
+
+const getCaseDate = (c = {}) => {
+  return (
+    c.date ||
+    c.incidentDate ||
+    c.createdAt ||
+    c.reportId?.date ||
+    c.reportId?.incidentDate ||
+    c.reportId?.createdAt ||
+    c.report?.date ||
+    c.report?.incidentDate ||
+    c.report?.createdAt ||
+    null
+  );
+};
+
+/* =========================================================
    NORMALIZE CASE
 ========================================================= */
 
@@ -253,6 +282,12 @@ const normalizeCase = (c) => {
 
   return {
     ...c,
+
+    /* =======================================================
+       NORMALIZED DATE
+    ======================================================= */
+
+    date: getCaseDate(c),
 
     offense:
       c.offense ||
@@ -721,12 +756,15 @@ const CasePrintableReport = ({ onClose }) => {
       const green = [22, 163, 74];
       const dark = [17, 24, 39];
       const gray = [107, 114, 128];
+
       const lightGray = [
         249, 250, 251,
       ];
+
       const border = [
         229, 231, 235,
       ];
+
       const white = [255, 255, 255];
 
       /* =====================================================
@@ -2718,8 +2756,5 @@ const SummaryCard = ({
   );
 };
 
-/* =========================================================
-   DEFAULT EXPORT
-========================================================= */
-
 export default CasePrintableReport;
+

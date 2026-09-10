@@ -184,7 +184,8 @@ const InterventionPage = () => {
 
   const getIncidentInterventions = (incidentId) => {
     return interventions.filter(
-      (i) => String(i.incidentId?._id || i.incidentId) === String(incidentId),
+      (i) =>
+        String(i.incidentId?._id || i.incidentId) === String(incidentId),
     );
   };
 
@@ -195,7 +196,9 @@ const InterventionPage = () => {
       return "none";
     }
 
-    const allCompleted = list.every((i) => i.status === "completed");
+    const allCompleted = list.every(
+      (i) => String(i.status || "").toLowerCase() === "completed",
+    );
 
     if (allCompleted) {
       return "completed";
@@ -298,45 +301,79 @@ const InterventionPage = () => {
   };
 
   /* =========================================================
+     INTERVENTION CASES
+  ========================================================= */
+
+  /*
+    An intervention case is:
+
+    1. An incident currently marked "intervention-ready"
+       and therefore available for a new intervention
+
+    OR
+
+    2. An incident that already has an intervention
+
+    This is important because once an intervention is completed,
+    the backend may change the incident status. We still need
+    the case to remain visible in the intervention page.
+  */
+
+  const interventionCases = useMemo(() => {
+    return cases.filter((c) => {
+      const interventionList = getIncidentInterventions(c.incidentId);
+
+      return (
+        c.status === "intervention-ready" ||
+        interventionList.length > 0
+      );
+    });
+  }, [cases, interventions]);
+
+  /* =========================================================
      FILTER
   ========================================================= */
 
   const filtered = useMemo(() => {
-    return cases.filter((c) => {
-      if (c.status !== "intervention-ready") return false;
-
+    return interventionCases.filter((c) => {
       const status = getIncidentInterventionStatus(c.incidentId);
 
-      if (tab !== "all" && tab !== status) return false;
+      // Status filter
+      if (tab !== "all" && tab !== status) {
+        return false;
+      }
+
+      // Search filter
+      const searchTerm = search.trim().toLowerCase();
 
       if (
-        search &&
-        !c.studentName.toLowerCase().includes(search.toLowerCase()) &&
-        !c.offense.toLowerCase().includes(search.toLowerCase())
+        searchTerm &&
+        !c.studentName.toLowerCase().includes(searchTerm) &&
+        !c.offense.toLowerCase().includes(searchTerm)
       ) {
         return false;
       }
 
       return true;
     });
-  }, [cases, tab, search, interventions]);
+  }, [interventionCases, tab, search]);
 
   /* =========================================================
      STATS
   ========================================================= */
 
   const stats = {
-    total: cases.length,
+    total: interventionCases.length,
 
-    ongoing: cases.filter(
+    ongoing: interventionCases.filter(
       (c) => getIncidentInterventionStatus(c.incidentId) === "ongoing",
     ).length,
 
-    completed: cases.filter(
+    completed: interventionCases.filter(
       (c) => getIncidentInterventionStatus(c.incidentId) === "completed",
     ).length,
 
-    pending: cases.filter(
+    pending: interventionCases.filter(
       (c) => getIncidentInterventionStatus(c.incidentId) === "none",
     ).length,
   };
@@ -530,22 +567,22 @@ const InterventionPage = () => {
           <button
             onClick={logout}
             className="
-        w-full
-        flex
-        items-center
-        justify-center
-        gap-2
-        py-2.5
-        rounded-xl
-        text-sm
-        font-semibold
-        text-gray-600
-        border border-gray-200
-        hover:bg-red-50
-        hover:text-red-600
-        hover:border-red-100
-        transition
-      "
+              w-full
+              flex
+              items-center
+              justify-center
+              gap-2
+              py-2.5
+              rounded-xl
+              text-sm
+              font-semibold
+              text-gray-600
+              border border-gray-200
+              hover:bg-red-50
+              hover:text-red-600
+              hover:border-red-100
+              transition
+            "
           >
             <LogOut size={16} />
             Sign out
@@ -606,23 +643,23 @@ const InterventionPage = () => {
                 {notifications.length > 0 && (
                   <span
                     className="
-                    absolute
-                    -top-1
-                    -right-1
-                    min-w-[18px]
-                    h-[18px]
-                    px-1
-                    rounded-full
-                    bg-red-500
-                    text-white
-                    text-[9px]
-                    font-bold
-                    flex
-                    items-center
-                    justify-center
-                    border-2
-                    border-white
-                  "
+                      absolute
+                      -top-1
+                      -right-1
+                      min-w-[18px]
+                      h-[18px]
+                      px-1
+                      rounded-full
+                      bg-red-500
+                      text-white
+                      text-[9px]
+                      font-bold
+                      flex
+                      items-center
+                      justify-center
+                      border-2
+                      border-white
+                    "
                   >
                     {notifications.length > 9 ? "9+" : notifications.length}
                   </span>
@@ -745,24 +782,24 @@ const InterventionPage = () => {
             <button
               onClick={() => setShowPrintableReport(true)}
               className="
-      h-10
-      px-4
-      rounded-xl
-      bg-white
-      border
-      border-gray-200
-      text-gray-600
-      text-xs
-      font-semibold
-      flex
-      items-center
-      justify-center
-      gap-2
-      hover:bg-gray-50
-      hover:border-gray-300
-      transition
-      shadow-sm
-    "
+                h-10
+                px-4
+                rounded-xl
+                bg-white
+                border
+                border-gray-200
+                text-gray-600
+                text-xs
+                font-semibold
+                flex
+                items-center
+                justify-center
+                gap-2
+                hover:bg-gray-50
+                hover:border-gray-300
+                transition
+                shadow-sm
+              "
             >
               <Printer size={15} />
               Printable Report
@@ -815,35 +852,35 @@ const InterventionPage = () => {
 
           <div
             className="
-            bg-white
-            border border-gray-100
-            rounded-2xl
-            shadow-sm
-            p-5
-            mb-6
-          "
+              bg-white
+              border border-gray-100
+              rounded-2xl
+              shadow-sm
+              p-5
+              mb-6
+            "
           >
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               {/* SEARCH */}
 
               <div
                 className="
-                flex
-                items-center
-                gap-3
-                h-11
-                px-4
-                rounded-xl
-                bg-gray-50
-                border
-                border-gray-200
-                w-full
-                lg:max-w-md
-                focus-within:border-green-300
-                focus-within:ring-4
-                focus-within:ring-green-50
-                transition
-              "
+                  flex
+                  items-center
+                  gap-3
+                  h-11
+                  px-4
+                  rounded-xl
+                  bg-gray-50
+                  border
+                  border-gray-200
+                  w-full
+                  lg:max-w-md
+                  focus-within:border-green-300
+                  focus-within:ring-4
+                  focus-within:ring-green-50
+                  transition
+                "
               >
                 <Search size={17} className="text-gray-400 shrink-0" />
 
@@ -922,7 +959,9 @@ const InterventionPage = () => {
             {search && (
               <span className="text-xs text-gray-400">
                 Search results for{" "}
-                <span className="font-semibold text-gray-600">"{search}"</span>
+                <span className="font-semibold text-gray-600">
+                  "{search}"
+                </span>
               </span>
             )}
           </div>
@@ -933,29 +972,29 @@ const InterventionPage = () => {
 
           <div
             className="
-            bg-white
-            border border-gray-100
-            rounded-2xl
-            shadow-sm
-            p-5
-          "
+              bg-white
+              border border-gray-100
+              rounded-2xl
+              shadow-sm
+              p-5
+            "
           >
             {filtered.length === 0 ? (
               <div className="min-h-[420px] flex items-center justify-center">
                 <div className="text-center max-w-sm">
                   <div
                     className="
-                    w-16
-                    h-16
-                    rounded-2xl
-                    bg-green-50
-                    text-green-600
-                    flex
-                    items-center
-                    justify-center
-                    mx-auto
-                    mb-4
-                  "
+                      w-16
+                      h-16
+                      rounded-2xl
+                      bg-green-50
+                      text-green-600
+                      flex
+                      items-center
+                      justify-center
+                      mx-auto
+                      mb-4
+                    "
                   >
                     <ClipboardCheck size={28} />
                   </div>
@@ -1014,7 +1053,8 @@ const InterventionPage = () => {
                       key={c._id}
                       whileHover={{
                         y: -3,
-                        boxShadow: "0 12px 30px rgba(15, 23, 42, 0.07)",
+                        boxShadow:
+                          "0 12px 30px rgba(15, 23, 42, 0.07)",
                       }}
                       transition={{
                         duration: 0.2,
@@ -1042,18 +1082,18 @@ const InterventionPage = () => {
                       <div className="flex items-start justify-between gap-4">
                         <div
                           className="
-                          w-12
-                          h-12
-                          rounded-xl
-                          bg-green-50
-                          text-green-700
-                          flex
-                          items-center
-                          justify-center
-                          font-bold
-                          text-sm
-                          shrink-0
-                        "
+                            w-12
+                            h-12
+                            rounded-xl
+                            bg-green-50
+                            text-green-700
+                            flex
+                            items-center
+                            justify-center
+                            font-bold
+                            text-sm
+                            shrink-0
+                          "
                         >
                           {getInitials(c.studentName)}
                         </div>
@@ -1084,12 +1124,12 @@ const InterventionPage = () => {
                       <div className="mt-4">
                         <h3
                           className="
-                          text-base
-                          font-bold
-                          text-gray-900
-                          group-hover:text-green-700
-                          transition-colors
-                        "
+                            text-base
+                            font-bold
+                            text-gray-900
+                            group-hover:text-green-700
+                            transition-colors
+                          "
                         >
                           {c.studentName}
                         </h3>
@@ -1104,17 +1144,20 @@ const InterventionPage = () => {
                       <div className="mt-5">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-5 h-5 rounded-md bg-gray-100 flex items-center justify-center">
-                            <AlertCircle size={11} className="text-gray-500" />
+                            <AlertCircle
+                              size={11}
+                              className="text-gray-500"
+                            />
                           </div>
 
                           <p
                             className="
-                            text-[10px]
-                            uppercase
-                            tracking-wider
-                            font-bold
-                            text-gray-400
-                          "
+                              text-[10px]
+                              uppercase
+                              tracking-wider
+                              font-bold
+                              text-gray-400
+                            "
                           >
                             Incident
                           </p>
@@ -1122,12 +1165,12 @@ const InterventionPage = () => {
 
                         <p
                           className="
-                          text-sm
-                          text-gray-700
-                          leading-relaxed
-                          line-clamp-2
-                          min-h-[40px]
-                        "
+                            text-sm
+                            text-gray-700
+                            leading-relaxed
+                            line-clamp-2
+                            min-h-[40px]
+                          "
                         >
                           {c.offense}
                         </p>
@@ -1137,27 +1180,27 @@ const InterventionPage = () => {
 
                       <div
                         className="
-                        mt-5
-                        p-3.5
-                        rounded-xl
-                        bg-green-50/70
-                        border
-                        border-green-100
-                      "
+                          mt-5
+                          p-3.5
+                          rounded-xl
+                          bg-green-50/70
+                          border
+                          border-green-100
+                        "
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2">
                             <div
                               className="
-                              w-7
-                              h-7
-                              rounded-lg
-                              bg-white
-                              text-green-600
-                              flex
-                              items-center
-                              justify-center
-                            "
+                                w-7
+                                h-7
+                                rounded-lg
+                                bg-white
+                                text-green-600
+                                flex
+                                items-center
+                                justify-center
+                              "
                             >
                               <Brain size={14} />
                             </div>
@@ -1165,23 +1208,23 @@ const InterventionPage = () => {
                             <div>
                               <p
                                 className="
-                                text-[9px]
-                                uppercase
-                                tracking-wider
-                                font-bold
-                                text-green-600
-                              "
+                                  text-[9px]
+                                  uppercase
+                                  tracking-wider
+                                  font-bold
+                                  text-green-600
+                                "
                               >
                                 AI Recommendation
                               </p>
 
                               <p
                                 className="
-                                text-xs
-                                font-semibold
-                                text-green-900
-                                mt-0.5
-                              "
+                                  text-xs
+                                  font-semibold
+                                  text-green-900
+                                  mt-0.5
+                                "
                               >
                                 {recommendAction(c.offense)}
                               </p>
@@ -1203,17 +1246,18 @@ const InterventionPage = () => {
 
                       <div
                         className="
-                        flex
-                        items-center
-                        justify-between
-                        mt-5
-                        pt-4
-                        border-t
-                        border-gray-100
-                      "
+                          flex
+                          items-center
+                          justify-between
+                          mt-5
+                          pt-4
+                          border-t
+                          border-gray-100
+                        "
                       >
                         <div className="flex items-center gap-1.5 text-xs text-gray-400">
                           <HandHelping size={13} />
+
                           {interventionCount}{" "}
                           {interventionCount === 1
                             ? "intervention"
@@ -1222,13 +1266,13 @@ const InterventionPage = () => {
 
                         <span
                           className="
-                          text-xs
-                          font-semibold
-                          text-green-600
-                          opacity-0
-                          group-hover:opacity-100
-                          transition
-                        "
+                            text-xs
+                            font-semibold
+                            text-green-600
+                            opacity-0
+                            group-hover:opacity-100
+                            transition
+                          "
                         >
                           View Case →
                         </span>
@@ -1310,30 +1354,30 @@ const InterventionPage = () => {
 
               <div
                 className="
-                px-7
-                py-5
-                bg-white
-                border-b
-                border-gray-100
-                flex
-                items-center
-                justify-between
-                shrink-0
-              "
+                  px-7
+                  py-5
+                  bg-white
+                  border-b
+                  border-gray-100
+                  flex
+                  items-center
+                  justify-between
+                  shrink-0
+                "
               >
                 <div className="flex items-center gap-4">
                   <div
                     className="
-                    w-12
-                    h-12
-                    rounded-xl
-                    bg-green-50
-                    text-green-700
-                    flex
-                    items-center
-                    justify-center
-                    font-bold
-                  "
+                      w-12
+                      h-12
+                      rounded-xl
+                      bg-green-50
+                      text-green-700
+                      flex
+                      items-center
+                      justify-center
+                      font-bold
+                    "
                   >
                     {getInitials(selected.studentName)}
                   </div>
@@ -1346,16 +1390,16 @@ const InterventionPage = () => {
 
                       <span
                         className="
-                        px-2
-                        py-1
-                        rounded-md
-                        bg-blue-50
-                        text-blue-700
-                        text-[9px]
-                        font-bold
-                        uppercase
-                        tracking-wide
-                      "
+                          px-2
+                          py-1
+                          rounded-md
+                          bg-blue-50
+                          text-blue-700
+                          text-[9px]
+                          font-bold
+                          uppercase
+                          tracking-wide
+                        "
                       >
                         Intervention
                       </span>
@@ -1396,13 +1440,13 @@ const InterventionPage = () => {
 
               <div
                 className="
-                grid
-                grid-cols-1
-                lg:grid-cols-12
-                gap-6
-                p-7
-                overflow-y-auto
-              "
+                  grid
+                  grid-cols-1
+                  lg:grid-cols-12
+                  gap-6
+                  p-7
+                  overflow-y-auto
+                "
               >
                 {/* =================================================
                     LEFT
@@ -1413,26 +1457,26 @@ const InterventionPage = () => {
 
                   <div
                     className="
-                    bg-white
-                    border
-                    border-gray-100
-                    rounded-2xl
-                    p-5
-                    shadow-sm
-                  "
+                      bg-white
+                      border
+                      border-gray-100
+                      rounded-2xl
+                      p-5
+                      shadow-sm
+                    "
                   >
                     <div className="flex items-center gap-2 mb-4">
                       <div
                         className="
-                        w-7
-                        h-7
-                        rounded-lg
-                        bg-gray-100
-                        text-gray-500
-                        flex
-                        items-center
-                        justify-center
-                      "
+                          w-7
+                          h-7
+                          rounded-lg
+                          bg-gray-100
+                          text-gray-500
+                          flex
+                          items-center
+                          justify-center
+                        "
                       >
                         <UserRound size={14} />
                       </div>
@@ -1449,7 +1493,10 @@ const InterventionPage = () => {
                         icon={UserRound}
                       />
 
-                      <Meta label="Student ID" value={selected.studentCode} />
+                      <Meta
+                        label="Student ID"
+                        value={selected.studentCode}
+                      />
 
                       <Meta label="Grade" value={selected.grade} />
 
@@ -1461,26 +1508,26 @@ const InterventionPage = () => {
 
                   <div
                     className="
-                    bg-white
-                    border
-                    border-gray-100
-                    rounded-2xl
-                    p-5
-                    shadow-sm
-                  "
+                      bg-white
+                      border
+                      border-gray-100
+                      rounded-2xl
+                      p-5
+                      shadow-sm
+                    "
                   >
                     <div className="flex items-center gap-2 mb-3">
                       <div
                         className="
-                        w-7
-                        h-7
-                        rounded-lg
-                        bg-red-50
-                        text-red-500
-                        flex
-                        items-center
-                        justify-center
-                      "
+                          w-7
+                          h-7
+                          rounded-lg
+                          bg-red-50
+                          text-red-500
+                          flex
+                          items-center
+                          justify-center
+                        "
                       >
                         <AlertCircle size={14} />
                       </div>
@@ -1498,19 +1545,19 @@ const InterventionPage = () => {
 
                     <div
                       className="
-                      p-4
-                      rounded-xl
-                      bg-gray-50
-                      border
-                      border-gray-100
-                    "
+                        p-4
+                        rounded-xl
+                        bg-gray-50
+                        border
+                        border-gray-100
+                      "
                     >
                       <p
                         className="
-                        text-sm
-                        text-gray-700
-                        leading-relaxed
-                      "
+                          text-sm
+                          text-gray-700
+                          leading-relaxed
+                        "
                       >
                         {selected.offense}
                       </p>
@@ -1521,25 +1568,25 @@ const InterventionPage = () => {
 
                   <div
                     className="
-                    rounded-2xl
-                    border
-                    border-green-100
-                    bg-green-50/80
-                    p-5
-                  "
+                      rounded-2xl
+                      border
+                      border-green-100
+                      bg-green-50/80
+                      p-5
+                    "
                   >
                     <div className="flex items-center gap-3 mb-3">
                       <div
                         className="
-                        w-9
-                        h-9
-                        rounded-xl
-                        bg-white
-                        text-green-600
-                        flex
-                        items-center
-                        justify-center
-                      "
+                          w-9
+                          h-9
+                          rounded-xl
+                          bg-white
+                          text-green-600
+                          flex
+                          items-center
+                          justify-center
+                        "
                       >
                         <Brain size={17} />
                       </div>
@@ -1547,23 +1594,23 @@ const InterventionPage = () => {
                       <div>
                         <p
                           className="
-                          text-[10px]
-                          uppercase
-                          tracking-wider
-                          font-bold
-                          text-green-600
-                        "
+                            text-[10px]
+                            uppercase
+                            tracking-wider
+                            font-bold
+                            text-green-600
+                          "
                         >
                           AI Recommendation
                         </p>
 
                         <p
                           className="
-                          text-base
-                          font-bold
-                          text-green-900
-                          mt-0.5
-                        "
+                            text-base
+                            font-bold
+                            text-green-900
+                            mt-0.5
+                          "
                         >
                           {recommendAction(selected.offense)}
                         </p>
@@ -1583,7 +1630,9 @@ const InterventionPage = () => {
                       label="Case Status"
                       value={
                         getStatusConfig(
-                          getIncidentInterventionStatus(selected.incidentId),
+                          getIncidentInterventionStatus(
+                            selected.incidentId,
+                          ),
                         ).label
                       }
                       icon={Activity}
@@ -1602,12 +1651,12 @@ const InterventionPage = () => {
 
                   <div
                     className="
-                    bg-white
-                    border
-                    border-gray-100
-                    rounded-2xl
-                    p-5
-                  "
+                      bg-white
+                      border
+                      border-gray-100
+                      rounded-2xl
+                      p-5
+                    "
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-sm font-bold text-gray-900">
@@ -1621,11 +1670,11 @@ const InterventionPage = () => {
                       {auditLog.length === 0 ? (
                         <div
                           className="
-                          py-3
-                          text-center
-                          text-xs
-                          text-gray-400
-                        "
+                            py-3
+                            text-center
+                            text-xs
+                            text-gray-400
+                          "
                         >
                           No actions recorded yet.
                         </div>
@@ -1644,24 +1693,26 @@ const InterventionPage = () => {
                             <div className="flex items-start gap-2">
                               <span
                                 className="
-                                mt-1
-                                w-1.5
-                                h-1.5
-                                rounded-full
-                                bg-green-500
-                                shrink-0
-                              "
+                                  mt-1
+                                  w-1.5
+                                  h-1.5
+                                  rounded-full
+                                  bg-green-500
+                                  shrink-0
+                                "
                               />
 
-                              <span className="text-gray-600">{a.action}</span>
+                              <span className="text-gray-600">
+                                {a.action}
+                              </span>
                             </div>
 
                             <span
                               className="
-                              text-[10px]
-                              text-gray-400
-                              shrink-0
-                            "
+                                text-[10px]
+                                text-gray-400
+                                shrink-0
+                              "
                             >
                               {new Date(a.time).toLocaleTimeString([], {
                                 hour: "numeric",
@@ -1684,21 +1735,21 @@ const InterventionPage = () => {
 
                   <div
                     className="
-                    bg-white
-                    border
-                    border-gray-100
-                    rounded-2xl
-                    shadow-sm
-                    p-5
-                  "
+                      bg-white
+                      border
+                      border-gray-100
+                      rounded-2xl
+                      shadow-sm
+                      p-5
+                    "
                   >
                     <div
                       className="
-                      flex
-                      items-center
-                      justify-between
-                      mb-5
-                    "
+                        flex
+                        items-center
+                        justify-between
+                        mb-5
+                      "
                     >
                       <div>
                         <h3 className="text-sm font-bold text-gray-900">
@@ -1712,33 +1763,33 @@ const InterventionPage = () => {
 
                       <div
                         className="
-                        w-8
-                        h-8
-                        rounded-lg
-                        bg-green-50
-                        text-green-600
-                        flex
-                        items-center
-                        justify-center
-                      "
+                          w-8
+                          h-8
+                          rounded-lg
+                          bg-green-50
+                          text-green-600
+                          flex
+                          items-center
+                          justify-center
+                        "
                       >
                         <Clock3 size={15} />
                       </div>
                     </div>
 
                     <div className="space-y-3">
-                      {getIncidentInterventions(selected.incidentId).length ===
-                      0 ? (
+                      {getIncidentInterventions(selected.incidentId)
+                        .length === 0 ? (
                         <div
                           className="
-                          py-10
-                          text-center
-                          rounded-xl
-                          bg-gray-50
-                          border
-                          border-dashed
-                          border-gray-200
-                        "
+                            py-10
+                            text-center
+                            rounded-xl
+                            bg-gray-50
+                            border
+                            border-dashed
+                            border-gray-200
+                          "
                         >
                           <HandHelping
                             size={24}
@@ -1755,58 +1806,63 @@ const InterventionPage = () => {
                         </div>
                       ) : (
                         getIncidentInterventions(selected.incidentId).map(
-                          (i, index) => {
+                          (i) => {
                             const isOpen = openTimeline === i._id;
-                            const completed = i.status === "completed";
+
+                            const completed =
+                              String(i.status || "").toLowerCase() ===
+                              "completed";
 
                             return (
                               <div
                                 key={i._id}
                                 className="
-                                border
-                                border-gray-100
-                                rounded-xl
-                                overflow-hidden
-                              "
+                                  border
+                                  border-gray-100
+                                  rounded-xl
+                                  overflow-hidden
+                                "
                               >
                                 <button
                                   onClick={() =>
-                                    setOpenTimeline(isOpen ? null : i._id)
+                                    setOpenTimeline(
+                                      isOpen ? null : i._id,
+                                    )
                                   }
                                   className="
-                                  w-full
-                                  flex
-                                  items-center
-                                  justify-between
-                                  p-4
-                                  text-left
-                                  hover:bg-gray-50
-                                  transition
-                                "
+                                    w-full
+                                    flex
+                                    items-center
+                                    justify-between
+                                    p-4
+                                    text-left
+                                    hover:bg-gray-50
+                                    transition
+                                  "
                                 >
                                   <div className="flex items-center gap-3">
                                     <div
                                       className="
-                                    relative
-                                    flex
-                                    flex-col
-                                    items-center
-                                  "
+                                        relative
+                                        flex
+                                        flex-col
+                                        items-center
+                                      "
                                     >
                                       <div
                                         className={`
-                                        w-8
-                                        h-8
-                                        rounded-lg
-                                        flex
-                                        items-center
-                                        justify-center
-                                        ${
-                                          completed
-                                            ? "bg-emerald-50 text-emerald-600"
-                                            : "bg-amber-50 text-amber-600"
-                                        }
-                                      `}
+                                          w-8
+                                          h-8
+                                          rounded-lg
+                                          flex
+                                          items-center
+                                          justify-center
+                                          ${
+                                            completed
+                                              ? "bg-emerald-50 text-emerald-600"
+                                              : "bg-amber-50 text-amber-600"
+                                          }
+                                        `}
                                       >
                                         {completed ? (
                                           <CheckCircle2 size={15} />
@@ -1819,43 +1875,43 @@ const InterventionPage = () => {
                                     <div>
                                       <p
                                         className="
-                                      text-sm
-                                      font-bold
-                                      text-gray-800
-                                      capitalize
-                                    "
+                                          text-sm
+                                          font-bold
+                                          text-gray-800
+                                          capitalize
+                                        "
                                       >
                                         {i.type}
                                       </p>
 
                                       <div
                                         className="
-                                      flex
-                                      items-center
-                                      gap-2
-                                      mt-1
-                                    "
+                                          flex
+                                          items-center
+                                          gap-2
+                                          mt-1
+                                        "
                                       >
                                         <span
                                           className={`
-                                        w-1.5
-                                        h-1.5
-                                        rounded-full
-                                        ${
-                                          completed
-                                            ? "bg-emerald-500"
-                                            : "bg-amber-500"
-                                        }
-                                      `}
+                                            w-1.5
+                                            h-1.5
+                                            rounded-full
+                                            ${
+                                              completed
+                                                ? "bg-emerald-500"
+                                                : "bg-amber-500"
+                                            }
+                                          `}
                                         />
 
                                         <span
                                           className="
-                                        text-[10px]
-                                        text-gray-400
-                                        uppercase
-                                        font-semibold
-                                      "
+                                            text-[10px]
+                                            text-gray-400
+                                            uppercase
+                                            font-semibold
+                                          "
                                         >
                                           {i.status}
                                         </span>
@@ -1868,9 +1924,9 @@ const InterventionPage = () => {
 
                                             <span
                                               className="
-                                            text-[10px]
-                                            text-gray-400
-                                          "
+                                                text-[10px]
+                                                text-gray-400
+                                              "
                                             >
                                               {formatDate(i.createdAt)}
                                             </span>
@@ -1883,10 +1939,14 @@ const InterventionPage = () => {
                                   <ChevronRight
                                     size={16}
                                     className={`
-                                    text-gray-400
-                                    transition-transform
-                                    ${isOpen ? "rotate-90" : ""}
-                                  `}
+                                      text-gray-400
+                                      transition-transform
+                                      ${
+                                        isOpen
+                                          ? "rotate-90"
+                                          : ""
+                                      }
+                                    `}
                                   />
                                 </button>
 
@@ -1906,9 +1966,9 @@ const InterventionPage = () => {
                                         opacity: 0,
                                       }}
                                       className="
-                                      border-t
-                                      border-gray-100
-                                    "
+                                        border-t
+                                        border-gray-100
+                                      "
                                     >
                                       <div className="p-4 space-y-4">
                                         {/* DESCRIPTION */}
@@ -1916,32 +1976,32 @@ const InterventionPage = () => {
                                         <div>
                                           <p
                                             className="
-                                          text-[10px]
-                                          uppercase
-                                          tracking-wider
-                                          font-bold
-                                          text-gray-400
-                                          mb-2
-                                        "
+                                              text-[10px]
+                                              uppercase
+                                              tracking-wider
+                                              font-bold
+                                              text-gray-400
+                                              mb-2
+                                            "
                                           >
                                             Intervention Plan
                                           </p>
 
                                           <div
                                             className="
-                                          p-3.5
-                                          rounded-xl
-                                          bg-gray-50
-                                          border
-                                          border-gray-100
-                                        "
+                                              p-3.5
+                                              rounded-xl
+                                              bg-gray-50
+                                              border
+                                              border-gray-100
+                                            "
                                           >
                                             <p
                                               className="
-                                            text-sm
-                                            text-gray-600
-                                            leading-relaxed
-                                          "
+                                                text-sm
+                                                text-gray-600
+                                                leading-relaxed
+                                              "
                                             >
                                               {i.description ||
                                                 "No description provided."}
@@ -1964,7 +2024,9 @@ const InterventionPage = () => {
 
                                           <Meta
                                             label="Created At"
-                                            value={formatDateTime(i.createdAt)}
+                                            value={formatDateTime(
+                                              i.createdAt,
+                                            )}
                                           />
 
                                           <Meta
@@ -1978,103 +2040,106 @@ const InterventionPage = () => {
                                         {i.auditLogs?.length > 0 && (
                                           <div
                                             className="
-                                          border
-                                          border-gray-100
-                                          rounded-xl
-                                          overflow-hidden
-                                        "
+                                              border
+                                              border-gray-100
+                                              rounded-xl
+                                              overflow-hidden
+                                            "
                                           >
                                             <div
                                               className="
-                                            px-3
-                                            py-2.5
-                                            bg-gray-50
-                                            border-b
-                                            border-gray-100
-                                          "
+                                                px-3
+                                                py-2.5
+                                                bg-gray-50
+                                                border-b
+                                                border-gray-100
+                                              "
                                             >
                                               <p
                                                 className="
-                                              text-[10px]
-                                              uppercase
-                                              tracking-wider
-                                              font-bold
-                                              text-gray-500
-                                            "
+                                                  text-[10px]
+                                                  uppercase
+                                                  tracking-wider
+                                                  font-bold
+                                                  text-gray-500
+                                                "
                                               >
                                                 Audit Trail
                                               </p>
                                             </div>
 
-                                            {i.auditLogs.map((log, idx) => (
-                                              <div
-                                                key={idx}
-                                                className="
-                                                  px-3
-                                                  py-3
-                                                  flex
-                                                  items-start
-                                                  justify-between
-                                                  gap-4
-                                                  border-b
-                                                  last:border-b-0
-                                                  border-gray-100
-                                                "
-                                              >
-                                                <div>
-                                                  <p
-                                                    className="
-                                                    text-xs
-                                                    font-semibold
-                                                    text-gray-700
+                                            {i.auditLogs.map(
+                                              (log, idx) => (
+                                                <div
+                                                  key={idx}
+                                                  className="
+                                                    px-3
+                                                    py-3
+                                                    flex
+                                                    items-start
+                                                    justify-between
+                                                    gap-4
+                                                    border-b
+                                                    last:border-b-0
+                                                    border-gray-100
                                                   "
-                                                  >
-                                                    {log.action}
-                                                  </p>
-
-                                                  {log.note && (
+                                                >
+                                                  <div>
                                                     <p
                                                       className="
-                                                      text-[11px]
-                                                      text-gray-400
-                                                      mt-1
-                                                    "
+                                                        text-xs
+                                                        font-semibold
+                                                        text-gray-700
+                                                      "
                                                     >
-                                                      {log.note}
+                                                      {log.action}
                                                     </p>
-                                                  )}
-                                                </div>
 
-                                                <div
-                                                  className="
-                                                  text-right
-                                                  shrink-0
-                                                "
-                                                >
-                                                  <p
-                                                    className="
-                                                    text-[11px]
-                                                    font-medium
-                                                    text-gray-600
-                                                  "
-                                                  >
-                                                    {log.by}
-                                                  </p>
-
-                                                  <p
-                                                    className="
-                                                    text-[9px]
-                                                    text-gray-400
-                                                    mt-1
-                                                  "
-                                                  >
-                                                    {formatDateTime(
-                                                      log.createdAt || log.time,
+                                                    {log.note && (
+                                                      <p
+                                                        className="
+                                                          text-[11px]
+                                                          text-gray-400
+                                                          mt-1
+                                                        "
+                                                      >
+                                                        {log.note}
+                                                      </p>
                                                     )}
-                                                  </p>
+                                                  </div>
+
+                                                  <div
+                                                    className="
+                                                      text-right
+                                                      shrink-0
+                                                    "
+                                                  >
+                                                    <p
+                                                      className="
+                                                        text-[11px]
+                                                        font-medium
+                                                        text-gray-600
+                                                      "
+                                                    >
+                                                      {log.by}
+                                                    </p>
+
+                                                    <p
+                                                      className="
+                                                        text-[9px]
+                                                        text-gray-400
+                                                        mt-1
+                                                      "
+                                                    >
+                                                      {formatDateTime(
+                                                        log.createdAt ||
+                                                          log.time,
+                                                      )}
+                                                    </p>
+                                                  </div>
                                                 </div>
-                                              </div>
-                                            ))}
+                                              ),
+                                            )}
                                           </div>
                                         )}
 
@@ -2082,23 +2147,25 @@ const InterventionPage = () => {
 
                                         {!completed && (
                                           <button
-                                            onClick={() => markComplete(i._id)}
+                                            onClick={() =>
+                                              markComplete(i._id)
+                                            }
                                             className="
-                                            w-full
-                                            h-10
-                                            rounded-xl
-                                            bg-green-600
-                                            hover:bg-green-700
-                                            text-white
-                                            text-xs
-                                            font-semibold
-                                            flex
-                                            items-center
-                                            justify-center
-                                            gap-2
-                                            transition
-                                            active:scale-[0.99]
-                                          "
+                                              w-full
+                                              h-10
+                                              rounded-xl
+                                              bg-green-600
+                                              hover:bg-green-700
+                                              text-white
+                                              text-xs
+                                              font-semibold
+                                              flex
+                                              items-center
+                                              justify-center
+                                              gap-2
+                                              transition
+                                              active:scale-[0.99]
+                                            "
                                           >
                                             <CheckCircle2 size={15} />
                                             Mark Intervention Complete
@@ -2120,26 +2187,26 @@ const InterventionPage = () => {
 
                   <div
                     className="
-                    bg-white
-                    border
-                    border-gray-100
-                    rounded-2xl
-                    shadow-sm
-                    p-5
-                  "
+                      bg-white
+                      border
+                      border-gray-100
+                      rounded-2xl
+                      shadow-sm
+                      p-5
+                    "
                   >
                     <div className="flex items-center gap-3 mb-5">
                       <div
                         className="
-                        w-9
-                        h-9
-                        rounded-xl
-                        bg-green-50
-                        text-green-600
-                        flex
-                        items-center
-                        justify-center
-                      "
+                          w-9
+                          h-9
+                          rounded-xl
+                          bg-green-50
+                          text-green-600
+                          flex
+                          items-center
+                          justify-center
+                        "
                       >
                         <Plus size={17} />
                       </div>
@@ -2159,14 +2226,14 @@ const InterventionPage = () => {
                       <div>
                         <label
                           className="
-                          block
-                          text-[10px]
-                          uppercase
-                          tracking-wider
-                          font-bold
-                          text-gray-400
-                          mb-2
-                        "
+                            block
+                            text-[10px]
+                            uppercase
+                            tracking-wider
+                            font-bold
+                            text-gray-400
+                            mb-2
+                          "
                         >
                           Intervention Type
                         </label>
@@ -2207,14 +2274,14 @@ const InterventionPage = () => {
                       <div>
                         <label
                           className="
-                          block
-                          text-[10px]
-                          uppercase
-                          tracking-wider
-                          font-bold
-                          text-gray-400
-                          mb-2
-                        "
+                            block
+                            text-[10px]
+                            uppercase
+                            tracking-wider
+                            font-bold
+                            text-gray-400
+                            mb-2
+                          "
                         >
                           Intervention Plan
                         </label>
@@ -2260,19 +2327,21 @@ const InterventionPage = () => {
 
               <div
                 className="
-                px-7
-                py-4
-                bg-white
-                border-t
-                border-gray-100
-                flex
-                items-center
-                justify-between
-                shrink-0
-              "
+                  px-7
+                  py-4
+                  bg-white
+                  border-t
+                  border-gray-100
+                  flex
+                  items-center
+                  justify-between
+                  shrink-0
+                "
               >
                 <button
-                  onClick={() => exportInterventionPDF(selected, interventions)}
+                  onClick={() =>
+                    exportInterventionPDF(selected, interventions)
+                  }
                   className="
                     h-10
                     px-4
@@ -2343,6 +2412,7 @@ const InterventionPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
       {showPrintableReport && (
         <InterventionPrintableReport
           cases={cases}
@@ -2382,7 +2452,11 @@ const Nav = ({ icon, label, onClick, active }) => (
     <span
       className={`
         transition
-        ${active ? "text-green-600" : "text-gray-400 group-hover:text-gray-700"}
+        ${
+          active
+            ? "text-green-600"
+            : "text-gray-400 group-hover:text-gray-700"
+        }
       `}
     >
       {icon}
@@ -2480,3 +2554,4 @@ const StatCard = ({
 );
 
 export default InterventionPage;
+
