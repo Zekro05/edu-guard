@@ -9,6 +9,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 
 import { connectDB } from "./db/connectDB.js";
+
 import Message from "./models/message.js";
 import Notification from "./models/Notification.js";
 
@@ -29,25 +30,45 @@ import pushNotificationRoutes from "./routes/pushNotificationRoutes.js";
 import settingsRoutes from "./routes/settings.js";
 
 import { User } from "./models/userModel.js";
-import { sendPushNotification } from "./utils/pushNotification.js";
+
+import {
+  sendPushNotification,
+} from "./utils/pushNotification.js";
 
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename =
+  fileURLToPath(
+    import.meta.url
+  );
+
+const __dirname =
+  path.dirname(
+    __filename
+  );
 
 dotenv.config();
 
-const app = express();
-const server = http.createServer(app);
+const app =
+  express();
 
-const PORT = process.env.PORT || 5000;
+const server =
+  http.createServer(
+    app
+  );
+
+const PORT =
+  process.env.PORT ||
+  5000;
 
 /* =========================================================
    TRUST PROXY
 ========================================================= */
 
-app.set("trust proxy", 1);
+app.set(
+  "trust proxy",
+  1
+);
 
 /* =========================================================
    SECURITY HEADERS
@@ -57,9 +78,13 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ["'self'"],
+        defaultSrc: [
+          "'self'",
+        ],
 
-        scriptSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+        ],
 
         styleSrc: [
           "'self'",
@@ -90,74 +115,104 @@ app.use(
           "http://localhost:5173",
           "http://localhost:5174",
           "http://localhost:8081",
+          "http://localhost:19000",
         ],
 
-        objectSrc: ["'none'"],
+        objectSrc: [
+          "'none'",
+        ],
 
-        frameAncestors: ["'none'"],
+        frameAncestors: [
+          "'none'",
+        ],
 
-        baseUri: ["'self'"],
+        baseUri: [
+          "'self'",
+        ],
 
-        formAction: ["'self'"],
+        formAction: [
+          "'self'",
+        ],
 
         upgradeInsecureRequests:
-          process.env.NODE_ENV === "production" ? [] : null,
+          process.env.NODE_ENV ===
+          "production"
+            ? []
+            : null,
       },
     },
 
     frameguard: {
-      action: "deny",
+      action:
+        "deny",
     },
 
-    noSniff: true,
+    noSniff:
+      true,
 
     hsts: {
-      maxAge: 31536000,
-      includeSubDomains: true,
-      preload: true,
+      maxAge:
+        31536000,
+
+      includeSubDomains:
+        true,
+
+      preload:
+        true,
     },
 
     referrerPolicy: {
-      policy: "strict-origin-when-cross-origin",
+      policy:
+        "strict-origin-when-cross-origin",
     },
 
-    crossOriginEmbedderPolicy: false,
+    crossOriginEmbedderPolicy:
+      false,
 
     crossOriginOpenerPolicy: {
-      policy: "same-origin",
+      policy:
+        "same-origin",
     },
 
     crossOriginResourcePolicy: {
-      policy: "cross-origin",
+      policy:
+        "cross-origin",
     },
-  }),
+  })
 );
 
 /* =========================================================
    ADDITIONAL SECURITY HEADERS
 ========================================================= */
 
-app.use((req, res, next) => {
-  res.setHeader(
-    "Permissions-Policy",
-    [
-      "camera=()",
-      "microphone=()",
-      "geolocation=()",
-      "payment=()",
-      "usb=()",
-      "magnetometer=()",
-      "gyroscope=()",
-      "accelerometer=()",
-    ].join(", "),
-  );
+app.use(
+  (req, res, next) => {
+    res.setHeader(
+      "Permissions-Policy",
+      [
+        "camera=()",
+        "microphone=()",
+        "geolocation=()",
+        "payment=()",
+        "usb=()",
+        "magnetometer=()",
+        "gyroscope=()",
+        "accelerometer=()",
+      ].join(", ")
+    );
 
-  res.setHeader("X-DNS-Prefetch-Control", "off");
+    res.setHeader(
+      "X-DNS-Prefetch-Control",
+      "off"
+    );
 
-  res.removeHeader("X-Powered-By");
+    res.removeHeader(
+      "X-Powered-By"
+    );
 
-  next();
-});
+    next();
+  }
+);
 
 /* =========================================================
    BODY PARSERS
@@ -165,18 +220,24 @@ app.use((req, res, next) => {
 
 app.use(
   express.json({
-    limit: "10mb",
-  }),
+    limit:
+      "10mb",
+  })
 );
 
 app.use(
   express.urlencoded({
-    extended: true,
-    limit: "10mb",
-  }),
+    extended:
+      true,
+
+    limit:
+      "10mb",
+  })
 );
 
-app.use(cookieParser());
+app.use(
+  cookieParser()
+);
 
 /* =========================================================
    CORS
@@ -187,6 +248,7 @@ const allowedOrigins = [
   "http://localhost:5174",
   "http://localhost:8081",
   "http://localhost:19000",
+
   "exp://localhost:8081",
   "exp://localhost:19000",
 
@@ -194,25 +256,50 @@ const allowedOrigins = [
   "https://guide-ed-mu.vercel.app",
 ];
 
-const isAllowedOrigin = (origin) => {
-  if (!origin) return true;
+const isAllowedOrigin = (
+  origin
+) => {
+  if (!origin) {
+    return true;
+  }
 
-  return allowedOrigins.includes(origin);
+  return allowedOrigins.includes(
+    origin
+  );
 };
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      if (isAllowedOrigin(origin)) {
-        return callback(null, true);
-      }
+    origin:
+      function (
+        origin,
+        callback
+      ) {
+        if (
+          isAllowedOrigin(
+            origin
+          )
+        ) {
+          return callback(
+            null,
+            true
+          );
+        }
 
-      console.warn("🚫 CORS blocked:", origin);
+        console.warn(
+          "🚫 CORS blocked:",
+          origin
+        );
 
-      return callback(new Error("Not allowed by CORS"));
-    },
+        return callback(
+          new Error(
+            "Not allowed by CORS"
+          )
+        );
+      },
 
-    credentials: true,
+    credentials:
+      true,
 
     methods: [
       "GET",
@@ -229,494 +316,633 @@ app.use(
     ],
 
     exposedHeaders: [],
-  }),
+  })
 );
 
 /* =========================================================
    GENERAL API RATE LIMIT
 ========================================================= */
 
-const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+const generalLimiter =
+  rateLimit({
+    windowMs:
+      15 * 60 * 1000,
 
-  max: 500,
+    max:
+      500,
 
-  standardHeaders: true,
+    standardHeaders:
+      true,
 
-  legacyHeaders: false,
+    legacyHeaders:
+      false,
 
-  message: {
-    success: false,
-    message: "Too many requests. Please try again later.",
-  },
+    message: {
+      success:
+        false,
 
-  skip: (req) => {
-    return req.path === "/ping";
-  },
-});
+      message:
+        "Too many requests. Please try again later.",
+    },
 
-app.use("/api", generalLimiter);
+    skip:
+      (req) =>
+        req.path ===
+        "/ping",
+  });
+
+app.use(
+  "/api",
+  generalLimiter
+);
 
 /* =========================================================
    AUTH RATE LIMIT
 ========================================================= */
 
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+const authLimiter =
+  rateLimit({
+    windowMs:
+      15 * 60 * 1000,
 
-  max: 20,
+    max:
+      20,
 
-  standardHeaders: true,
+    standardHeaders:
+      true,
 
-  legacyHeaders: false,
+    legacyHeaders:
+      false,
 
-  message: {
-    success: false,
-    message:
-      "Too many authentication attempts. Please try again later.",
-  },
-});
+    message: {
+      success:
+        false,
 
-app.use("/api/auth", authLimiter);
+      message:
+        "Too many authentication attempts. Please try again later.",
+    },
+  });
+
+app.use(
+  "/api/auth",
+  authLimiter
+);
 
 /* =========================================================
    ROUTES
 ========================================================= */
 
-app.use("/api/auth", authRoutes);
+app.use(
+  "/api/auth",
+  authRoutes
+);
 
-app.use("/api/students", studentRoutes);
+app.use(
+  "/api/students",
+  studentRoutes
+);
 
-app.use("/api/incidents", incidentRoutes);
+app.use(
+  "/api/incidents",
+  incidentRoutes
+);
 
-app.use("/api/reports", reportRoutes);
+app.use(
+  "/api/reports",
+  reportRoutes
+);
 
-app.use("/api/history", historyRoutes);
+app.use(
+  "/api/history",
+  historyRoutes
+);
 
-app.use("/api/gemini", geminiRoutes);
+app.use(
+  "/api/gemini",
+  geminiRoutes
+);
 
-app.use("/api/messages", messageRoutes);
+app.use(
+  "/api/messages",
+  messageRoutes
+);
 
-app.use("/api/notifications", notificationRoutes);
+app.use(
+  "/api/notifications",
+  notificationRoutes
+);
 
-app.use("/api/teacher-reports", teacherReportRoutes);
+app.use(
+  "/api/teacher-reports",
+  teacherReportRoutes
+);
 
-app.use("/api/interventions", interventionRoutes);
+app.use(
+  "/api/interventions",
+  interventionRoutes
+);
 
-app.use("/api/cases", caseRoutes);
+app.use(
+  "/api/cases",
+  caseRoutes
+);
 
-app.use("/api/upload", uploadRoutes);
+app.use(
+  "/api/upload",
+  uploadRoutes
+);
 
 app.use(
   "/api/notification-settings",
-  notificationSettingsRoutes,
+  notificationSettingsRoutes
 );
 
 app.use(
   "/api/push-notifications",
-  pushNotificationRoutes,
+  pushNotificationRoutes
 );
 
-app.use("/api/settings", settingsRoutes);
+app.use(
+  "/api/settings",
+  settingsRoutes
+);
 
 /* =========================================================
    USERS
 ========================================================= */
 
-app.get("/api/users", async (req, res) => {
-  try {
-    const users = await User.find();
+app.get(
+  "/api/users",
+  async (
+    req,
+    res
+  ) => {
+    try {
+      const users =
+        await User.find();
 
-    res.json(users);
-  } catch (err) {
-    console.error("❌ GET USERS ERROR:", err);
+      res.json(users);
+    } catch (err) {
+      console.error(
+        "❌ GET USERS ERROR:",
+        err
+      );
 
-    res.status(500).json({
-      success: false,
-      message: "Failed to retrieve users.",
-    });
+      res.status(500).json({
+        success:
+          false,
+
+        message:
+          "Failed to retrieve users.",
+      });
+    }
   }
-});
+);
 
 /* =========================================================
    HEALTH CHECK
 ========================================================= */
 
-app.get("/ping", (req, res) => {
-  res.status(200).json({
-    ok: true,
-    message: "alive",
-  });
-});
+app.get(
+  "/ping",
+  (
+    req,
+    res
+  ) => {
+    res.status(200).json({
+      ok:
+        true,
+
+      message:
+        "alive",
+    });
+  }
+);
 
 /* =========================================================
    SOCKET.IO
 ========================================================= */
 
-export const io = new Server(server, {
-  cors: {
-    origin: function (origin, callback) {
-      if (isAllowedOrigin(origin)) {
-        return callback(null, true);
-      }
+export const io =
+  new Server(
+    server,
+    {
+      cors: {
+        origin:
+          function (
+            origin,
+            callback
+          ) {
+            if (
+              isAllowedOrigin(
+                origin
+              )
+            ) {
+              return callback(
+                null,
+                true
+              );
+            }
 
-      console.warn(
-        "🚫 Socket.IO CORS blocked:",
-        origin,
-      );
+            console.warn(
+              "🚫 Socket.IO CORS blocked:",
+              origin
+            );
 
-      return callback(
-        new Error("Not allowed by Socket.IO CORS"),
-      );
-    },
+            return callback(
+              new Error(
+                "Not allowed by Socket.IO CORS"
+              )
+            );
+          },
 
-    methods: ["GET", "POST"],
+        methods: [
+          "GET",
+          "POST",
+        ],
 
-    credentials: true,
-  },
+        credentials:
+          true,
+      },
 
-  transports: [
-    "websocket",
-    "polling",
-  ],
-});
+      transports: [
+        "websocket",
+        "polling",
+      ],
+    }
+  );
 
 /* =========================================================
    TEST SOCKET NOTIFICATION
 ========================================================= */
 
-app.get("/api/test-notif", (req, res) => {
-  io.emit("newNotification", {
-    id: Date.now(),
+app.get(
+  "/api/test-notif",
+  (
+    req,
+    res
+  ) => {
+    io.emit(
+      "newNotification",
+      {
+        id:
+          Date.now(),
 
-    title: "🔥 Test Notification",
+        title:
+          "🔥 Test Notification",
 
-    message: "Dashboard socket is working",
+        message:
+          "Dashboard socket is working",
 
-    createdAt: new Date().toISOString(),
-  });
+        type:
+          "general",
 
-  res.json({
-    ok: true,
-  });
-});
+        priority:
+          "low",
+
+        isRead:
+          false,
+
+        createdAt:
+          new Date().toISOString(),
+      }
+    );
+
+    res.json({
+      ok:
+        true,
+    });
+  }
+);
 
 /* =========================================================
    ONLINE USERS
 ========================================================= */
 
-const onlineUsers = new Map();
+const onlineUsers =
+  new Map();
 
 /* =========================================================
    SEND SOCKET NOTIFICATION
 ========================================================= */
 
-export const sendNotification = (
-  userId,
-  payload,
-) => {
-  if (!userId) return;
+export const sendNotification =
+  (
+    userId,
+    payload
+  ) => {
+    if (!userId) {
+      return;
+    }
 
-  io.to(String(userId)).emit(
-    "newNotification",
-    payload,
-  );
-};
+    io.to(
+      String(userId)
+    ).emit(
+      "newNotification",
+      payload
+    );
+  };
 
 /* =========================================================
    SOCKET CONNECTION
 ========================================================= */
 
-io.on("connection", (socket) => {
-  console.log(
-    "🟢 Socket connected:",
-    socket.id,
-  );
-
-  /* =======================================================
-     REGISTER USER
-  ======================================================= */
-
-  socket.on("register", (userId) => {
-    if (!userId) {
-      console.log(
-        "⚠️ No user ID received",
-      );
-
-      return;
-    }
-
-    const userIdString = String(userId);
-
-    socket.join(userIdString);
-
-    onlineUsers.set(
-      userIdString,
-      socket.id,
-    );
-
+io.on(
+  "connection",
+  (
+    socket
+  ) => {
     console.log(
-      `👤 User registered: ${userIdString}`,
+      "🟢 Socket connected:",
+      socket.id
     );
-  });
 
-  /* =======================================================
-     SEND MESSAGE
-  ======================================================= */
+    /* ===================================================
+       REGISTER USER
+    =================================================== */
 
-  socket.on(
-    "send_message",
-    async (msg, callback) => {
-      try {
-        console.log(
-          "📨 Socket message received:",
-          msg,
+    socket.on(
+      "register",
+      (
+        userId
+      ) => {
+        if (!userId) {
+          console.log(
+            "⚠️ No user ID received"
+          );
+
+          return;
+        }
+
+        const userIdString =
+          String(userId);
+
+        socket.join(
+          userIdString
         );
 
-        const {
-          sender,
-          receiver,
-          text,
-          clientMessageId,
-        } = msg;
+        onlineUsers.set(
+          userIdString,
+          socket.id
+        );
 
-        if (
-          !sender ||
-          !receiver ||
-          !text?.trim()
-        ) {
-          if (
-            typeof callback === "function"
-          ) {
-            callback({
-              error: true,
-              message:
-                "Missing sender, receiver, or message text.",
-            });
-          }
+        console.log(
+          `👤 User registered: ${userIdString}`
+        );
+      }
+    );
 
+    /* ===================================================
+       OPTIONAL JOIN EVENT
+
+       Your frontend emits this too.
+       Keeping it makes the system compatible with both
+       register and join.
+    =================================================== */
+
+    socket.on(
+      "join",
+      (
+        userId
+      ) => {
+        if (!userId) {
           return;
         }
 
-        const chatId = [
-          String(sender),
-          String(receiver),
-        ]
-          .sort()
-          .join("-");
+        const userIdString =
+          String(userId);
 
-        /* =================================================
-           GET USERS
-        ================================================= */
+        socket.join(
+          userIdString
+        );
 
-        const senderUser =
-          await User.findById(sender).select(
-            "name firstName middleName lastName email profilePhoto",
+        console.log(
+          `📡 User joined room: ${userIdString}`
+        );
+      }
+    );
+
+    /* ===================================================
+       SEND MESSAGE
+    =================================================== */
+
+    socket.on(
+      "send_message",
+      async (
+        msg,
+        callback
+      ) => {
+        try {
+          console.log(
+            "📨 Socket message received:",
+            msg
           );
 
-        const receiverUser =
-          await User.findById(receiver).select(
-            "expoPushToken email name firstName middleName lastName profilePhoto",
-          );
-
-        if (!senderUser) {
-          if (
-            typeof callback === "function"
-          ) {
-            callback({
-              error: true,
-              message:
-                "Sender account not found.",
-            });
-          }
-
-          return;
-        }
-
-        if (!receiverUser) {
-          if (
-            typeof callback === "function"
-          ) {
-            callback({
-              error: true,
-              message:
-                "Receiver account not found.",
-            });
-          }
-
-          return;
-        }
-
-        /* =================================================
-           SENDER INFO
-        ================================================= */
-
-        const senderName =
-          senderUser.name ||
-          [
-            senderUser.firstName,
-            senderUser.middleName,
-            senderUser.lastName,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .trim() ||
-          "User";
-
-        const senderProfilePhoto =
-          senderUser.profilePhoto || null;
-
-        /* =================================================
-           SAVE MESSAGE
-        ================================================= */
-
-        const message =
-          await Message.create({
-            chatId,
-
+          const {
             sender,
-
             receiver,
+            text,
+            clientMessageId,
+          } =
+            msg || {};
 
-            text: text.trim(),
+          if (
+            !sender ||
+            !receiver ||
+            !text?.trim()
+          ) {
+            if (
+              typeof callback ===
+              "function"
+            ) {
+              callback({
+                error:
+                  true,
 
-            seen: false,
-          });
+                message:
+                  "Missing sender, receiver, or message text.",
+              });
+            }
 
-        console.log(
-          "💾 Message saved:",
-          message._id,
-        );
+            return;
+          }
 
-        /* =================================================
-           REALTIME MESSAGE
-        ================================================= */
+          const chatId =
+            [
+              String(sender),
+              String(receiver),
+            ]
+              .sort()
+              .join("-");
 
-        const realtimeMessage = {
-          ...message.toObject(),
+          /* =============================================
+             GET USERS
+          ============================================= */
 
-          sender: String(sender),
+          const senderUser =
+            await User.findById(
+              sender
+            ).select(
+              "name firstName middleName lastName email profilePhoto"
+            );
 
-          receiver: String(receiver),
+          const receiverUser =
+            await User.findById(
+              receiver
+            ).select(
+              "pushTokens email name firstName middleName lastName profilePhoto"
+            );
 
-          senderName,
+          if (!senderUser) {
+            if (
+              typeof callback ===
+              "function"
+            ) {
+              callback({
+                error:
+                  true,
 
-          senderProfilePhoto,
+                message:
+                  "Sender account not found.",
+              });
+            }
 
-          clientMessageId:
-            clientMessageId || null,
-        };
+            return;
+          }
 
-        /* =================================================
-           SAVE NOTIFICATION
-        ================================================= */
+          if (!receiverUser) {
+            if (
+              typeof callback ===
+              "function"
+            ) {
+              callback({
+                error:
+                  true,
 
-        const notification =
-          await Notification.create({
-            userId: receiver,
+                message:
+                  "Receiver account not found.",
+              });
+            }
 
-            title:
-              `New message from ${senderName}`,
+            return;
+          }
 
-            message: text.trim(),
+          /* =============================================
+             SENDER INFO
+          ============================================= */
 
-            type: "message",
+          const senderName =
+            senderUser.name ||
+            [
+              senderUser.firstName,
+              senderUser.middleName,
+              senderUser.lastName,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .trim() ||
+            "User";
 
-            priority: "low",
+          const senderProfilePhoto =
+            senderUser.profilePhoto ||
+            null;
 
-            isRead: false,
+          /* =============================================
+             SAVE MESSAGE
+          ============================================= */
 
-            data: {
-              type: "message",
-
+          const message =
+            await Message.create({
               chatId,
 
-              senderId:
-                String(sender),
+              sender,
 
-              receiverId:
-                String(receiver),
+              receiver,
 
-              messageId:
-                message._id.toString(),
-            },
-          });
-
-        /* =================================================
-           SEND REALTIME MESSAGE
-        ================================================= */
-
-        io.to(String(receiver)).emit(
-          "receive_message",
-          realtimeMessage,
-        );
-
-        /* =================================================
-           SEND TO SENDER
-        ================================================= */
-
-        io.to(String(sender)).emit(
-          "receive_message",
-          realtimeMessage,
-        );
-
-        /* =================================================
-           SEND SOCKET NOTIFICATION
-        ================================================= */
-
-        io.to(String(receiver)).emit(
-          "newNotification",
-          {
-            ...notification.toObject(),
-
-            id:
-              notification._id.toString(),
-
-            senderName,
-
-            senderProfilePhoto,
-
-            data: {
-              type: "message",
-
-              chatId,
-
-              senderId:
-                String(sender),
-
-              receiverId:
-                String(receiver),
-
-              messageId:
-                message._id.toString(),
-            },
-          },
-        );
-
-        /* =================================================
-           PHONE PUSH NOTIFICATION
-
-           IMPORTANT:
-           This is the ONLY place in the Socket.IO
-           message flow that sends the phone push.
-        ================================================= */
-
-        if (
-          receiverUser.expoPushToken
-        ) {
-          try {
-            await sendPushNotification({
-              token:
-                receiverUser.expoPushToken,
-
-              title:
-                `💬 ${senderName}`,
-
-              body:
+              text:
                 text.trim(),
 
+              seen:
+                false,
+            });
+
+          console.log(
+            "💾 Message saved:",
+            message._id
+          );
+
+          /* =============================================
+             REALTIME MESSAGE
+          ============================================= */
+
+          const realtimeMessage =
+            {
+              ...message.toObject(),
+
+              sender:
+                String(sender),
+
+              receiver:
+                String(receiver),
+
+              senderName,
+
+              senderProfilePhoto,
+
+              clientMessageId:
+                clientMessageId ||
+                null,
+            };
+
+          /* =============================================
+             SEND MESSAGE TO RECEIVER
+          ============================================= */
+
+          io.to(
+            String(receiver)
+          ).emit(
+            "receive_message",
+            realtimeMessage
+          );
+
+          /* =============================================
+             SEND MESSAGE TO SENDER
+          ============================================= */
+
+          io.to(
+            String(sender)
+          ).emit(
+            "receive_message",
+            realtimeMessage
+          );
+
+          /* =============================================
+             SAVE NOTIFICATION
+          ============================================= */
+
+          const notification =
+            await Notification.create({
+              userId:
+                receiver,
+
+              title:
+                `New message from ${senderName}`,
+
+              message:
+                text.trim(),
+
+              type:
+                "message",
+
+              priority:
+                "low",
+
+              isRead:
+                false,
+
               data: {
-                type: "message",
+                type:
+                  "message",
 
                 chatId,
 
@@ -731,112 +957,214 @@ io.on("connection", (socket) => {
               },
             });
 
-            console.log(
-              "📱 Push notification sent:",
-              receiverUser.email,
-            );
-          } catch (pushError) {
-            console.error(
-              "⚠️ SOCKET MESSAGE PUSH ERROR:",
-              pushError,
-            );
-          }
-        } else {
-          console.log(
-            "⚠️ Receiver has no Expo push token:",
-            receiver,
+          /* =============================================
+             SOCKET NOTIFICATION
+          ============================================= */
+
+          io.to(
+            String(receiver)
+          ).emit(
+            "newNotification",
+            {
+              ...notification.toObject(),
+
+              id:
+                notification._id.toString(),
+
+              senderName,
+
+              senderProfilePhoto,
+            }
           );
-        }
 
-        /* =================================================
-           ACTIVITY FEED
-        ================================================= */
+          /* =============================================
+             GET EXPO TOKENS
 
-        io.emit(
-          "activity_feed",
-          {
-            type: "message",
+             Android + iOS
+          ============================================= */
 
-            message:
-              `💬 ${senderName}: ${text.trim()}`,
+          const expoTokens =
+            Array.isArray(
+              receiverUser.pushTokens
+            )
+              ? receiverUser.pushTokens.filter(
+                  (pushToken) =>
+                    pushToken?.provider ===
+                      "expo" &&
+                    ["android", "ios"].includes(
+                      pushToken?.platform
+                    )
+                )
+              : [];
 
-            time: new Date(),
-          },
-        );
+          console.log(
+            `📱 Expo tokens for ${receiverUser.email}:`,
+            expoTokens.length
+          );
 
-        /* =================================================
-           CALLBACK
-        ================================================= */
+          /* =============================================
+             SEND PHONE PUSH
+          ============================================= */
 
-        if (
-          typeof callback === "function"
-        ) {
-          callback({
-            success: true,
+          for (
+            const pushToken of expoTokens
+          ) {
+            try {
+              await sendPushNotification({
+                token:
+                  pushToken.token,
 
-            message:
-              realtimeMessage,
-          });
-        }
-      } catch (err) {
-        console.error(
-          "❌ SOCKET SEND MESSAGE ERROR:",
-          err,
-        );
+                title:
+                  `💬 ${senderName}`,
 
-        if (
-          typeof callback === "function"
-        ) {
-          callback({
-            error: true,
+                body:
+                  text.trim(),
 
-            message:
-              process.env.NODE_ENV ===
-              "production"
-                ? "Failed to send message."
-                : err.message,
-          });
+                data: {
+                  type:
+                    "message",
+
+                  chatId,
+
+                  senderId:
+                    String(sender),
+
+                  receiverId:
+                    String(receiver),
+
+                  messageId:
+                    message._id.toString(),
+
+                  notificationId:
+                    notification._id.toString(),
+                },
+              });
+
+              console.log(
+                "📱 Socket message push sent:",
+                receiverUser.email
+              );
+            } catch (
+              pushError
+            ) {
+              console.error(
+                "⚠️ SOCKET MESSAGE PUSH ERROR:",
+                pushError
+              );
+            }
+          }
+
+          /* =============================================
+             ACTIVITY FEED
+          ============================================= */
+
+          io.emit(
+            "activity_feed",
+            {
+              type:
+                "message",
+
+              message:
+                `💬 ${senderName}: ${text.trim()}`,
+
+              time:
+                new Date(),
+            }
+          );
+
+          /* =============================================
+             CALLBACK
+          ============================================= */
+
+          if (
+            typeof callback ===
+            "function"
+          ) {
+            callback({
+              success:
+                true,
+
+              message:
+                realtimeMessage,
+            });
+          }
+        } catch (err) {
+          console.error(
+            "❌ SOCKET SEND MESSAGE ERROR:",
+            err
+          );
+
+          if (
+            typeof callback ===
+            "function"
+          ) {
+            callback({
+              error:
+                true,
+
+              message:
+                process.env.NODE_ENV ===
+                "production"
+                  ? "Failed to send message."
+                  : err.message,
+            });
+          }
         }
       }
-    },
-  );
-
-  /* =======================================================
-     DISCONNECT
-  ======================================================= */
-
-  socket.on("disconnect", () => {
-    console.log(
-      "🔴 Socket disconnected:",
-      socket.id,
     );
 
-    for (
-      const [userId, socketId]
-      of onlineUsers.entries()
-    ) {
-      if (socketId === socket.id) {
-        onlineUsers.delete(userId);
+    /* ===================================================
+       DISCONNECT
+    =================================================== */
 
+    socket.on(
+      "disconnect",
+      () => {
         console.log(
-          `👤 User offline: ${userId}`,
+          "🔴 Socket disconnected:",
+          socket.id
         );
 
-        break;
+        for (
+          const [
+            userId,
+            socketId,
+          ] of onlineUsers.entries()
+        ) {
+          if (
+            socketId ===
+            socket.id
+          ) {
+            onlineUsers.delete(
+              userId
+            );
+
+            console.log(
+              `👤 User offline: ${userId}`
+            );
+
+            break;
+          }
+        }
       }
-    }
-  });
-});
+    );
+  }
+);
 
 /* =========================================================
    EXPRESS ERROR HANDLER
 ========================================================= */
 
 app.use(
-  (err, req, res, next) => {
+  (
+    err,
+    req,
+    res,
+    next
+  ) => {
     console.error(
       "❌ SERVER ERROR:",
-      err,
+      err
     );
 
     if (
@@ -844,7 +1172,9 @@ app.use(
       "Not allowed by CORS"
     ) {
       return res.status(403).json({
-        success: false,
+        success:
+          false,
+
         message:
           "Origin not allowed.",
       });
@@ -855,16 +1185,20 @@ app.use(
       "Not allowed by Socket.IO CORS"
     ) {
       return res.status(403).json({
-        success: false,
+        success:
+          false,
+
         message:
           "Socket origin not allowed.",
       });
     }
 
     res.status(
-      err.status || 500,
+      err.status ||
+        500
     ).json({
-      success: false,
+      success:
+        false,
 
       message:
         process.env.NODE_ENV ===
@@ -872,14 +1206,17 @@ app.use(
           ? "Internal server error."
           : err.message,
     });
-  },
+  }
 );
 
 /* =========================================================
    SET SOCKET.IO INSTANCE
 ========================================================= */
 
-app.set("io", io);
+app.set(
+  "io",
+  io
+);
 
 /* =========================================================
    START SERVER
@@ -894,20 +1231,22 @@ server.listen(
 
       console.log(
         "🚀 Server running on port:",
-        PORT,
+        PORT
       );
 
       console.log(
         `🔐 Environment: ${
           process.env.NODE_ENV ||
           "development"
-        }`,
+        }`
       );
-    } catch (error) {
+    } catch (
+      error
+    ) {
       console.error(
         "❌ Database connection failed:",
-        error,
+        error
       );
     }
-  },
+  }
 );

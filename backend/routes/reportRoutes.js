@@ -15,6 +15,7 @@ import {
   getMyReports,
   getReports,
   createReport,
+  getPrintableReports,
 } from "../controllers/reportController.js";
 
 import { getDisciplineAction } from "../utils/disciplineEngine.js";
@@ -629,6 +630,12 @@ router.get("/", async (req, res) => {
     });
   }
 });
+
+router.get(
+  "/printable",
+  verifyToken,
+  getPrintableReports,
+);
 
 /* =========================================================
    GET REPORT BY ID

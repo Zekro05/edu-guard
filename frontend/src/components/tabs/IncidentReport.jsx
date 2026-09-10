@@ -315,7 +315,10 @@ const IncidentReport = () => {
 
       setResults(res.data || []);
     } catch (error) {
-      if (error?.name !== "CanceledError" && error?.name !== "AbortError") {
+      if (
+        error?.name !== "CanceledError" &&
+        error?.name !== "AbortError"
+      ) {
         console.error("Student search error:", error);
       }
     } finally {
@@ -324,7 +327,11 @@ const IncidentReport = () => {
   }, []);
 
   const handleSelectStudent = (student) => {
-    const fullName = [student.firstName, student.middleName, student.lastName]
+    const fullName = [
+      student.firstName,
+      student.middleName,
+      student.lastName,
+    ]
       .filter(Boolean)
       .join(" ");
 
@@ -438,36 +445,36 @@ const IncidentReport = () => {
   ========================================================= */
 
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 space-y-4 sm:space-y-5 lg:space-y-6">
       {/* =====================================================
           FORM HEADER
       ===================================================== */}
 
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-9 h-9 rounded-xl bg-green-50 text-green-700 flex items-center justify-center">
-              <ClipboardPenLine size={17} />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-green-50 text-green-700 flex items-center justify-center flex-shrink-0">
+              <ClipboardPenLine size={16} className="sm:w-[17px] sm:h-[17px]" />
             </div>
 
-            <span className="text-[10px] uppercase tracking-widest font-bold text-green-700">
+            <span className="text-[9px] sm:text-[10px] uppercase tracking-[0.18em] font-bold text-green-700">
               Incident Management
             </span>
           </div>
 
-          <h3 className="text-xl font-extrabold tracking-tight text-gray-900">
+          <h3 className="text-lg sm:text-xl font-extrabold tracking-tight text-gray-900 break-words">
             Incident Report
           </h3>
 
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-xs sm:text-sm text-gray-500 mt-1 leading-relaxed max-w-2xl">
             Record a student incident and submit it for guidance review.
           </p>
         </div>
 
-        <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100">
-          <span className="w-2 h-2 rounded-full bg-green-500" />
+        <div className="self-start hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-gray-50 border border-gray-100 flex-shrink-0">
+          <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
 
-          <span className="text-[11px] font-semibold text-gray-500">
+          <span className="text-[11px] font-semibold text-gray-500 whitespace-nowrap">
             New Report
           </span>
         </div>
@@ -477,20 +484,20 @@ const IncidentReport = () => {
           STUDENT INFORMATION
       ===================================================== */}
 
-      <section className="bg-white border border-gray-100 rounded-3xl p-5 md:p-6 shadow-[0_4px_24px_rgba(0,0,0,0.025)]">
+      <section className="w-full min-w-0 bg-white border border-gray-100 rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 shadow-[0_4px_24px_rgba(0,0,0,0.025)]">
         <SectionHeader
           icon={<UserRound size={17} />}
           title="Student Information"
           description="Search and select the student involved in the incident."
         />
 
-        <div className="mt-5">
+        <div className="mt-4 sm:mt-5">
           <FieldLabel label="Student" required />
 
           <div className="relative mt-2">
             <Search
               size={17}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+              className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
             />
 
             <input
@@ -510,8 +517,8 @@ const IncidentReport = () => {
               placeholder="Search student by name..."
               className="
                 w-full
-                h-12
-                pl-11
+                h-11 sm:h-12
+                pl-10 sm:pl-11
                 pr-10
                 rounded-xl
                 bg-gray-50
@@ -532,14 +539,14 @@ const IncidentReport = () => {
             {loading && (
               <Loader2
                 size={17}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-green-600 animate-spin"
+                className="absolute right-3.5 sm:right-4 top-1/2 -translate-y-1/2 text-green-600 animate-spin"
               />
             )}
 
             {!loading && form.studentId && (
               <CheckCircle2
                 size={17}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-green-600"
+                className="absolute right-3.5 sm:right-4 top-1/2 -translate-y-1/2 text-green-600"
               />
             )}
 
@@ -556,16 +563,16 @@ const IncidentReport = () => {
                   bg-white
                   border
                   border-gray-100
-                  rounded-2xl
+                  rounded-xl sm:rounded-2xl
                   shadow-[0_16px_40px_rgba(0,0,0,0.10)]
                   overflow-hidden
                 "
               >
                 {loading ? (
-                  <div className="p-5 flex items-center gap-3">
+                  <div className="p-4 sm:p-5 flex items-center gap-3">
                     <Loader2
                       size={17}
-                      className="text-green-600 animate-spin"
+                      className="text-green-600 animate-spin flex-shrink-0"
                     />
 
                     <p className="text-sm text-gray-500">
@@ -573,7 +580,7 @@ const IncidentReport = () => {
                     </p>
                   </div>
                 ) : results.length > 0 ? (
-                  <div className="max-h-64 overflow-y-auto p-2">
+                  <div className="max-h-60 sm:max-h-64 overflow-y-auto p-1.5 sm:p-2">
                     {results.map((student) => (
                       <button
                         type="button"
@@ -584,14 +591,15 @@ const IncidentReport = () => {
                           flex
                           items-center
                           gap-3
-                          p-3
+                          p-2.5 sm:p-3
                           rounded-xl
                           text-left
                           hover:bg-green-50
+                          active:bg-green-100
                           transition
                         "
                       >
-                        <div className="w-10 h-10 rounded-xl bg-green-100 text-green-700 flex items-center justify-center flex-shrink-0">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-green-100 text-green-700 flex items-center justify-center flex-shrink-0">
                           <span className="text-xs font-bold">
                             {student.firstName?.charAt(0)}
                             {student.lastName?.charAt(0)}
@@ -609,7 +617,7 @@ const IncidentReport = () => {
                               .join(" ")}
                           </p>
 
-                          <p className="text-[11px] text-gray-400 mt-0.5">
+                          <p className="text-[11px] text-gray-400 mt-0.5 truncate">
                             {student.studentId || "Student"}
                           </p>
                         </div>
@@ -617,7 +625,7 @@ const IncidentReport = () => {
                     ))}
                   </div>
                 ) : (
-                  <div className="p-6 text-center">
+                  <div className="p-5 sm:p-6 text-center">
                     <UserRound
                       size={22}
                       className="mx-auto text-gray-300 mb-2"
@@ -639,17 +647,17 @@ const IncidentReport = () => {
           {/* SELECTED STUDENT */}
 
           {form.studentId && (
-            <div className="mt-3 flex items-center gap-3 p-3 rounded-2xl bg-green-50 border border-green-100">
-              <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center text-green-700 border border-green-100">
-                <CheckCircle2 size={17} />
+            <div className="mt-3 flex items-center gap-2.5 sm:gap-3 p-3 rounded-2xl bg-green-50 border border-green-100 min-w-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-white flex items-center justify-center text-green-700 border border-green-100 flex-shrink-0">
+                <CheckCircle2 size={16} />
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] uppercase tracking-wider font-bold text-green-600">
+                <p className="text-[9px] sm:text-[10px] uppercase tracking-wider font-bold text-green-600">
                   Selected Student
                 </p>
 
-                <p className="text-sm font-bold text-gray-900 truncate">
+                <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">
                   {form.studentName}
                 </p>
               </div>
@@ -666,7 +674,8 @@ const IncidentReport = () => {
                     studentName: "",
                   }));
                 }}
-                className="w-8 h-8 rounded-lg hover:bg-white flex items-center justify-center text-gray-400 hover:text-gray-700 transition"
+                className="w-8 h-8 rounded-lg hover:bg-white flex items-center justify-center text-gray-400 hover:text-gray-700 active:bg-white transition flex-shrink-0"
+                aria-label="Remove selected student"
               >
                 <X size={15} />
               </button>
@@ -679,14 +688,14 @@ const IncidentReport = () => {
           INCIDENT DETAILS
       ===================================================== */}
 
-      <section className="bg-white border border-gray-100 rounded-3xl p-5 md:p-6 shadow-[0_4px_24px_rgba(0,0,0,0.025)]">
+      <section className="w-full min-w-0 bg-white border border-gray-100 rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 shadow-[0_4px_24px_rgba(0,0,0,0.025)]">
         <SectionHeader
           icon={<FileWarning size={17} />}
           title="Incident Details"
           description="Provide the offense and location where the incident occurred."
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 mt-4 sm:mt-5">
           <DropdownField
             icon={<FileWarning size={16} />}
             label="Offense"
@@ -710,7 +719,7 @@ const IncidentReport = () => {
 
         {/* DESCRIPTION */}
 
-        <div className="mt-5">
+        <div className="mt-4 sm:mt-5">
           <FieldLabel label="Incident Description" required />
 
           <textarea
@@ -722,8 +731,8 @@ const IncidentReport = () => {
             className="
               w-full
               mt-2
-              px-4
-              py-3.5
+              px-3.5 sm:px-4
+              py-3 sm:py-3.5
               rounded-xl
               bg-gray-50
               border
@@ -738,6 +747,7 @@ const IncidentReport = () => {
               focus:ring-4
               focus:ring-green-50
               transition
+              leading-relaxed
             "
           />
 
@@ -753,7 +763,7 @@ const IncidentReport = () => {
           EVIDENCE
       ===================================================== */}
 
-      <section className="bg-white border border-gray-100 rounded-3xl p-5 md:p-6 shadow-[0_4px_24px_rgba(0,0,0,0.025)]">
+      <section className="w-full min-w-0 bg-white border border-gray-100 rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 shadow-[0_4px_24px_rgba(0,0,0,0.025)]">
         <SectionHeader
           icon={<Paperclip size={17} />}
           title="Evidence"
@@ -761,7 +771,7 @@ const IncidentReport = () => {
           optional
         />
 
-        <div className="mt-5">
+        <div className="mt-4 sm:mt-5">
           <input
             ref={fileRef}
             type="file"
@@ -779,24 +789,25 @@ const IncidentReport = () => {
               border-2
               border-dashed
               border-gray-200
-              rounded-2xl
-              p-7
+              rounded-xl sm:rounded-2xl
+              p-5 sm:p-7
               bg-gray-50/70
               hover:bg-green-50/40
               hover:border-green-200
+              active:bg-green-50
               transition
               group
             "
           >
-            <div className="w-11 h-11 mx-auto rounded-xl bg-white border border-gray-100 flex items-center justify-center text-gray-400 group-hover:text-green-600 group-hover:border-green-100 transition">
-              <UploadCloud size={20} />
+            <div className="w-10 h-10 sm:w-11 sm:h-11 mx-auto rounded-xl bg-white border border-gray-100 flex items-center justify-center text-gray-400 group-hover:text-green-600 group-hover:border-green-100 transition">
+              <UploadCloud size={19} />
             </div>
 
-            <p className="text-sm font-semibold text-gray-700 mt-3">
+            <p className="text-xs sm:text-sm font-semibold text-gray-700 mt-3">
               Click to upload evidence
             </p>
 
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-[11px] sm:text-xs text-gray-400 mt-1">
               You can select multiple image files
             </p>
           </button>
@@ -805,18 +816,18 @@ const IncidentReport = () => {
 
           {files.length > 0 && (
             <div className="mt-4">
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between gap-3 mb-3">
                 <p className="text-xs font-bold text-gray-700">
                   Attached Evidence
                 </p>
 
-                <span className="text-[10px] text-gray-400">
+                <span className="text-[10px] text-gray-400 whitespace-nowrap">
                   {files.length}{" "}
                   {files.length === 1 ? "file" : "files"}
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3">
                 {files.map((file, index) => (
                   <EvidencePreview
                     key={`${file.name}-${index}`}
@@ -835,11 +846,11 @@ const IncidentReport = () => {
           SUBMIT
       ===================================================== */}
 
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-1 pb-2">
-        <div className="flex items-start gap-2 text-xs text-gray-400">
-          <span className="text-red-400">*</span>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pt-1 pb-2">
+        <div className="flex items-start gap-2 text-[11px] sm:text-xs text-gray-400 min-w-0">
+          <span className="text-red-400 flex-shrink-0">*</span>
 
-          <p>
+          <p className="leading-relaxed">
             Required fields must be completed before submitting the report.
           </p>
         </div>
@@ -851,12 +862,13 @@ const IncidentReport = () => {
           className="
             w-full
             sm:w-auto
-            min-w-[190px]
+            min-w-0
+            sm:min-w-[190px]
             flex
             items-center
             justify-center
             gap-2
-            px-6
+            px-5 sm:px-6
             py-3
             rounded-xl
             bg-green-700
@@ -898,23 +910,27 @@ const SectionHeader = ({
   description,
   optional = false,
 }) => (
-  <div className="flex items-start gap-3">
-    <div className="w-9 h-9 rounded-xl bg-green-50 text-green-700 flex items-center justify-center flex-shrink-0">
+  <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
+    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-green-50 text-green-700 flex items-center justify-center flex-shrink-0">
       {icon}
     </div>
 
-    <div>
-      <div className="flex items-center gap-2">
-        <h4 className="text-sm font-bold text-gray-900">{title}</h4>
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-2 flex-wrap">
+        <h4 className="text-sm font-bold text-gray-900">
+          {title}
+        </h4>
 
         {optional && (
-          <span className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">
+          <span className="text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider text-gray-400">
             Optional
           </span>
         )}
       </div>
 
-      <p className="text-[11px] text-gray-400 mt-1">{description}</p>
+      <p className="text-[10px] sm:text-[11px] text-gray-400 mt-1 leading-relaxed break-words">
+        {description}
+      </p>
     </div>
   </div>
 );
@@ -947,11 +963,11 @@ const DropdownField = memo(
     options,
     required,
   }) => (
-    <div>
+    <div className="min-w-0">
       <FieldLabel label={label} required={required} />
 
       <div className="relative mt-2">
-        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+        <span className="absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
           {icon}
         </span>
 
@@ -961,8 +977,8 @@ const DropdownField = memo(
           onChange={onChange}
           className="
             w-full
-            h-12
-            pl-11
+            h-11 sm:h-12
+            pl-10 sm:pl-11
             pr-10
             rounded-xl
             bg-gray-50
@@ -977,6 +993,7 @@ const DropdownField = memo(
             focus:ring-4
             focus:ring-green-50
             transition
+            truncate
           "
         >
           <option value="">Select {label}</option>
@@ -992,7 +1009,7 @@ const DropdownField = memo(
           ))}
         </select>
 
-        <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+        <span className="absolute right-3.5 sm:right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
           <svg
             width="14"
             height="14"
@@ -1029,7 +1046,7 @@ const EvidencePreview = memo(({ file, index, onRemove }) => {
   }, [file]);
 
   return (
-    <div className="group relative rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+    <div className="group relative rounded-xl sm:rounded-2xl overflow-hidden border border-gray-100 bg-gray-50 min-w-0">
       <div className="aspect-square">
         {preview ? (
           <img
@@ -1047,8 +1064,8 @@ const EvidencePreview = memo(({ file, index, onRemove }) => {
         )}
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/60 to-transparent pt-8">
-        <p className="text-[10px] text-white truncate pr-5">
+      <div className="absolute inset-x-0 bottom-0 p-1.5 sm:p-2 bg-gradient-to-t from-black/60 to-transparent pt-7 sm:pt-8">
+        <p className="text-[9px] sm:text-[10px] text-white truncate pr-5">
           {file.name}
         </p>
       </div>
@@ -1058,8 +1075,8 @@ const EvidencePreview = memo(({ file, index, onRemove }) => {
         onClick={() => onRemove(index)}
         className="
           absolute
-          top-2
-          right-2
+          top-1.5 sm:top-2
+          right-1.5 sm:right-2
           w-7
           h-7
           rounded-lg
@@ -1068,11 +1085,14 @@ const EvidencePreview = memo(({ file, index, onRemove }) => {
           flex
           items-center
           justify-center
-          opacity-0
-          group-hover:opacity-100
+          opacity-100
+          sm:opacity-0
+          sm:group-hover:opacity-100
           hover:bg-red-500
+          active:bg-red-600
           transition
         "
+        aria-label={`Remove ${file.name}`}
       >
         <X size={13} />
       </button>

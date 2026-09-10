@@ -102,7 +102,7 @@ const getCroppedImg = async (imageSrc, pixelCrop) => {
     0,
     0,
     size,
-    size
+    size,
   );
 
   return new Promise((resolve, reject) => {
@@ -116,7 +116,7 @@ const getCroppedImg = async (imageSrc, pixelCrop) => {
         resolve(blob);
       },
       "image/jpeg",
-      0.95
+      0.95,
     );
   });
 };
@@ -177,14 +177,8 @@ const SignupPage = () => {
      STORE
   ========================================================= */
 
-  const {
-    signup,
-    verifyOTP,
-    otpRequired,
-    setOtpRequired,
-    error,
-    isLoading,
-  } = useAuthStore();
+  const { signup, verifyOTP, otpRequired, setOtpRequired, error, isLoading } =
+    useAuthStore();
 
   /* =========================================================
      CLEANUP PHOTO URL
@@ -262,12 +256,9 @@ const SignupPage = () => {
      CROP COMPLETE
   ========================================================= */
 
-  const onCropComplete = useCallback(
-    (croppedArea, croppedAreaPixels) => {
-      setCroppedAreaPixels(croppedAreaPixels);
-    },
-    []
-  );
+  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
 
   /* =========================================================
      CANCEL CROPPING
@@ -303,18 +294,11 @@ const SignupPage = () => {
     }
 
     try {
-      const croppedBlob = await getCroppedImg(
-        cropImage,
-        croppedAreaPixels
-      );
+      const croppedBlob = await getCroppedImg(cropImage, croppedAreaPixels);
 
-      const croppedFile = new File(
-        [croppedBlob],
-        "profile-photo.jpg",
-        {
-          type: "image/jpeg",
-        }
-      );
+      const croppedFile = new File([croppedBlob], "profile-photo.jpg", {
+        type: "image/jpeg",
+      });
 
       /* -----------------------------------------
          Create preview
@@ -378,10 +362,8 @@ const SignupPage = () => {
       !confirmPassword ||
       !gender ||
       !accountType ||
-      (accountType === "Student" &&
-        (!studentId || !grade)) ||
-      (accountType === "Teacher" &&
-        (!employeeId || !department))
+      (accountType === "Student" && (!studentId || !grade)) ||
+      (accountType === "Teacher" && (!employeeId || !department))
     ) {
       setLocalError("Please fill in all required fields.");
       return;
@@ -401,9 +383,7 @@ const SignupPage = () => {
     ----------------------------------------- */
 
     if (!acceptedPolicy) {
-      setLocalError(
-        "Please read and accept the GuidEd User Policy."
-      );
+      setLocalError("Please read and accept the GuidEd User Policy.");
       return;
     }
 
@@ -447,10 +427,7 @@ const SignupPage = () => {
          Role
       ----------------------------------------- */
 
-      const role =
-        accountType === "Teacher"
-          ? "teacher"
-          : "student";
+      const role = accountType === "Teacher" ? "teacher" : "student";
 
       formData.append("role", role);
 
@@ -461,10 +438,7 @@ const SignupPage = () => {
       ----------------------------------------- */
 
       if (profilePhoto) {
-        formData.append(
-          "profilePhoto",
-          profilePhoto
-        );
+        formData.append("profilePhoto", profilePhoto);
       }
 
       /* -----------------------------------------
@@ -476,9 +450,7 @@ const SignupPage = () => {
       toast.success("OTP sent to your email!");
     } catch (err) {
       setLocalError(
-        err.response?.data?.message ||
-          err.message ||
-          "Registration failed."
+        err.response?.data?.message || err.message || "Registration failed.",
       );
     }
   };
@@ -497,10 +469,7 @@ const SignupPage = () => {
         replace: true,
       });
     } catch (err) {
-      toast.error(
-        err.response?.data?.message ||
-          "OTP verification failed"
-      );
+      toast.error(err.response?.data?.message || "OTP verification failed");
     }
   };
 
@@ -650,11 +619,10 @@ const SignupPage = () => {
                 borderColor: LightColors.border,
               }}
             >
-              <GraduationCap
-                className="w-6 h-6 sm:w-8 sm:h-8"
-                style={{
-                  color: LightColors.primary,
-                }}
+              <img
+                src="/school-logo.png"
+                alt="School Logo"
+                className="w-full h-full object-contain p-2"
               />
             </div>
 
@@ -824,9 +792,7 @@ const SignupPage = () => {
                 }}
               >
                 Join The
-
                 <br />
-
                 <span
                   style={{
                     color: LightColors.primary,
@@ -834,9 +800,7 @@ const SignupPage = () => {
                 >
                   Future
                 </span>
-
                 <br />
-
                 Of Campus Safety.
               </h1>
 
@@ -853,9 +817,8 @@ const SignupPage = () => {
                   color: LightColors.textSecondary,
                 }}
               >
-                Create your GuidEd account and gain access
-                to a secure, modern campus safety ecosystem
-                built for students, teachers, and
+                Create your GuidEd account and gain access to a secure, modern
+                campus safety ecosystem built for students, teachers, and
                 administrators.
               </p>
             </div>
@@ -1050,8 +1013,7 @@ const SignupPage = () => {
                 background: "rgba(255,255,255,0.82)",
                 backdropFilter: "blur(22px)",
                 borderColor: "rgba(255,255,255,0.4)",
-                boxShadow:
-                  "0 30px 80px rgba(0,0,0,0.08)",
+                boxShadow: "0 30px 80px rgba(0,0,0,0.08)",
               }}
             >
               {/* ACCENT */}
@@ -1105,18 +1067,10 @@ const SignupPage = () => {
                       borderColor: LightColors.border,
                     }}
                   >
-                    <GraduationCap
-                      className="
-                        w-9
-                        h-9
-                        sm:w-11
-                        sm:h-11
-                        lg:w-12
-                        lg:h-12
-                      "
-                      style={{
-                        color: LightColors.primary,
-                      }}
+                    <img
+                      src="/school-logo.png"
+                      alt="School Logo"
+                      className="w-full h-full object-contain p-3 sm:p-4"
                     />
                   </div>
 
@@ -1150,9 +1104,8 @@ const SignupPage = () => {
                       color: LightColors.textSecondary,
                     }}
                   >
-                    Register your account to access
-                    GuidEd's secure campus safety
-                    management platform.
+                    Register your account to access GuidEd's secure campus
+                    safety management platform.
                   </p>
                 </div>
 
@@ -1220,17 +1173,11 @@ const SignupPage = () => {
                         color: LightColors.textPrimary,
                       }}
                     >
-                      <option value="">
-                        Select Account Type
-                      </option>
+                      <option value="">Select Account Type</option>
 
-                      <option value="Student">
-                        Student
-                      </option>
+                      <option value="Student">Student</option>
 
-                      <option value="Teacher">
-                        Teacher
-                      </option>
+                      <option value="Teacher">Teacher</option>
                     </select>
                   </div>
 
@@ -1242,9 +1189,7 @@ const SignupPage = () => {
                       type="text"
                       placeholder="First Name"
                       value={firstName}
-                      onChange={(e) =>
-                        setFirstName(e.target.value)
-                      }
+                      onChange={(e) => setFirstName(e.target.value)}
                     />
 
                     <Input
@@ -1252,9 +1197,7 @@ const SignupPage = () => {
                       type="text"
                       placeholder="Last Name"
                       value={lastName}
-                      onChange={(e) =>
-                        setLastName(e.target.value)
-                      }
+                      onChange={(e) => setLastName(e.target.value)}
                     />
                   </div>
 
@@ -1265,9 +1208,7 @@ const SignupPage = () => {
                     type="text"
                     placeholder="Middle Name (Optional)"
                     value={middleName}
-                    onChange={(e) =>
-                      setMiddleName(e.target.value)
-                    }
+                    onChange={(e) => setMiddleName(e.target.value)}
                   />
 
                   {/* EMAIL */}
@@ -1277,9 +1218,7 @@ const SignupPage = () => {
                     type="email"
                     placeholder="Institutional Email"
                     value={email}
-                    onChange={(e) =>
-                      setEmail(e.target.value)
-                    }
+                    onChange={(e) => setEmail(e.target.value)}
                   />
 
                   {/* STUDENT / TEACHER */}
@@ -1291,9 +1230,7 @@ const SignupPage = () => {
                         type="text"
                         placeholder="Student ID"
                         value={studentId}
-                        onChange={(e) =>
-                          setStudentId(e.target.value)
-                        }
+                        onChange={(e) => setStudentId(e.target.value)}
                       />
 
                       <Input
@@ -1301,9 +1238,7 @@ const SignupPage = () => {
                         type="text"
                         placeholder="Grade / Year"
                         value={grade}
-                        onChange={(e) =>
-                          setGrade(e.target.value)
-                        }
+                        onChange={(e) => setGrade(e.target.value)}
                       />
                     </div>
                   ) : accountType === "Teacher" ? (
@@ -1313,9 +1248,7 @@ const SignupPage = () => {
                         type="text"
                         placeholder="Employee ID"
                         value={employeeId}
-                        onChange={(e) =>
-                          setEmployeeId(e.target.value)
-                        }
+                        onChange={(e) => setEmployeeId(e.target.value)}
                       />
 
                       <Input
@@ -1323,9 +1256,7 @@ const SignupPage = () => {
                         type="text"
                         placeholder="Department"
                         value={department}
-                        onChange={(e) =>
-                          setDepartment(e.target.value)
-                        }
+                        onChange={(e) => setDepartment(e.target.value)}
                       />
                     </div>
                   ) : null}
@@ -1350,9 +1281,7 @@ const SignupPage = () => {
 
                     <select
                       value={gender}
-                      onChange={(e) =>
-                        setGender(e.target.value)
-                      }
+                      onChange={(e) => setGender(e.target.value)}
                       required
                       className="
                         w-full
@@ -1372,21 +1301,13 @@ const SignupPage = () => {
                         color: LightColors.textPrimary,
                       }}
                     >
-                      <option value="">
-                        Select Gender
-                      </option>
+                      <option value="">Select Gender</option>
 
-                      <option value="Male">
-                        Male
-                      </option>
+                      <option value="Male">Male</option>
 
-                      <option value="Female">
-                        Female
-                      </option>
+                      <option value="Female">Female</option>
 
-                      <option value="Other">
-                        Other
-                      </option>
+                      <option value="Other">Other</option>
                     </select>
                   </div>
 
@@ -1398,9 +1319,7 @@ const SignupPage = () => {
                       type="password"
                       placeholder="Password"
                       value={password}
-                      onChange={(e) =>
-                        setPassword(e.target.value)
-                      }
+                      onChange={(e) => setPassword(e.target.value)}
                     />
 
                     <Input
@@ -1408,17 +1327,13 @@ const SignupPage = () => {
                       type="password"
                       placeholder="Confirm Password"
                       value={confirmPassword}
-                      onChange={(e) =>
-                        setConfirmPassword(e.target.value)
-                      }
+                      onChange={(e) => setConfirmPassword(e.target.value)}
                     />
                   </div>
 
                   {/* PASSWORD STRENGTH */}
 
-                  <PasswordStrengthMeter
-                    password={password}
-                  />
+                  <PasswordStrengthMeter password={password} />
 
                   {/* =================================================
                       PROFILE PHOTO
@@ -1478,8 +1393,7 @@ const SignupPage = () => {
                               shadow-md
                             "
                             style={{
-                              borderColor:
-                                LightColors.primary,
+                              borderColor: LightColors.primary,
                             }}
                           />
 
@@ -1491,8 +1405,7 @@ const SignupPage = () => {
                               font-semibold
                             "
                             style={{
-                              color:
-                                LightColors.primary,
+                              color: LightColors.primary,
                             }}
                           >
                             Click to change photo
@@ -1506,12 +1419,10 @@ const SignupPage = () => {
                               text-center
                             "
                             style={{
-                              color:
-                                LightColors.textSecondary,
+                              color: LightColors.textSecondary,
                             }}
                           >
-                            You can crop the new photo
-                            before using it
+                            You can crop the new photo before using it
                           </p>
                         </>
                       ) : (
@@ -1526,8 +1437,7 @@ const SignupPage = () => {
                               sm:mb-3
                             "
                             style={{
-                              color:
-                                LightColors.primary,
+                              color: LightColors.primary,
                             }}
                           />
 
@@ -1539,8 +1449,7 @@ const SignupPage = () => {
                               text-center
                             "
                             style={{
-                              color:
-                                LightColors.textPrimary,
+                              color: LightColors.textPrimary,
                             }}
                           >
                             Upload Profile Photo
@@ -1554,8 +1463,7 @@ const SignupPage = () => {
                               text-center
                             "
                             style={{
-                              color:
-                                LightColors.textSecondary,
+                              color: LightColors.textSecondary,
                             }}
                           >
                             PNG, JPG or JPEG • Max 10MB
@@ -1639,11 +1547,7 @@ const SignupPage = () => {
                     <input
                       type="checkbox"
                       checked={acceptedPolicy}
-                      onChange={(e) =>
-                        setAcceptedPolicy(
-                          e.target.checked
-                        )
-                      }
+                      onChange={(e) => setAcceptedPolicy(e.target.checked)}
                       className="
                         mt-1
                         w-5
@@ -1657,8 +1561,7 @@ const SignupPage = () => {
                       <p
                         className="font-semibold"
                         style={{
-                          color:
-                            LightColors.textPrimary,
+                          color: LightColors.textPrimary,
                         }}
                       >
                         I agree to the Policy
@@ -1667,12 +1570,10 @@ const SignupPage = () => {
                       <p
                         className="text-xs mt-1"
                         style={{
-                          color:
-                            LightColors.textSecondary,
+                          color: LightColors.textSecondary,
                         }}
                       >
-                        You must read the full policy
-                        before continuing.
+                        You must read the full policy before continuing.
                       </p>
                     </div>
                   </div>
@@ -1687,10 +1588,7 @@ const SignupPage = () => {
                       scale: 0.985,
                     }}
                     type="submit"
-                    disabled={
-                      isLoading ||
-                      !acceptedPolicy
-                    }
+                    disabled={isLoading || !acceptedPolicy}
                     className="
                       w-full
                       h-14
@@ -1718,8 +1616,7 @@ const SignupPage = () => {
                           #256d2a 100%
                         )
                       `,
-                      boxShadow:
-                        "0 20px 40px rgba(27,94,32,0.25)",
+                      boxShadow: "0 20px 40px rgba(27,94,32,0.25)",
                     }}
                   >
                     {isLoading ? (
@@ -1746,18 +1643,15 @@ const SignupPage = () => {
                   <p
                     className="text-sm"
                     style={{
-                      color:
-                        LightColors.textSecondary,
+                      color: LightColors.textSecondary,
                     }}
                   >
                     Already have an account?{" "}
-
                     <Link
                       to="/login"
                       className="font-bold hover:underline"
                       style={{
-                        color:
-                          LightColors.primary,
+                        color: LightColors.primary,
                       }}
                     >
                       Sign in
@@ -1777,8 +1671,7 @@ const SignupPage = () => {
                     text-center
                   "
                   style={{
-                    borderColor:
-                      LightColors.divider,
+                    borderColor: LightColors.divider,
                   }}
                 >
                   <p
@@ -1790,12 +1683,10 @@ const SignupPage = () => {
                       sm:tracking-[0.2em]
                     "
                     style={{
-                      color:
-                        LightColors.textMuted,
+                      color: LightColors.textMuted,
                     }}
                   >
-                    GuidEd Campus Security Platform ©
-                    2026
+                    GuidEd Campus Security Platform © 2026
                   </p>
                 </div>
               </div>
@@ -1859,7 +1750,7 @@ const SignupPage = () => {
                 text-gray-700
               "
             >
-{`GuidED User Policy and Agreement
+              {`GuidED User Policy and Agreement
 1. Purpose
 
 The purpose of this policy is to establish the rules, responsibilities, and procedures governing the use of the Student Discipline Management System (SDMS), a mobile and web-based application designed to improve the reporting, monitoring, recording, and analysis of student disciplinary incidents within the institution.
@@ -2059,9 +1950,7 @@ The Student Discipline Management System aims to modernize school discipline pro
             >
               <button
                 type="button"
-                onClick={() =>
-                  setShowPolicy(false)
-                }
+                onClick={() => setShowPolicy(false)}
                 className="
                   w-full
                   sm:w-auto
@@ -2093,8 +1982,7 @@ The Student Discipline Management System aims to modernize school discipline pro
                   font-semibold
                 "
                 style={{
-                  background:
-                    LightColors.primary,
+                  background: LightColors.primary,
                 }}
               >
                 I Understand & Accept
@@ -2164,8 +2052,7 @@ The Student Discipline Management System aims to modernize school discipline pro
                 border-b
               "
               style={{
-                borderColor:
-                  LightColors.divider,
+                borderColor: LightColors.divider,
               }}
             >
               <div>
@@ -2176,8 +2063,7 @@ The Student Discipline Management System aims to modernize school discipline pro
                     font-black
                   "
                   style={{
-                    color:
-                      LightColors.textPrimary,
+                    color: LightColors.textPrimary,
                   }}
                 >
                   Crop Profile Photo
@@ -2190,8 +2076,7 @@ The Student Discipline Management System aims to modernize school discipline pro
                     mt-1
                   "
                   style={{
-                    color:
-                      LightColors.textSecondary,
+                    color: LightColors.textSecondary,
                   }}
                 >
                   Drag the image and adjust the zoom
@@ -2264,8 +2149,7 @@ The Student Discipline Management System aims to modernize school discipline pro
                 <ZoomOut
                   className="w-5 h-5 shrink-0"
                   style={{
-                    color:
-                      LightColors.textSecondary,
+                    color: LightColors.textSecondary,
                   }}
                 />
 
@@ -2275,11 +2159,7 @@ The Student Discipline Management System aims to modernize school discipline pro
                   max={3}
                   step={0.05}
                   value={zoom}
-                  onChange={(e) =>
-                    setZoom(
-                      Number(e.target.value)
-                    )
-                  }
+                  onChange={(e) => setZoom(Number(e.target.value))}
                   className="
                     flex-1
                     accent-green-800
@@ -2290,8 +2170,7 @@ The Student Discipline Management System aims to modernize school discipline pro
                 <ZoomIn
                   className="w-5 h-5 shrink-0"
                   style={{
-                    color:
-                      LightColors.textSecondary,
+                    color: LightColors.textSecondary,
                   }}
                 />
               </div>
@@ -2303,8 +2182,7 @@ The Student Discipline Management System aims to modernize school discipline pro
                     font-medium
                   "
                   style={{
-                    color:
-                      LightColors.textSecondary,
+                    color: LightColors.textSecondary,
                   }}
                 >
                   Zoom: {zoom.toFixed(1)}x
@@ -2352,14 +2230,11 @@ The Student Discipline Management System aims to modernize school discipline pro
                     transition
                   "
                   style={{
-                    borderColor:
-                      LightColors.border,
-                    color:
-                      LightColors.textPrimary,
+                    borderColor: LightColors.border,
+                    color: LightColors.textPrimary,
                   }}
                 >
                   <RotateCcw className="w-4 h-4" />
-
                   Reset
                 </button>
 
@@ -2380,10 +2255,8 @@ The Student Discipline Management System aims to modernize school discipline pro
                     transition
                   "
                   style={{
-                    borderColor:
-                      LightColors.border,
-                    color:
-                      LightColors.textPrimary,
+                    borderColor: LightColors.border,
+                    color: LightColors.textPrimary,
                   }}
                 >
                   Cancel
@@ -2421,7 +2294,6 @@ The Student Discipline Management System aims to modernize school discipline pro
                   }}
                 >
                   <CheckCircle2 className="w-5 h-5" />
-
                   Use Photo
                 </button>
               </div>

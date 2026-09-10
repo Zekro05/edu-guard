@@ -12,7 +12,9 @@ import {
   Activity,
 } from "lucide-react";
 
-/* ================= THEME ================= */
+/* =========================================================
+   THEME
+========================================================= */
 
 const C = {
   primary: "#1B5E20",
@@ -23,7 +25,9 @@ const C = {
   muted: "#6B7280",
 };
 
-/* ================= STATUS BADGE ================= */
+/* =========================================================
+   STATUS BADGE
+========================================================= */
 
 const StatusBadge = memo(({ status }) => {
   const normalizedStatus = status?.toLowerCase() || "pending";
@@ -50,70 +54,128 @@ const StatusBadge = memo(({ status }) => {
   return (
     <div
       className={`
-        inline-flex items-center gap-2
-        px-3 py-1.5
+        inline-flex
+        items-center
+        justify-center
+        gap-2
+        px-3
+        py-1.5
         rounded-full
         border
         text-xs
         font-semibold
         capitalize
+        whitespace-nowrap
         ${style.wrapper}
       `}
     >
-      <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+      <span
+        className={`
+          w-1.5
+          h-1.5
+          rounded-full
+          shrink-0
+          ${style.dot}
+        `}
+      />
 
       {normalizedStatus}
     </div>
   );
 });
 
-/* ================= INFO BLOCK ================= */
+/* =========================================================
+   INFO BLOCK
+========================================================= */
 
 const Info = memo(({ icon, label, value }) => (
   <div
     className="
+      min-w-0
       rounded-xl
       border
       bg-gray-50/70
-      p-4
+      p-3.5
+      sm:p-4
       transition-all
       duration-200
       hover:bg-gray-50
     "
     style={{ borderColor: C.border }}
   >
-    <div className="flex items-center gap-2 mb-3">
+    <div className="flex items-center gap-2 mb-2.5 sm:mb-3 min-w-0">
       <div
-        className="w-8 h-8 rounded-lg flex items-center justify-center"
-        style={{ background: C.primaryLight, color: C.primary }}
+        className="
+          w-8
+          h-8
+          rounded-lg
+          flex
+          items-center
+          justify-center
+          shrink-0
+        "
+        style={{
+          background: C.primaryLight,
+          color: C.primary,
+        }}
       >
         {icon}
       </div>
 
-      <p className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
+      <p
+        className="
+          text-[10px]
+          sm:text-[11px]
+          uppercase
+          tracking-wide
+          text-gray-400
+          font-semibold
+          leading-tight
+          break-words
+        "
+      >
         {label}
       </p>
     </div>
 
-    <p className="text-sm font-semibold text-gray-800 break-words leading-relaxed">
+    <p
+      className="
+        text-sm
+        font-semibold
+        text-gray-800
+        break-words
+        whitespace-normal
+        leading-relaxed
+      "
+    >
       {value || "N/A"}
     </p>
   </div>
 ));
 
-/* ================= MAIN CARD ================= */
+/* =========================================================
+   MAIN CARD
+========================================================= */
 
 const MobileReport = ({ report, onAccept, onReject }) => {
-  const status = report.status?.toLowerCase() || "pending";
+  const status = report?.status?.toLowerCase() || "pending";
 
-  const reporterName = report.reporterId
+  /* =======================================================
+     REPORTER
+  ======================================================= */
+
+  const reporterName = report?.reporterId
     ? report.reporterId.name ||
       `${report.reporterId.firstName || ""} ${
         report.reporterId.lastName || ""
       }`.trim()
     : "Anonymous";
 
-  const createdDate = report.createdAt
+  /* =======================================================
+     CREATED DATE
+  ======================================================= */
+
+  const createdDate = report?.createdAt
     ? new Date(report.createdAt).toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",
@@ -121,7 +183,11 @@ const MobileReport = ({ report, onAccept, onReject }) => {
       })
     : "N/A";
 
-  const incidentDate = report.date
+  /* =======================================================
+     INCIDENT DATE
+  ======================================================= */
+
+  const incidentDate = report?.date
     ? `${new Date(report.date).toLocaleDateString("en-US", {
         year: "numeric",
         month: "long",
@@ -132,12 +198,24 @@ const MobileReport = ({ report, onAccept, onReject }) => {
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.22 }}
+      initial={{
+        opacity: 0,
+        y: 15,
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+      }}
+      whileHover={{
+        y: -2,
+      }}
+      transition={{
+        duration: 0.22,
+      }}
       className="
         relative
+        w-full
+        max-w-full
         overflow-hidden
         rounded-2xl
         border
@@ -146,27 +224,83 @@ const MobileReport = ({ report, onAccept, onReject }) => {
         hover:shadow-md
         transition-shadow
       "
-      style={{ borderColor: C.border }}
+      style={{
+        borderColor: C.border,
+      }}
     >
-      {/* ================= TOP ACCENT ================= */}
+      {/* ===================================================
+          TOP ACCENT
+      =================================================== */}
 
       <div
-        className="absolute top-0 left-0 right-0 h-1"
-        style={{ background: C.primary }}
+        className="
+          absolute
+          top-0
+          left-0
+          right-0
+          h-1
+        "
+        style={{
+          background: C.primary,
+        }}
       />
 
-      <div className="p-6">
-        {/* ================= HEADER ================= */}
+      {/* ===================================================
+          CARD CONTENT
+      =================================================== */}
 
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5 mb-6">
-          <div className="flex items-start gap-4">
+      <div
+        className="
+          p-4
+          sm:p-5
+          lg:p-6
+        "
+      >
+        {/* =================================================
+            HEADER
+        ================================================= */}
+
+        <div
+          className="
+            flex
+            flex-col
+            gap-4
+            mb-5
+            sm:mb-6
+            lg:flex-row
+            lg:items-start
+            lg:justify-between
+            lg:gap-5
+          "
+        >
+          {/* REPORT TYPE */}
+
+          <div
+            className="
+              flex
+              items-start
+              gap-3
+              sm:gap-4
+              min-w-0
+              flex-1
+            "
+          >
             <motion.div
-              whileHover={{ scale: 1.04 }}
-              transition={{ duration: 0.15 }}
+              whileHover={{
+                scale: 1.04,
+              }}
+              transition={{
+                duration: 0.15,
+              }}
               className="
-                w-12 h-12
+                w-10
+                h-10
+                sm:w-12
+                sm:h-12
                 rounded-xl
-                flex items-center justify-center
+                flex
+                items-center
+                justify-center
                 shrink-0
               "
               style={{
@@ -174,67 +308,189 @@ const MobileReport = ({ report, onAccept, onReject }) => {
                 color: C.primary,
               }}
             >
-              <Smartphone size={22} />
+              <Smartphone
+                size={20}
+                className="sm:hidden"
+              />
+
+              <Smartphone
+                size={22}
+                className="hidden sm:block"
+              />
             </motion.div>
 
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-lg font-semibold text-gray-900">
+            <div className="min-w-0 flex-1">
+              {/* TITLE */}
+
+              <div
+                className="
+                  flex
+                  items-start
+                  gap-2
+                  flex-wrap
+                "
+              >
+                <h3
+                  className="
+                    text-base
+                    sm:text-lg
+                    font-semibold
+                    text-gray-900
+                    leading-snug
+                    break-words
+                  "
+                >
                   Mobile Incident Report
                 </h3>
 
-                <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-                  <Activity size={12} />
+                <div
+                  className="
+                    flex
+                    items-center
+                    gap-1.5
+                    text-[10px]
+                    sm:text-[11px]
+                    text-gray-400
+                    whitespace-nowrap
+                  "
+                >
+                  <Activity size={11} />
+
                   Mobile
                 </div>
               </div>
 
-              <p className="text-sm text-gray-500 mt-1">
+              {/* SUBTITLE */}
+
+              <p
+                className="
+                  text-xs
+                  sm:text-sm
+                  text-gray-500
+                  mt-1
+                  leading-relaxed
+                "
+              >
                 Submitted via student mobile application
               </p>
 
-              <div className="flex items-center gap-2 mt-3">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              {/* REAL-TIME STATUS */}
+
+              <div
+                className="
+                  flex
+                  items-start
+                  gap-2
+                  mt-3
+                "
+              >
+                <span
+                  className="
+                    relative
+                    flex
+                    h-2
+                    w-2
+                    mt-1
+                    shrink-0
+                  "
+                >
+                  <span
+                    className="
+                      animate-ping
+                      absolute
+                      inline-flex
+                      h-full
+                      w-full
+                      rounded-full
+                      bg-green-400
+                      opacity-60
+                    "
+                  />
+
+                  <span
+                    className="
+                      relative
+                      inline-flex
+                      rounded-full
+                      h-2
+                      w-2
+                      bg-green-500
+                    "
+                  />
                 </span>
 
-                <span className="text-xs text-gray-400">
+                <span
+                  className="
+                    text-[10px]
+                    sm:text-xs
+                    text-gray-400
+                    leading-relaxed
+                  "
+                >
                   Real-time synchronized report
                 </span>
               </div>
             </div>
           </div>
 
-          <StatusBadge status={status} />
+          {/* STATUS */}
+
+          <div
+            className="
+              flex
+              lg:justify-end
+              shrink-0
+            "
+          >
+            <StatusBadge status={status} />
+          </div>
         </div>
 
-        {/* ================= DIVIDER ================= */}
+        {/* =================================================
+            DIVIDER
+        ================================================= */}
 
         <div
-          className="border-t mb-6"
-          style={{ borderColor: C.border }}
+          className="
+            border-t
+            mb-5
+            sm:mb-6
+          "
+          style={{
+            borderColor: C.border,
+          }}
         />
 
-        {/* ================= INFORMATION ================= */}
+        {/* =================================================
+            INFORMATION GRID
+        ================================================= */}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div
+          className="
+            grid
+            grid-cols-1
+            sm:grid-cols-2
+            xl:grid-cols-3
+            gap-3
+            sm:gap-4
+          "
+        >
           <Info
             icon={<User2 size={15} />}
             label="Student"
-            value={report.studentName}
+            value={report?.studentName}
           />
 
           <Info
             icon={<FileText size={15} />}
             label="Offense"
-            value={report.offense}
+            value={report?.offense}
           />
 
           <Info
             icon={<MapPin size={15} />}
             label="Location"
-            value={report.location}
+            value={report?.location}
           />
 
           <Info
@@ -256,12 +512,36 @@ const MobileReport = ({ report, onAccept, onReject }) => {
           />
         </div>
 
-        {/* ================= DESCRIPTION ================= */}
+        {/* =================================================
+            DESCRIPTION
+        ================================================= */}
 
-        <div className="mt-6">
-          <div className="flex items-center gap-2 mb-3">
+        <div
+          className="
+            mt-5
+            sm:mt-6
+          "
+        >
+          {/* DESCRIPTION HEADER */}
+
+          <div
+            className="
+              flex
+              items-center
+              gap-2
+              mb-3
+            "
+          >
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              className="
+                w-8
+                h-8
+                rounded-lg
+                flex
+                items-center
+                justify-center
+                shrink-0
+              "
               style={{
                 background: C.primaryLight,
                 color: C.primary,
@@ -270,94 +550,151 @@ const MobileReport = ({ report, onAccept, onReject }) => {
               <FileText size={15} />
             </div>
 
-            <div>
-              <p className="text-sm font-semibold text-gray-800">
+            <div className="min-w-0">
+              <p
+                className="
+                  text-sm
+                  font-semibold
+                  text-gray-800
+                "
+              >
                 Incident Description
               </p>
 
-              <p className="text-xs text-gray-400">
+              <p
+                className="
+                  text-[10px]
+                  sm:text-xs
+                  text-gray-400
+                "
+              >
                 Details provided with the report
               </p>
             </div>
           </div>
+
+          {/* DESCRIPTION CONTENT */}
 
           <div
             className="
               rounded-xl
               border
               bg-gray-50/70
-              p-4
+              p-3.5
+              sm:p-4
               text-sm
-              leading-7
+              leading-6
+              sm:leading-7
               text-gray-600
+              break-words
+              whitespace-pre-wrap
+              overflow-hidden
             "
-            style={{ borderColor: C.border }}
+            style={{
+              borderColor: C.border,
+            }}
           >
-            {report.description || "No description provided."}
+            {report?.description || "No description provided."}
           </div>
         </div>
 
-        {/* ================= ACTIONS ================= */}
+        {/* =================================================
+            ACTIONS
+        ================================================= */}
 
         {status === "pending" && (
           <div
             className="
-              mt-6
-              pt-5
+              mt-5
+              sm:mt-6
+              pt-4
+              sm:pt-5
               border-t
               flex
               flex-col
               sm:flex-row
               gap-3
             "
-            style={{ borderColor: C.border }}
+            style={{
+              borderColor: C.border,
+            }}
           >
+            {/* ACCEPT */}
+
             <motion.button
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => onAccept(report._id)}
+              whileHover={{
+                scale: 1.01,
+              }}
+              whileTap={{
+                scale: 0.98,
+              }}
+              onClick={() => onAccept?.(report._id)}
               className="
-                flex-1
+                w-full
+                sm:flex-1
+                min-h-[44px]
                 flex
                 items-center
                 justify-center
                 gap-2
                 py-2.5
+                px-4
                 rounded-xl
                 bg-green-700
                 hover:bg-green-800
+                active:bg-green-900
                 text-white
                 text-sm
                 font-semibold
                 transition-colors
+                touch-manipulation
               "
             >
-              <Check size={17} />
-              Accept Report
+              <Check
+                size={17}
+                className="shrink-0"
+              />
+
+              <span>Accept Report</span>
             </motion.button>
 
+            {/* REJECT */}
+
             <motion.button
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => onReject(report._id)}
+              whileHover={{
+                scale: 1.01,
+              }}
+              whileTap={{
+                scale: 0.98,
+              }}
+              onClick={() => onReject?.(report._id)}
               className="
-                flex-1
+                w-full
+                sm:flex-1
+                min-h-[44px]
                 flex
                 items-center
                 justify-center
                 gap-2
                 py-2.5
+                px-4
                 rounded-xl
                 bg-red-600
                 hover:bg-red-700
+                active:bg-red-800
                 text-white
                 text-sm
                 font-semibold
                 transition-colors
+                touch-manipulation
               "
             >
-              <X size={17} />
-              Reject Report
+              <X
+                size={17}
+                className="shrink-0"
+              />
+
+              <span>Reject Report</span>
             </motion.button>
           </div>
         )}
@@ -367,3 +704,4 @@ const MobileReport = ({ report, onAccept, onReject }) => {
 };
 
 export default memo(MobileReport);
+

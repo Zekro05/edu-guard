@@ -34,11 +34,13 @@ import {
   SlidersHorizontal,
   Activity,
   LogOut,
+  Printer,
 } from "lucide-react";
 
 import { useAuthStore } from "../store/authStore";
 import { useNavigate } from "react-router-dom";
 import { API } from "../lib/api";
+import CasePrintableReport from "../components/reports/CasePrintableReport";
 
 const socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000");
 
@@ -77,11 +79,7 @@ const Nav = ({ icon, label, onClick, active }) => (
     <span
       className={`
         transition
-        ${
-          active
-            ? "text-green-600"
-            : "text-gray-400 group-hover:text-gray-700"
-        }
+        ${active ? "text-green-600" : "text-gray-400 group-hover:text-gray-700"}
       `}
     >
       {icon}
@@ -779,6 +777,7 @@ export default function CaseManagement() {
   const [loading, setLoading] = useState(true);
 
   const [selected, setSelected] = useState(null);
+  const [showCasePrintableReport, setShowCasePrintableReport] = useState(false);
   const [note, setNote] = useState("");
   const [studentInput, setStudentInput] = useState("");
   const [requestSent, setRequestSent] = useState(false);
@@ -1712,6 +1711,34 @@ export default function CaseManagement() {
             </div>
 
             <div className="hidden sm:flex items-center gap-2 text-[10px] text-gray-400">
+              <button
+                onClick={() => setShowCasePrintableReport(true)}
+                className="
+      flex
+      items-center
+      justify-center
+      gap-2
+      px-4
+      h-10
+      rounded-xl
+      bg-white
+      border
+      border-gray-200
+      text-gray-700
+      text-xs
+      font-bold
+      hover:border-green-200
+      hover:bg-green-50
+      hover:text-green-700
+      transition
+      shadow-sm
+      whitespace-nowrap
+    "
+              >
+                <Printer size={16} />
+                Printable Report
+              </button>
+
               <RefreshCw size={12} />
 
               <span>Real-time synchronized</span>
@@ -2958,6 +2985,11 @@ export default function CaseManagement() {
           </motion.div>
         )}
       </AnimatePresence>
+      {showCasePrintableReport && (
+        <CasePrintableReport
+          onClose={() => setShowCasePrintableReport(false)}
+        />
+      )}
     </div>
   );
 }

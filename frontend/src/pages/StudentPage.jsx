@@ -18,7 +18,6 @@ import {
   Search,
   BriefcaseBusiness,
   HandHelping,
-  ExternalLink,
   LogOut,
   UserRound,
   GraduationCap,
@@ -29,6 +28,7 @@ import {
   Database,
   ChevronLeft,
   ChevronRight,
+  Menu,
 } from "lucide-react";
 
 import { useAuthStore } from "../store/authStore";
@@ -38,7 +38,8 @@ import RiskBadge from "../components/RiskBadge";
 import ViewProfileModal from "../components/ViewProfileModal";
 
 const socket = io(
-  import.meta.env.VITE_SOCKET_URL || "https://edu-guard-backend.onrender.com",
+  import.meta.env.VITE_SOCKET_URL ||
+    "https://edu-guard-backend.onrender.com",
 );
 
 /* =========================================================
@@ -87,6 +88,8 @@ const StudentPage = () => {
   const [showPreview, setShowPreview] = useState(false);
 
   const [loading, setLoading] = useState(true);
+
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const fileRef = useRef(null);
 
@@ -141,6 +144,22 @@ const StudentPage = () => {
   }, []);
 
   /* =========================================================
+     CLOSE MOBILE MENU ON RESIZE
+  ========================================================= */
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  /* =========================================================
      FILTER
   ========================================================= */
 
@@ -149,9 +168,9 @@ const StudentPage = () => {
 
     if (!query) return true;
 
-    const fullName = `${student.firstName || ""} ${student.middleName || ""} ${
-      student.lastName || ""
-    }`.toLowerCase();
+    const fullName = `${student.firstName || ""} ${
+      student.middleName || ""
+    } ${student.lastName || ""}`.toLowerCase();
 
     const studentId = String(student.studentId || "").toLowerCase();
 
@@ -166,7 +185,10 @@ const StudentPage = () => {
 
   const pages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
 
-  const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const paginated = filtered.slice(
+    (page - 1) * PER_PAGE,
+    page * PER_PAGE,
+  );
 
   useEffect(() => {
     setPage(1);
@@ -294,6 +316,15 @@ const StudentPage = () => {
   };
 
   /* =========================================================
+     NAVIGATION
+  ========================================================= */
+
+  const handleNavigate = (path) => {
+    setMobileMenuOpen(false);
+    navigate(path);
+  };
+
+  /* =========================================================
      ACTION BUTTON
   ========================================================= */
 
@@ -303,6 +334,7 @@ const StudentPage = () => {
       whileTap={{ scale: 0.95 }}
       onClick={onClick}
       title={label}
+      aria-label={label}
       className={`
         w-9
         h-9
@@ -328,18 +360,18 @@ const StudentPage = () => {
   ========================================================= */
 
   return (
-    <div className="h-screen w-screen flex bg-[#F7F9F8] text-gray-900 overflow-hidden">
+    <div className="min-h-screen w-full flex bg-[#F7F9F8] text-gray-900 overflow-x-hidden">
       {/* =====================================================
-          SIDEBAR
+          DESKTOP SIDEBAR
       ===================================================== */}
 
-      <aside className="hidden lg:flex w-[270px] bg-white border-r border-gray-100 flex-col justify-between px-5 py-6">
+      <aside className="hidden lg:flex fixed left-0 top-0 bottom-0 z-40 w-[250px] xl:w-[270px] bg-white border-r border-gray-100 flex-col justify-between px-4 xl:px-5 py-6 overflow-y-auto">
         <div>
           {/* BRAND */}
 
           <div className="px-3 mb-8">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 flex items-center justify-center">
+              <div className="w-10 xl:w-11 h-10 xl:h-11 flex items-center justify-center flex-shrink-0">
                 <img
                   src="/school-logo.png"
                   alt="School Logo"
@@ -347,12 +379,12 @@ const StudentPage = () => {
                 />
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-xl font-extrabold tracking-tight text-gray-900">
                   Guid<span className="text-green-600">Ed</span>
                 </h1>
 
-                <p className="text-[9px] uppercase tracking-widest text-gray-400 font-semibold">
+                <p className="text-[9px] uppercase tracking-widest text-gray-400 font-semibold truncate">
                   Student Guidance
                 </p>
               </div>
@@ -375,7 +407,7 @@ const StudentPage = () => {
             <Nav
               icon={<LayoutDashboard size={18} />}
               label="Dashboard"
-              onClick={() => navigate("/dashboard")}
+              onClick={() => handleNavigate("/dashboard")}
             />
 
             <Nav icon={<Users size={18} />} label="Students" active />
@@ -383,25 +415,25 @@ const StudentPage = () => {
             <Nav
               icon={<ShieldX size={18} />}
               label="Guidance"
-              onClick={() => navigate("/guidance")}
+              onClick={() => handleNavigate("/guidance")}
             />
 
             <Nav
               icon={<ChartNoAxesCombined size={18} />}
               label="Reports"
-              onClick={() => navigate("/reports")}
+              onClick={() => handleNavigate("/reports")}
             />
 
             <Nav
               icon={<BriefcaseBusiness size={18} />}
               label="Cases"
-              onClick={() => navigate("/cases")}
+              onClick={() => handleNavigate("/cases")}
             />
 
             <Nav
               icon={<HandHelping size={18} />}
               label="Interventions"
-              onClick={() => navigate("/interventions")}
+              onClick={() => handleNavigate("/interventions")}
             />
           </div>
 
@@ -412,13 +444,13 @@ const StudentPage = () => {
           <Nav
             icon={<Settings size={18} />}
             label="Settings"
-            onClick={() => navigate("/settings")}
+            onClick={() => handleNavigate("/settings")}
           />
         </div>
 
         {/* SIDEBAR FOOTER */}
 
-        <div className="space-y-3">
+        <div className="space-y-3 mt-8">
           <div className="p-3 rounded-2xl bg-gray-50 border border-gray-100">
             <div className="flex items-center gap-3">
               <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-green-100 flex items-center justify-center flex-shrink-0">
@@ -480,35 +512,267 @@ const StudentPage = () => {
       </aside>
 
       {/* =====================================================
+          MOBILE OVERLAY
+      ===================================================== */}
+
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm lg:hidden"
+            />
+
+            <motion.aside
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="
+                fixed
+                left-0
+                top-0
+                bottom-0
+                z-50
+                w-[min(82vw,300px)]
+                bg-white
+                border-r
+                border-gray-100
+                flex
+                flex-col
+                justify-between
+                px-5
+                py-6
+                overflow-y-auto
+                lg:hidden
+              "
+            >
+              <div>
+                {/* MOBILE BRAND */}
+
+                <div className="px-3 mb-8">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                        <img
+                          src="/school-logo.png"
+                          alt="School Logo"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+
+                      <div className="min-w-0">
+                        <h1 className="text-xl font-extrabold tracking-tight text-gray-900">
+                          Guid<span className="text-green-600">Ed</span>
+                        </h1>
+
+                        <p className="text-[9px] uppercase tracking-widest text-gray-400 font-semibold">
+                          Student Guidance
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-gray-500 flex-shrink-0"
+                      aria-label="Close menu"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] leading-relaxed text-gray-400 mt-4">
+                    Our Lady of the Holy Rosary School
+                    <br />
+                    General Trias Campus
+                  </p>
+                </div>
+
+                <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                  Main Menu
+                </p>
+
+                <div className="space-y-1">
+                  <Nav
+                    icon={<LayoutDashboard size={18} />}
+                    label="Dashboard"
+                    onClick={() => handleNavigate("/dashboard")}
+                  />
+
+                  <Nav icon={<Users size={18} />} label="Students" active />
+
+                  <Nav
+                    icon={<ShieldX size={18} />}
+                    label="Guidance"
+                    onClick={() => handleNavigate("/guidance")}
+                  />
+
+                  <Nav
+                    icon={<ChartNoAxesCombined size={18} />}
+                    label="Reports"
+                    onClick={() => handleNavigate("/reports")}
+                  />
+
+                  <Nav
+                    icon={<BriefcaseBusiness size={18} />}
+                    label="Cases"
+                    onClick={() => handleNavigate("/cases")}
+                  />
+
+                  <Nav
+                    icon={<HandHelping size={18} />}
+                    label="Interventions"
+                    onClick={() => handleNavigate("/interventions")}
+                  />
+                </div>
+
+                <p className="px-3 mt-8 mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                  System
+                </p>
+
+                <Nav
+                  icon={<Settings size={18} />}
+                  label="Settings"
+                  onClick={() => handleNavigate("/settings")}
+                />
+              </div>
+
+              <div className="space-y-3 mt-8">
+                <div className="p-3 rounded-2xl bg-gray-50 border border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-green-100 flex items-center justify-center flex-shrink-0">
+                      {adminPhoto ? (
+                        <img
+                          src={adminPhoto}
+                          alt={adminName}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <span className="text-green-700 font-bold">
+                          {adminName.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+
+                      <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white" />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400">
+                        Administrator
+                      </p>
+
+                      <p className="text-sm font-bold text-gray-900 truncate">
+                        {adminName}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={logout}
+                  className="
+                    w-full
+                    flex
+                    items-center
+                    justify-center
+                    gap-2
+                    py-2.5
+                    rounded-xl
+                    text-sm
+                    font-semibold
+                    text-gray-600
+                    border
+                    border-gray-200
+                    hover:bg-red-50
+                    hover:text-red-600
+                    hover:border-red-100
+                    transition
+                  "
+                >
+                  <LogOut size={16} />
+                  Sign out
+                </button>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* =====================================================
           MAIN
       ===================================================== */}
 
-      <main className="flex-1 min-w-0 overflow-y-auto">
+      <main className="flex-1 min-w-0 lg:ml-[250px] xl:ml-[270px] overflow-y-auto min-h-screen">
         {/* HEADER */}
 
-        <header className="sticky top-0 z-30 bg-[#F7F9F8]/90 backdrop-blur-xl border-b border-gray-100">
-          <div className="px-6 md:px-10 py-5 flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-xs text-gray-400 mb-1">
-                <span>Management</span>
-                <ChevronRight size={12} />
-                <span className="text-green-600 font-medium">Students</span>
+        <header className="sticky top-0 z-30 bg-[#F7F9F8]/95 backdrop-blur-xl border-b border-gray-100">
+          <div className="px-4 sm:px-6 md:px-8 xl:px-10 py-4 sm:py-5">
+            <div className="flex items-center justify-between gap-4">
+              {/* MOBILE MENU BUTTON */}
+
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="
+                  lg:hidden
+                  w-10
+                  h-10
+                  rounded-xl
+                  bg-white
+                  border
+                  border-gray-200
+                  flex
+                  items-center
+                  justify-center
+                  text-gray-600
+                  flex-shrink-0
+                "
+                aria-label="Open menu"
+              >
+                <Menu size={19} />
+              </button>
+
+              <div className="min-w-0 flex-1">
+                <div className="hidden sm:flex items-center gap-2 text-xs text-gray-400 mb-1">
+                  <span>Management</span>
+                  <ChevronRight size={12} />
+                  <span className="text-green-600 font-medium">
+                    Students
+                  </span>
+                </div>
+
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900">
+                  Students
+                </h2>
+
+                <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate sm:whitespace-normal">
+                  Manage student records and monitor behavioral risk.
+                </p>
               </div>
 
-              <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900">
-                Students
-              </h2>
+              <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-gray-100">
+                  <Database size={15} className="text-green-600" />
 
-              <p className="text-sm text-gray-500 mt-1">
-                Manage student records and monitor behavioral risk.
-              </p>
+                  <span className="text-xs font-semibold text-gray-600">
+                    {students.length} records
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="hidden md:flex items-center gap-2">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-gray-100">
-                <Database size={15} className="text-green-600" />
+            {/* MOBILE RECORD COUNT */}
 
-                <span className="text-xs font-semibold text-gray-600">
+            <div className="sm:hidden mt-3">
+              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-gray-100">
+                <Database size={14} className="text-green-600" />
+
+                <span className="text-[11px] font-semibold text-gray-600">
                   {students.length} records
                 </span>
               </div>
@@ -518,14 +782,14 @@ const StudentPage = () => {
 
         {/* CONTENT */}
 
-        <div className="px-6 md:px-10 py-8 space-y-8">
+        <div className="px-4 sm:px-6 md:px-8 xl:px-10 py-5 sm:py-8 space-y-6 sm:space-y-8">
           {/* ===================================================
               OVERVIEW
           =================================================== */}
 
           <section>
             <div className="flex items-end justify-between mb-4">
-              <div>
+              <div className="min-w-0">
                 <h3 className="text-sm font-bold text-gray-900">
                   Student Overview
                 </h3>
@@ -535,10 +799,10 @@ const StudentPage = () => {
                 </p>
               </div>
 
-              <Users size={18} className="text-gray-300" />
+              <Users size={18} className="text-gray-300 flex-shrink-0" />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <StatCard
                 label="Total Students"
                 value={stats.total}
@@ -574,8 +838,8 @@ const StudentPage = () => {
           =================================================== */}
 
           <section>
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-4">
-              <div>
+            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-4">
+              <div className="min-w-0">
                 <h3 className="text-sm font-bold text-gray-900">
                   Student Directory
                 </h3>
@@ -585,7 +849,7 @@ const StudentPage = () => {
                 </p>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col xs:flex-row sm:flex-row gap-2 w-full lg:w-auto">
                 <input
                   ref={fileRef}
                   type="file"
@@ -598,9 +862,11 @@ const StudentPage = () => {
                   whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => fileRef.current?.click()}
+                  disabled={importing}
                   className="
                     flex
                     items-center
+                    justify-center
                     gap-2
                     px-4
                     py-2.5
@@ -615,6 +881,9 @@ const StudentPage = () => {
                     hover:text-green-700
                     hover:shadow-sm
                     transition
+                    disabled:opacity-50
+                    w-full
+                    sm:w-auto
                   "
                 >
                   <Upload size={16} />
@@ -633,6 +902,7 @@ const StudentPage = () => {
                   className="
                     flex
                     items-center
+                    justify-center
                     gap-2
                     px-4
                     py-2.5
@@ -645,6 +915,8 @@ const StudentPage = () => {
                     shadow-sm
                     shadow-green-200
                     transition
+                    w-full
+                    sm:w-auto
                   "
                 >
                   <Plus size={17} />
@@ -657,40 +929,47 @@ const StudentPage = () => {
 
             <div
               className="
-              bg-white
-              border
-              border-gray-100
-              rounded-2xl
-              p-3
-              shadow-[0_4px_24px_rgba(0,0,0,0.025)]
-              mb-4
-            "
+                bg-white
+                border
+                border-gray-100
+                rounded-2xl
+                p-2.5
+                sm:p-3
+                shadow-[0_4px_24px_rgba(0,0,0,0.025)]
+                mb-4
+              "
             >
               <div
                 className="
-                flex
-                items-center
-                gap-3
-                bg-gray-50
-                border
-                border-gray-100
-                px-4
-                py-3
-                rounded-xl
-                focus-within:bg-white
-                focus-within:border-green-200
-                focus-within:ring-4
-                focus-within:ring-green-50
-                transition
-              "
+                  flex
+                  items-center
+                  gap-3
+                  bg-gray-50
+                  border
+                  border-gray-100
+                  px-3
+                  sm:px-4
+                  py-2.5
+                  sm:py-3
+                  rounded-xl
+                  focus-within:bg-white
+                  focus-within:border-green-200
+                  focus-within:ring-4
+                  focus-within:ring-green-50
+                  transition
+                "
               >
-                <Search size={17} className="text-gray-400 flex-shrink-0" />
+                <Search
+                  size={17}
+                  className="text-gray-400 flex-shrink-0"
+                />
 
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="
                     w-full
+                    min-w-0
                     outline-none
                     bg-transparent
                     text-sm
@@ -703,7 +982,8 @@ const StudentPage = () => {
                 {search && (
                   <button
                     onClick={() => setSearch("")}
-                    className="text-gray-400 hover:text-gray-700"
+                    className="text-gray-400 hover:text-gray-700 flex-shrink-0"
+                    aria-label="Clear search"
                   >
                     <X size={16} />
                   </button>
@@ -717,35 +997,36 @@ const StudentPage = () => {
 
             <div
               className="
-              bg-white
-              border
-              border-gray-100
-              rounded-3xl
-              overflow-hidden
-              shadow-[0_4px_24px_rgba(0,0,0,0.025)]
-            "
+                bg-white
+                border
+                border-gray-100
+                rounded-2xl
+                sm:rounded-3xl
+                overflow-hidden
+                shadow-[0_4px_24px_rgba(0,0,0,0.025)]
+              "
             >
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[760px] text-sm">
                   <thead>
                     <tr className="bg-gray-50/80 border-b border-gray-100">
-                      <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      <th className="px-4 sm:px-6 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">
                         Student
                       </th>
 
-                      <th className="px-6 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      <th className="px-4 sm:px-6 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">
                         Student ID
                       </th>
 
-                      <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      <th className="px-4 sm:px-6 py-4 text-center text-[10px] font-bold uppercase tracking-wider text-gray-400">
                         Grade
                       </th>
 
-                      <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      <th className="px-4 sm:px-6 py-4 text-center text-[10px] font-bold uppercase tracking-wider text-gray-400">
                         Risk Level
                       </th>
 
-                      <th className="px-6 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      <th className="px-4 sm:px-6 py-4 text-right text-[10px] font-bold uppercase tracking-wider text-gray-400">
                         Actions
                       </th>
                     </tr>
@@ -783,22 +1064,24 @@ const StudentPage = () => {
                         >
                           {/* STUDENT */}
 
-                          <td className="px-6 py-4">
+                          <td className="px-4 sm:px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div
                                 className="
-                                w-10
-                                h-10
-                                rounded-xl
-                                bg-green-50
-                                border
-                                border-green-100
-                                overflow-hidden
-                                flex
-                                items-center
-                                justify-center
-                                flex-shrink-0
-                              "
+                                  w-9
+                                  sm:w-10
+                                  h-9
+                                  sm:h-10
+                                  rounded-xl
+                                  bg-green-50
+                                  border
+                                  border-green-100
+                                  overflow-hidden
+                                  flex
+                                  items-center
+                                  justify-center
+                                  flex-shrink-0
+                                "
                               >
                                 {student.profilePhoto ? (
                                   <img
@@ -814,7 +1097,7 @@ const StudentPage = () => {
                                 )}
                               </div>
 
-                              <div className="min-w-0">
+                              <div className="min-w-0 max-w-[230px]">
                                 <p className="font-semibold text-gray-900 truncate">
                                   {student.firstName}{" "}
                                   {student.middleName
@@ -832,7 +1115,7 @@ const StudentPage = () => {
 
                           {/* ID */}
 
-                          <td className="px-6 py-4">
+                          <td className="px-4 sm:px-6 py-4">
                             <span className="text-xs font-medium text-gray-500">
                               {student.studentId || "—"}
                             </span>
@@ -840,21 +1123,21 @@ const StudentPage = () => {
 
                           {/* GRADE */}
 
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-4 sm:px-6 py-4 text-center">
                             <span
                               className="
-                              inline-flex
-                              items-center
-                              px-2.5
-                              py-1
-                              rounded-lg
-                              bg-gray-50
-                              border
-                              border-gray-100
-                              text-xs
-                              font-semibold
-                              text-gray-600
-                            "
+                                inline-flex
+                                items-center
+                                px-2.5
+                                py-1
+                                rounded-lg
+                                bg-gray-50
+                                border
+                                border-gray-100
+                                text-xs
+                                font-semibold
+                                text-gray-600
+                              "
                             >
                               {student.grade || "—"}
                             </span>
@@ -862,13 +1145,13 @@ const StudentPage = () => {
 
                           {/* RISK */}
 
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-4 sm:px-6 py-4 text-center">
                             <RiskBadge level={student.riskLevel} />
                           </td>
 
                           {/* ACTIONS */}
 
-                          <td className="px-6 py-4">
+                          <td className="px-4 sm:px-6 py-4">
                             <div className="flex justify-end gap-1.5">
                               <Action
                                 label="View profile"
@@ -911,20 +1194,21 @@ const StudentPage = () => {
               {!loading && (
                 <div
                   className="
-                  px-6
-                  py-4
-                  border-t
-                  border-gray-100
-                  bg-gray-50/40
-                  flex
-                  flex-col
-                  sm:flex-row
-                  items-center
-                  justify-between
-                  gap-3
-                "
+                    px-4
+                    sm:px-6
+                    py-4
+                    border-t
+                    border-gray-100
+                    bg-gray-50/40
+                    flex
+                    flex-col
+                    sm:flex-row
+                    items-center
+                    justify-between
+                    gap-3
+                  "
                 >
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-gray-400 text-center sm:text-left">
                     {filtered.length === 0
                       ? "No students found"
                       : `Showing ${(page - 1) * PER_PAGE + 1}–${Math.min(
@@ -956,24 +1240,25 @@ const StudentPage = () => {
                         disabled:cursor-not-allowed
                         transition
                       "
+                      aria-label="Previous page"
                     >
                       <ChevronLeft size={16} />
                     </button>
 
                     <div
                       className="
-                      min-w-9
-                      h-9
-                      px-3
-                      rounded-xl
-                      bg-green-600
-                      text-white
-                      flex
-                      items-center
-                      justify-center
-                      text-xs
-                      font-bold
-                    "
+                        min-w-9
+                        h-9
+                        px-3
+                        rounded-xl
+                        bg-green-600
+                        text-white
+                        flex
+                        items-center
+                        justify-center
+                        text-xs
+                        font-bold
+                      "
                     >
                       {page}
                     </div>
@@ -981,7 +1266,9 @@ const StudentPage = () => {
                     <button
                       disabled={page >= pages}
                       onClick={() =>
-                        setPage((current) => Math.min(current + 1, pages))
+                        setPage((current) =>
+                          Math.min(current + 1, pages),
+                        )
                       }
                       className="
                         w-9
@@ -1000,6 +1287,7 @@ const StudentPage = () => {
                         disabled:cursor-not-allowed
                         transition
                       "
+                      aria-label="Next page"
                     >
                       <ChevronRight size={16} />
                     </button>
@@ -1059,7 +1347,9 @@ const StudentPage = () => {
               items-center
               justify-center
               z-50
-              p-4
+              p-3
+              sm:p-4
+              overflow-y-auto
             "
           >
             <motion.div
@@ -1075,10 +1365,12 @@ const StudentPage = () => {
               }}
               className="
                 bg-white
-                rounded-3xl
+                rounded-2xl
+                sm:rounded-3xl
                 w-full
                 max-w-[760px]
-                max-h-[85vh]
+                max-h-[92vh]
+                sm:max-h-[85vh]
                 overflow-hidden
                 shadow-2xl
                 border
@@ -1089,35 +1381,41 @@ const StudentPage = () => {
 
               <div
                 className="
-                px-6
-                py-5
-                border-b
-                border-gray-100
-                flex
-                items-center
-                justify-between
-              "
+                  px-4
+                  sm:px-6
+                  py-4
+                  sm:py-5
+                  border-b
+                  border-gray-100
+                  flex
+                  items-center
+                  justify-between
+                  gap-3
+                "
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <div
                     className="
-                    w-10
-                    h-10
-                    rounded-xl
-                    bg-green-50
-                    text-green-600
-                    flex
-                    items-center
-                    justify-center
-                  "
+                      w-10
+                      h-10
+                      rounded-xl
+                      bg-green-50
+                      text-green-600
+                      flex
+                      items-center
+                      justify-center
+                      flex-shrink-0
+                    "
                   >
                     <FileUp size={18} />
                   </div>
 
-                  <div>
-                    <h2 className="font-bold text-gray-900">Import Preview</h2>
+                  <div className="min-w-0">
+                    <h2 className="font-bold text-gray-900">
+                      Import Preview
+                    </h2>
 
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-gray-400 mt-0.5 truncate">
                       Review changes before importing
                     </p>
                   </div>
@@ -1138,7 +1436,9 @@ const StudentPage = () => {
                     items-center
                     justify-center
                     text-gray-500
+                    flex-shrink-0
                   "
+                  aria-label="Close preview"
                 >
                   <X size={17} />
                 </button>
@@ -1146,7 +1446,7 @@ const StudentPage = () => {
 
               {/* BODY */}
 
-              <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="p-4 sm:p-6 overflow-y-auto max-h-[65vh]">
                 {/* INSERTS */}
 
                 <ImportSection
@@ -1216,15 +1516,18 @@ const StudentPage = () => {
 
               <div
                 className="
-                px-6
-                py-4
-                border-t
-                border-gray-100
-                bg-gray-50/50
-                flex
-                justify-end
-                gap-2
-              "
+                  px-4
+                  sm:px-6
+                  py-4
+                  border-t
+                  border-gray-100
+                  bg-gray-50/50
+                  flex
+                  flex-col-reverse
+                  sm:flex-row
+                  justify-end
+                  gap-2
+                "
               >
                 <button
                   onClick={() => {
@@ -1242,6 +1545,8 @@ const StudentPage = () => {
                     font-semibold
                     text-gray-600
                     hover:bg-gray-50
+                    w-full
+                    sm:w-auto
                   "
                 >
                   Cancel
@@ -1260,6 +1565,8 @@ const StudentPage = () => {
                     text-sm
                     font-semibold
                     disabled:opacity-50
+                    w-full
+                    sm:w-auto
                   "
                 >
                   {importing ? "Importing..." : "Confirm Import"}
@@ -1289,7 +1596,9 @@ const StudentPage = () => {
               items-center
               justify-center
               z-50
-              p-4
+              p-3
+              sm:p-4
+              overflow-y-auto
             "
           >
             <motion.div
@@ -1303,33 +1612,36 @@ const StudentPage = () => {
               }}
               className="
                 bg-white
-                rounded-3xl
-                p-6
+                rounded-2xl
+                sm:rounded-3xl
+                p-5
+                sm:p-6
                 w-full
                 max-w-[400px]
                 shadow-2xl
                 border
                 border-gray-100
+                my-auto
               "
             >
               <div className="flex items-start gap-3">
                 <div
                   className="
-                  w-11
-                  h-11
-                  rounded-xl
-                  bg-red-50
-                  text-red-500
-                  flex
-                  items-center
-                  justify-center
-                  flex-shrink-0
-                "
+                    w-11
+                    h-11
+                    rounded-xl
+                    bg-red-50
+                    text-red-500
+                    flex
+                    items-center
+                    justify-center
+                    flex-shrink-0
+                  "
                 >
                   <Trash2 size={19} />
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <h2 className="text-lg font-bold text-gray-900">
                     Delete Student
                   </h2>
@@ -1342,17 +1654,17 @@ const StudentPage = () => {
 
               <div
                 className="
-                mt-5
-                p-4
-                rounded-2xl
-                bg-red-50
-                border
-                border-red-100
-              "
+                  mt-5
+                  p-4
+                  rounded-2xl
+                  bg-red-50
+                  border
+                  border-red-100
+                "
               >
                 <p className="text-xs text-red-600">You are deleting</p>
 
-                <p className="text-sm font-bold text-red-800 mt-1">
+                <p className="text-sm font-bold text-red-800 mt-1 break-words">
                   {deleteTarget.firstName} {deleteTarget.lastName}
                 </p>
               </div>
@@ -1385,7 +1697,7 @@ const StudentPage = () => {
                 "
               />
 
-              <div className="flex justify-end gap-2 mt-5">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 mt-5">
                 <button
                   onClick={() => {
                     setDeleteTarget(null);
@@ -1400,6 +1712,8 @@ const StudentPage = () => {
                     text-sm
                     font-semibold
                     text-gray-600
+                    w-full
+                    sm:w-auto
                   "
                 >
                   Cancel
@@ -1420,6 +1734,8 @@ const StudentPage = () => {
                     disabled:bg-red-200
                     disabled:cursor-not-allowed
                     transition
+                    w-full
+                    sm:w-auto
                   "
                 >
                   Delete Student
@@ -1519,21 +1835,27 @@ const StatCard = ({ label, value, type, icon }) => {
         bg-white
         border
         border-gray-100
-        rounded-3xl
-        p-5
+        rounded-2xl
+        sm:rounded-3xl
+        p-4
+        sm:p-5
         shadow-[0_4px_24px_rgba(0,0,0,0.025)]
       "
     >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-semibold text-gray-400">{label}</p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] sm:text-xs font-semibold text-gray-400 truncate">
+            {label}
+          </p>
 
           <p
             className={`
-              text-3xl
+              text-2xl
+              sm:text-3xl
               font-extrabold
               tracking-tight
-              mt-3
+              mt-2
+              sm:mt-3
               ${style.number}
             `}
           >
@@ -1543,12 +1865,15 @@ const StatCard = ({ label, value, type, icon }) => {
 
         <div
           className={`
-            w-10
-            h-10
+            w-9
+            sm:w-10
+            h-9
+            sm:h-10
             rounded-xl
             flex
             items-center
             justify-center
+            flex-shrink-0
             ${style.icon}
           `}
         >
@@ -1558,9 +1883,11 @@ const StatCard = ({ label, value, type, icon }) => {
 
       <div
         className={`
-          mt-5
+          mt-4
+          sm:mt-5
           h-1
-          w-10
+          w-8
+          sm:w-10
           rounded-full
           ${style.line}
         `}
@@ -1575,7 +1902,7 @@ const StatCard = ({ label, value, type, icon }) => {
 
 const SkeletonRow = () => (
   <tr className="border-b border-gray-50 animate-pulse">
-    <td className="px-6 py-4">
+    <td className="px-4 sm:px-6 py-4">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-gray-100" />
 
@@ -1586,19 +1913,19 @@ const SkeletonRow = () => (
       </div>
     </td>
 
-    <td className="px-6 py-4">
+    <td className="px-4 sm:px-6 py-4">
       <div className="h-3 w-20 bg-gray-100 rounded" />
     </td>
 
-    <td className="px-6 py-4">
+    <td className="px-4 sm:px-6 py-4">
       <div className="h-6 w-12 bg-gray-100 rounded-lg mx-auto" />
     </td>
 
-    <td className="px-6 py-4">
+    <td className="px-4 sm:px-6 py-4">
       <div className="h-6 w-16 bg-gray-100 rounded-full mx-auto" />
     </td>
 
-    <td className="px-6 py-4">
+    <td className="px-4 sm:px-6 py-4">
       <div className="flex justify-end gap-2">
         <div className="w-9 h-9 bg-gray-100 rounded-xl" />
         <div className="w-9 h-9 bg-gray-100 rounded-xl" />
@@ -1617,16 +1944,16 @@ const EmptyState = ({ search }) => (
     <td colSpan="5" className="px-6 py-16 text-center">
       <div
         className="
-        w-14
-        h-14
-        rounded-2xl
-        bg-gray-50
-        flex
-        items-center
-        justify-center
-        mx-auto
-        mb-4
-      "
+          w-14
+          h-14
+          rounded-2xl
+          bg-gray-50
+          flex
+          items-center
+          justify-center
+          mx-auto
+          mb-4
+        "
       >
         {search ? (
           <Search size={22} className="text-gray-300" />
@@ -1674,8 +2001,8 @@ const ImportSection = ({ title, count, color, icon, children }) => {
 
   return (
     <div className="mb-6 last:mb-0">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mb-3 gap-3">
+        <div className="flex items-center gap-2 min-w-0">
           <div
             className={`
               w-8
@@ -1684,13 +2011,16 @@ const ImportSection = ({ title, count, color, icon, children }) => {
               flex
               items-center
               justify-center
+              flex-shrink-0
               ${style.icon}
             `}
           >
             {icon}
           </div>
 
-          <h3 className="text-sm font-bold text-gray-800">{title}</h3>
+          <h3 className="text-sm font-bold text-gray-800 truncate">
+            {title}
+          </h3>
         </div>
 
         <span
@@ -1700,6 +2030,7 @@ const ImportSection = ({ title, count, color, icon, children }) => {
             rounded-lg
             text-[10px]
             font-bold
+            flex-shrink-0
             ${style.badge}
           `}
         >
@@ -1737,9 +2068,13 @@ const ImportRow = ({ title, subtitle, color }) => {
       `}
     >
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-gray-800 truncate">{title}</p>
+        <p className="text-sm font-semibold text-gray-800 truncate">
+          {title}
+        </p>
 
-        <p className="text-[11px] text-gray-400 mt-0.5">{subtitle}</p>
+        <p className="text-[11px] text-gray-400 mt-0.5 truncate">
+          {subtitle}
+        </p>
       </div>
     </div>
   );
@@ -1752,17 +2087,18 @@ const ImportRow = ({ title, subtitle, color }) => {
 const EmptyImport = ({ text }) => (
   <div
     className="
-    p-4
-    rounded-xl
-    bg-gray-50
-    border
-    border-gray-100
-    text-xs
-    text-gray-400
-  "
+      p-4
+      rounded-xl
+      bg-gray-50
+      border
+      border-gray-100
+      text-xs
+      text-gray-400
+    "
   >
     {text}
   </div>
 );
 
 export default StudentPage;
+

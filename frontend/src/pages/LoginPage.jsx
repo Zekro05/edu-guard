@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -211,11 +210,10 @@ const LoginPage = () => {
                 borderColor: LightColors.border,
               }}
             >
-              <GraduationCap
-                className="w-6 h-6 sm:w-8 sm:h-8"
-                style={{
-                  color: LightColors.primary,
-                }}
+              <img
+                src="/school-logo.png"
+                alt="School Logo"
+                className="w-full h-full object-contain p-2"
               />
             </div>
 
@@ -371,7 +369,6 @@ const LoginPage = () => {
               >
                 Secure
                 <br />
-
                 <span
                   style={{
                     color: LightColors.primary,
@@ -379,7 +376,6 @@ const LoginPage = () => {
                 >
                   Modern
                 </span>
-
                 <br />
                 Campus Safety.
               </h1>
@@ -642,18 +638,10 @@ const LoginPage = () => {
                       borderColor: LightColors.border,
                     }}
                   >
-                    <GraduationCap
-                      className="
-                        w-9
-                        h-9
-                        sm:w-11
-                        sm:h-11
-                        lg:w-12
-                        lg:h-12
-                      "
-                      style={{
-                        color: LightColors.primary,
-                      }}
+                    <img
+                      src="/school-logo.png"
+                      alt="School Logo"
+                      className="w-full h-full object-contain p-3 sm:p-4"
                     />
                   </div>
 
@@ -822,8 +810,7 @@ const LoginPage = () => {
                           #256d2a 100%
                         )
                       `,
-                      boxShadow:
-                        "0 20px 40px rgba(27,94,32,0.25)",
+                      boxShadow: "0 20px 40px rgba(27,94,32,0.25)",
                     }}
                   >
                     {isLoading ? (
@@ -897,4 +884,3 @@ const LoginPage = () => {
 };
 
 export default LoginPage;
-

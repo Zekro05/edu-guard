@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { API } from "../lib/api";
 import { exportInterventionPDF } from "../utils/exportInterventionPDF";
+import InterventionPrintableReport from "../components/reports/InterventionPrintableReport";
 
 import {
   LayoutDashboard,
@@ -30,6 +31,7 @@ import {
   CircleCheck,
   Timer,
   LogOut,
+  Printer,
 } from "lucide-react";
 
 import { useAuthStore } from "../store/authStore";
@@ -59,6 +61,8 @@ const InterventionPage = () => {
 
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(null);
+
+  const [showPrintableReport, setShowPrintableReport] = useState(false);
 
   const [tab, setTab] = useState("all");
   const [search, setSearch] = useState("");
@@ -461,12 +465,16 @@ const InterventionPage = () => {
               onClick={() => navigate("/reports")}
             />
 
-            <Nav icon={<BriefcaseBusiness size={18} />} label="Cases"
-            onClick={() => navigate("/cases")}/>
+            <Nav
+              icon={<BriefcaseBusiness size={18} />}
+              label="Cases"
+              onClick={() => navigate("/cases")}
+            />
 
             <Nav
               icon={<HandHelping size={18} />}
-              label="Interventions" active
+              label="Interventions"
+              active
             />
           </div>
 
@@ -560,7 +568,9 @@ const InterventionPage = () => {
               <div className="flex items-center gap-2 text-xs text-gray-400 mb-2">
                 <span>Guidance</span>
                 <ChevronRight size={13} />
-                <span className="text-green-600 font-medium">Interventions</span>
+                <span className="text-green-600 font-medium">
+                  Interventions
+                </span>
               </div>
 
               <h2 className="text-3xl font-black tracking-tight text-gray-900">
@@ -721,7 +731,7 @@ const InterventionPage = () => {
               OVERVIEW
           ================================================= */}
 
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
             <div>
               <h3 className="text-lg font-bold text-gray-900">
                 Intervention Overview
@@ -731,6 +741,32 @@ const InterventionPage = () => {
                 Monitor the current state of student intervention cases.
               </p>
             </div>
+
+            <button
+              onClick={() => setShowPrintableReport(true)}
+              className="
+      h-10
+      px-4
+      rounded-xl
+      bg-white
+      border
+      border-gray-200
+      text-gray-600
+      text-xs
+      font-semibold
+      flex
+      items-center
+      justify-center
+      gap-2
+      hover:bg-gray-50
+      hover:border-gray-300
+      transition
+      shadow-sm
+    "
+            >
+              <Printer size={15} />
+              Printable Report
+            </button>
           </div>
 
           {/* =================================================
@@ -2307,6 +2343,13 @@ const InterventionPage = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      {showPrintableReport && (
+        <InterventionPrintableReport
+          cases={cases}
+          interventions={interventions}
+          onClose={() => setShowPrintableReport(false)}
+        />
+      )}
     </div>
   );
 };
@@ -2339,11 +2382,7 @@ const Nav = ({ icon, label, onClick, active }) => (
     <span
       className={`
         transition
-        ${
-          active
-            ? "text-green-600"
-            : "text-gray-400 group-hover:text-gray-700"
-        }
+        ${active ? "text-green-600" : "text-gray-400 group-hover:text-gray-700"}
       `}
     >
       {icon}
