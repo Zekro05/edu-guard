@@ -1,5 +1,5 @@
 import admin from "../config/firebase.js";
-import User from "../models/User.js";
+import User from "../models/userModel.js";
 
 export const sendPushNotification = async ({
   token,
