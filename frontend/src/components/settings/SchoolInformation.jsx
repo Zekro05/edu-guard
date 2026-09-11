@@ -1,4 +1,4 @@
-import { School, Save } from "lucide-react";
+import { School, Lock } from "lucide-react";
 
 const SchoolInformation = () => {
   return (
@@ -43,7 +43,7 @@ const SchoolInformation = () => {
             </h1>
 
             <p className="text-sm text-gray-400 mt-1">
-              Manage official school details used across the system.
+              Official school details used across the system.
             </p>
           </div>
         </div>
@@ -63,11 +63,46 @@ const SchoolInformation = () => {
             border-gray-100
           "
         >
-          <span className="w-2 h-2 rounded-full bg-green-500" />
+          <Lock size={13} className="text-gray-400" />
 
           <span className="text-xs font-medium text-gray-500">
-            School Profile
+            Read Only
           </span>
+        </div>
+      </div>
+
+      {/* =====================================================
+          READ-ONLY NOTICE
+      ===================================================== */}
+      <div
+        className="
+          mb-8
+          flex
+          items-start
+          gap-3
+          px-4
+          py-3.5
+          rounded-xl
+          bg-amber-50
+          border
+          border-amber-100
+        "
+      >
+        <Lock
+          size={17}
+          strokeWidth={2}
+          className="text-amber-600 mt-0.5 flex-shrink-0"
+        />
+
+        <div>
+          <p className="text-sm font-semibold text-amber-800">
+            School information is read-only
+          </p>
+
+          <p className="text-xs text-amber-700 mt-0.5">
+            These details are official school records and cannot be edited
+            from the system.
+          </p>
         </div>
       </div>
 
@@ -112,17 +147,17 @@ const SchoolInformation = () => {
 
               <Field
                 label="School Name"
-                placeholder="Our Lady of the Holy Rosary School"
+                value="Our Lady of the Holy Rosary School"
               />
 
               <Field
                 label="Contact Number"
-                placeholder="09XXXXXXXXX"
+                value="09XXXXXXXXX"
               />
 
               <Field
                 label="Email Address"
-                placeholder="school@email.com"
+                value="school@email.com"
                 type="email"
               />
 
@@ -165,7 +200,7 @@ const SchoolInformation = () => {
 
             <Field
               label="School Address"
-              placeholder="City, Province"
+              value="General Trias, Cavite"
             />
 
             <div>
@@ -181,33 +216,41 @@ const SchoolInformation = () => {
                 School Details
               </label>
 
-              <textarea
-                rows={6}
-                placeholder="Brief description about the school..."
-                className="
-                  w-full
-                  bg-white
-                  border
-                  border-gray-200
-                  rounded-xl
-                  px-4
-                  py-3
-                  text-sm
-                  text-gray-900
-                  placeholder-gray-400
-                  resize-none
-                  transition-all
-                  duration-200
-                  focus:outline-none
-                  focus:ring-2
-                  focus:ring-green-100
-                  focus:border-green-500
-                  hover:border-gray-300
-                "
-              />
+              <div className="relative">
+                <textarea
+                  rows={6}
+                  value="Our Lady of the Holy Rosary School - General Trias Campus"
+                  readOnly
+                  className="
+                    w-full
+                    bg-gray-50
+                    border
+                    border-gray-200
+                    rounded-xl
+                    px-4
+                    py-3
+                    pr-11
+                    text-sm
+                    text-gray-600
+                    resize-none
+                    cursor-not-allowed
+                    focus:outline-none
+                  "
+                />
+
+                <Lock
+                  size={15}
+                  className="
+                    absolute
+                    right-4
+                    top-4
+                    text-gray-400
+                  "
+                />
+              </div>
 
               <p className="text-[11px] text-gray-400 mt-2">
-                Keep this description concise and relevant to the school.
+                This information is maintained as an official school record.
               </p>
             </div>
 
@@ -217,7 +260,7 @@ const SchoolInformation = () => {
       </div>
 
       {/* =====================================================
-          ACTION BAR
+          READ-ONLY FOOTER
       ===================================================== */}
       <div
         className="
@@ -231,33 +274,37 @@ const SchoolInformation = () => {
           gap-4
         "
       >
-        <p className="hidden sm:block text-xs text-gray-400">
-          Changes will be applied across the system.
-        </p>
+        <div className="flex items-center gap-2">
+          <Lock
+            size={14}
+            className="text-gray-400"
+          />
 
-        <button
+          <p className="text-xs text-gray-400">
+            School information is managed by the system administrator.
+          </p>
+        </div>
+
+        <span
           className="
-            inline-flex
+            hidden
+            sm:inline-flex
             items-center
-            justify-center
-            gap-2
-            bg-green-600
-            hover:bg-green-700
-            text-white
+            gap-1.5
+            px-3
+            py-1.5
+            rounded-lg
+            bg-gray-50
+            border
+            border-gray-100
+            text-[11px]
             font-semibold
-            text-sm
-            px-5
-            py-2.5
-            rounded-xl
-            shadow-sm
-            hover:shadow-md
-            transition-all
-            duration-200
+            text-gray-500
           "
         >
-          <Save size={16} strokeWidth={2.2} />
-          Save Changes
-        </button>
+          <Lock size={11} />
+          Read Only
+        </span>
       </div>
 
     </div>
@@ -267,12 +314,12 @@ const SchoolInformation = () => {
 export default SchoolInformation;
 
 /* =========================================================
-   FIELD COMPONENT
+   READ-ONLY FIELD COMPONENT
 ========================================================= */
 
 const Field = ({
   label,
-  placeholder,
+  value,
   type = "text",
 }) => {
   return (
@@ -289,29 +336,38 @@ const Field = ({
         {label}
       </label>
 
-      <input
-        type={type}
-        placeholder={placeholder}
-        className="
-          w-full
-          bg-white
-          border
-          border-gray-200
-          rounded-xl
-          px-4
-          py-3
-          text-sm
-          text-gray-900
-          placeholder-gray-400
-          transition-all
-          duration-200
-          hover:border-gray-300
-          focus:outline-none
-          focus:ring-2
-          focus:ring-green-100
-          focus:border-green-500
-        "
-      />
+      <div className="relative">
+        <input
+          type={type}
+          value={value}
+          readOnly
+          className="
+            w-full
+            bg-gray-50
+            border
+            border-gray-200
+            rounded-xl
+            px-4
+            py-3
+            pr-11
+            text-sm
+            text-gray-600
+            cursor-not-allowed
+            focus:outline-none
+          "
+        />
+
+        <Lock
+          size={14}
+          className="
+            absolute
+            right-4
+            top-1/2
+            -translate-y-1/2
+            text-gray-400
+          "
+        />
+      </div>
     </div>
   );
 };

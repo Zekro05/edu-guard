@@ -51,6 +51,8 @@ const socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000");
 const DEFAULT_AVATAR =
   "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png";
 
+const MIN_TEXT_LENGTH = 10;
+
 /* =========================================================
    NAV
 ========================================================= */
@@ -1050,15 +1052,22 @@ export default function CaseManagement() {
   ===================================================== */
 
   const updateStatus = async (status) => {
-    if (!note.trim()) {
-      alert("Admin note required.");
+    const trimmedNote = note.trim();
+
+    if (!trimmedNote) {
+      alert("Admin note is required.");
+      return;
+    }
+
+    if (trimmedNote.length < MIN_TEXT_LENGTH) {
+      alert(`Admin note must be at least ${MIN_TEXT_LENGTH} characters long.`);
       return;
     }
 
     try {
       const payload = {
         status,
-        note,
+        note: trimmedNote,
         changedByName: loggedInUser,
       };
 
@@ -1130,16 +1139,25 @@ export default function CaseManagement() {
   ===================================================== */
 
   const saveStudentStatement = async () => {
-    try {
-      if (!studentInput.trim()) {
-        alert("Statement cannot be empty");
-        return;
-      }
+    const trimmedStatement = studentInput.trim();
 
+    if (!trimmedStatement) {
+      alert("Student statement cannot be empty.");
+      return;
+    }
+
+    if (trimmedStatement.length < MIN_TEXT_LENGTH) {
+      alert(
+        `Student statement must be at least ${MIN_TEXT_LENGTH} characters long.`,
+      );
+      return;
+    }
+
+    try {
       const res = await API.put(
         `/api/incidents/${selected._id}/manual-statement`,
         {
-          statement: studentInput,
+          statement: trimmedStatement,
           changedByName: loggedInUser,
           stage: "student_statement_saved",
         },
@@ -2574,23 +2592,48 @@ export default function CaseManagement() {
                       <textarea
                         value={studentInput}
                         onChange={(e) => setStudentInput(e.target.value)}
-                        className="
-                          w-full
-                          min-h-[110px]
-                          p-4
-                          rounded-xl
-                          bg-gray-50
-                          border border-gray-200
-                          outline-none
-                          resize-none
-                          text-sm
-                          text-gray-700
-                          focus:ring-2
-                          focus:ring-green-500/10
-                          focus:border-green-300
-                        "
+                        minLength={MIN_TEXT_LENGTH}
+                        className={`
+                        w-full
+                        min-h-[110px]
+                        p-4
+                        rounded-xl
+                        bg-gray-50
+                        border
+                        outline-none
+                        resize-none
+                        text-sm
+                        text-gray-700
+                        focus:ring-2
+                        focus:ring-green-500/10
+                        ${
+                          studentInput.length > 0 &&
+                          studentInput.trim().length < MIN_TEXT_LENGTH
+                            ? "border-red-300 focus:border-red-400"
+                            : "border-gray-200 focus:border-green-300"
+                        }
+                      `}
                         placeholder="Write student statement..."
                       />
+
+                      <div className="flex items-center justify-between mt-2">
+                        <p
+                          className={`text-[10px] ${
+                            studentInput.trim().length > 0 &&
+                            studentInput.trim().length < MIN_TEXT_LENGTH
+                              ? "text-red-500"
+                              : "text-gray-400"
+                          }`}
+                        >
+                          {studentInput.trim().length < MIN_TEXT_LENGTH
+                            ? `${MIN_TEXT_LENGTH - studentInput.trim().length} more characters required`
+                            : "Minimum length reached"}
+                        </p>
+
+                        <p className="text-[10px] text-gray-400">
+                          {studentInput.length} characters
+                        </p>
+                      </div>
 
                       <button
                         onClick={saveStudentStatement}
@@ -2895,23 +2938,47 @@ export default function CaseManagement() {
                   <textarea
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    className="
-                      mt-2
-                      w-full
-                      min-h-[100px]
-                      p-4
-                      rounded-xl
-                      bg-white
-                      border border-gray-200
-                      outline-none
-                      resize-none
-                      text-sm
-                      focus:ring-2
-                      focus:ring-green-500/10
-                      focus:border-green-300
-                    "
+                    minLength={MIN_TEXT_LENGTH}
+                    className={`
+                    mt-2
+                    w-full
+                    min-h-[100px]
+                    p-4
+                    rounded-xl
+                    bg-white
+                    border
+                    outline-none
+                    resize-none
+                    text-sm
+                    focus:ring-2
+                    focus:ring-green-500/10
+                    ${
+                      note.length > 0 && note.trim().length < MIN_TEXT_LENGTH
+                        ? "border-red-300 focus:border-red-400"
+                        : "border-gray-200 focus:border-green-300"
+                    }
+                  `}
                     placeholder="Add a note explaining this case action..."
                   />
+
+                  <div className="flex items-center justify-between mt-2">
+                    <p
+                      className={`text-[10px] ${
+                        note.trim().length > 0 &&
+                        note.trim().length < MIN_TEXT_LENGTH
+                          ? "text-red-500"
+                          : "text-gray-400"
+                      }`}
+                    >
+                      {note.trim().length < MIN_TEXT_LENGTH
+                        ? `${MIN_TEXT_LENGTH - note.trim().length} more characters required`
+                        : "Minimum length reached"}
+                    </p>
+
+                    <p className="text-[10px] text-gray-400">
+                      {note.length} characters
+                    </p>
+                  </div>
                 </div>
 
                 {/* ACTIONS */}

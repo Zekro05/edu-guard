@@ -159,10 +159,9 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
 
   /* ================= DISPLAY ================= */
 
-  const fullName =
-    `${form.firstName} ${form.middleName} ${form.lastName}`
-      .replace(/\s+/g, " ")
-      .trim();
+  const fullName = `${form.firstName} ${form.middleName} ${form.lastName}`
+    .replace(/\s+/g, " ")
+    .trim();
 
   return (
     <AnimatePresence>
@@ -255,11 +254,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     shadow-sm
                   "
                 >
-                  {isEditing ? (
-                    <UserRound size={22} />
-                  ) : (
-                    <Plus size={22} />
-                  )}
+                  {isEditing ? <UserRound size={22} /> : <Plus size={22} />}
                 </div>
 
                 <div>
@@ -487,12 +482,24 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                       onChange={handleChange}
                     />
 
-                    <Input
+                    <Select
                       name="grade"
-                      label="Grade Level"
-                      required
-                      form={form}
+                      value={form.grade}
                       onChange={handleChange}
+                      options={[
+                        "Grade 1",
+                        "Grade 2",
+                        "Grade 3",
+                        "Grade 4",
+                        "Grade 5",
+                        "Grade 6",
+                        "Grade 7",
+                        "Grade 8",
+                        "Grade 9",
+                        "Grade 10",
+                      ]}
+                      label="Grade Level"
+                      placeholder="Select grade level"
                     />
                   </div>
                 </div>
@@ -780,14 +787,7 @@ const Input = ({
    SELECT
 ========================================================= */
 
-const Select = ({
-  name,
-  value,
-  onChange,
-  options,
-  label,
-  placeholder,
-}) => (
+const Select = ({ name, value, onChange, options, label, placeholder }) => (
   <div>
     <label className="block text-xs font-semibold text-slate-600 mb-1.5">
       {label}
@@ -894,11 +894,7 @@ const RiskSelector = ({ value, onChange }) => {
                 flex
                 items-center
                 justify-center
-                ${
-                  active
-                    ? "bg-white/70"
-                    : "bg-slate-50 text-slate-400"
-                }
+                ${active ? "bg-white/70" : "bg-slate-50 text-slate-400"}
               `}
             >
               {risk.icon}

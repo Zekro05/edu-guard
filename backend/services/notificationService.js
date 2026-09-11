@@ -8,8 +8,16 @@ export const sendPushNotification = async ({
 }) => {
   try {
     if (!token) {
+      console.log("⚠️ FCM: No token provided");
       return null;
     }
+
+    const stringData = Object.fromEntries(
+      Object.entries(data).map(([key, value]) => [
+        key,
+        String(value ?? ""),
+      ])
+    );
 
     const message = {
       token,
@@ -19,12 +27,7 @@ export const sendPushNotification = async ({
         body,
       },
 
-      data: Object.fromEntries(
-        Object.entries(data).map(([key, value]) => [
-          key,
-          String(value),
-        ])
-      ),
+      data: stringData,
 
       android: {
         priority: "high",
@@ -34,6 +37,9 @@ export const sendPushNotification = async ({
       },
 
       apns: {
+        headers: {
+          "apns-priority": "10",
+        },
         payload: {
           aps: {
             sound: "default",
@@ -42,13 +48,29 @@ export const sendPushNotification = async ({
       },
     };
 
+    console.log("========================================");
+    console.log("📱 SENDING FCM PUSH");
+    console.log("========================================");
+    console.log("Title:", title);
+    console.log("Body:", body);
+    console.log("Token:", `${token.substring(0, 20)}...`);
+    console.log("Data:", stringData);
+    console.log("========================================");
+
     const response = await admin.messaging().send(message);
 
-    console.log("FCM notification sent:", response);
+    console.log("✅ FCM notification sent successfully");
+    console.log("FCM Message ID:", response);
 
     return response;
   } catch (error) {
-    console.error("FCM SEND ERROR:", error);
+    console.error("========================================");
+    console.error("❌ FCM SEND ERROR");
+    console.error("========================================");
+    console.error("Code:", error?.code);
+    console.error("Message:", error?.message);
+    console.error("Full error:", error);
+    console.error("========================================");
 
     return null;
   }
