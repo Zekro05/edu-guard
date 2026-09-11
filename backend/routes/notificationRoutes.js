@@ -1,6 +1,6 @@
 import express from "express";
 import  Notification  from "../models/Notification.js";
-import  User  from "../models/userModel.js";
+import  { User }  from "../models/userModel.js";
 import { sendPushNotification } from "../services/notificationService.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 
@@ -163,7 +163,8 @@ router.get("/", verifyToken, async (req, res) => {
     console.log("\n========================================");
     console.log("🔔 GET CURRENT USER NOTIFICATIONS");
     console.log("========================================");
-    console.log("Authenticated User ID:", userId);
+    console.log("JWT decoded user ID:", userId);
+    console.log("JWT req.user:", req.user);
 
     if (!userId) {
       return res.status(401).json({
@@ -171,6 +172,32 @@ router.get("/", verifyToken, async (req, res) => {
         message: "User authentication required",
       });
     }
+
+    // ---------------------------------------------------------
+    // DEBUG: show latest notifications regardless of owner
+    // ---------------------------------------------------------
+
+    const latestNotifications = await Notification.find({})
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    console.log("\n📋 LATEST NOTIFICATIONS IN DATABASE:");
+
+    latestNotifications.forEach((notification, index) => {
+      console.log(`\nNotification ${index + 1}`);
+      console.log("  ID:", notification._id?.toString());
+      console.log("  Owner:", notification.user?.toString());
+      console.log("  Title:", notification.title);
+      console.log(
+        "  MATCH:",
+        String(notification.user) === String(userId)
+      );
+    });
+
+    // ---------------------------------------------------------
+    // ACTUAL USER QUERY
+    // ---------------------------------------------------------
 
     const notifications = await Notification.find({
       user: userId,
@@ -185,23 +212,23 @@ router.get("/", verifyToken, async (req, res) => {
       (notification) => !notification.isRead
     ).length;
 
-    const formattedNotifications = notifications.map(
-      formatNotification
-    );
+    const formattedNotifications =
+      notifications.map(formatNotification);
 
+    console.log("\n📦 USER QUERY RESULT:");
+    console.log("User ID queried:", userId);
     console.log(
-      "📦 Notifications found:",
+      "Notifications found:",
       formattedNotifications.length
     );
-
     console.log(
-      "🔵 Unread notifications:",
+      "Unread notifications:",
       unreadCount
     );
 
     if (formattedNotifications.length > 0) {
       console.log(
-        "📝 Latest notification:",
+        "Latest notification:",
         formattedNotifications[0].title
       );
     }
@@ -210,9 +237,7 @@ router.get("/", verifyToken, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-
       notifications: formattedNotifications,
-
       unreadCount,
     });
 
@@ -224,9 +249,7 @@ router.get("/", verifyToken, async (req, res) => {
 
     return res.status(500).json({
       success: false,
-
       message: "Failed to fetch notifications",
-
       error:
         process.env.NODE_ENV === "development"
           ? error.message
