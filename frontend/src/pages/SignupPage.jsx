@@ -60,6 +60,14 @@ export const LightColors = {
 };
 
 /* =========================================================
+   TEST ADMIN KEY
+   NOTE:
+   This is intentionally hardcoded for testing only.
+========================================================= */
+
+const TEST_ADMIN_KEY = "GuidEdAdmin123";
+
+/* =========================================================
    CROPPED IMAGE HELPER
 ========================================================= */
 
@@ -151,6 +159,12 @@ const SignupPage = () => {
   const [gender, setGender] = useState("");
 
   const [accountType, setAccountType] = useState("");
+
+  /* =========================================================
+     ADMIN KEY
+  ========================================================= */
+
+  const [adminKey, setAdminKey] = useState("");
 
   const [showPolicy, setShowPolicy] = useState(false);
   const [acceptedPolicy, setAcceptedPolicy] = useState(false);
@@ -370,6 +384,15 @@ const SignupPage = () => {
     }
 
     /* -----------------------------------------
+       Admin Key validation
+    ----------------------------------------- */
+
+    if (accountType === "Admin" && adminKey !== TEST_ADMIN_KEY) {
+      setLocalError("Invalid Admin Key.");
+      return;
+    }
+
+    /* -----------------------------------------
        Password validation
     ----------------------------------------- */
 
@@ -412,7 +435,7 @@ const SignupPage = () => {
       if (accountType === "Student") {
         formData.append("studentId", studentId);
         formData.append("grade", grade);
-      } else {
+      } else if (accountType === "Teacher") {
         formData.append("employeeId", employeeId);
         formData.append("department", department);
       }
@@ -427,9 +450,23 @@ const SignupPage = () => {
          Role
       ----------------------------------------- */
 
-      const role = accountType === "Teacher" ? "teacher" : "student";
+      const role =
+        accountType === "Admin"
+          ? "admin"
+          : accountType === "Teacher"
+            ? "teacher"
+            : "student";
 
       formData.append("role", role);
+
+      /* -----------------------------------------
+         Admin Key
+         Only send when creating Admin account
+      ----------------------------------------- */
+
+      if (accountType === "Admin") {
+        formData.append("adminKey", adminKey);
+      }
 
       /* -----------------------------------------
          Profile photo
@@ -1153,6 +1190,8 @@ const SignupPage = () => {
                         setGrade("");
                         setEmployeeId("");
                         setDepartment("");
+                        setAdminKey("");
+                        setLocalError("");
                       }}
                       required
                       className="
@@ -1178,6 +1217,8 @@ const SignupPage = () => {
                       <option value="Student">Student</option>
 
                       <option value="Teacher">Teacher</option>
+
+                      <option value="Admin">Administrator</option>
                     </select>
                   </div>
 
@@ -1260,6 +1301,21 @@ const SignupPage = () => {
                       />
                     </div>
                   ) : null}
+
+                  {/* ADMIN KEY */}
+
+                  {accountType === "Admin" && (
+                    <Input
+                      icon={ShieldCheck}
+                      type="password"
+                      placeholder="Admin Key"
+                      value={adminKey}
+                      onChange={(e) => {
+                        setAdminKey(e.target.value);
+                        setLocalError("");
+                      }}
+                    />
+                  )}
 
                   {/* GENDER */}
 

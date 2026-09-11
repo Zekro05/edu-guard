@@ -42,21 +42,9 @@ export default function Notification() {
 
   const router = useRouter();
 
-  /*
-  =========================================================
-  AUTH STORE
-  =========================================================
-
-  IMPORTANT:
-  Your authStore needs to expose the JWT as `token`.
-
-  Example:
-
-  const { user, token } = useAuthStore();
-
-  If your authStore uses another name such as accessToken,
-  change `token` below.
-  */
+  /* =========================================================
+     AUTH STORE
+  ========================================================= */
 
   const { user, token } = useAuthStore();
 
@@ -128,65 +116,24 @@ export default function Notification() {
   }, []);
 
   /* =========================================================
-     MERGE NOTIFICATION
-  ========================================================= */
-
-  const addNotification = useCallback(
-    (incomingNotification) => {
-      const normalized =
-        normalizeNotification(incomingNotification);
-
-      if (!normalized) {
-        console.log(
-          "⚠️ Invalid notification received",
-        );
-
-        return;
-      }
-
-      setNotifications((previous) => {
-        const incomingId = String(
-          normalized._id || normalized.id,
-        );
-
-        const exists = previous.some(
-          (item) =>
-            String(item._id || item.id) ===
-            incomingId,
-        );
-
-        if (exists) {
-          console.log(
-            "🔔 Duplicate notification ignored:",
-            incomingId,
-          );
-
-          return previous;
-        }
-
-        console.log(
-          "🔔 Adding notification to UI:",
-          normalized.title,
-        );
-
-        return [
-          normalized,
-          ...previous,
-        ];
-      });
-    },
-    [normalizeNotification],
-  );
-
-  /* =========================================================
      FETCH NOTIFICATIONS FROM MONGODB
+     
+     IMPORTANT:
+     MongoDB is the source of truth.
+
+     We MERGE the database results with the current UI list
+     instead of blindly replacing the list.
+
+     This prevents a realtime notification from disappearing
+     when the API response temporarily lags behind Socket.IO
+     or FCM.
   ========================================================= */
 
   const fetchNotifications = useCallback(
     async (isRefresh = false) => {
       if (!user?._id) {
         console.log(
-          "⚠️ No logged-in user. Cannot fetch notifications.",
+          "⚠️ No logged-in user. Cannot fetch notifications."
         );
 
         setNotifications([]);
@@ -198,7 +145,7 @@ export default function Notification() {
 
       if (!token) {
         console.log(
-          "⚠️ No authentication token. Cannot fetch notifications.",
+          "⚠️ No authentication token. Cannot fetch notifications."
         );
 
         setNotifications([]);
@@ -217,23 +164,23 @@ export default function Notification() {
 
         console.log("");
         console.log(
-          "====================================",
+          "===================================="
         );
         console.log(
-          "🔔 FETCHING STUDENT NOTIFICATIONS",
+          "🔔 FETCHING STUDENT NOTIFICATIONS"
         );
         console.log(
-          "====================================",
+          "===================================="
         );
 
         console.log(
           "User ID:",
-          user._id,
+          user._id
         );
 
         console.log(
           "Token available:",
-          !!token,
+          !!token
         );
 
         const url =
@@ -241,31 +188,29 @@ export default function Notification() {
 
         console.log(
           "Request URL:",
-          url,
+          url
         );
 
         const res = await axios.get(
           url,
           {
             headers: getAuthHeaders(),
-          },
+          }
         );
 
         console.log(
           "✅ Notification API status:",
-          res.status,
+          res.status
         );
 
         console.log(
           "📦 Raw notification response:",
-          res.data,
+          res.data
         );
 
-        /*
-        =====================================================
-        SUPPORT DIFFERENT RESPONSE SHAPES
-        =====================================================
-        */
+        /* =====================================================
+           SUPPORT DIFFERENT RESPONSE SHAPES
+        ===================================================== */
 
         let data = [];
 
@@ -273,14 +218,14 @@ export default function Notification() {
           data = res.data;
         } else if (
           Array.isArray(
-            res.data?.notifications,
+            res.data?.notifications
           )
         ) {
           data =
             res.data.notifications;
         } else if (
           Array.isArray(
-            res.data?.data,
+            res.data?.data
           )
         ) {
           data =
@@ -289,44 +234,38 @@ export default function Notification() {
 
         console.log(
           "📦 Notification records received:",
-          data.length,
+          data.length
         );
 
-        /*
-        =====================================================
-        NORMALIZE
-        =====================================================
-        */
+        /* =====================================================
+           NORMALIZE
+        ===================================================== */
 
         const normalized = data
           .map(normalizeNotification)
           .filter(Boolean);
 
-        /*
-        =====================================================
-        SORT NEWEST FIRST
-        =====================================================
-        */
+        /* =====================================================
+           SORT DATABASE RESULTS
+        ===================================================== */
 
         normalized.sort((a, b) => {
           const dateA =
             new Date(
-              a.createdAt || 0,
+              a.createdAt || 0
             ).getTime();
 
           const dateB =
             new Date(
-              b.createdAt || 0,
+              b.createdAt || 0
             ).getTime();
 
           return dateB - dateA;
         });
 
-        /*
-        =====================================================
-        LOG INDIVIDUAL NOTIFICATIONS
-        =====================================================
-        */
+        /* =====================================================
+           LOG INDIVIDUAL NOTIFICATIONS
+        ===================================================== */
 
         normalized.forEach(
           (notification, index) => {
@@ -344,66 +283,195 @@ export default function Notification() {
                   notification.isRead,
                 createdAt:
                   notification.createdAt,
-              },
+              }
             );
-          },
+          }
         );
 
-        setNotifications(
-          normalized,
+        /* =====================================================
+           MERGE DATABASE RESULTS WITH CURRENT UI
+           
+           IMPORTANT:
+           Do NOT simply do:
+           
+           setNotifications(normalized)
+           
+           because a realtime notification can arrive just
+           before the database/API has finished updating.
+
+           Instead:
+           1. Keep notifications currently visible.
+           2. Apply database notifications.
+           3. Database version wins when IDs match.
+           4. Keep any newer realtime item temporarily present.
+        ===================================================== */
+
+        setNotifications((previous) => {
+          const mergedMap = new Map();
+
+          /*
+          -----------------------------------------------------
+          KEEP CURRENT UI NOTIFICATIONS
+          -----------------------------------------------------
+          */
+
+          previous.forEach((notification) => {
+            const id = String(
+              notification._id ||
+                notification.id
+            );
+
+            if (id) {
+              mergedMap.set(
+                id,
+                notification
+              );
+            }
+          });
+
+          /*
+          -----------------------------------------------------
+          APPLY DATABASE RESULTS
+          
+          If the same notification exists, the database
+          version replaces the current version.
+          -----------------------------------------------------
+          */
+
+          normalized.forEach((notification) => {
+            const id = String(
+              notification._id ||
+                notification.id
+            );
+
+            if (id) {
+              mergedMap.set(
+                id,
+                notification
+              );
+            }
+          });
+
+          /*
+          -----------------------------------------------------
+          CONVERT BACK TO ARRAY
+          -----------------------------------------------------
+          */
+
+          const merged =
+            Array.from(
+              mergedMap.values()
+            );
+
+          /*
+          -----------------------------------------------------
+          SORT NEWEST FIRST
+          -----------------------------------------------------
+          */
+
+          merged.sort((a, b) => {
+            const dateA =
+              new Date(
+                a.createdAt || 0
+              ).getTime();
+
+            const dateB =
+              new Date(
+                b.createdAt || 0
+              ).getTime();
+
+            return dateB - dateA;
+          });
+
+          console.log(
+            "===================================="
+          );
+
+          console.log(
+            "✅ NOTIFICATION LIST MERGED"
+          );
+
+          console.log(
+            "Database notifications:",
+            normalized.length
+          );
+
+          console.log(
+            "Previous UI notifications:",
+            previous.length
+          );
+
+          console.log(
+            "Final UI notifications:",
+            merged.length
+          );
+
+          console.log(
+            "===================================="
+          );
+
+          return merged;
+        });
+
+        console.log(
+          "✅ Notification list update completed."
         );
 
         console.log(
-          "✅ Notification list updated:",
-          normalized.length,
-        );
-
-        console.log(
-          "====================================",
+          "===================================="
         );
       } catch (err) {
         console.log("");
+
         console.log(
-          "❌ FETCH NOTIFICATIONS ERROR",
+          "❌ FETCH NOTIFICATIONS ERROR"
         );
 
         console.log(
           "Status:",
-          err?.response?.status,
+          err?.response?.status
         );
 
         console.log(
           "Response:",
-          err?.response?.data,
+          err?.response?.data
         );
 
         console.log(
           "Message:",
-          err?.message,
+          err?.message
         );
 
-        /*
-        =====================================================
-        AUTH ERROR
-        =====================================================
-        */
+        /* =====================================================
+           AUTH ERROR
+        ===================================================== */
 
         if (
           err?.response?.status ===
           401
         ) {
           console.log(
-            "❌ Authentication failed while fetching notifications.",
+            "❌ Authentication failed while fetching notifications."
           );
 
           console.log(
-            "Check whether authStore.token contains the current JWT.",
+            "Check whether authStore.token contains the current JWT."
           );
         }
 
         console.log(
-          "====================================",
+          "===================================="
         );
+
+        /*
+        IMPORTANT:
+
+        Do not clear the existing notifications during a
+        refresh error.
+
+        Otherwise a temporary network/backend problem could
+        make the notification list disappear.
+        */
 
         if (!isRefresh) {
           setNotifications([]);
@@ -419,7 +487,7 @@ export default function Notification() {
       token,
       getAuthHeaders,
       normalizeNotification,
-    ],
+    ]
   );
 
   /* =========================================================
@@ -429,17 +497,17 @@ export default function Notification() {
   useFocusEffect(
     useCallback(() => {
       console.log(
-        "📱 Notification screen focused",
+        "📱 Notification screen focused"
       );
 
       fetchNotifications();
 
       return () => {
         console.log(
-          "📱 Notification screen unfocused",
+          "📱 Notification screen unfocused"
         );
       };
-    }, [fetchNotifications]),
+    }, [fetchNotifications])
   );
 
   /* =========================================================
@@ -455,17 +523,17 @@ export default function Notification() {
             "📱 App state:",
             appStateRef.current,
             "→",
-            nextState,
+            nextState
           );
 
           if (
             appStateRef.current.match(
-              /inactive|background/,
+              /inactive|background/
             ) &&
             nextState === "active"
           ) {
             console.log(
-              "📱 App returned to foreground",
+              "📱 App returned to foreground"
             );
 
             fetchNotifications(true);
@@ -473,7 +541,7 @@ export default function Notification() {
 
           appStateRef.current =
             nextState;
-        },
+        }
       );
 
     return () => {
@@ -487,48 +555,49 @@ export default function Notification() {
      IMPORTANT:
      We DO NOT create a local notification here.
 
-     MongoDB is the source of truth.
-
      FCM is only used to tell the app:
-     "There may be a new notification. Refresh."
+     "There may be a new notification. Refresh from MongoDB."
   ========================================================= */
 
   useEffect(() => {
     console.log(
-      "📱 Setting up native Firebase FCM foreground listener...",
+      "📱 Setting up native Firebase FCM foreground listener..."
     );
 
     const unsubscribe =
       messaging().onMessage(
         async (remoteMessage) => {
           console.log("");
+
           console.log(
-            "====================================",
+            "===================================="
           );
+
           console.log(
-            "📱 NATIVE FCM MESSAGE RECEIVED",
+            "📱 NATIVE FCM MESSAGE RECEIVED"
           );
+
           console.log(
-            "====================================",
+            "===================================="
           );
 
           console.log(
             "Message ID:",
-            remoteMessage?.messageId,
+            remoteMessage?.messageId
           );
 
           console.log(
             "Notification:",
-            remoteMessage?.notification,
+            remoteMessage?.notification
           );
 
           console.log(
             "Data:",
-            remoteMessage?.data,
+            remoteMessage?.data
           );
 
           console.log(
-            "====================================",
+            "===================================="
           );
 
           /*
@@ -536,21 +605,19 @@ export default function Notification() {
           DO NOT USE expo-notifications
           =====================================================
 
-          The backend already saved the notification
+          The backend already saves the notification
           into MongoDB.
 
           Just refresh the database list.
           */
 
-          await fetchNotifications(
-            true,
-          );
-        },
+          await fetchNotifications(true);
+        }
       );
 
     return () => {
       console.log(
-        "📱 Removing native Firebase FCM foreground listener...",
+        "📱 Removing native Firebase FCM foreground listener..."
       );
 
       unsubscribe();
@@ -563,46 +630,47 @@ export default function Notification() {
 
   useEffect(() => {
     console.log(
-      "📱 Setting up FCM background notification-open listener...",
+      "📱 Setting up FCM background notification-open listener..."
     );
 
     const unsubscribe =
       messaging().onNotificationOpenedApp(
         async (remoteMessage) => {
           console.log("");
+
           console.log(
-            "====================================",
+            "===================================="
           );
+
           console.log(
-            "📱 FCM NOTIFICATION TAPPED",
+            "📱 FCM NOTIFICATION TAPPED"
           );
+
           console.log(
-            "====================================",
+            "===================================="
           );
 
           console.log(
             "Notification:",
-            remoteMessage?.notification,
+            remoteMessage?.notification
           );
 
           console.log(
             "Data:",
-            remoteMessage?.data,
+            remoteMessage?.data
           );
 
           console.log(
-            "====================================",
+            "===================================="
           );
 
-          await fetchNotifications(
-            true,
-          );
-        },
+          await fetchNotifications(true);
+        }
       );
 
     return () => {
       console.log(
-        "📱 Removing FCM notification-open listener...",
+        "📱 Removing FCM notification-open listener..."
       );
 
       unsubscribe();
@@ -630,38 +698,39 @@ export default function Notification() {
           }
 
           console.log("");
+
           console.log(
-            "====================================",
+            "===================================="
           );
+
           console.log(
-            "📱 APP OPENED FROM FCM NOTIFICATION",
+            "📱 APP OPENED FROM FCM NOTIFICATION"
           );
+
           console.log(
-            "====================================",
+            "===================================="
           );
 
           console.log(
             "Notification:",
-            remoteMessage?.notification,
+            remoteMessage?.notification
           );
 
           console.log(
             "Data:",
-            remoteMessage?.data,
+            remoteMessage?.data
           );
 
           console.log(
-            "====================================",
+            "===================================="
           );
 
-          await fetchNotifications(
-            true,
-          );
+          await fetchNotifications(true);
         } catch (error) {
           console.log(
             "❌ Error checking initial FCM notification:",
             error?.message ||
-              error,
+              error
           );
         }
       };
@@ -680,26 +749,29 @@ export default function Notification() {
   useEffect(() => {
     if (!user?._id) {
       console.log(
-        "⚠️ No user ID. Socket not started.",
+        "⚠️ No user ID. Socket not started."
       );
 
       return;
     }
 
     console.log("");
+
     console.log(
-      "====================================",
+      "===================================="
     );
+
     console.log(
-      "🔌 STARTING STUDENT NOTIFICATION SOCKET",
+      "🔌 STARTING STUDENT NOTIFICATION SOCKET"
     );
+
     console.log(
-      "====================================",
+      "===================================="
     );
 
     console.log(
       "User ID:",
-      user._id,
+      user._id
     );
 
     const socket = io(
@@ -720,7 +792,7 @@ export default function Notification() {
         reconnectionDelay: 1000,
 
         timeout: 20000,
-      },
+      }
     );
 
     socketRef.current =
@@ -734,106 +806,120 @@ export default function Notification() {
       "connect",
       () => {
         console.log("");
+
         console.log(
-          "====================================",
+          "===================================="
         );
+
         console.log(
-          "🔌 STUDENT SOCKET CONNECTED",
+          "🔌 STUDENT SOCKET CONNECTED"
         );
+
         console.log(
-          "====================================",
+          "===================================="
         );
 
         console.log(
           "Socket ID:",
-          socket.id,
+          socket.id
         );
 
         console.log(
           "Registering user:",
-          user._id,
+          user._id
         );
 
         socket.emit(
           "register",
-          user._id,
+          user._id
         );
 
         socket.emit(
           "join",
-          user._id,
+          user._id
         );
 
         console.log(
-          "✅ register emitted",
+          "✅ register emitted"
         );
 
         console.log(
-          "✅ join emitted",
+          "✅ join emitted"
         );
 
         console.log(
-          "====================================",
+          "===================================="
         );
-      },
+      }
     );
 
     /* =======================================================
        NEW REALTIME NOTIFICATION
+       
+       IMPORTANT:
+       We do NOT add the socket object directly to the UI.
+
+       MongoDB is the source of truth.
+
+       We wait 1 second to allow the backend to finish
+       saving the notification, then fetch from MongoDB.
     ======================================================= */
 
     socket.on(
       "newNotification",
       async (notif) => {
         console.log("");
+
         console.log(
-          "====================================",
+          "===================================="
         );
+
         console.log(
-          "🔔 STUDENT REALTIME NOTIFICATION",
+          "🔔 STUDENT REALTIME NOTIFICATION"
         );
+
         console.log(
-          "====================================",
+          "===================================="
         );
 
         console.log(
           "Notification:",
-          notif,
+          notif
         );
 
         console.log(
           "ID:",
           notif?._id ||
-            notif?.id,
+            notif?.id
         );
 
         console.log(
           "Title:",
-          notif?.title,
+          notif?.title
         );
 
         console.log(
           "Message:",
-          notif?.message,
+          notif?.message
         );
 
         console.log(
           "Type:",
-          notif?.type,
+          notif?.type
         );
 
         console.log(
           "Priority:",
-          notif?.priority,
+          notif?.priority
         );
 
         console.log(
           "Data:",
-          notif?.data,
+          notif?.data
         );
 
         console.log(
-          "====================================",
+          "===================================="
         );
 
         if (!notif) {
@@ -842,26 +928,22 @@ export default function Notification() {
 
         /*
         =====================================================
-        ADD IMMEDIATELY
+        WAIT FOR BACKEND DATABASE SAVE
         =====================================================
         */
 
-        addNotification(
-          notif,
+        console.log(
+          "⏳ Waiting for notification database save..."
         );
 
-        /*
-        =====================================================
-        REFRESH FROM DATABASE
-        =====================================================
-        */
-
         setTimeout(() => {
-          fetchNotifications(
-            true,
+          console.log(
+            "🔄 Refreshing notifications from MongoDB..."
           );
-        }, 500);
-      },
+
+          fetchNotifications(true);
+        }, 1000);
+      }
     );
 
     /* =======================================================
@@ -873,21 +955,17 @@ export default function Notification() {
       (notif) => {
         console.log(
           "🔔 Generic notification event received:",
-          notif,
+          notif
         );
 
-        if (notif) {
-          addNotification(
-            notif,
-          );
-        }
-
         setTimeout(() => {
-          fetchNotifications(
-            true,
+          console.log(
+            "🔄 Refreshing after generic notification..."
           );
-        }, 500);
-      },
+
+          fetchNotifications(true);
+        }, 1000);
+      }
     );
 
     /* =======================================================
@@ -899,21 +977,17 @@ export default function Notification() {
       (notif) => {
         console.log(
           "🔔 Student notification event received:",
-          notif,
+          notif
         );
 
-        if (notif) {
-          addNotification(
-            notif,
-          );
-        }
-
         setTimeout(() => {
-          fetchNotifications(
-            true,
+          console.log(
+            "🔄 Refreshing after student notification..."
           );
-        }, 500);
-      },
+
+          fetchNotifications(true);
+        }, 1000);
+      }
     );
 
     /* =======================================================
@@ -925,15 +999,13 @@ export default function Notification() {
       (data) => {
         console.log(
           "📄 Report accepted event:",
-          data,
+          data
         );
 
         setTimeout(() => {
-          fetchNotifications(
-            true,
-          );
-        }, 500);
-      },
+          fetchNotifications(true);
+        }, 1000);
+      }
     );
 
     /* =======================================================
@@ -945,15 +1017,13 @@ export default function Notification() {
       (data) => {
         console.log(
           "📄 Report status updated:",
-          data,
+          data
         );
 
         setTimeout(() => {
-          fetchNotifications(
-            true,
-          );
-        }, 500);
-      },
+          fetchNotifications(true);
+        }, 1000);
+      }
     );
 
     /* =======================================================
@@ -965,9 +1035,9 @@ export default function Notification() {
       (reason) => {
         console.log(
           "🔌 Student notification socket disconnected:",
-          reason,
+          reason
         );
-      },
+      }
     );
 
     /* =======================================================
@@ -980,9 +1050,9 @@ export default function Notification() {
         console.log(
           "❌ Student notification socket connection error:",
           error?.message ||
-            error,
+            error
         );
-      },
+      }
     );
 
     /* =======================================================
@@ -994,19 +1064,19 @@ export default function Notification() {
       (attempt) => {
         console.log(
           "🔄 Student notification socket reconnected:",
-          attempt,
+          attempt
         );
 
         socket.emit(
           "register",
-          user._id,
+          user._id
         );
 
         socket.emit(
           "join",
-          user._id,
+          user._id
         );
-      },
+      }
     );
 
     /* =======================================================
@@ -1015,8 +1085,9 @@ export default function Notification() {
 
     return () => {
       console.log("");
+
       console.log(
-        "🔌 CLEANING STUDENT NOTIFICATION SOCKET",
+        "🔌 CLEANING STUDENT NOTIFICATION SOCKET"
       );
 
       socket.removeAllListeners();
@@ -1033,7 +1104,6 @@ export default function Notification() {
     };
   }, [
     user?._id,
-    addNotification,
     fetchNotifications,
   ]);
 
@@ -1049,7 +1119,7 @@ export default function Notification() {
     try {
       console.log(
         "📖 Marking notification as read:",
-        id,
+        id
       );
 
       /*
@@ -1064,14 +1134,14 @@ export default function Notification() {
             (notification) =>
               String(
                 notification._id ||
-                  notification.id,
+                  notification.id
               ) === String(id)
                 ? {
                     ...notification,
                     isRead: true,
                   }
-                : notification,
-          ),
+                : notification
+          )
       );
 
       /*
@@ -1086,17 +1156,17 @@ export default function Notification() {
         {
           headers:
             getAuthHeaders(),
-        },
+        }
       );
 
       console.log(
-        "✅ Notification marked as read",
+        "✅ Notification marked as read"
       );
     } catch (err) {
       console.log(
         "❌ Mark notification read error:",
         err?.response?.data ||
-          err?.message,
+          err?.message
       );
     }
   };
@@ -1115,13 +1185,15 @@ export default function Notification() {
           notification.data?.type?.toLowerCase();
 
         if (
-          activeTab === "all"
+          activeTab ===
+          "all"
         ) {
           return true;
         }
 
         if (
-          activeTab === "high"
+          activeTab ===
+          "high"
         ) {
           return (
             notification.priority?.toLowerCase() ===
@@ -1130,7 +1202,8 @@ export default function Notification() {
         }
 
         if (
-          activeTab === "updates"
+          activeTab ===
+          "updates"
         ) {
           return (
             type === "update" ||
@@ -1141,7 +1214,7 @@ export default function Notification() {
         }
 
         return true;
-      },
+      }
     );
 
   /* =========================================================
@@ -1151,14 +1224,14 @@ export default function Notification() {
   const unreadCount =
     notifications.filter(
       (notification) =>
-        !notification.isRead,
+        !notification.isRead
     ).length;
 
   const highPriorityCount =
     notifications.filter(
       (notification) =>
         notification.priority?.toLowerCase() ===
-        "high",
+        "high"
     ).length;
 
   /* =========================================================
@@ -1166,7 +1239,7 @@ export default function Notification() {
   ========================================================= */
 
   const getNotifDesign = (
-    notification,
+    notification
   ) => {
     const priority =
       notification.priority?.toLowerCase();
@@ -1224,7 +1297,8 @@ export default function Notification() {
     ===================================================== */
 
     if (
-      priority === "high"
+      priority ===
+      "high"
     ) {
       return {
         color:
@@ -1265,7 +1339,8 @@ export default function Notification() {
     ===================================================== */
 
     if (
-      type === "report"
+      type ===
+      "report"
     ) {
       return {
         color:
@@ -1285,7 +1360,8 @@ export default function Notification() {
     ===================================================== */
 
     if (
-      type === "message"
+      type ===
+      "message"
     ) {
       return {
         color:
@@ -1304,7 +1380,8 @@ export default function Notification() {
     ===================================================== */
 
     if (
-      type === "update"
+      type ===
+      "update"
     ) {
       return {
         color:
@@ -1324,7 +1401,8 @@ export default function Notification() {
     ===================================================== */
 
     if (
-      type === "success"
+      type ===
+      "success"
     ) {
       return {
         color:
@@ -1344,7 +1422,8 @@ export default function Notification() {
     ===================================================== */
 
     if (
-      type === "warning"
+      type ===
+      "warning"
     ) {
       return {
         color:
@@ -1364,7 +1443,8 @@ export default function Notification() {
     ===================================================== */
 
     if (
-      type === "rejected"
+      type ===
+      "rejected"
     ) {
       return {
         color:
@@ -1418,7 +1498,7 @@ export default function Notification() {
         activeOpacity={0.85}
         onPress={() =>
           markAsRead(
-            notificationId,
+            notificationId
           )
         }
         style={[
@@ -1528,7 +1608,7 @@ export default function Notification() {
               {item.timeAgo ||
                 (item.createdAt
                   ? new Date(
-                      item.createdAt,
+                      item.createdAt
                     ).toLocaleString()
                   : "Just now")}
             </Text>
@@ -1629,7 +1709,7 @@ export default function Notification() {
           }
           onPress={() =>
             fetchNotifications(
-              true,
+              true
             )
           }
           activeOpacity={0.8}
@@ -1910,7 +1990,7 @@ export default function Notification() {
             ]}
             onPress={() =>
               setActiveTab(
-                "all",
+                "all"
               )
             }
             activeOpacity={0.8}
@@ -1949,7 +2029,7 @@ export default function Notification() {
             ]}
             onPress={() =>
               setActiveTab(
-                "high",
+                "high"
               )
             }
             activeOpacity={0.8}
@@ -2013,7 +2093,7 @@ export default function Notification() {
             ]}
             onPress={() =>
               setActiveTab(
-                "updates",
+                "updates"
               )
             }
             activeOpacity={0.8}
@@ -2052,7 +2132,7 @@ export default function Notification() {
             }
             keyExtractor={(
               item,
-              index,
+              index
             ) =>
               (
                 item._id ||
@@ -2073,7 +2153,7 @@ export default function Notification() {
                 }
                 onRefresh={() =>
                   fetchNotifications(
-                    true,
+                    true
                   )
                 }
                 tintColor={
