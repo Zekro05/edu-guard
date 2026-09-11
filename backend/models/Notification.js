@@ -38,7 +38,11 @@ const notificationSchema = new mongoose.Schema(
 
     priority: {
       type: String,
-      enum: ["low", "high"],
+      enum: [
+        "low",
+        "medium",
+        "high",
+      ],
       default: "low",
     },
 
@@ -65,15 +69,28 @@ const notificationSchema = new mongoose.Schema(
         "Report",
         "Incident",
         "System",
+        "message",
+        "report",
+        "incident",
+        "system",
         null,
       ],
       default: null,
     },
+
+    data: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
   },
   {
     timestamps: true,
-  },
+  }
 );
+
+/* =========================================================
+   INDEX
+========================================================= */
 
 notificationSchema.index({
   user: 1,
@@ -83,5 +100,5 @@ notificationSchema.index({
 
 export default mongoose.model(
   "Notification",
-  notificationSchema,
+  notificationSchema
 );

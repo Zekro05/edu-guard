@@ -21,11 +21,7 @@ import Notification from "../models/Notification.js";
 
 export const saveFCMToken = async (req, res) => {
   try {
-    const {
-      token,
-      platform,
-      provider = "fcm",
-    } = req.body;
+    const { token, platform, provider = "fcm" } = req.body;
 
     /* =====================================================
        VALIDATE TOKEN
@@ -42,17 +38,12 @@ export const saveFCMToken = async (req, res) => {
        VALIDATE PLATFORM
     ===================================================== */
 
-    const allowedPlatforms = [
-      "android",
-      "ios",
-      "web",
-    ];
+    const allowedPlatforms = ["android", "ios", "web"];
 
     if (!allowedPlatforms.includes(platform)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid platform. Use android, ios, or web.",
+        message: "Invalid platform. Use android, ios, or web.",
       });
     }
 
@@ -60,16 +51,12 @@ export const saveFCMToken = async (req, res) => {
        VALIDATE PROVIDER
     ===================================================== */
 
-    const allowedProviders = [
-      "expo",
-      "fcm",
-    ];
+    const allowedProviders = ["expo", "fcm"];
 
     if (!allowedProviders.includes(provider)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid push provider. Use expo or fcm.",
+        message: "Invalid push provider. Use expo or fcm.",
       });
     }
 
@@ -77,25 +64,17 @@ export const saveFCMToken = async (req, res) => {
        VALIDATE PROVIDER / PLATFORM COMBINATION
     ===================================================== */
 
-    if (
-      provider === "expo" &&
-      !["android", "ios"].includes(platform)
-    ) {
+    if (provider === "expo" && !["android", "ios"].includes(platform)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Expo tokens are only supported on Android and iOS.",
+        message: "Expo tokens are only supported on Android and iOS.",
       });
     }
 
-    if (
-      provider === "fcm" &&
-      platform !== "web"
-    ) {
+    if (provider === "fcm" && !["android", "ios", "web"].includes(platform)) {
       return res.status(400).json({
         success: false,
-        message:
-          "FCM tokens are currently used for Web.",
+        message: "FCM tokens are supported on Android, iOS, and Web.",
       });
     }
 
@@ -133,9 +112,7 @@ export const saveFCMToken = async (req, res) => {
        A token should only exist once for this account.
     ===================================================== */
 
-    user.pushTokens = user.pushTokens.filter(
-      (item) => item?.token !== token
-    );
+    user.pushTokens = user.pushTokens.filter((item) => item?.token !== token);
 
     /* =====================================================
        ADD NEW TOKEN
@@ -149,28 +126,18 @@ export const saveFCMToken = async (req, res) => {
 
     await user.save();
 
-    console.log(
-      "✅ PUSH TOKEN SAVED:",
-      user.email,
-      provider,
-      platform
-    );
+    console.log("✅ PUSH TOKEN SAVED:", user.email, provider, platform);
 
     return res.status(200).json({
       success: true,
       message: "Push token saved successfully.",
     });
   } catch (error) {
-    console.error(
-      "❌ SAVE PUSH TOKEN ERROR:",
-      error
-    );
+    console.error("❌ SAVE PUSH TOKEN ERROR:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        error.message ||
-        "Failed to save push token.",
+      message: error.message || "Failed to save push token.",
     });
   }
 };
@@ -184,10 +151,7 @@ export const saveFCMToken = async (req, res) => {
    the backend removes only that token.
 ========================================================= */
 
-export const removePushToken = async (
-  req,
-  res
-) => {
+export const removePushToken = async (req, res) => {
   try {
     const { token } = req.body;
 
@@ -215,9 +179,7 @@ export const removePushToken = async (
     }
 
     if (Array.isArray(user.pushTokens)) {
-      user.pushTokens = user.pushTokens.filter(
-        (item) => item?.token !== token
-      );
+      user.pushTokens = user.pushTokens.filter((item) => item?.token !== token);
 
       await user.save();
     }
@@ -227,16 +189,11 @@ export const removePushToken = async (
       message: "Push token removed successfully.",
     });
   } catch (error) {
-    console.error(
-      "❌ REMOVE PUSH TOKEN ERROR:",
-      error
-    );
+    console.error("❌ REMOVE PUSH TOKEN ERROR:", error);
 
     return res.status(500).json({
       success: false,
-      message:
-        error.message ||
-        "Failed to remove push token.",
+      message: error.message || "Failed to remove push token.",
     });
   }
 };
@@ -250,10 +207,7 @@ export const removePushToken = async (
    - Student Mobile
 ========================================================= */
 
-export const getNotificationSettings = async (
-  req,
-  res
-) => {
+export const getNotificationSettings = async (req, res) => {
   try {
     if (!req.userId) {
       return res.status(401).json({
@@ -262,10 +216,8 @@ export const getNotificationSettings = async (
       });
     }
 
-    const user = await User.findById(
-      req.userId
-    ).select(
-      "notificationSettings role"
+    const user = await User.findById(req.userId).select(
+      "notificationSettings role",
     );
 
     if (!user) {
@@ -277,20 +229,14 @@ export const getNotificationSettings = async (
 
     return res.status(200).json({
       success: true,
-      settings:
-        user.notificationSettings || {},
+      settings: user.notificationSettings || {},
     });
   } catch (err) {
-    console.error(
-      "❌ GET NOTIFICATION SETTINGS ERROR:",
-      err
-    );
+    console.error("❌ GET NOTIFICATION SETTINGS ERROR:", err);
 
     return res.status(500).json({
       success: false,
-      message:
-        err.message ||
-        "Failed to load notification settings.",
+      message: err.message || "Failed to load notification settings.",
     });
   }
 };
@@ -304,10 +250,7 @@ export const getNotificationSettings = async (
    - Student Mobile
 ========================================================= */
 
-export const updateNotificationSettings = async (
-  req,
-  res
-) => {
+export const updateNotificationSettings = async (req, res) => {
   try {
     if (!req.userId) {
       return res.status(401).json({
@@ -316,9 +259,7 @@ export const updateNotificationSettings = async (
       });
     }
 
-    const user = await User.findById(
-      req.userId
-    );
+    const user = await User.findById(req.userId);
 
     if (!user) {
       return res.status(404).json({
@@ -327,15 +268,10 @@ export const updateNotificationSettings = async (
       });
     }
 
-    if (
-      !req.body ||
-      typeof req.body !== "object" ||
-      Array.isArray(req.body)
-    ) {
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid notification settings.",
+        message: "Invalid notification settings.",
       });
     }
 
@@ -366,23 +302,15 @@ export const updateNotificationSettings = async (
     const updates = {};
 
     for (const key of allowedSettings) {
-      if (
-        Object.prototype.hasOwnProperty.call(
-          req.body,
-          key
-        )
-      ) {
+      if (Object.prototype.hasOwnProperty.call(req.body, key)) {
         updates[key] = req.body[key];
       }
     }
 
-    if (
-      Object.keys(updates).length === 0
-    ) {
+    if (Object.keys(updates).length === 0) {
       return res.status(400).json({
         success: false,
-        message:
-          "No valid notification settings provided.",
+        message: "No valid notification settings provided.",
       });
     }
 
@@ -406,10 +334,7 @@ export const updateNotificationSettings = async (
 
     for (const key of booleanSettings) {
       if (
-        Object.prototype.hasOwnProperty.call(
-          updates,
-          key
-        ) &&
+        Object.prototype.hasOwnProperty.call(updates, key) &&
         typeof updates[key] !== "boolean"
       ) {
         return res.status(400).json({
@@ -432,22 +357,15 @@ export const updateNotificationSettings = async (
 
     return res.status(200).json({
       success: true,
-      message:
-        "Notification settings updated successfully.",
-      settings:
-        user.notificationSettings,
+      message: "Notification settings updated successfully.",
+      settings: user.notificationSettings,
     });
   } catch (err) {
-    console.error(
-      "❌ UPDATE NOTIFICATION SETTINGS ERROR:",
-      err
-    );
+    console.error("❌ UPDATE NOTIFICATION SETTINGS ERROR:", err);
 
     return res.status(500).json({
       success: false,
-      message:
-        err.message ||
-        "Failed to update notification settings.",
+      message: err.message || "Failed to update notification settings.",
     });
   }
 };

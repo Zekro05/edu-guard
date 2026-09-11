@@ -1,15 +1,9 @@
 import express from "express";
-
 import Notification from "../models/Notification.js";
 
 import {
   saveFCMToken,
   removePushToken,
-  getNotifications,
-  getUnreadNotifications,
-  markNotificationAsRead,
-  markAllNotificationsAsRead,
-  deleteNotification,
 } from "../controllers/notificationController.js";
 
 import { verifyToken } from "../middleware/verifyToken.js";
@@ -17,7 +11,7 @@ import { verifyToken } from "../middleware/verifyToken.js";
 const router = express.Router();
 
 /* =========================================================
-   SAVE PUSH TOKEN
+   SAVE FCM TOKEN
 
    POST /api/notifications/fcm-token
 ========================================================= */
@@ -29,7 +23,7 @@ router.post(
 );
 
 /* =========================================================
-   REMOVE PUSH TOKEN
+   REMOVE FCM TOKEN
 
    POST /api/notifications/remove-token
 ========================================================= */
@@ -46,9 +40,10 @@ router.post(
    GET /api/notifications
 
    IMPORTANT:
-   We no longer accept :userId from the frontend.
-
    The authenticated user's ID comes from req.userId.
+
+   Notification model uses:
+   user: ObjectId
 ========================================================= */
 
 router.get(
@@ -63,40 +58,41 @@ router.get(
         });
       }
 
-      const notifications =
-        await Notification.find({
-          userId: req.userId,
+      const notifications = await Notification.find({
+        user: req.userId,
+      })
+        .sort({
+          createdAt: -1,
         })
-          .sort({
-            createdAt: -1,
-          })
-          .lean();
+        .lean();
 
-      const formatted =
-        notifications.map((n) => ({
-          id: n._id,
+      const formatted = notifications.map((n) => ({
+        id: n._id.toString(),
 
-          title: n.title,
+        title: n.title,
 
-          message: n.message,
+        message: n.message,
 
-          type: n.type,
+        type: n.type,
 
-          priority: n.priority,
+        priority: n.priority,
 
-          isRead: n.isRead,
+        isRead: n.isRead,
 
-          data: n.data || {},
+        data: n.data || {},
 
-          createdAt:
-            n.createdAt,
+        relatedId: n.relatedId
+          ? n.relatedId.toString()
+          : null,
 
-          updatedAt:
-            n.updatedAt,
+        relatedType: n.relatedType || null,
 
-          timeAgo:
-            getTimeAgo(n.createdAt),
-        }));
+        createdAt: n.createdAt,
+
+        updatedAt: n.updatedAt,
+
+        timeAgo: getTimeAgo(n.createdAt),
+      }));
 
       return res.status(200).json({
         success: true,
@@ -124,8 +120,7 @@ router.get(
    Kept for compatibility with your existing mobile UI.
 
    IMPORTANT:
-   It still verifies that the requested ID belongs to
-   the authenticated user.
+   The requested userId must match the authenticated user.
 ========================================================= */
 
 router.get(
@@ -151,40 +146,41 @@ router.get(
         });
       }
 
-      const notifications =
-        await Notification.find({
-          userId: req.userId,
+      const notifications = await Notification.find({
+        user: req.userId,
+      })
+        .sort({
+          createdAt: -1,
         })
-          .sort({
-            createdAt: -1,
-          })
-          .lean();
+        .lean();
 
-      const formatted =
-        notifications.map((n) => ({
-          id: n._id,
+      const formatted = notifications.map((n) => ({
+        id: n._id.toString(),
 
-          title: n.title,
+        title: n.title,
 
-          message: n.message,
+        message: n.message,
 
-          type: n.type,
+        type: n.type,
 
-          priority: n.priority,
+        priority: n.priority,
 
-          isRead: n.isRead,
+        isRead: n.isRead,
 
-          data: n.data || {},
+        data: n.data || {},
 
-          createdAt:
-            n.createdAt,
+        relatedId: n.relatedId
+          ? n.relatedId.toString()
+          : null,
 
-          updatedAt:
-            n.updatedAt,
+        relatedType: n.relatedType || null,
 
-          timeAgo:
-            getTimeAgo(n.createdAt),
-        }));
+        createdAt: n.createdAt,
+
+        updatedAt: n.updatedAt,
+
+        timeAgo: getTimeAgo(n.createdAt),
+      }));
 
       return res.status(200).json({
         success: true,
@@ -193,6 +189,90 @@ router.get(
     } catch (err) {
       console.error(
         "❌ GET USER NOTIFICATIONS ERROR:",
+        err
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: err.message,
+      });
+    }
+  }
+);
+
+/* =========================================================
+   GET ONLY UNREAD
+
+   GET /api/notifications/:userId/unread
+========================================================= */
+
+router.get(
+  "/:userId/unread",
+  verifyToken,
+  async (req, res) => {
+    try {
+      if (!req.userId) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized.",
+        });
+      }
+
+      if (
+        String(req.userId) !==
+        String(req.params.userId)
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "You can only access your own notifications.",
+        });
+      }
+
+      const notifications = await Notification.find({
+        user: req.userId,
+        isRead: false,
+      })
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
+
+      const formatted = notifications.map((n) => ({
+        id: n._id.toString(),
+
+        title: n.title,
+
+        message: n.message,
+
+        type: n.type,
+
+        priority: n.priority,
+
+        isRead: n.isRead,
+
+        data: n.data || {},
+
+        relatedId: n.relatedId
+          ? n.relatedId.toString()
+          : null,
+
+        relatedType: n.relatedType || null,
+
+        createdAt: n.createdAt,
+
+        updatedAt: n.updatedAt,
+
+        timeAgo: getTimeAgo(n.createdAt),
+      }));
+
+      return res.status(200).json({
+        success: true,
+        notifications: formatted,
+      });
+    } catch (err) {
+      console.error(
+        "❌ GET UNREAD NOTIFICATIONS ERROR:",
         err
       );
 
@@ -226,11 +306,15 @@ router.put(
         await Notification.findOneAndUpdate(
           {
             _id: req.params.id,
-            userId: req.userId,
+
+            // IMPORTANT:
+            // model field is "user", NOT "userId"
+            user: req.userId,
           },
           {
             $set: {
               isRead: true,
+              readAt: new Date(),
             },
           },
           {
@@ -241,8 +325,7 @@ router.put(
       if (!notification) {
         return res.status(404).json({
           success: false,
-          message:
-            "Notification not found.",
+          message: "Notification not found.",
         });
       }
 
@@ -285,12 +368,13 @@ router.put(
       const result =
         await Notification.updateMany(
           {
-            userId: req.userId,
+            user: req.userId,
             isRead: false,
           },
           {
             $set: {
               isRead: true,
+              readAt: new Date(),
             },
           }
         );
@@ -321,9 +405,20 @@ router.put(
 
    POST /api/notifications
 
-   Kept for testing/admin usage.
+   Useful for testing/admin usage.
 
-   This endpoint is now authenticated.
+   Body:
+   {
+     "userId": "...",
+     "title": "...",
+     "message": "...",
+     "type": "general",
+     "priority": "low",
+     "data": {}
+   }
+
+   The request still accepts "userId" from the frontend,
+   but saves it to the model's "user" field.
 ========================================================= */
 
 router.post(
@@ -338,6 +433,8 @@ router.post(
         type,
         priority,
         data,
+        relatedId,
+        relatedType,
       } = req.body;
 
       if (!userId) {
@@ -350,7 +447,9 @@ router.post(
 
       const notif =
         await Notification.create({
-          userId,
+          // IMPORTANT:
+          // Notification model uses "user"
+          user: userId,
 
           title:
             title || "EduGuard",
@@ -367,6 +466,12 @@ router.post(
           isRead: false,
 
           data: data || {},
+
+          relatedId:
+            relatedId || null,
+
+          relatedType:
+            relatedType || null,
         });
 
       /* ===================================================
@@ -379,12 +484,35 @@ router.post(
         io.to(String(userId)).emit(
           "newNotification",
           {
-            ...notif.toObject(),
-
             id: notif._id.toString(),
 
-            timeAgo:
-              "Just now",
+            title: notif.title,
+
+            message: notif.message,
+
+            type: notif.type,
+
+            priority: notif.priority,
+
+            isRead: notif.isRead,
+
+            data: notif.data || {},
+
+            relatedId:
+              notif.relatedId
+                ? notif.relatedId.toString()
+                : null,
+
+            relatedType:
+              notif.relatedType || null,
+
+            createdAt:
+              notif.createdAt,
+
+            updatedAt:
+              notif.updatedAt,
+
+            timeAgo: "Just now",
           }
         );
       }
@@ -407,36 +535,58 @@ router.post(
   }
 );
 
-router.get("/:userId", getNotifications);
-
 /* =========================================================
-   GET ONLY UNREAD
-   GET /api/notifications/:userId/unread
-========================================================= */
+   DELETE NOTIFICATION
 
-router.get("/:userId/unread", getUnreadNotifications);
-
-/* =========================================================
-   MARK ONE AS READ
-   PUT /api/notifications/read/:id
-========================================================= */
-
-router.put("/read/:id", markNotificationAsRead);
-
-/* =========================================================
-   MARK ALL AS READ
-   PUT /api/notifications/:userId/read-all
-========================================================= */
-
-router.put("/:userId/read-all", markAllNotificationsAsRead);
-
-/* =========================================================
-   DELETE
    DELETE /api/notifications/:id
 ========================================================= */
 
-router.delete("/:id", deleteNotification);
+router.delete(
+  "/:id",
+  verifyToken,
+  async (req, res) => {
+    try {
+      if (!req.userId) {
+        return res.status(401).json({
+          success: false,
+          message: "Unauthorized.",
+        });
+      }
 
+      const notification =
+        await Notification.findOneAndDelete({
+          _id: req.params.id,
+
+          // IMPORTANT:
+          // model field is "user"
+          user: req.userId,
+        });
+
+      if (!notification) {
+        return res.status(404).json({
+          success: false,
+          message: "Notification not found.",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Notification deleted successfully.",
+      });
+    } catch (err) {
+      console.error(
+        "❌ DELETE NOTIFICATION ERROR:",
+        err
+      );
+
+      return res.status(500).json({
+        success: false,
+        message: err.message,
+      });
+    }
+  }
+);
 
 /* =========================================================
    TIME AGO HELPER
