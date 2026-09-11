@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   AppState,
+  Platform,
 } from "react-native";
 
 import React, {
@@ -20,7 +21,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 
 import io from "socket.io-client";
-import axios from "axios";
 
 import messaging from "@react-native-firebase/messaging";
 
@@ -29,554 +29,881 @@ import { useFocusEffect } from "@react-navigation/native";
 import { createStyles } from "../../../assets/styles/homestyle/notification.styles";
 import { useTheme } from "../../../assets/styles/theme/useTheme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuthStore } from "../../../store/authStore";
 
-const API_URL = "https://edu-guard-backend.onrender.com";
+import {
+  useAuthStore,
+  API,
+} from "../../../store/authStore";
+
+const API_URL =
+  "https://edu-guard-backend.onrender.com";
 
 export default function Notification() {
   const { colors } = useTheme();
-
   const styles = createStyles(colors);
-
   const insets = useSafeAreaInsets();
-
   const router = useRouter();
 
   /* =========================================================
      AUTH STORE
   ========================================================= */
 
-  const { user, token } = useAuthStore();
+  const {
+    user,
+    isAuthenticated,
+    isCheckingAuth,
+  } = useAuthStore();
+
+  /*
+   * The authStore stores the token inside:
+   *
+   * user.token
+   *
+   * The MongoDB User ID is:
+   *
+   * user._id
+   */
+
+  const token =
+    user?.token || null;
+
+  const currentUserId =
+    user?._id || null;
 
   /* =========================================================
      STATE
   ========================================================= */
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] =
+    useState(true);
 
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] =
+    useState(false);
 
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] =
+    useState([]);
 
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] =
+    useState("all");
 
   /* =========================================================
      REFS
   ========================================================= */
 
-  const socketRef = useRef(null);
+  const socketRef =
+    useRef(null);
 
-  const appStateRef = useRef(
-    AppState.currentState
-  );
+  const appStateRef =
+    useRef(AppState.currentState);
+
+  const mountedRef =
+    useRef(true);
+
+  const hasLoadedRef =
+    useRef(false);
 
   /* =========================================================
-     AUTH HEADERS
+     AUTH DEBUG
   ========================================================= */
 
-  const getAuthHeaders = useCallback(() => {
-    if (!token) {
+  useEffect(() => {
+    console.log("");
+    console.log(
+      "==============================================="
+    );
+    console.log(
+      "🔐 NOTIFICATION AUTH STATE"
+    );
+    console.log(
+      "==============================================="
+    );
+
+    console.log(
+      "User:",
+      user
+    );
+
+    console.log(
+      "MongoDB User._id:",
+      currentUserId
+    );
+
+    console.log(
+      "Token exists:",
+      !!token
+    );
+
+    console.log(
+      "Token length:",
+      token?.length || 0
+    );
+
+    console.log(
+      "Authenticated:",
+      isAuthenticated
+    );
+
+    console.log(
+      "Checking auth:",
+      isCheckingAuth
+    );
+
+    console.log(
+      "Platform:",
+      Platform.OS
+    );
+
+    console.log(
+      "==============================================="
+    );
+  }, [
+    user,
+    currentUserId,
+    token,
+    isAuthenticated,
+    isCheckingAuth,
+  ]);
+
+  /* =========================================================
+     MOUNT / UNMOUNT
+  ========================================================= */
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    console.log("");
+    console.log(
+      "==============================================="
+    );
+    console.log(
+      "📱 NOTIFICATION SCREEN MOUNTED"
+    );
+    console.log(
+      "==============================================="
+    );
+
+    console.log(
+      "Current student User._id:",
+      currentUserId
+    );
+
+    console.log(
+      "Token available:",
+      !!token
+    );
+
+    console.log(
+      "Authenticated:",
+      isAuthenticated
+    );
+
+    console.log(
+      "Auth checking:",
+      isCheckingAuth
+    );
+
+    console.log(
+      "==============================================="
+    );
+
+    return () => {
+      mountedRef.current = false;
+
+      console.log("");
       console.log(
-        "⚠️ No authentication token available."
+        "==============================================="
       );
-
-      return {};
-    }
-
-    return {
-      Authorization: `Bearer ${token}`,
+      console.log(
+        "📱 NOTIFICATION SCREEN UNMOUNTED"
+      );
+      console.log(
+        "==============================================="
+      );
     };
-  }, [token]);
+  }, []);
 
   /* =========================================================
      NORMALIZE NOTIFICATION
   ========================================================= */
 
-  const normalizeNotification = useCallback(
-    (notification) => {
-      if (!notification) {
-        return null;
-      }
+  const normalizeNotification =
+    useCallback(
+      (notification) => {
+        if (!notification) {
+          return null;
+        }
 
-      const id =
-        notification._id ||
-        notification.id ||
-        null;
+        const id =
+          notification._id ||
+          notification.id ||
+          null;
 
-      if (!id) {
-        console.log(
-          "⚠️ Notification has no ID:",
-          notification
-        );
+        if (!id) {
+          console.log(
+            "⚠️ Notification has no ID:",
+            notification
+          );
 
-        return null;
-      }
+          return null;
+        }
 
-      return {
-        ...notification,
+        return {
+          ...notification,
 
-        _id: String(id),
+          _id: String(id),
 
-        id: String(id),
+          id: String(id),
 
-        isRead:
-          notification.isRead ?? false,
+          isRead:
+            notification.isRead ??
+            false,
 
-        data:
-          notification.data || {},
+          data:
+            notification.data ||
+            {},
 
-        createdAt:
-          notification.createdAt ||
-          new Date().toISOString(),
+          createdAt:
+            notification.createdAt ||
+            new Date().toISOString(),
 
-        updatedAt:
-          notification.updatedAt ||
-          notification.createdAt ||
-          new Date().toISOString(),
+          updatedAt:
+            notification.updatedAt ||
+            notification.createdAt ||
+            new Date().toISOString(),
 
-        timeAgo:
-          notification.timeAgo ||
-          null,
-      };
-    },
-    []
-  );
+          timeAgo:
+            notification.timeAgo ||
+            null,
+        };
+      },
+      []
+    );
 
   /* =========================================================
      FETCH NOTIFICATIONS
-     
-     IMPORTANT:
-     The authenticated backend endpoint is:
-
-     GET /api/notifications
-
-     We do NOT need to send user._id anymore.
-
-     The backend gets the current user from req.userId.
   ========================================================= */
 
-  const fetchNotifications = useCallback(
-    async (isRefresh = false) => {
-      /*
-      =======================================================
-      TOKEN CHECK
-      =======================================================
-      */
-
-      if (!token) {
-        console.log(
-          "⚠️ No authentication token."
-        );
-
-        setLoading(false);
-
-        setRefreshing(false);
-
-        return;
-      }
-
-      try {
-        if (isRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
-
+  const fetchNotifications =
+    useCallback(
+      async (isRefresh = false) => {
         console.log("");
-
         console.log(
-          "===================================="
+          "==============================================="
+        );
+        console.log(
+          "📲 FETCHING STUDENT NOTIFICATIONS"
+        );
+        console.log(
+          "==============================================="
         );
 
         console.log(
-          "🔔 FETCHING STUDENT NOTIFICATIONS"
+          "Current User._id:",
+          currentUserId
         );
 
         console.log(
-          "===================================="
-        );
-
-        console.log(
-          "User from authStore:",
-          user?._id ||
-            user?.id ||
-            "not available"
-        );
-
-        console.log(
-          "Token available:",
+          "Token exists:",
           !!token
         );
 
-        /*
-        =====================================================
-        IMPORTANT CHANGE
-
-        OLD:
-
-        /api/notifications/${user._id}
-
-        NEW:
-
-        /api/notifications
-
-        The backend gets req.userId from JWT.
-        =====================================================
-        */
-
-        const url =
-          `${API_URL}/api/notifications`;
-
         console.log(
-          "Request URL:",
-          url
-        );
-
-        const res = await axios.get(
-          url,
-          {
-            headers:
-              getAuthHeaders(),
-
-            timeout: 20000,
-          }
+          "Authenticated:",
+          isAuthenticated
         );
 
         console.log(
-          "✅ Notification API status:",
-          res.status
+          "Checking auth:",
+          isCheckingAuth
         );
 
         console.log(
-          "📦 Raw notification response:",
-          res.data
+          "Refresh:",
+          isRefresh
         );
 
         /* =====================================================
-           RESPONSE DATA
+           AUTH IS STILL BEING RESTORED
         ===================================================== */
 
-        let data = [];
+        if (isCheckingAuth) {
+          console.log(
+            "⏳ AuthStore is still checking authentication."
+          );
 
-        if (
-          Array.isArray(
-            res.data
-          )
-        ) {
-          data = res.data;
-        } else if (
-          Array.isArray(
-            res.data?.notifications
-          )
-        ) {
-          data =
-            res.data.notifications;
-        } else if (
-          Array.isArray(
-            res.data?.data
-          )
-        ) {
-          data =
-            res.data.data;
+          /*
+           * IMPORTANT:
+           *
+           * Do not set loading(false) here.
+           *
+           * We want the screen to remain in loading state
+           * until checkAuth() finishes.
+           */
+
+          return;
         }
 
-        console.log(
-          "📦 Notification records received:",
-          data.length
-        );
-
-        console.log(
-          "🔵 Backend unread count:",
-          res.data?.unreadCount ??
-            "not provided"
-        );
-
         /* =====================================================
-           NORMALIZE
+           AUTH FINISHED BUT USER IS NOT LOGGED IN
         ===================================================== */
 
-        const normalized = data
-          .map(
-            normalizeNotification
-          )
-          .filter(Boolean);
+        if (
+          !isAuthenticated ||
+          !token ||
+          !currentUserId
+        ) {
+          console.log(
+            "⚠️ Cannot fetch notifications."
+          );
 
-        /* =====================================================
-           SORT
-        ===================================================== */
+          console.log(
+            "Authenticated:",
+            isAuthenticated
+          );
 
-        normalized.sort(
-          (a, b) => {
-            const dateA =
-              new Date(
-                a.createdAt || 0
-              ).getTime();
+          console.log(
+            "Token exists:",
+            !!token
+          );
 
-            const dateB =
-              new Date(
-                b.createdAt || 0
-              ).getTime();
+          console.log(
+            "User ID:",
+            currentUserId
+          );
 
-            return dateB - dateA;
+          if (
+            mountedRef.current
+          ) {
+            setLoading(false);
+            setRefreshing(false);
           }
-        );
+
+          return;
+        }
 
         /* =====================================================
-           LOG NOTIFICATIONS
+           REFRESH STATE
         ===================================================== */
 
-        normalized.forEach(
-          (
-            notification,
-            index
-          ) => {
-            console.log(
-              `🔔 Notification ${
-                index + 1
-              }:`,
+        if (isRefresh) {
+          setRefreshing(true);
+        } else if (
+          !hasLoadedRef.current
+        ) {
+          setLoading(true);
+        }
+
+        try {
+          /* ===================================================
+             API URL
+          =================================================== */
+
+          const url =
+            `/api/notifications/${currentUserId}`;
+
+          console.log("");
+          console.log(
+            "📡 NOTIFICATION REQUEST"
+          );
+          console.log(
+            "-----------------------------------------------"
+          );
+
+          console.log(
+            "URL:",
+            `${API_URL}${url}`
+          );
+
+          console.log(
+            "User ID:",
+            currentUserId
+          );
+
+          console.log(
+            "Authorization:",
+            token
+              ? "Bearer token attached by API interceptor"
+              : "NO TOKEN"
+          );
+
+          console.log(
+            "-----------------------------------------------"
+          );
+
+          /*
+           * IMPORTANT:
+           *
+           * Use the API instance from authStore.
+           *
+           * Your authStore interceptor automatically
+           * attaches:
+           *
+           * Authorization: Bearer <token>
+           */
+
+          const response =
+            await API.get(
+              url,
               {
-                id:
-                  notification._id,
-
-                user:
-                  notification.user,
-
-                title:
-                  notification.title,
-
-                message:
-                  notification.message,
-
-                type:
-                  notification.type,
-
-                priority:
-                  notification.priority,
-
-                isRead:
-                  notification.isRead,
-
-                createdAt:
-                  notification.createdAt,
+                timeout: 20000,
               }
             );
+
+          console.log("");
+          console.log(
+            "📥 NOTIFICATION RESPONSE"
+          );
+          console.log(
+            "-----------------------------------------------"
+          );
+
+          console.log(
+            "HTTP status:",
+            response.status
+          );
+
+          console.log(
+            "Success:",
+            response.data?.success
+          );
+
+          console.log(
+            "Raw response:",
+            response.data
+          );
+
+          console.log(
+            "-----------------------------------------------"
+          );
+
+          /* =================================================
+             GET NOTIFICATIONS ARRAY
+          ================================================= */
+
+          let data = [];
+
+          if (
+            Array.isArray(
+              response.data
+            )
+          ) {
+            data =
+              response.data;
+          } else if (
+            Array.isArray(
+              response.data
+                ?.notifications
+            )
+          ) {
+            data =
+              response.data
+                .notifications;
+          } else if (
+            Array.isArray(
+              response.data?.data
+            )
+          ) {
+            data =
+              response.data.data;
           }
-        );
 
-        /* =====================================================
-           MERGE DATABASE RESULTS WITH CURRENT UI
+          console.log("");
+          console.log(
+            "📊 DATABASE NOTIFICATIONS"
+          );
+          console.log(
+            "-----------------------------------------------"
+          );
 
-           MongoDB is still the source of truth.
+          console.log(
+            "Notifications returned:",
+            data.length
+          );
 
-           Existing realtime notifications are retained
-           temporarily if they are not yet present in the
-           database response.
-        ===================================================== */
+          console.log(
+            "Current User._id:",
+            currentUserId
+          );
 
-        setNotifications(
-          (previous) => {
-            const mergedMap =
-              new Map();
+          console.log(
+            "-----------------------------------------------"
+          );
 
-            /*
-            ---------------------------------------------------
-            KEEP CURRENT UI ITEMS
-            ---------------------------------------------------
-            */
+          console.log(
+            "Raw notifications:",
+            data
+          );
 
-            previous.forEach(
-              (notification) => {
-                const id =
-                  String(
-                    notification._id ||
-                      notification.id ||
-                      ""
-                  );
+          /* =================================================
+             NORMALIZE
+          ================================================= */
 
-                if (id) {
-                  mergedMap.set(
-                    id,
-                    notification
-                  );
-                }
-              }
-            );
+          const normalized =
+            data
+              .map(
+                normalizeNotification
+              )
+              .filter(Boolean);
 
-            /*
-            ---------------------------------------------------
-            DATABASE ITEMS OVERRIDE OLD UI ITEMS
-            ---------------------------------------------------
-            */
+          /* =================================================
+             SORT NEWEST FIRST
+          ================================================= */
 
-            normalized.forEach(
-              (notification) => {
-                const id =
-                  String(
-                    notification._id ||
-                      notification.id ||
-                      ""
-                  );
+          normalized.sort(
+            (a, b) => {
+              const dateA =
+                new Date(
+                  a.createdAt || 0
+                ).getTime();
 
-                if (id) {
-                  mergedMap.set(
-                    id,
-                    notification
-                  );
-                }
-              }
-            );
+              const dateB =
+                new Date(
+                  b.createdAt || 0
+                ).getTime();
 
-            /*
-            ---------------------------------------------------
-            ARRAY
-            ---------------------------------------------------
-            */
-
-            const merged =
-              Array.from(
-                mergedMap.values()
+              return (
+                dateB -
+                dateA
               );
+            }
+          );
 
-            /*
-            ---------------------------------------------------
-            SORT NEWEST FIRST
-            ---------------------------------------------------
-            */
+          /* =================================================
+             DEBUG
+          ================================================= */
 
-            merged.sort(
-              (a, b) => {
-                const dateA =
-                  new Date(
-                    a.createdAt || 0
-                  ).getTime();
+          console.log("");
+          console.log(
+            "🔔 FINAL NOTIFICATIONS TO DISPLAY"
+          );
+          console.log(
+            "-----------------------------------------------"
+          );
 
-                const dateB =
-                  new Date(
-                    b.createdAt || 0
-                  ).getTime();
+          console.log(
+            "Total:",
+            normalized.length
+          );
 
-                return dateB - dateA;
-              }
+          normalized.forEach(
+            (
+              notification,
+              index
+            ) => {
+              console.log(
+                `${index + 1}.`,
+                {
+                  id:
+                    notification._id,
+
+                  user:
+                    notification.user,
+
+                  title:
+                    notification.title,
+
+                  message:
+                    notification.message,
+
+                  type:
+                    notification.type,
+
+                  priority:
+                    notification.priority,
+
+                  isRead:
+                    notification.isRead,
+
+                  createdAt:
+                    notification.createdAt,
+                }
+              );
+            }
+          );
+
+          console.log(
+            "-----------------------------------------------"
+          );
+
+          /* =================================================
+             UPDATE STATE
+          ================================================= */
+
+          if (
+            mountedRef.current
+          ) {
+            setNotifications(
+              normalized
             );
 
-            console.log(
-              "===================================="
-            );
-
-            console.log(
-              "✅ NOTIFICATION LIST MERGED"
-            );
-
-            console.log(
-              "Database notifications:",
-              normalized.length
-            );
-
-            console.log(
-              "Previous UI notifications:",
-              previous.length
-            );
-
-            console.log(
-              "Final UI notifications:",
-              merged.length
-            );
-
-            console.log(
-              "===================================="
-            );
-
-            return merged;
+            hasLoadedRef.current =
+              true;
           }
-        );
-
-        console.log(
-          "✅ Notification list update completed."
-        );
-
-        console.log(
-          "===================================="
-        );
-      } catch (err) {
-        console.log("");
-
-        console.log(
-          "❌ FETCH NOTIFICATIONS ERROR"
-        );
-
-        console.log(
-          "Status:",
-          err?.response?.status
-        );
-
-        console.log(
-          "Response:",
-          err?.response?.data
-        );
-
-        console.log(
-          "Message:",
-          err?.message
-        );
-
-        if (
-          err?.response?.status ===
-          401
-        ) {
+        } catch (error) {
+          console.log("");
           console.log(
-            "❌ Authentication failed."
+            "==============================================="
+          );
+          console.log(
+            "❌ FETCH NOTIFICATIONS ERROR"
+          );
+          console.log(
+            "==============================================="
           );
 
           console.log(
-            "The JWT may be expired or invalid."
+            "Message:",
+            error?.message
+          );
+
+          console.log(
+            "Status:",
+            error?.response?.status
+          );
+
+          console.log(
+            "Response:",
+            error?.response?.data
+          );
+
+          console.log(
+            "URL:",
+            error?.config?.url
+          );
+
+          console.log(
+            "==============================================="
+          );
+
+          /*
+           * Do not clear existing notifications.
+           *
+           * A temporary network error should not make
+           * the notification list disappear.
+           */
+        } finally {
+          if (
+            mountedRef.current
+          ) {
+            setLoading(false);
+            setRefreshing(false);
+          }
+
+          console.log(
+            "🏁 Notification fetch finished"
           );
         }
-
-        console.log(
-          "===================================="
-        );
-
-        /*
-        =====================================================
-        DO NOT CLEAR EXISTING DATA DURING REFRESH ERROR
-        =====================================================
-        */
-
-        if (!isRefresh) {
-          setNotifications([]);
-        }
-      } finally {
-        setLoading(false);
-
-        setRefreshing(false);
-      }
-    },
-    [
-      token,
-      user,
-      getAuthHeaders,
-      normalizeNotification,
-    ]
-  );
+      },
+      [
+        token,
+        currentUserId,
+        isAuthenticated,
+        isCheckingAuth,
+        normalizeNotification,
+      ]
+    );
 
   /* =========================================================
-     FETCH WHEN SCREEN OPENS
+     FETCH AFTER AUTH RESTORATION
+  ========================================================= */
+
+  useEffect(() => {
+    console.log("");
+    console.log(
+      "==============================================="
+    );
+    console.log(
+      "🔄 NOTIFICATION AUTH EFFECT"
+    );
+    console.log(
+      "==============================================="
+    );
+
+    console.log(
+      "Checking auth:",
+      isCheckingAuth
+    );
+
+    console.log(
+      "Authenticated:",
+      isAuthenticated
+    );
+
+    console.log(
+      "Token exists:",
+      !!token
+    );
+
+    console.log(
+      "User ID:",
+      currentUserId
+    );
+
+    if (isCheckingAuth) {
+      console.log(
+        "⏳ Still checking authentication..."
+      );
+
+      return;
+    }
+
+    if (
+      isAuthenticated &&
+      token &&
+      currentUserId
+    ) {
+      console.log(
+        "✅ Authentication ready."
+      );
+
+      console.log(
+        "📲 Fetching notifications..."
+      );
+
+      fetchNotifications(false);
+    } else {
+      console.log(
+        "⚠️ Authentication finished but no valid user."
+      );
+
+      if (
+        mountedRef.current
+      ) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, [
+    isCheckingAuth,
+    isAuthenticated,
+    token,
+    currentUserId,
+    fetchNotifications,
+  ]);
+
+  /* =========================================================
+     RESET WHEN USER CHANGES
+  ========================================================= */
+
+  useEffect(() => {
+    hasLoadedRef.current =
+      false;
+
+    /*
+     * IMPORTANT:
+     *
+     * Previously this did:
+     *
+     * setLoading(true)
+     *
+     * whenever currentUserId was missing.
+     *
+     * That could cause the screen to remain stuck
+     * while authStore was still restoring the user.
+     *
+     * Now we only clear the screen after auth has
+     * completely finished checking.
+     */
+
+    if (
+      !currentUserId &&
+      !isCheckingAuth
+    ) {
+      setNotifications([]);
+      setLoading(false);
+    }
+  }, [
+    currentUserId,
+    isCheckingAuth,
+  ]);
+
+  /* =========================================================
+     FETCH WHEN SCREEN IS FOCUSED
   ========================================================= */
 
   useFocusEffect(
     useCallback(() => {
+      console.log("");
       console.log(
-        "📱 Student notification screen focused"
+        "==============================================="
+      );
+      console.log(
+        "📱 NOTIFICATION SCREEN FOCUSED"
+      );
+      console.log(
+        "==============================================="
       );
 
-      fetchNotifications();
+      console.log(
+        "Current User._id:",
+        currentUserId
+      );
+
+      console.log(
+        "Token available:",
+        !!token
+      );
+
+      console.log(
+        "Authenticated:",
+        isAuthenticated
+      );
+
+      console.log(
+        "Checking auth:",
+        isCheckingAuth
+      );
+
+      /*
+       * Don't fetch while auth is restoring.
+       */
+
+      if (isCheckingAuth) {
+        console.log(
+          "⏳ Auth is still checking. Waiting..."
+        );
+
+        return () => {
+          console.log(
+            "📱 Notification screen unfocused"
+          );
+        };
+      }
+
+      if (
+        isAuthenticated &&
+        token &&
+        currentUserId
+      ) {
+        console.log(
+          "✅ Auth ready. Fetching notifications..."
+        );
+
+        fetchNotifications(false);
+      } else {
+        console.log(
+          "⚠️ No valid authenticated user yet."
+        );
+
+        if (
+          mountedRef.current
+        ) {
+          setLoading(false);
+        }
+      }
 
       return () => {
         console.log(
-          "📱 Student notification screen unfocused"
+          "📱 Notification screen unfocused"
         );
       };
-    }, [fetchNotifications])
+    }, [
+      fetchNotifications,
+      token,
+      currentUserId,
+      isAuthenticated,
+      isCheckingAuth,
+    ])
   );
 
   /* =========================================================
@@ -599,13 +926,23 @@ export default function Notification() {
             appStateRef.current.match(
               /inactive|background/
             ) &&
-            nextState === "active"
+            nextState ===
+              "active"
           ) {
             console.log(
               "📱 App returned to foreground"
             );
 
-            fetchNotifications(true);
+            if (
+              !isCheckingAuth &&
+              isAuthenticated &&
+              token &&
+              currentUserId
+            ) {
+              fetchNotifications(
+                true
+              );
+            }
           }
 
           appStateRef.current =
@@ -616,140 +953,180 @@ export default function Notification() {
     return () => {
       subscription.remove();
     };
-  }, [fetchNotifications]);
+  }, [
+    fetchNotifications,
+    token,
+    currentUserId,
+    isAuthenticated,
+    isCheckingAuth,
+  ]);
 
   /* =========================================================
-     FCM FOREGROUND MESSAGE
-     
-     FCM is ONLY used as a trigger to refresh MongoDB.
+     NATIVE FCM FOREGROUND
   ========================================================= */
 
   useEffect(() => {
-    console.log(
-      "📱 Setting up native Firebase FCM foreground listener..."
-    );
+    if (
+      Platform.OS ===
+      "web"
+    ) {
+      return;
+    }
 
-    const unsubscribe =
-      messaging().onMessage(
-        async (
-          remoteMessage
-        ) => {
-          console.log("");
+    if (
+      !isAuthenticated ||
+      !currentUserId
+    ) {
+      return;
+    }
 
-          console.log(
-            "===================================="
-          );
+    let unsubscribe =
+      null;
 
-          console.log(
-            "📱 NATIVE FCM MESSAGE RECEIVED"
-          );
+    try {
+      unsubscribe =
+        messaging().onMessage(
+          async (
+            remoteMessage
+          ) => {
+            console.log("");
+            console.log(
+              "==============================================="
+            );
+            console.log(
+              "📱 NATIVE FCM MESSAGE RECEIVED"
+            );
+            console.log(
+              "==============================================="
+            );
 
-          console.log(
-            "===================================="
-          );
+            console.log(
+              "Message:",
+              remoteMessage
+            );
 
-          console.log(
-            "Message ID:",
-            remoteMessage?.messageId
-          );
+            console.log(
+              "==============================================="
+            );
 
-          console.log(
-            "Notification:",
-            remoteMessage?.notification
-          );
-
-          console.log(
-            "Data:",
-            remoteMessage?.data
-          );
-
-          console.log(
-            "===================================="
-          );
-
-          /*
-          -----------------------------------------------------
-          Refresh MongoDB.
-          -----------------------------------------------------
-          */
-
-          await fetchNotifications(
-            true
-          );
-        }
+            if (
+              token &&
+              currentUserId
+            ) {
+              await fetchNotifications(
+                true
+              );
+            }
+          }
+        );
+    } catch (error) {
+      console.log(
+        "❌ FCM foreground listener error:",
+        error?.message ||
+          error
       );
+    }
 
     return () => {
-      console.log(
-        "📱 Removing native Firebase FCM foreground listener..."
-      );
-
-      unsubscribe();
+      if (
+        typeof unsubscribe ===
+        "function"
+      ) {
+        unsubscribe();
+      }
     };
-  }, [fetchNotifications]);
+  }, [
+    fetchNotifications,
+    token,
+    currentUserId,
+    isAuthenticated,
+  ]);
 
   /* =========================================================
-     FCM BACKGROUND NOTIFICATION OPENED
+     FCM BACKGROUND OPEN
   ========================================================= */
 
   useEffect(() => {
-    console.log(
-      "📱 Setting up FCM background notification-open listener..."
-    );
+    if (
+      Platform.OS ===
+      "web"
+    ) {
+      return;
+    }
 
-    const unsubscribe =
-      messaging().onNotificationOpenedApp(
-        async (
-          remoteMessage
-        ) => {
-          console.log("");
+    if (
+      !isAuthenticated ||
+      !currentUserId
+    ) {
+      return;
+    }
 
-          console.log(
-            "===================================="
-          );
+    let unsubscribe =
+      null;
 
-          console.log(
-            "📱 FCM NOTIFICATION TAPPED"
-          );
+    try {
+      unsubscribe =
+        messaging().onNotificationOpenedApp(
+          async (
+            remoteMessage
+          ) => {
+            console.log(
+              "📱 FCM notification opened:",
+              remoteMessage
+            );
 
-          console.log(
-            "===================================="
-          );
-
-          console.log(
-            "Notification:",
-            remoteMessage?.notification
-          );
-
-          console.log(
-            "Data:",
-            remoteMessage?.data
-          );
-
-          console.log(
-            "===================================="
-          );
-
-          await fetchNotifications(
-            true
-          );
-        }
+            if (
+              token &&
+              currentUserId
+            ) {
+              await fetchNotifications(
+                true
+              );
+            }
+          }
+        );
+    } catch (error) {
+      console.log(
+        "❌ FCM opened-app listener error:",
+        error?.message ||
+          error
       );
+    }
 
     return () => {
-      console.log(
-        "📱 Removing FCM notification-open listener..."
-      );
-
-      unsubscribe();
+      if (
+        typeof unsubscribe ===
+        "function"
+      ) {
+        unsubscribe();
+      }
     };
-  }, [fetchNotifications]);
+  }, [
+    fetchNotifications,
+    token,
+    currentUserId,
+    isAuthenticated,
+  ]);
 
   /* =========================================================
      FCM QUIT STATE
   ========================================================= */
 
   useEffect(() => {
+    if (
+      Platform.OS ===
+      "web"
+    ) {
+      return;
+    }
+
+    if (
+      !isAuthenticated ||
+      !currentUserId
+    ) {
+      return;
+    }
+
     let mounted = true;
 
     const checkInitialNotification =
@@ -765,40 +1142,22 @@ export default function Notification() {
             return;
           }
 
-          console.log("");
-
           console.log(
-            "===================================="
+            "📱 App opened from FCM notification:",
+            remoteMessage
           );
 
-          console.log(
-            "📱 APP OPENED FROM FCM NOTIFICATION"
-          );
-
-          console.log(
-            "===================================="
-          );
-
-          console.log(
-            "Notification:",
-            remoteMessage?.notification
-          );
-
-          console.log(
-            "Data:",
-            remoteMessage?.data
-          );
-
-          console.log(
-            "===================================="
-          );
-
-          await fetchNotifications(
-            true
-          );
+          if (
+            token &&
+            currentUserId
+          ) {
+            await fetchNotifications(
+              true
+            );
+          }
         } catch (error) {
           console.log(
-            "❌ Error checking initial FCM notification:",
+            "❌ Initial FCM notification error:",
             error?.message ||
               error
           );
@@ -810,73 +1169,64 @@ export default function Notification() {
     return () => {
       mounted = false;
     };
-  }, [fetchNotifications]);
+  }, [
+    fetchNotifications,
+    token,
+    currentUserId,
+    isAuthenticated,
+  ]);
 
   /* =========================================================
      SOCKET.IO
   ========================================================= */
 
   useEffect(() => {
-    /*
-    =====================================================
-    We still need the user ID for Socket.IO because the
-    socket server needs to know which room to join.
-
-    Accept both _id and id in case authStore shape differs.
-    =====================================================
-    */
-
-    const currentUserId =
-      user?._id ||
-      user?.id;
-
-    if (!currentUserId) {
-      console.log(
-        "⚠️ No user ID. Student notification socket not started."
-      );
-
+    if (
+      !currentUserId ||
+      !isAuthenticated ||
+      isCheckingAuth
+    ) {
       return;
     }
 
     console.log("");
-
     console.log(
-      "===================================="
+      "==============================================="
     );
-
     console.log(
       "🔌 STARTING STUDENT NOTIFICATION SOCKET"
     );
-
     console.log(
-      "===================================="
+      "==============================================="
     );
 
     console.log(
-      "User ID:",
+      "Student User._id:",
       currentUserId
     );
 
-    const socket = io(
-      API_URL,
-      {
-        transports: [
-          "websocket",
-          "polling",
-        ],
+    const socket =
+      io(
+        API_URL,
+        {
+          transports: [
+            "websocket",
+            "polling",
+          ],
 
-        forceNew: true,
+          forceNew: true,
 
-        reconnection: true,
+          reconnection: true,
 
-        reconnectionAttempts:
-          Infinity,
+          reconnectionAttempts:
+            Infinity,
 
-        reconnectionDelay: 1000,
+          reconnectionDelay:
+            1000,
 
-        timeout: 20000,
-      }
-    );
+          timeout: 20000,
+        }
+      );
 
     socketRef.current =
       socket;
@@ -888,28 +1238,9 @@ export default function Notification() {
     socket.on(
       "connect",
       () => {
-        console.log("");
-
         console.log(
-          "===================================="
-        );
-
-        console.log(
-          "🔌 STUDENT SOCKET CONNECTED"
-        );
-
-        console.log(
-          "===================================="
-        );
-
-        console.log(
-          "Socket ID:",
+          "🔌 Student notification socket connected:",
           socket.id
-        );
-
-        console.log(
-          "Registering user:",
-          currentUserId
         );
 
         socket.emit(
@@ -923,106 +1254,109 @@ export default function Notification() {
         );
 
         console.log(
-          "✅ register emitted"
-        );
-
-        console.log(
-          "✅ join emitted"
-        );
-
-        console.log(
-          "===================================="
+          "✅ Registered socket for student:",
+          currentUserId
         );
       }
     );
 
     /* =======================================================
-       NEW NOTIFICATION
+       REALTIME NOTIFICATION
     ======================================================= */
 
     socket.on(
       "newNotification",
-      async (notif) => {
+      (notification) => {
         console.log("");
-
         console.log(
-          "===================================="
+          "🔔 REALTIME STUDENT NOTIFICATION"
         );
 
         console.log(
-          "🔔 STUDENT REALTIME NOTIFICATION"
+          notification
         );
 
-        console.log(
-          "===================================="
-        );
-
-        console.log(
-          "Notification:",
-          notif
-        );
-
-        console.log(
-          "ID:",
-          notif?._id ||
-            notif?.id
-        );
-
-        console.log(
-          "Title:",
-          notif?.title
-        );
-
-        console.log(
-          "Message:",
-          notif?.message
-        );
-
-        console.log(
-          "Type:",
-          notif?.type
-        );
-
-        console.log(
-          "Priority:",
-          notif?.priority
-        );
-
-        console.log(
-          "Data:",
-          notif?.data
-        );
-
-        console.log(
-          "===================================="
-        );
-
-        if (!notif) {
+        if (!notification) {
           return;
         }
 
-        /*
-        =====================================================
-        WAIT A LITTLE BEFORE FETCHING
+        const notificationUser =
+          notification?.user?._id ||
+          notification?.user ||
+          notification?.userId ||
+          null;
 
-        This gives the backend enough time to finish the
-        MongoDB save before the GET request runs.
-        =====================================================
-        */
-
-        console.log(
-          "⏳ Waiting for database save..."
-        );
-
-        setTimeout(() => {
+        if (
+          notificationUser &&
+          String(
+            notificationUser
+          ) !==
+            String(
+              currentUserId
+            )
+        ) {
           console.log(
-            "🔄 Refreshing notifications from MongoDB..."
+            "⚠️ Realtime notification belongs to another user. Ignoring."
           );
 
-          fetchNotifications(
-            true
+          return;
+        }
+
+        const normalized =
+          normalizeNotification(
+            notification
           );
-        }, 1000);
+
+        if (!normalized) {
+          return;
+        }
+
+        if (
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        setNotifications(
+          (previous) => {
+            const alreadyExists =
+              previous.some(
+                (item) =>
+                  String(
+                    item._id ||
+                      item.id
+                  ) ===
+                  String(
+                    normalized._id
+                  )
+              );
+
+            if (
+              alreadyExists
+            ) {
+              return previous;
+            }
+
+            const updated = [
+              normalized,
+              ...previous,
+            ];
+
+            updated.sort(
+              (a, b) =>
+                new Date(
+                  b.createdAt ||
+                    0
+                ).getTime() -
+                new Date(
+                  a.createdAt ||
+                    0
+                ).getTime()
+            );
+
+            return updated;
+          }
+        );
       }
     );
 
@@ -1032,17 +1366,21 @@ export default function Notification() {
 
     socket.on(
       "notification",
-      (notif) => {
+      () => {
         console.log(
-          "🔔 Generic notification event received:",
-          notif
+          "🔔 Generic notification event received"
         );
 
-        setTimeout(() => {
-          fetchNotifications(
-            true
-          );
-        }, 1000);
+        if (
+          token &&
+          currentUserId
+        ) {
+          setTimeout(() => {
+            fetchNotifications(
+              true
+            );
+          }, 500);
+        }
       }
     );
 
@@ -1052,17 +1390,21 @@ export default function Notification() {
 
     socket.on(
       "studentNotification",
-      (notif) => {
+      () => {
         console.log(
-          "🔔 Student notification event received:",
-          notif
+          "🔔 Student notification event received"
         );
 
-        setTimeout(() => {
-          fetchNotifications(
-            true
-          );
-        }, 1000);
+        if (
+          token &&
+          currentUserId
+        ) {
+          setTimeout(() => {
+            fetchNotifications(
+              true
+            );
+          }, 500);
+        }
       }
     );
 
@@ -1072,17 +1414,21 @@ export default function Notification() {
 
     socket.on(
       "reportAccepted",
-      (data) => {
+      () => {
         console.log(
-          "📄 Report accepted event:",
-          data
+          "📄 Report accepted event received"
         );
 
-        setTimeout(() => {
-          fetchNotifications(
-            true
-          );
-        }, 1000);
+        if (
+          token &&
+          currentUserId
+        ) {
+          setTimeout(() => {
+            fetchNotifications(
+              true
+            );
+          }, 500);
+        }
       }
     );
 
@@ -1092,17 +1438,21 @@ export default function Notification() {
 
     socket.on(
       "reportStatusUpdated",
-      (data) => {
+      () => {
         console.log(
-          "📄 Report status updated:",
-          data
+          "📄 Report status updated event received"
         );
 
-        setTimeout(() => {
-          fetchNotifications(
-            true
-          );
-        }, 1000);
+        if (
+          token &&
+          currentUserId
+        ) {
+          setTimeout(() => {
+            fetchNotifications(
+              true
+            );
+          }, 500);
+        }
       }
     );
 
@@ -1128,7 +1478,7 @@ export default function Notification() {
       "connect_error",
       (error) => {
         console.log(
-          "❌ Student notification socket connection error:",
+          "❌ Student notification socket error:",
           error?.message ||
             error
         );
@@ -1141,10 +1491,9 @@ export default function Notification() {
 
     socket.io.on(
       "reconnect",
-      (attempt) => {
+      () => {
         console.log(
-          "🔄 Student notification socket reconnected:",
-          attempt
+          "🔄 Student notification socket reconnected"
         );
 
         socket.emit(
@@ -1164,10 +1513,8 @@ export default function Notification() {
     ======================================================= */
 
     return () => {
-      console.log("");
-
       console.log(
-        "🔌 CLEANING STUDENT NOTIFICATION SOCKET"
+        "🔌 Cleaning student notification socket"
       );
 
       socket.removeAllListeners();
@@ -1183,31 +1530,28 @@ export default function Notification() {
       }
     };
   }, [
-    user,
+    currentUserId,
     fetchNotifications,
+    normalizeNotification,
+    token,
+    isAuthenticated,
+    isCheckingAuth,
   ]);
 
   /* =========================================================
-     MARK NOTIFICATION AS READ
+     MARK AS READ
   ========================================================= */
 
   const markAsRead =
     async (id) => {
-      if (!id) {
+      if (!id || !token) {
         return;
       }
 
       try {
-        console.log(
-          "📖 Marking notification as read:",
-          id
-        );
-
         /*
-        =====================================================
-        UPDATE UI IMMEDIATELY
-        =====================================================
-        */
+         * Immediately update UI.
+         */
 
         setNotifications(
           (previous) =>
@@ -1229,28 +1573,24 @@ export default function Notification() {
         );
 
         /*
-        =====================================================
-        UPDATE BACKEND
-        =====================================================
-        */
+         * Use the authenticated API instance.
+         */
 
-        await axios.put(
-          `${API_URL}/api/notifications/read/${id}`,
-          {},
-          {
-            headers:
-              getAuthHeaders(),
-          }
+        await API.put(
+          `/api/notifications/read/${id}`,
+          {}
         );
 
         console.log(
-          "✅ Notification marked as read"
+          "✅ Notification marked as read:",
+          id
         );
-      } catch (err) {
+      } catch (error) {
         console.log(
-          "❌ Mark notification read error:",
-          err?.response?.data ||
-            err?.message
+          "❌ Mark notification as read error:",
+          error?.response
+            ?.data ||
+            error?.message
         );
       }
     };
@@ -1335,10 +1675,6 @@ export default function Notification() {
       const dataType =
         notification.data?.type?.toLowerCase();
 
-      /* =====================================================
-         REPORT ACCEPTED
-      ===================================================== */
-
       if (
         dataType ===
         "report_accepted"
@@ -1355,10 +1691,6 @@ export default function Notification() {
             "Report Accepted",
         };
       }
-
-      /* =====================================================
-         REPORT REJECTED
-      ===================================================== */
 
       if (
         dataType ===
@@ -1377,10 +1709,6 @@ export default function Notification() {
         };
       }
 
-      /* =====================================================
-         HIGH PRIORITY
-      ===================================================== */
-
       if (
         priority ===
         "high"
@@ -1397,10 +1725,6 @@ export default function Notification() {
             "High Priority",
         };
       }
-
-      /* =====================================================
-         INTERVENTION
-      ===================================================== */
 
       if (
         type ===
@@ -1419,10 +1743,6 @@ export default function Notification() {
         };
       }
 
-      /* =====================================================
-         REPORT
-      ===================================================== */
-
       if (
         type ===
         "report"
@@ -1440,10 +1760,6 @@ export default function Notification() {
         };
       }
 
-      /* =====================================================
-         MESSAGE
-      ===================================================== */
-
       if (
         type ===
         "message"
@@ -1459,10 +1775,6 @@ export default function Notification() {
             "Message",
         };
       }
-
-      /* =====================================================
-         UPDATE
-      ===================================================== */
 
       if (
         type ===
@@ -1481,10 +1793,6 @@ export default function Notification() {
         };
       }
 
-      /* =====================================================
-         SUCCESS
-      ===================================================== */
-
       if (
         type ===
         "success"
@@ -1501,10 +1809,6 @@ export default function Notification() {
             "Success",
         };
       }
-
-      /* =====================================================
-         WARNING
-      ===================================================== */
 
       if (
         type ===
@@ -1523,10 +1827,6 @@ export default function Notification() {
         };
       }
 
-      /* =====================================================
-         REJECTED
-      ===================================================== */
-
       if (
         type ===
         "rejected"
@@ -1543,10 +1843,6 @@ export default function Notification() {
             "Rejected",
         };
       }
-
-      /* =====================================================
-         GENERAL
-      ===================================================== */
 
       return {
         color:
@@ -1581,9 +1877,7 @@ export default function Notification() {
 
       return (
         <TouchableOpacity
-          activeOpacity={
-            0.85
-          }
+          activeOpacity={0.85}
           onPress={() =>
             markAsRead(
               notificationId
@@ -1659,9 +1953,7 @@ export default function Notification() {
               style={
                 styles.notifTitle
               }
-              numberOfLines={
-                2
-              }
+              numberOfLines={2}
             >
               {item.title ||
                 "Notification"}
@@ -1671,9 +1963,7 @@ export default function Notification() {
               style={
                 styles.notifMessage
               }
-              numberOfLines={
-                3
-              }
+              numberOfLines={3}
             >
               {item.message ||
                 "You have a new notification."}
@@ -1805,9 +2095,7 @@ export default function Notification() {
                 true
               )
             }
-            activeOpacity={
-              0.8
-            }
+            activeOpacity={0.8}
           >
             <Ionicons
               name="refresh-outline"
@@ -1830,7 +2118,7 @@ export default function Notification() {
     };
 
   /* =========================================================
-     LOADING SCREEN
+     LOADING
   ========================================================= */
 
   if (loading) {
@@ -1951,9 +2239,7 @@ export default function Notification() {
           onPress={() =>
             router.back()
           }
-          activeOpacity={
-            0.75
-          }
+          activeOpacity={0.75}
         >
           <Ionicons
             name="arrow-back"
@@ -1982,8 +2268,7 @@ export default function Notification() {
               Notifications
             </Text>
 
-            {unreadCount >
-              0 && (
+            {unreadCount > 0 && (
               <View
                 style={
                   styles.unreadBadge
@@ -1994,8 +2279,7 @@ export default function Notification() {
                     styles.unreadBadgeText
                   }
                 >
-                  {unreadCount >
-                  99
+                  {unreadCount > 99
                     ? "99+"
                     : unreadCount}
                 </Text>
@@ -2049,8 +2333,7 @@ export default function Notification() {
             </Text>
           </View>
 
-          {unreadCount >
-            0 && (
+          {unreadCount > 0 && (
             <View
               style={
                 styles.unreadSummary
@@ -2083,8 +2366,6 @@ export default function Notification() {
             styles.filterRow
           }
         >
-          {/* ALL */}
-
           <TouchableOpacity
             style={[
               styles.filterBtn,
@@ -2097,9 +2378,7 @@ export default function Notification() {
                 "all"
               )
             }
-            activeOpacity={
-              0.8
-            }
+            activeOpacity={0.8}
           >
             <Ionicons
               name="apps-outline"
@@ -2124,8 +2403,6 @@ export default function Notification() {
             </Text>
           </TouchableOpacity>
 
-          {/* HIGH PRIORITY */}
-
           <TouchableOpacity
             style={[
               styles.filterBtn,
@@ -2138,9 +2415,7 @@ export default function Notification() {
                 "high"
               )
             }
-            activeOpacity={
-              0.8
-            }
+            activeOpacity={0.8}
           >
             <Ionicons
               name="warning-outline"
@@ -2190,8 +2465,6 @@ export default function Notification() {
             )}
           </TouchableOpacity>
 
-          {/* UPDATES */}
-
           <TouchableOpacity
             style={[
               styles.filterBtn,
@@ -2204,9 +2477,7 @@ export default function Notification() {
                 "updates"
               )
             }
-            activeOpacity={
-              0.8
-            }
+            activeOpacity={0.8}
           >
             <Ionicons
               name="information-circle-outline"
@@ -2248,11 +2519,11 @@ export default function Notification() {
               item,
               index
             ) =>
-              (
+              String(
                 item._id ||
-                item.id ||
-                `notification-${index}`
-              ).toString()
+                  item.id ||
+                  `notification-${index}`
+              )
             }
             renderItem={
               renderItem
@@ -2292,4 +2563,3 @@ export default function Notification() {
     </View>
   );
 }
-

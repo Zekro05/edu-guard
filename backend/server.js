@@ -604,6 +604,15 @@ io.on("connection", (socket) => {
         },
       });
 
+      console.log("🔔 MESSAGE NOTIFICATION SAVED");
+      console.log("Notification ID:", notification._id.toString());
+      console.log("Notification USER:", notification.user.toString());
+      console.log("Receiver ID:", String(receiver));
+      console.log(
+        "USER MATCH:",
+        String(notification.user) === String(receiver),
+      );
+
       /* =============================================
              SOCKET NOTIFICATION
           ============================================= */
