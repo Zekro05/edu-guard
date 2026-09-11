@@ -123,7 +123,7 @@ export const createIntervention = async (req, res) => {
 
     if (targetUserId) {
       const targetUser = await User.findById(targetUserId).select(
-        "expoPushToken email name firstName lastName",
+        "pushTokens email name firstName lastName notificationSettings",
       );
 
       // ============================================
@@ -131,7 +131,7 @@ export const createIntervention = async (req, res) => {
       // ============================================
 
       const notification = await Notification.create({
-        userId: targetUserId,
+        user: targetUserId,
 
         title: "New Intervention",
 
@@ -147,6 +147,7 @@ export const createIntervention = async (req, res) => {
 
         data: {
           type: "intervention",
+          notificationType: "guidance",
           interventionId: intervention._id.toString(),
           incidentId: incident._id.toString(),
           studentId: studentId.toString(),
@@ -169,45 +170,69 @@ export const createIntervention = async (req, res) => {
 
       console.log(
         "🔔 Realtime intervention notification sent to:",
-        targetUserId,
+        targetUserId.toString(),
       );
 
       // ============================================
       // PHONE PUSH NOTIFICATION
       // ============================================
+      //
+      // Native FCM only.
+      //
+      // Expo Push Tokens are no longer used.
+      //
+      // notificationType: "message"
+      // maps to the student's guidanceMessages setting
+      // inside notificationService.js.
+      //
+      // ============================================
 
-      if (targetUser?.expoPushToken) {
-        try {
-          await sendPushNotification({
-            token: targetUser.expoPushToken,
+      const fcmTokens = (targetUser.pushTokens || [])
+        .filter(
+          (pushToken) =>
+            pushToken?.token &&
+            pushToken?.provider === "fcm" &&
+            ["android", "ios"].includes(pushToken?.platform),
+        )
+        .map((pushToken) => pushToken.token);
 
-            title: "⚠️ New Intervention",
+      if (fcmTokens.length > 0) {
+        for (const token of fcmTokens) {
+          try {
+            await sendPushNotification({
+              token,
 
-            body: `A ${actionName} intervention has been assigned to you.`,
+              title: "⚠️ New Intervention",
 
-            data: {
-              type: "intervention",
-              interventionId: intervention._id.toString(),
-              incidentId: incident._id.toString(),
-              studentId: studentId.toString(),
-              notificationId: notification._id.toString(),
-            },
-          });
+              body: `A ${actionName} intervention has been assigned to you.`,
 
-          console.log(
-            "📱 Intervention push notification sent to:",
-            targetUser.email,
-          );
-        } catch (pushError) {
-          console.error(
-            "⚠️ INTERVENTION PUSH NOTIFICATION ERROR:",
-            pushError,
-          );
+              notificationType: "message",
+
+              data: {
+                type: "intervention",
+                notificationType: "message",
+                interventionId: intervention._id.toString(),
+                incidentId: incident._id.toString(),
+                studentId: studentId.toString(),
+                notificationId: notification._id.toString(),
+              },
+            });
+
+            console.log(
+              "📱 Intervention FCM push notification sent to:",
+              targetUser.email,
+            );
+          } catch (pushError) {
+            console.error(
+              "⚠️ INTERVENTION FCM PUSH NOTIFICATION ERROR:",
+              pushError?.message || pushError,
+            );
+          }
         }
       } else {
         console.log(
-          "⚠️ Target student has no Expo push token:",
-          targetUserId,
+          "⚠️ Target student has no native FCM token:",
+          targetUserId.toString(),
         );
       }
     } else {
@@ -246,7 +271,10 @@ export const getInterventions = async (req, res) => {
     return res.json(interventions);
   } catch (err) {
     console.error("getInterventions error:", err);
-    return res.status(500).json({ message: err.message });
+
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
@@ -262,7 +290,10 @@ export const getStudentInterventions = async (req, res) => {
     return res.json(data);
   } catch (err) {
     console.error("getStudentInterventions error:", err);
-    return res.status(500).json({ message: err.message });
+
+    return res.status(500).json({
+      message: err.message,
+    });
   }
 };
 
@@ -360,3 +391,4 @@ export const deleteIntervention = async (req, res) => {
     });
   }
 };
+

@@ -1,73 +1,535 @@
-import * as Notifications from "expo-notifications";
-import * as Device from "expo-device";
-import Constants from "expo-constants";
-import { Platform } from "react-native";
+import admin from "../config/firebase.js";
+import User from "../models/userModel.js";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// =========================================================
+// DEFAULT NOTIFICATION SETTINGS
+// =========================================================
 
-export const registerForPushNotificationsAsync = async () => {
-  try {
-    if (!Device.isDevice) {
-      console.log("⚠️ Push notifications require a physical device.");
-      return null;
-    }
+const DEFAULT_NOTIFICATION_SETTINGS = {
+  mute: false,
 
-    if (Platform.OS === "android") {
-      await Notifications.setNotificationChannelAsync("default", {
-        name: "EduGuard Notifications",
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        sound: "default",
-      });
-    }
+  incidentUpdates: true,
+  guidanceMessages: true,
+  systemAnnouncements: true,
+  highRiskAlerts: true,
 
-    const { status: existingStatus } =
-      await Notifications.getPermissionsAsync();
+  quietHours: false,
 
-    let finalStatus = existingStatus;
+  sound: true,
+  vibration: true,
+};
 
-    if (existingStatus !== "granted") {
-      const { status } =
-        await Notifications.requestPermissionsAsync();
+// =========================================================
+// GET NOTIFICATION CATEGORY SETTING
+// =========================================================
+//
+// notificationType values expected from callers:
+//
+// incident
+// message
+// announcement
+// system
+// high-risk
+// general
+//
+// =========================================================
 
-      finalStatus = status;
-    }
+const getCategorySetting = (
+  notificationType,
+  settings
+) => {
+  switch (notificationType) {
+    case "incident":
+      return settings.incidentUpdates;
 
-    if (finalStatus !== "granted") {
-      console.log("⚠️ Notification permission denied.");
-      return null;
-    }
+    case "message":
+      return settings.guidanceMessages;
 
-    const projectId =
-      Constants?.expoConfig?.extra?.eas?.projectId ??
-      Constants?.easConfig?.projectId;
+    case "announcement":
+    case "system":
+      return settings.systemAnnouncements;
 
-    if (!projectId) {
-      console.log("❌ Expo project ID not found.");
-      return null;
-    }
+    case "high-risk":
+      return settings.highRiskAlerts;
 
-    const token =
-      await Notifications.getExpoPushTokenAsync({
-        projectId,
-      });
-
-    console.log("✅ Expo Push Token:", token.data);
-
-    return token.data;
-  } catch (error) {
-    console.error(
-      "❌ Push notification registration error:",
-      error
-    );
-
-    return null;
+    default:
+      return true;
   }
 };
+
+// =========================================================
+// GET ANDROID CHANNEL
+// =========================================================
+//
+// We use separate Android channels because Android channels
+// are persistent and their sound/vibration configuration
+// cannot safely be changed after creation.
+//
+// Channels created in the mobile app:
+//
+// eduguard_sound_vibration
+// eduguard_sound_only
+// eduguard_vibration_only
+// eduguard_silent
+//
+// =========================================================
+
+const getAndroidChannel = (
+  soundEnabled,
+  vibrationEnabled
+) => {
+  if (
+    soundEnabled &&
+    vibrationEnabled
+  ) {
+    return "eduguard_sound_vibration";
+  }
+
+  if (
+    soundEnabled &&
+    !vibrationEnabled
+  ) {
+    return "eduguard_sound_only";
+  }
+
+  if (
+    !soundEnabled &&
+    vibrationEnabled
+  ) {
+    return "eduguard_vibration_only";
+  }
+
+  return "eduguard_silent";
+};
+
+// =========================================================
+// SEND PUSH NOTIFICATION
+// =========================================================
+
+export const sendPushNotification = async ({
+  token,
+  title,
+  body,
+  data = {},
+  notificationType = "general",
+}) => {
+  try {
+    // =====================================================
+    // VALIDATE TOKEN
+    // =====================================================
+
+    if (!token) {
+      console.log(
+        "⚠️ FCM: No token provided"
+      );
+
+      return null;
+    }
+
+    // =====================================================
+    // FIND USER WHO OWNS THIS TOKEN
+    // =====================================================
+
+    const user = await User.findOne({
+      "pushTokens.token": token,
+    }).select(
+      "notificationSettings email name firstName lastName"
+    );
+
+    if (!user) {
+      console.log(
+        "⚠️ FCM: No user found for token."
+      );
+
+      return {
+        success: false,
+        skipped: true,
+        reason: "user_not_found",
+      };
+    }
+
+    // =====================================================
+    // MERGE SETTINGS WITH DEFAULTS
+    // =====================================================
+
+    const settings = {
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      ...(user.notificationSettings?.toObject?.() ||
+        user.notificationSettings ||
+        {}),
+    };
+
+    console.log("========================================");
+    console.log("🔔 CHECKING USER NOTIFICATION SETTINGS");
+    console.log("========================================");
+    console.log(
+      "User:",
+      user.email ||
+        user.name ||
+        user.firstName ||
+        "Unknown"
+    );
+    console.log(
+      "Notification Type:",
+      notificationType
+    );
+    console.log(
+      "Mute:",
+      settings.mute
+    );
+    console.log(
+      "Incident Updates:",
+      settings.incidentUpdates
+    );
+    console.log(
+      "Guidance Messages:",
+      settings.guidanceMessages
+    );
+    console.log(
+      "System Announcements:",
+      settings.systemAnnouncements
+    );
+    console.log(
+      "High Risk Alerts:",
+      settings.highRiskAlerts
+    );
+    console.log(
+      "Sound:",
+      settings.sound
+    );
+    console.log(
+      "Vibration:",
+      settings.vibration
+    );
+    console.log("========================================");
+
+    // =====================================================
+    // MASTER MUTE
+    // =====================================================
+
+    if (settings.mute === true) {
+      console.log(
+        "🔕 PUSH BLOCKED: User has notifications muted."
+      );
+
+      return {
+        success: true,
+        skipped: true,
+        reason: "muted",
+      };
+    }
+
+    // =====================================================
+    // CATEGORY SETTING
+    // =====================================================
+
+    const categoryEnabled =
+      getCategorySetting(
+        notificationType,
+        settings
+      );
+
+    if (categoryEnabled === false) {
+      console.log(
+        "🔕 PUSH BLOCKED: Notification category disabled."
+      );
+
+      return {
+        success: true,
+        skipped: true,
+        reason: "category_disabled",
+      };
+    }
+
+    // =====================================================
+    // QUIET HOURS
+    // =====================================================
+    //
+    // The quietHours toggle by itself does not contain a
+    // schedule, so we do not automatically block the
+    // notification here.
+    //
+    // If you later add quietHoursStart / quietHoursEnd,
+    // this service can enforce the actual time range.
+    //
+    // =====================================================
+
+    // =====================================================
+    // SOUND + VIBRATION
+    // =====================================================
+
+    const soundEnabled =
+      settings.sound !== false;
+
+    const vibrationEnabled =
+      settings.vibration !== false;
+
+    const channelId =
+      getAndroidChannel(
+        soundEnabled,
+        vibrationEnabled
+      );
+
+    // =====================================================
+    // CONVERT DATA TO STRINGS
+    // =====================================================
+    //
+    // Firebase requires all FCM data values to be strings.
+    //
+    // =====================================================
+
+    const stringData = Object.fromEntries(
+      Object.entries({
+        ...data,
+
+        notificationType,
+
+        soundEnabled: String(
+          soundEnabled
+        ),
+
+        vibrationEnabled: String(
+          vibrationEnabled
+        ),
+
+        channelId,
+      }).map(
+        ([key, value]) => [
+          key,
+          String(value ?? ""),
+        ]
+      )
+    );
+
+    // =====================================================
+    // BUILD FCM MESSAGE
+    // =====================================================
+
+    const message = {
+      token,
+
+      // ---------------------------------------------------
+      // Notification payload
+      // ---------------------------------------------------
+
+      notification: {
+        title,
+        body,
+      },
+
+      // ---------------------------------------------------
+      // Data payload
+      // ---------------------------------------------------
+
+      data: stringData,
+
+      // ---------------------------------------------------
+      // Android
+      // ---------------------------------------------------
+
+      android: {
+        priority: "high",
+
+        notification: {
+          channelId,
+
+          ...(soundEnabled
+            ? {
+                sound: "default",
+              }
+            : {}),
+
+          ...(vibrationEnabled
+            ? {
+                defaultVibrateTimings: true,
+              }
+            : {
+                defaultVibrateTimings: false,
+                vibrateTimingsMillis: [0],
+              }),
+        },
+      },
+
+      // ---------------------------------------------------
+      // iOS / APNs
+      // ---------------------------------------------------
+
+      apns: {
+        headers: {
+          "apns-priority": "10",
+        },
+
+        payload: {
+          aps: {
+            ...(soundEnabled
+              ? {
+                  sound: "default",
+                }
+              : {}),
+          },
+        },
+      },
+    };
+
+    // =====================================================
+    // LOG
+    // =====================================================
+
+    console.log("========================================");
+    console.log("📱 SENDING FCM PUSH");
+    console.log("========================================");
+
+    console.log(
+      "Title:",
+      title
+    );
+
+    console.log(
+      "Body:",
+      body
+    );
+
+    console.log(
+      "Type:",
+      notificationType
+    );
+
+    console.log(
+      "Token:",
+      `${token.substring(0, 20)}...`
+    );
+
+    console.log(
+      "Sound:",
+      soundEnabled
+    );
+
+    console.log(
+      "Vibration:",
+      vibrationEnabled
+    );
+
+    console.log(
+      "Android Channel:",
+      channelId
+    );
+
+    console.log(
+      "Data:",
+      stringData
+    );
+
+    console.log("========================================");
+
+    // =====================================================
+    // SEND TO FIREBASE
+    // =====================================================
+
+    const response =
+      await admin.messaging().send(
+        message
+      );
+
+    console.log(
+      "✅ FCM notification sent successfully"
+    );
+
+    console.log(
+      "FCM Message ID:",
+      response
+    );
+
+    return {
+      success: true,
+      messageId: response,
+      skipped: false,
+      settings: {
+        sound: soundEnabled,
+        vibration: vibrationEnabled,
+        channelId,
+      },
+    };
+  } catch (error) {
+    console.error("========================================");
+    console.error("❌ FCM SEND ERROR");
+    console.error("========================================");
+
+    console.error(
+      "Code:",
+      error?.code
+    );
+
+    console.error(
+      "Message:",
+      error?.message
+    );
+
+    if (token) {
+      console.error(
+        "Token:",
+        `${token.substring(0, 20)}...`
+      );
+    }
+
+    console.error("========================================");
+
+    // =====================================================
+    // AUTOMATICALLY REMOVE DEAD FCM TOKEN
+    // =====================================================
+
+    if (
+      error?.code ===
+      "messaging/registration-token-not-registered"
+    ) {
+      try {
+        const result =
+          await User.updateMany(
+            {
+              "pushTokens.token": token,
+            },
+            {
+              $pull: {
+                pushTokens: {
+                  token,
+                },
+              },
+            }
+          );
+
+        console.log("========================================");
+        console.log(
+          "🧹 DEAD FCM TOKEN REMOVED"
+        );
+        console.log("========================================");
+
+        console.log(
+          "Token:",
+          `${token.substring(0, 20)}...`
+        );
+
+        console.log(
+          "Users updated:",
+          result.modifiedCount
+        );
+
+        console.log("========================================");
+      } catch (cleanupError) {
+        console.error(
+          "❌ Failed to remove dead FCM token:"
+        );
+
+        console.error(
+          cleanupError
+        );
+      }
+    }
+
+    return {
+      success: false,
+      error:
+        error?.code ||
+        "fcm_send_error",
+    };
+  }
+};
+

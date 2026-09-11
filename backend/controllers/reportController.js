@@ -1,18 +1,14 @@
-// backend/controllers/reportController.js
-
 import Report from "../models/reportModel.js";
 import Student from "../models/studentModel.js";
 import User from "../models/userModel.js";
 import Notification from "../models/Notification.js";
 import Incident from "../models/incidentModel.js";
+
 import { notifyAdmins } from "../utils/createNotification.js";
-
 import { io } from "../server.js";
-
 import { getDisciplineAction } from "../utils/disciplineEngine.js";
 
 import { sendPushNotification } from "../services/notificationService.js";
-
 import { sendWebPushNotification } from "../utils/webPushNotification.js";
 
 /* =========================================================
@@ -55,9 +51,7 @@ export const createReport = async (req, res) => {
     const files = req.files || [];
 
     console.log("🔥 REPORT ROUTE HIT");
-
     console.log("BODY:", req.body);
-
     console.log("FILES:", files);
 
     /* =====================================================
@@ -84,7 +78,8 @@ export const createReport = async (req, res) => {
 
         if (
           reporterStudent &&
-          reporterStudent._id.toString() === studentId.toString()
+          reporterStudent._id.toString() ===
+            studentId.toString()
         ) {
           return res.status(400).json({
             message: "You cannot report yourself.",
@@ -100,7 +95,9 @@ export const createReport = async (req, res) => {
     const evidence = files.map((file) => ({
       url: file.path,
 
-      type: file.mimetype.startsWith("image") ? "image" : "document",
+      type: file.mimetype.startsWith("image")
+        ? "image"
+        : "document",
 
       uploadedAt: new Date(),
     }));
@@ -128,23 +125,38 @@ export const createReport = async (req, res) => {
 
       reporterId: req.userId || null,
 
-      reporterType: req.userId ? "student" : "guest",
+      reporterType: req.userId
+        ? "student"
+        : "guest",
 
       evidence,
     });
 
+    /* =====================================================
+       NOTIFY ADMINS THROUGH DATABASE/SOCKET
+    ===================================================== */
+
     await notifyAdmins({
       title: "New Report Submitted",
+
       message:
         "A new student report has been submitted and requires your attention.",
+
       type: "report",
+
       priority: "high",
+
       relatedId: report._id,
+
       relatedType: "Report",
+
       io: req.app.get("io"),
     });
 
-    console.log("✅ REPORT CREATED:", report._id);
+    console.log(
+      "✅ REPORT CREATED:",
+      report._id
+    );
 
     /* =====================================================
        FIND ALL ADMIN USERS
@@ -152,12 +164,18 @@ export const createReport = async (req, res) => {
 
     const adminUsers = await User.find({
       role: "admin",
-    }).select("pushTokens email name firstName middleName lastName role");
+    }).select(
+      "pushTokens email name firstName middleName lastName role notificationSettings"
+    );
 
-    console.log(`👑 Admin users found: ${adminUsers.length}`);
+    console.log(
+      `👑 Admin users found: ${adminUsers.length}`
+    );
 
     if (adminUsers.length === 0) {
-      console.log("⚠️ No admin users found to notify.");
+      console.log(
+        "⚠️ No admin users found to notify."
+      );
     }
 
     /* =====================================================
@@ -167,15 +185,21 @@ export const createReport = async (req, res) => {
     const notificationData = {
       type: "report",
 
-      reportId: report._id.toString(),
+      reportId:
+        report._id.toString(),
 
-      studentId: report.studentId ? report.studentId.toString() : "",
+      studentId: report.studentId
+        ? report.studentId.toString()
+        : "",
 
-      studentName: report.studentName || "",
+      studentName:
+        report.studentName || "",
 
-      offense: report.offense || "",
+      offense:
+        report.offense || "",
 
-      location: report.location || "",
+      location:
+        report.location || "",
     };
 
     /* =====================================================
@@ -184,109 +208,164 @@ export const createReport = async (req, res) => {
 
     for (const admin of adminUsers) {
       try {
-        console.log(`👑 Processing admin notification for: ${admin.email}`);
+        console.log(
+          `👑 Processing admin notification for: ${admin.email}`
+        );
 
         /* ===============================================
            SAVE DATABASE NOTIFICATION
         =============================================== */
 
-        const notification = await Notification.create({
-          user: admin._id,
+        const notification =
+          await Notification.create({
+            user: admin._id,
 
-          title: "New Report Submitted",
+            title:
+              "New Report Submitted",
 
-          message: `${
-            report.reporter || "Someone"
-          } submitted a report against ${report.studentName} for "${
-            report.offense
-          }".`,
+            message: `${
+              report.reporter || "Someone"
+            } submitted a report against ${
+              report.studentName
+            } for "${report.offense}".`,
 
-          type: "report",
+            type: "report",
 
-          priority: "high",
+            priority: "high",
 
-          isRead: false,
+            isRead: false,
 
-          relatedId: report._id,
+            relatedId:
+              report._id,
 
-          relatedType: "Report",
-        });
+            relatedType:
+              "Report",
+          });
 
         console.log(
           "🔔 Report notification saved:",
           notification._id,
           "for",
-          admin.email,
+          admin.email
         );
 
         /* ===============================================
            REALTIME SOCKET.IO
         =============================================== */
 
-        io.to(admin._id.toString()).emit("newNotification", {
-          ...notification.toObject(),
+        io.to(
+          admin._id.toString()
+        ).emit(
+          "newNotification",
+          {
+            ...notification.toObject(),
 
-          id: notification._id.toString(),
-        });
-
-        /* ===============================================
-           GET ADMIN EXPO TOKENS
-
-           Android / iOS
-        =============================================== */
-
-        const expoTokens = Array.isArray(admin.pushTokens)
-          ? admin.pushTokens.filter(
-              (pushToken) =>
-                pushToken?.provider === "expo" &&
-                ["android", "ios"].includes(pushToken?.platform),
-            )
-          : [];
+            id: notification._id.toString(),
+          }
+        );
 
         /* ===============================================
-           GET ADMIN WEB FCM TOKENS
+           GET NATIVE MOBILE FCM TOKENS
+           
+           Current architecture:
+           Android/iOS = native FCM
+           
+           Expo push tokens are no longer used.
         =============================================== */
 
-        const webTokens = Array.isArray(admin.pushTokens)
-          ? admin.pushTokens.filter(
-              (pushToken) =>
-                pushToken?.provider === "fcm" && pushToken?.platform === "web",
-            )
-          : [];
-
-        console.log(`📱 Expo tokens for ${admin.email}:`, expoTokens.length);
-
-        console.log(`🌐 Web FCM tokens for ${admin.email}:`, webTokens.length);
+        const mobileFcmTokens =
+          Array.isArray(
+            admin.pushTokens
+          )
+            ? admin.pushTokens.filter(
+                (pushToken) =>
+                  pushToken?.provider ===
+                    "fcm" &&
+                  [
+                    "android",
+                    "ios",
+                  ].includes(
+                    pushToken?.platform
+                  )
+              )
+            : [];
 
         /* ===============================================
-           EXPO PUSH
+           GET WEB FCM TOKENS
         =============================================== */
 
-        for (const pushToken of expoTokens) {
+        const webTokens =
+          Array.isArray(
+            admin.pushTokens
+          )
+            ? admin.pushTokens.filter(
+                (pushToken) =>
+                  pushToken?.provider ===
+                    "fcm" &&
+                  pushToken?.platform ===
+                    "web"
+              )
+            : [];
+
+        console.log(
+          `📱 Native FCM tokens for ${admin.email}:`,
+          mobileFcmTokens.length
+        );
+
+        console.log(
+          `🌐 Web FCM tokens for ${admin.email}:`,
+          webTokens.length
+        );
+
+        /* ===============================================
+           NATIVE MOBILE FCM PUSH
+        =============================================== */
+
+        for (const pushToken of mobileFcmTokens) {
           try {
             await sendPushNotification({
-              token: pushToken.token,
+              token:
+                pushToken.token,
 
-              title: "⚠️ New Report Submitted",
+              title:
+                "⚠️ New Report Submitted",
 
               body: `${
-                report.reporter || "Someone"
-              } submitted a report against ${report.studentName} for "${
-                report.offense
-              }".`,
+                report.reporter ||
+                "Someone"
+              } submitted a report against ${
+                report.studentName
+              } for "${report.offense}".`,
+
+              /*
+                This tells notificationService.js
+                that this is a report notification.
+
+                The service will check:
+                - mute
+                - systemAnnouncements
+                - sound
+                - vibration
+              */
+              notificationType:
+                "report",
 
               data: {
                 ...notificationData,
 
-                notificationId: notification._id.toString(),
+                notificationId:
+                  notification._id.toString(),
               },
             });
 
-            console.log("📱 Expo report notification sent to:", admin.email);
+            console.log(
+              "📱 Native FCM report notification processed for:",
+              admin.email
+            );
           } catch (pushError) {
             console.error(
-              `⚠️ EXPO REPORT PUSH ERROR (${admin.email}):`,
-              pushError,
+              `⚠️ NATIVE FCM REPORT PUSH ERROR (${admin.email}):`,
+              pushError
             );
           }
         }
@@ -298,28 +377,35 @@ export const createReport = async (req, res) => {
         for (const pushToken of webTokens) {
           try {
             await sendWebPushNotification({
-              token: pushToken.token,
+              token:
+                pushToken.token,
 
-              title: "⚠️ New Report Submitted",
+              title:
+                "⚠️ New Report Submitted",
 
               body: `${
-                report.reporter || "Someone"
-              } submitted a report against ${report.studentName} for "${
-                report.offense
-              }".`,
+                report.reporter ||
+                "Someone"
+              } submitted a report against ${
+                report.studentName
+              } for "${report.offense}".`,
 
               data: {
                 ...notificationData,
 
-                notificationId: notification._id.toString(),
+                notificationId:
+                  notification._id.toString(),
               },
             });
 
-            console.log("🌐 Web FCM report notification sent to:", admin.email);
+            console.log(
+              "🌐 Web FCM report notification sent to:",
+              admin.email
+            );
           } catch (webPushError) {
             console.error(
               `⚠️ WEB FCM REPORT PUSH ERROR (${admin.email}):`,
-              webPushError,
+              webPushError
             );
           }
         }
@@ -328,13 +414,20 @@ export const createReport = async (req, res) => {
            NO PUSH TOKENS
         =============================================== */
 
-        if (expoTokens.length === 0 && webTokens.length === 0) {
-          console.log(`⚠️ Admin has no registered push tokens: ${admin.email}`);
+        if (
+          mobileFcmTokens.length === 0 &&
+          webTokens.length === 0
+        ) {
+          console.log(
+            `⚠️ Admin has no registered push tokens: ${admin.email}`
+          );
         }
-      } catch (adminNotificationError) {
+      } catch (
+        adminNotificationError
+      ) {
         console.error(
           `❌ ADMIN NOTIFICATION ERROR (${admin.email}):`,
-          adminNotificationError,
+          adminNotificationError
         );
       }
     }
@@ -345,31 +438,43 @@ export const createReport = async (req, res) => {
        Kept for your existing dashboard activity.
     ===================================================== */
 
-    const reporterName = report.reporter || "Anonymous";
+    const reporterName =
+      report.reporter ||
+      "Anonymous";
 
-    io.emit("newNotification", {
-      id: report._id,
+    io.emit(
+      "newNotification",
+      {
+        id: report._id,
 
-      title: "New Report Submitted",
+        title:
+          "New Report Submitted",
 
-      message: `${reporterName} submitted a report against ${report.studentName} for "${report.offense}"`,
+        message: `${reporterName} submitted a report against ${report.studentName} for "${report.offense}"`,
 
-      type: "warning",
+        type: "warning",
 
-      priority: "high",
+        priority: "high",
 
-      isRead: false,
+        isRead: false,
 
-      createdAt: new Date().toISOString(),
-    });
+        createdAt:
+          new Date().toISOString(),
+      }
+    );
 
     /* =====================================================
        RESPONSE
     ===================================================== */
 
-    return res.status(201).json(report);
+    return res.status(201).json(
+      report
+    );
   } catch (err) {
-    console.error("❌ CREATE REPORT ERROR:", err);
+    console.error(
+      "❌ CREATE REPORT ERROR:",
+      err
+    );
 
     return res.status(500).json({
       message: err.message,
@@ -381,7 +486,10 @@ export const createReport = async (req, res) => {
    CREATE DIRECT INCIDENT
 ========================================================= */
 
-export const createDirectIncident = async (req, res) => {
+export const createDirectIncident = async (
+  req,
+  res
+) => {
   try {
     const {
       studentId,
@@ -396,95 +504,131 @@ export const createDirectIncident = async (req, res) => {
 
     const files = req.files || [];
 
-    const evidence = files.map((file) => ({
-      url: file.path,
+    const evidence = files.map(
+      (file) => ({
+        url: file.path,
 
-      type: file.mimetype.startsWith("image") ? "image" : "document",
+        type: file.mimetype.startsWith(
+          "image"
+        )
+          ? "image"
+          : "document",
 
-      uploadedAt: new Date(),
-    }));
+        uploadedAt:
+          new Date(),
+      })
+    );
 
-    const report = await Report.create({
-      studentId,
+    const report =
+      await Report.create({
+        studentId,
 
-      studentName,
+        studentName,
 
-      offense,
+        offense,
 
-      location,
+        location,
 
-      description,
+        description,
 
-      date: new Date(date),
+        date: new Date(date),
 
-      time,
+        time,
 
-      reporter: reporter || "Teacher",
+        reporter:
+          reporter || "Teacher",
 
-      reporterId: req.userId,
+        reporterId:
+          req.userId,
 
-      reporterType: "teacher",
+        reporterType:
+          "teacher",
 
-      status: "accepted",
+        status:
+          "accepted",
 
-      evidence,
-    });
+        evidence,
+      });
 
-    const totalOffenses = await Report.countDocuments({
-      studentId,
-    });
+    const totalOffenses =
+      await Report.countDocuments({
+        studentId,
+      });
 
-    const highCount = await Report.countDocuments({
-      studentId,
+    const highCount =
+      await Report.countDocuments({
+        studentId,
 
-      offense: /fighting|assault|violence/i,
-    });
+        offense:
+          /fighting|assault|violence/i,
+      });
 
-    const mediumCount = await Report.countDocuments({
-      studentId,
+    const mediumCount =
+      await Report.countDocuments({
+        studentId,
 
-      offense: /bullying|cheating|disrespect/i,
-    });
+        offense:
+          /bullying|cheating|disrespect/i,
+      });
 
-    const decision = getDisciplineAction({
-      offenseCount: totalOffenses,
+    const decision =
+      getDisciplineAction({
+        offenseCount:
+          totalOffenses,
 
-      hasHigh: highCount,
+        hasHigh:
+          highCount,
 
-      hasMedium: mediumCount,
+        hasMedium:
+          mediumCount,
 
-      offense,
-    });
+        offense,
+      });
 
     await Incident.create({
       studentId,
 
-      reportId: report._id,
+      reportId:
+        report._id,
 
-      title: offense,
+      title:
+        offense,
 
-      category: offense,
+      category:
+        offense,
 
-      action: decision.action,
+      action:
+        decision.action,
 
-      level: decision.level,
+      level:
+        decision.level,
 
-      status: "received",
+      status:
+        "received",
 
       evidence,
     });
 
-    await Student.findByIdAndUpdate(studentId, {
-      totalIncidents: totalOffenses,
+    await Student.findByIdAndUpdate(
+      studentId,
+      {
+        totalIncidents:
+          totalOffenses,
 
-      riskLevel: decision.level,
-    });
+        riskLevel:
+          decision.level,
+      }
+    );
 
     return res.status(201).json({
-      message: "Incident created successfully",
+      message:
+        "Incident created successfully",
     });
   } catch (err) {
-    console.error("❌ CREATE DIRECT INCIDENT ERROR:", err);
+    console.error(
+      "❌ CREATE DIRECT INCIDENT ERROR:",
+      err
+    );
 
     return res.status(500).json({
       message: err.message,
@@ -496,13 +640,24 @@ export const createDirectIncident = async (req, res) => {
    CREATE GUEST REPORT
 ========================================================= */
 
-export const createGuestReport = async (req, res) => {
+export const createGuestReport = async (
+  req,
+  res
+) => {
   try {
-    console.log("🔥 GUEST REPORT HIT");
+    console.log(
+      "🔥 GUEST REPORT HIT"
+    );
 
-    console.log("BODY:", req.body);
+    console.log(
+      "BODY:",
+      req.body
+    );
 
-    console.log("FILES:", req.files);
+    console.log(
+      "FILES:",
+      req.files
+    );
 
     const {
       studentId,
@@ -519,196 +674,298 @@ export const createGuestReport = async (req, res) => {
 
     if (files.length === 0) {
       return res.status(400).json({
-        message: "No evidence uploaded via multer",
+        message:
+          "No evidence uploaded via multer",
       });
     }
 
-    const evidence = files.map((file) => ({
-      url: file.path,
+    const evidence = files.map(
+      (file) => ({
+        url: file.path,
 
-      type: file.mimetype.startsWith("image") ? "image" : "document",
+        type: file.mimetype.startsWith(
+          "image"
+        )
+          ? "image"
+          : "document",
 
-      uploadedAt: new Date(),
-    }));
+        uploadedAt:
+          new Date(),
+      })
+    );
 
-    const newReport = await Report.create({
-      studentId: studentId || null,
+    const newReport =
+      await Report.create({
+        studentId:
+          studentId || null,
 
-      studentName,
+        studentName,
 
-      offense,
+        offense,
 
-      location,
+        location,
 
-      description,
+        description,
 
-      date: new Date(date),
+        date: new Date(date),
 
-      time,
+        time,
 
-      reporter: reporter || "Guest",
+        reporter:
+          reporter || "Guest",
 
-      reporterId: null,
+        reporterId:
+          null,
 
-      reporterType: "guest",
+        reporterType:
+          "guest",
 
-      evidence,
-    });
+        evidence,
+      });
 
     /* ===================================================
-         FIND ADMINS
-      =================================================== */
+       FIND ADMINS
+    =================================================== */
 
-    const adminUsers = await User.find({
-      role: "admin",
-    }).select("pushTokens email name firstName middleName lastName role");
+    const adminUsers =
+      await User.find({
+        role: "admin",
+      }).select(
+        "pushTokens email name firstName middleName lastName role notificationSettings"
+      );
 
-    console.log(`👑 Admin users found for guest report: ${adminUsers.length}`);
+    console.log(
+      `👑 Admin users found for guest report: ${adminUsers.length}`
+    );
 
     /* ===================================================
-         NOTIFY ADMINS
-      =================================================== */
+       NOTIFY ADMINS
+    =================================================== */
 
     for (const admin of adminUsers) {
       try {
-        const notification = await Notification.create({
-          user: admin._id,
+        /* ===============================================
+           SAVE DATABASE NOTIFICATION
+        =============================================== */
 
-          title: "New Guest Report Submitted",
+        const notification =
+          await Notification.create({
+            user: admin._id,
 
-          message: `A guest submitted a report against ${studentName} for "${offense}".`,
+            title:
+              "New Guest Report Submitted",
 
-          type: "report",
+            message: `A guest submitted a report against ${studentName} for "${offense}".`,
 
-          priority: "high",
+            type:
+              "report",
 
-          isRead: false,
+            priority:
+              "high",
 
-          relatedId: newReport._id,
+            isRead:
+              false,
 
-          relatedType: "Report",
-        });
+            relatedId:
+              newReport._id,
+
+            relatedType:
+              "Report",
+          });
 
         console.log(
           "🔔 Guest report notification saved:",
           notification._id,
           "for",
-          admin.email,
+          admin.email
         );
 
         /* ===============================================
-             SOCKET.IO
-          =============================================== */
+           SOCKET.IO
+        =============================================== */
 
-        io.to(admin._id.toString()).emit("newNotification", {
-          ...notification.toObject(),
+        io.to(
+          admin._id.toString()
+        ).emit(
+          "newNotification",
+          {
+            ...notification.toObject(),
 
-          id: notification._id.toString(),
-        });
-
-        /* ===============================================
-             EXPO TOKENS
-          =============================================== */
-
-        const expoTokens = Array.isArray(admin.pushTokens)
-          ? admin.pushTokens.filter(
-              (pushToken) =>
-                pushToken?.provider === "expo" &&
-                ["android", "ios"].includes(pushToken?.platform),
-            )
-          : [];
+            id: notification._id.toString(),
+          }
+        );
 
         /* ===============================================
-             WEB FCM TOKENS
-          =============================================== */
+           NATIVE MOBILE FCM TOKENS
+        =============================================== */
 
-        const webTokens = Array.isArray(admin.pushTokens)
-          ? admin.pushTokens.filter(
-              (pushToken) =>
-                pushToken?.provider === "fcm" && pushToken?.platform === "web",
-            )
-          : [];
+        const mobileFcmTokens =
+          Array.isArray(
+            admin.pushTokens
+          )
+            ? admin.pushTokens.filter(
+                (pushToken) =>
+                  pushToken?.provider ===
+                    "fcm" &&
+                  [
+                    "android",
+                    "ios",
+                  ].includes(
+                    pushToken?.platform
+                  )
+              )
+            : [];
 
         /* ===============================================
-             EXPO PUSH
-          =============================================== */
+           WEB FCM TOKENS
+        =============================================== */
 
-        for (const pushToken of expoTokens) {
+        const webTokens =
+          Array.isArray(
+            admin.pushTokens
+          )
+            ? admin.pushTokens.filter(
+                (pushToken) =>
+                  pushToken?.provider ===
+                    "fcm" &&
+                  pushToken?.platform ===
+                    "web"
+              )
+            : [];
+
+        console.log(
+          `📱 Native FCM tokens for ${admin.email}:`,
+          mobileFcmTokens.length
+        );
+
+        console.log(
+          `🌐 Web FCM tokens for ${admin.email}:`,
+          webTokens.length
+        );
+
+        /* ===============================================
+           NATIVE MOBILE FCM PUSH
+        =============================================== */
+
+        for (const pushToken of mobileFcmTokens) {
           try {
             await sendPushNotification({
-              token: pushToken.token,
+              token:
+                pushToken.token,
 
-              title: "⚠️ New Guest Report",
+              title:
+                "⚠️ New Guest Report",
 
               body: `A guest submitted a report against ${studentName} for "${offense}".`,
 
+              notificationType:
+                "report",
+
               data: {
-                type: "report",
+                type:
+                  "report",
 
-                reportId: newReport._id.toString(),
+                reportId:
+                  newReport._id.toString(),
 
-                studentId: studentId ? studentId.toString() : "",
+                studentId:
+                  studentId
+                    ? studentId.toString()
+                    : "",
 
-                notificationId: notification._id.toString(),
+                notificationId:
+                  notification._id.toString(),
               },
             });
 
             console.log(
-              "📱 Guest report Expo notification sent to:",
-              admin.email,
+              "📱 Native FCM guest report notification processed for:",
+              admin.email
             );
           } catch (pushError) {
-            console.error("⚠️ GUEST REPORT EXPO PUSH ERROR:", pushError);
+            console.error(
+              `⚠️ NATIVE FCM GUEST REPORT PUSH ERROR (${admin.email}):`,
+              pushError
+            );
           }
         }
 
         /* ===============================================
-             WEB FCM PUSH
-          =============================================== */
+           WEB FCM PUSH
+        =============================================== */
 
         for (const pushToken of webTokens) {
           try {
             await sendWebPushNotification({
-              token: pushToken.token,
+              token:
+                pushToken.token,
 
-              title: "⚠️ New Guest Report",
+              title:
+                "⚠️ New Guest Report",
 
               body: `A guest submitted a report against ${studentName} for "${offense}".`,
 
               data: {
-                type: "report",
+                type:
+                  "report",
 
-                reportId: newReport._id.toString(),
+                reportId:
+                  newReport._id.toString(),
 
-                studentId: studentId ? studentId.toString() : "",
+                studentId:
+                  studentId
+                    ? studentId.toString()
+                    : "",
 
-                notificationId: notification._id.toString(),
+                notificationId:
+                  notification._id.toString(),
               },
             });
 
             console.log(
               "🌐 Guest report Web FCM notification sent to:",
-              admin.email,
+              admin.email
             );
           } catch (webPushError) {
-            console.error("⚠️ GUEST REPORT WEB FCM ERROR:", webPushError);
+            console.error(
+              `⚠️ GUEST REPORT WEB FCM ERROR (${admin.email}):`,
+              webPushError
+            );
           }
+        }
+
+        /* ===============================================
+           NO PUSH TOKENS
+        =============================================== */
+
+        if (
+          mobileFcmTokens.length === 0 &&
+          webTokens.length === 0
+        ) {
+          console.log(
+            `⚠️ Admin has no registered push tokens: ${admin.email}`
+          );
         }
       } catch (adminError) {
         console.error(
           `❌ GUEST ADMIN NOTIFICATION ERROR (${admin.email}):`,
-          adminError,
+          adminError
         );
       }
     }
 
     return res.status(201).json({
-      message: "Guest report submitted successfully",
+      message:
+        "Guest report submitted successfully",
 
-      report: newReport,
+      report:
+        newReport,
     });
   } catch (err) {
-    console.error("❌ GUEST REPORT ERROR:", err);
+    console.error(
+      "❌ GUEST REPORT ERROR:",
+      err
+    );
 
     return res.status(500).json({
       message: err.message,
@@ -720,14 +977,18 @@ export const createGuestReport = async (req, res) => {
    DELETE A REPORT
 ========================================================= */
 
-export const deleteReport = async (req, res) => {
+export const deleteReport = async (
+  req,
+  res
+) => {
   const { id } = req.params;
 
   try {
     await Report.findByIdAndDelete(id);
 
     res.json({
-      message: "Report deleted",
+      message:
+        "Report deleted",
     });
   } catch (err) {
     res.status(500).json({
@@ -740,22 +1001,35 @@ export const deleteReport = async (req, res) => {
    GET MY REPORTS
 ========================================================= */
 
-export const getMyReports = async (req, res) => {
+export const getMyReports = async (
+  req,
+  res
+) => {
   try {
-    const userId = req.userId;
+    const userId =
+      req.userId;
 
-    const reports = await Report.find({
-      reporterId: userId,
-    }).sort({
-      createdAt: -1,
-    });
+    const reports =
+      await Report.find({
+        reporterId:
+          userId,
+      }).sort({
+        createdAt:
+          -1,
+      });
 
-    res.status(200).json(reports);
+    res.status(200).json(
+      reports
+    );
   } catch (err) {
-    console.error("Get My Reports Error:", err);
+    console.error(
+      "Get My Reports Error:",
+      err
+    );
 
     res.status(500).json({
-      message: "Server error",
+      message:
+        "Server error",
     });
   }
 };
@@ -764,22 +1038,38 @@ export const getMyReports = async (req, res) => {
    GET REPORT BY ID
 ========================================================= */
 
-export const getReportById = async (req, res) => {
+export const getReportById = async (
+  req,
+  res
+) => {
   try {
-    const report = await Report.findById(req.params.id)
-      .populate("studentId", "name")
-      .populate("reporterId", "firstName lastName name email");
+    const report =
+      await Report.findById(
+        req.params.id
+      )
+        .populate(
+          "studentId",
+          "name"
+        )
+        .populate(
+          "reporterId",
+          "firstName lastName name email"
+        );
 
     if (!report) {
       return res.status(404).json({
-        message: "Report not found",
+        message:
+          "Report not found",
       });
     }
 
-    res.json(report);
+    res.json(
+      report
+    );
   } catch (err) {
     res.status(500).json({
-      message: err.message,
+      message:
+        err.message,
     });
   }
 };
@@ -788,24 +1078,40 @@ export const getReportById = async (req, res) => {
    GET ALL REPORTS
 ========================================================= */
 
-export const getReports = async (req, res) => {
+export const getReports = async (
+  req,
+  res
+) => {
   try {
-    const reports = await Report.find()
-      .populate("studentId", "name section age gender")
-      .populate("reporterId", "firstName lastName name email")
-      .populate({
-        path: "incidentId",
+    const reports =
+      await Report.find()
+        .populate(
+          "studentId",
+          "name section age gender"
+        )
+        .populate(
+          "reporterId",
+          "firstName lastName name email"
+        )
+        .populate({
+          path:
+            "incidentId",
 
-        select: "status",
-      })
-      .sort({
-        createdAt: -1,
-      });
+          select:
+            "status",
+        })
+        .sort({
+          createdAt:
+            -1,
+        });
 
-    res.status(200).json(reports);
+    res.status(200).json(
+      reports
+    );
   } catch (err) {
     res.status(500).json({
-      message: err.message,
+      message:
+        err.message,
     });
   }
 };
@@ -814,7 +1120,10 @@ export const getReports = async (req, res) => {
    GET PRINTABLE REPORTS
 ========================================================= */
 
-export const getPrintableReports = async (req, res) => {
+export const getPrintableReports = async (
+  req,
+  res
+) => {
   try {
     const {
       status = "all",
@@ -827,12 +1136,19 @@ export const getPrintableReports = async (req, res) => {
     ===================================================== */
 
     const selectedDate = date
-      ? new Date(`${date}T00:00:00`)
+      ? new Date(
+          `${date}T00:00:00`
+        )
       : new Date();
 
-    if (Number.isNaN(selectedDate.getTime())) {
+    if (
+      Number.isNaN(
+        selectedDate.getTime()
+      )
+    ) {
       return res.status(400).json({
-        message: "Invalid date.",
+        message:
+          "Invalid date.",
       });
     }
 
@@ -843,12 +1159,32 @@ export const getPrintableReports = async (req, res) => {
        DAILY
     ===================================================== */
 
-    if (period === "daily") {
-      startDate = new Date(selectedDate);
-      startDate.setHours(0, 0, 0, 0);
+    if (
+      period === "daily"
+    ) {
+      startDate =
+        new Date(
+          selectedDate
+        );
 
-      endDate = new Date(selectedDate);
-      endDate.setHours(23, 59, 59, 999);
+      startDate.setHours(
+        0,
+        0,
+        0,
+        0
+      );
+
+      endDate =
+        new Date(
+          selectedDate
+        );
+
+      endDate.setHours(
+        23,
+        59,
+        59,
+        999
+      );
     }
 
     /* =====================================================
@@ -856,28 +1192,50 @@ export const getPrintableReports = async (req, res) => {
        Monday → Sunday
     ===================================================== */
 
-    else if (period === "weekly") {
-      startDate = new Date(selectedDate);
-      startDate.setHours(0, 0, 0, 0);
+    else if (
+      period === "weekly"
+    ) {
+      startDate =
+        new Date(
+          selectedDate
+        );
 
-      const day = startDate.getDay();
+      startDate.setHours(
+        0,
+        0,
+        0,
+        0
+      );
+
+      const day =
+        startDate.getDay();
 
       // Convert Sunday=0 to Monday-based week
-      const difference = day === 0 ? 6 : day - 1;
+      const difference =
+        day === 0
+          ? 6
+          : day - 1;
 
       startDate.setDate(
-        startDate.getDate() - difference,
+        startDate.getDate() -
+          difference
       );
 
-      endDate = new Date(startDate);
+      endDate =
+        new Date(
+          startDate
+        );
+
       endDate.setDate(
-        endDate.getDate() + 6,
+        endDate.getDate() +
+          6
       );
+
       endDate.setHours(
         23,
         59,
         59,
-        999,
+        999
       );
     }
 
@@ -885,52 +1243,61 @@ export const getPrintableReports = async (req, res) => {
        MONTHLY
     ===================================================== */
 
-    else if (period === "monthly") {
-      startDate = new Date(
-        selectedDate.getFullYear(),
-        selectedDate.getMonth(),
-        1,
-        0,
-        0,
-        0,
-        0,
-      );
+    else if (
+      period === "monthly"
+    ) {
+      startDate =
+        new Date(
+          selectedDate.getFullYear(),
+          selectedDate.getMonth(),
+          1,
+          0,
+          0,
+          0,
+          0
+        );
 
-      endDate = new Date(
-        selectedDate.getFullYear(),
-        selectedDate.getMonth() + 1,
-        0,
-        23,
-        59,
-        59,
-        999,
-      );
+      endDate =
+        new Date(
+          selectedDate.getFullYear(),
+          selectedDate.getMonth() +
+            1,
+          0,
+          23,
+          59,
+          59,
+          999
+        );
     }
 
     /* =====================================================
        YEARLY
     ===================================================== */
 
-    else if (period === "yearly") {
-      startDate = new Date(
-        selectedDate.getFullYear(),
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-      );
+    else if (
+      period === "yearly"
+    ) {
+      startDate =
+        new Date(
+          selectedDate.getFullYear(),
+          0,
+          1,
+          0,
+          0,
+          0,
+          0
+        );
 
-      endDate = new Date(
-        selectedDate.getFullYear(),
-        11,
-        31,
-        23,
-        59,
-        59,
-        999,
-      );
+      endDate =
+        new Date(
+          selectedDate.getFullYear(),
+          11,
+          31,
+          23,
+          59,
+          59,
+          999
+        );
     }
 
     else {
@@ -946,8 +1313,11 @@ export const getPrintableReports = async (req, res) => {
 
     const query = {
       date: {
-        $gte: startDate,
-        $lte: endDate,
+        $gte:
+          startDate,
+
+        $lte:
+          endDate,
       },
 
       /*
@@ -974,7 +1344,9 @@ export const getPrintableReports = async (req, res) => {
        STATUS FILTER
     ===================================================== */
 
-    if (status === "accepted") {
+    if (
+      status === "accepted"
+    ) {
       query.status = {
         $in: [
           "accepted",
@@ -983,56 +1355,78 @@ export const getPrintableReports = async (req, res) => {
       };
     }
 
-    if (status === "rejected") {
-      query.status = "rejected";
+    if (
+      status === "rejected"
+    ) {
+      query.status =
+        "rejected";
     }
 
     /* =====================================================
        GET REPORTS
     ===================================================== */
 
-    const reports = await Report.find(query)
-      .populate(
-        "studentId",
-        "name firstName middleName lastName section grade gender age",
+    const reports =
+      await Report.find(
+        query
       )
-      .populate(
-        "reporterId",
-        "name firstName middleName lastName email",
-      )
-      .sort({
-        date: -1,
-        createdAt: -1,
-      });
+        .populate(
+          "studentId",
+          "name firstName middleName lastName section grade gender age"
+        )
+        .populate(
+          "reporterId",
+          "name firstName middleName lastName email"
+        )
+        .sort({
+          date:
+            -1,
+
+          createdAt:
+            -1,
+        });
 
     /* =====================================================
        SUMMARY
     ===================================================== */
 
-    const accepted = reports.filter(
-      (report) =>
-        report.status === "accepted" ||
-        report.status === "under_review",
-    ).length;
+    const accepted =
+      reports.filter(
+        (report) =>
+          report.status ===
+            "accepted" ||
+          report.status ===
+            "under_review"
+      ).length;
 
-    const rejected = reports.filter(
-      (report) =>
-        report.status === "rejected",
-    ).length;
+    const rejected =
+      reports.filter(
+        (report) =>
+          report.status ===
+          "rejected"
+      ).length;
 
     return res.status(200).json({
       reports,
 
       summary: {
-        total: reports.length,
+        total:
+          reports.length,
+
         accepted,
+
         rejected,
       },
 
       period: {
-        type: period,
-        start: startDate,
-        end: endDate,
+        type:
+          period,
+
+        start:
+          startDate,
+
+        end:
+          endDate,
       },
 
       filters: {
@@ -1042,11 +1436,13 @@ export const getPrintableReports = async (req, res) => {
   } catch (err) {
     console.error(
       "GET PRINTABLE REPORTS ERROR:",
-      err,
+      err
     );
 
     return res.status(500).json({
-      message: err.message,
+      message:
+        err.message,
     });
   }
 };
+

@@ -12,7 +12,7 @@ import { sendNotificationEmail } from "../mailer/emails.js";
 
 /* =========================================================
    STUDENT NOTIFICATION HELPER
-   FCM ONLY
+   NATIVE FCM ONLY
 ========================================================= */
 
 const notifyStudent = async ({
@@ -47,20 +47,64 @@ const notifyStudent = async ({
     }
 
     /* =====================================================
+       DETERMINE IF THIS IS A HIGH-RISK NOTIFICATION
+    ===================================================== */
+
+    const incidentLevel =
+      String(
+        data?.level ||
+          incidentLevelFromPriority(priority)
+      ).toLowerCase();
+
+    const isHighRisk =
+      incidentLevel === "high" ||
+      priority === "high" ||
+      data?.status ===
+        "refer-for-intervention";
+
+    /*
+      The notification service itself also checks the
+      user's notificationSettings.
+
+      Here we only pass the correct notification type
+      and metadata so notificationService.js knows what
+      category this belongs to.
+    */
+
+    const notificationType = isHighRisk
+      ? "high-risk"
+      : "incident";
+
+    /* =====================================================
        DATABASE NOTIFICATION
     ===================================================== */
 
+    let savedNotification = null;
+
     try {
-      await Notification.create({
-        user: user._id,
-        title,
-        message,
-        type,
-        priority,
-      });
+      savedNotification =
+        await Notification.create({
+          user: user._id,
+          title,
+          message,
+          type,
+          priority,
+          isRead: false,
+          relatedId:
+            data?.incidentId || null,
+          relatedType:
+            data?.incidentId
+              ? "Incident"
+              : undefined,
+        });
 
       console.log(
         `✅ Database notification created for ${user.email}`
+      );
+
+      console.log(
+        "🔔 Notification ID:",
+        savedNotification._id.toString()
       );
     } catch (notificationError) {
       console.error(
@@ -77,13 +121,23 @@ const notifyStudent = async ({
       io.to(user._id.toString()).emit(
         "newNotification",
         {
-          id: Date.now(),
+          id:
+            savedNotification?._id?.toString() ||
+            Date.now().toString(),
+
           title,
+
           message,
+
           type,
+
           priority,
+
           isRead: false,
-          createdAt: new Date().toISOString(),
+
+          createdAt:
+            new Date().toISOString(),
+
           data,
         }
       );
@@ -102,58 +156,174 @@ const notifyStudent = async ({
        FCM PUSH NOTIFICATION
     ===================================================== */
 
+    console.log("");
     console.log("========================================");
     console.log("📱 FCM STUDENT PUSH DEBUG");
-    console.log("Notification Title:", title);
-    console.log("Notification Message:", message);
-    console.log("Notification Type:", type);
+    console.log("========================================");
+
+    console.log(
+      "Notification Title:",
+      title
+    );
+
+    console.log(
+      "Notification Message:",
+      message
+    );
+
+    console.log(
+      "Notification Type:",
+      notificationType
+    );
+
+    console.log(
+      "Original App Type:",
+      type
+    );
+
+    console.log(
+      "Priority:",
+      priority
+    );
+
     console.log(
       "Incident ID:",
       data?.incidentId || "N/A"
     );
-    console.log("Student User:", user.email);
-
-    const fcmTokens = (user.pushTokens || [])
-      .filter(
-        (pushToken) =>
-          pushToken?.token &&
-          pushToken?.provider === "fcm"
-      )
-      .map(
-        (pushToken) => pushToken.token
-      );
 
     console.log(
-      "FCM Token Count:",
+      "Incident Status:",
+      data?.status || "N/A"
+    );
+
+    console.log(
+      "Incident Level:",
+      data?.level || "N/A"
+    );
+
+    console.log(
+      "Student User:",
+      user.email
+    );
+
+    console.log(
+      "User Notification Settings:",
+      user.notificationSettings || {}
+    );
+
+    /* =====================================================
+       ONLY NATIVE FCM ANDROID / IOS TOKENS
+
+       Expo tokens are intentionally ignored.
+    ===================================================== */
+
+    const fcmTokens =
+      Array.isArray(
+        user.pushTokens
+      )
+        ? user.pushTokens.filter(
+            (pushToken) =>
+              pushToken?.token &&
+              pushToken?.provider ===
+                "fcm" &&
+              [
+                "android",
+                "ios",
+              ].includes(
+                pushToken?.platform
+              )
+          )
+        : [];
+
+    console.log(
+      "Native FCM Token Count:",
       fcmTokens.length
     );
 
-    console.log("========================================");
+    console.log(
+      "Native FCM Platforms:",
+      fcmTokens.map(
+        (pushToken) =>
+          pushToken.platform
+      )
+    );
+
+    console.log(
+      "========================================"
+    );
 
     if (!fcmTokens.length) {
       console.log(
-        `⚠️ No FCM push token for ${user.email}`
+        `⚠️ No native FCM push token for ${user.email}`
       );
     } else {
-      for (const token of fcmTokens) {
+      for (const pushToken of fcmTokens) {
         try {
+          console.log("");
           console.log(
-            `📱 Sending FCM push to ${user.email}...`
+            `📱 Sending native FCM push to ${user.email}`
           );
+
+          console.log(
+            "Platform:",
+            pushToken.platform
+          );
+
+          console.log(
+            "Provider:",
+            pushToken.provider
+          );
+
+          /*
+            IMPORTANT:
+
+            notificationService.js will now check:
+              - mute
+              - incidentUpdates
+              - highRiskAlerts
+              - sound
+              - vibration
+
+            We pass notificationType so the service knows
+            which setting controls this notification.
+          */
 
           const pushResult =
             await sendPushNotification({
-              token,
-              title: "EduGuard 🔔",
-              body: `${title}: ${message}`,
+              token:
+                pushToken.token,
+
+              title:
+                "EduGuard 🔔",
+
+              body:
+                `${title}: ${message}`,
+
+              notificationType,
+
               data: {
                 type,
+
+                notificationType,
+
                 ...data,
+
+                notificationId:
+                  savedNotification?._id
+                    ?.toString() || "",
+
+                soundEnabled:
+                  user.notificationSettings
+                    ?.sound !== false,
+
+                vibrationEnabled:
+                  user.notificationSettings
+                    ?.vibration !== false,
               },
             });
 
           console.log(
-            `✅ Student FCM push sent successfully to ${user.email}`
+            `✅ Student native FCM push processed for ${user.email}`
           );
 
           console.log(
@@ -169,15 +339,35 @@ const notifyStudent = async ({
       }
     }
 
+    console.log("");
     console.log(
       `✅ Student notification processing completed for ${user.email}`
     );
+    console.log("========================================");
+    console.log("");
   } catch (error) {
     console.error(
       "❌ Student notification error:",
       error.message
     );
   }
+};
+
+/* =========================================================
+   HELPER FOR PRIORITY / INCIDENT LEVEL
+========================================================= */
+
+const incidentLevelFromPriority = (
+  priority
+) => {
+  if (
+    String(priority).toLowerCase() ===
+    "high"
+  ) {
+    return "high";
+  }
+
+  return "low";
 };
 
 /* =========================================================
@@ -208,15 +398,22 @@ const notifyAdmins = async ({
        GET ADMIN USERS
     ===================================================== */
 
-    const admins = await User.find({
-      role: "admin",
-    }).select(
-      "_id email name firstName lastName notificationSettings pushTokens"
-    );
+    const admins =
+      await User.find({
+        role: "admin",
+      }).select(
+        "_id email name firstName lastName notificationSettings pushTokens"
+      );
 
     if (!admins.length) {
-      console.log("⚠️ No admin users found.");
-      console.log("========================================");
+      console.log(
+        "⚠️ No admin users found."
+      );
+
+      console.log(
+        "========================================"
+      );
+
       return;
     }
 
@@ -231,11 +428,19 @@ const notifyAdmins = async ({
     for (const admin of admins) {
       try {
         const settings =
-          admin.notificationSettings || {};
+          admin.notificationSettings ||
+          {};
 
         console.log("");
-        console.log("----------------------------------------");
-        console.log("👤 ADMIN:", admin.email);
+        console.log(
+          "----------------------------------------"
+        );
+
+        console.log(
+          "👤 ADMIN:",
+          admin.email
+        );
+
         console.log(
           "Notification Settings:",
           settings
@@ -272,7 +477,9 @@ const notifyAdmins = async ({
           console.log(
             `✅ Database notification created for ${admin.email}`
           );
-        } catch (notificationError) {
+        } catch (
+          notificationError
+        ) {
           console.error(
             `❌ Database notification failed for ${admin.email}:`,
             notificationError.message
@@ -284,7 +491,9 @@ const notifyAdmins = async ({
         ================================================= */
 
         try {
-          io.to(admin._id.toString()).emit(
+          io.to(
+            admin._id.toString()
+          ).emit(
             "newNotification",
             {
               id: Date.now(),
@@ -302,7 +511,9 @@ const notifyAdmins = async ({
           console.log(
             `📡 Socket notification emitted to ${admin.email}`
           );
-        } catch (socketError) {
+        } catch (
+          socketError
+        ) {
           console.error(
             `❌ Socket notification failed for ${admin.email}:`,
             socketError.message
@@ -314,19 +525,34 @@ const notifyAdmins = async ({
         ================================================= */
 
         console.log("");
-        console.log("📱 ADMIN FCM PUSH");
+        console.log(
+          "📱 ADMIN FCM PUSH"
+        );
+
+        /*
+          Only native Android/iOS FCM tokens are sent here.
+
+          Web FCM is handled separately by the report
+          controller / web notification system.
+        */
 
         const fcmTokens =
-          (admin.pushTokens || [])
-            .filter(
-              (pushToken) =>
-                pushToken?.token &&
-                pushToken?.provider === "fcm"
-            )
-            .map(
-              (pushToken) =>
-                pushToken.token
-            );
+          Array.isArray(
+            admin.pushTokens
+          )
+            ? admin.pushTokens.filter(
+                (pushToken) =>
+                  pushToken?.token &&
+                  pushToken?.provider ===
+                    "fcm" &&
+                  [
+                    "android",
+                    "ios",
+                  ].includes(
+                    pushToken?.platform
+                  )
+              )
+            : [];
 
         console.log(
           `FCM Token Count for ${admin.email}:`,
@@ -335,10 +561,10 @@ const notifyAdmins = async ({
 
         if (!fcmTokens.length) {
           console.log(
-            `⚠️ No FCM push token for ${admin.email}`
+            `⚠️ No native FCM push token for ${admin.email}`
           );
         } else {
-          for (const token of fcmTokens) {
+          for (const pushToken of fcmTokens) {
             try {
               console.log(
                 `📱 Sending FCM push to ${admin.email}...`
@@ -346,10 +572,24 @@ const notifyAdmins = async ({
 
               const pushResult =
                 await sendPushNotification({
-                  token,
+                  token:
+                    pushToken.token,
+
                   title:
                     "EduGuard Admin Alert 🔔",
-                  body: `${title}: ${message}`,
+
+                  body:
+                    `${title}: ${message}`,
+
+                  notificationType:
+                    type ===
+                    "incident"
+                      ? "incident"
+                      : type ===
+                        "high-risk"
+                      ? "high-risk"
+                      : "report",
+
                   data: {
                     type,
                     ...data,
@@ -364,7 +604,9 @@ const notifyAdmins = async ({
                 "📨 FCM Result:",
                 pushResult
               );
-            } catch (pushError) {
+            } catch (
+              pushError
+            ) {
               console.error(
                 `❌ Admin FCM push failed for ${admin.email}:`,
                 pushError.message
@@ -378,7 +620,8 @@ const notifyAdmins = async ({
         ================================================= */
 
         if (
-          settings.emailAlerts !== false &&
+          settings.emailAlerts !==
+            false &&
           admin.email
         ) {
           console.log(
@@ -593,7 +836,9 @@ const notifyAdmins = async ({
             console.log(
               `✅ ADMIN EMAIL SENT SUCCESSFULLY TO ${admin.email}`
             );
-          } catch (emailError) {
+          } catch (
+            emailError
+          ) {
             console.error(
               `❌ ADMIN EMAIL FAILED FOR ${admin.email}:`
             );
@@ -606,7 +851,8 @@ const notifyAdmins = async ({
           }
         } else {
           if (
-            settings.emailAlerts === false
+            settings.emailAlerts ===
+            false
           ) {
             console.log(
               `🔕 Email alerts disabled for ${admin.email}`
@@ -634,12 +880,15 @@ const notifyAdmins = async ({
     console.log(
       "========================================"
     );
+
     console.log(
       "🔔 ADMIN NOTIFICATION COMPLETE"
     );
+
     console.log(
       "========================================"
     );
+
     console.log("");
   } catch (error) {
     console.error(
@@ -653,7 +902,10 @@ const notifyAdmins = async ({
    GET INCIDENTS
 ========================================================= */
 
-export const getIncidents = async (req, res) => {
+export const getIncidents = async (
+  req,
+  res
+) => {
   try {
     if (!req.userId) {
       return res.status(401).json({
@@ -661,13 +913,17 @@ export const getIncidents = async (req, res) => {
       });
     }
 
-    const user = await User.findById(req.userId).select(
-      "role studentId email"
-    );
+    const user =
+      await User.findById(
+        req.userId
+      ).select(
+        "role studentId email"
+      );
 
     if (!user) {
       return res.status(404).json({
-        message: "User not found",
+        message:
+          "User not found",
       });
     }
 
@@ -677,40 +933,51 @@ export const getIncidents = async (req, res) => {
        STUDENT → ONLY THEIR OWN INCIDENTS
     ===================================================== */
 
-    if (user.role === "student") {
-      const student = await Student.findOne({
-        studentId: user.studentId,
-      });
+    if (
+      user.role === "student"
+    ) {
+      const student =
+        await Student.findOne({
+          studentId:
+            user.studentId,
+        });
 
       if (!student) {
         return res.status(404).json({
-          message: "Student profile not found",
+          message:
+            "Student profile not found",
         });
       }
 
-      query.studentId = student._id;
+      query.studentId =
+        student._id;
     }
 
-    const incidents = await Incident.find(query)
-      .populate(
-        "studentId",
-        "firstName middleName lastName studentId grade gender phone profilePhoto"
-      )
-      .populate({
-        path: "reportId",
-        populate: {
-          path: "reporterId",
-          model: "User",
-          select:
-            "firstName lastName name email",
-        },
-      })
-      .sort({ createdAt: -1 })
-      .lean();
+    const incidents =
+      await Incident.find(query)
+        .populate(
+          "studentId",
+          "firstName middleName lastName studentId grade gender phone profilePhoto"
+        )
+        .populate({
+          path: "reportId",
+          populate: {
+            path: "reporterId",
+            model: "User",
+            select:
+              "firstName lastName name email",
+          },
+        })
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
 
-    const incidentIds = incidents.map(
-      (incident) => incident._id
-    );
+    const incidentIds =
+      incidents.map(
+        (incident) =>
+          incident._id
+      );
 
     const interventions =
       await Intervention.find({
@@ -718,31 +985,45 @@ export const getIncidents = async (req, res) => {
           $in: incidentIds,
         },
       })
-        .sort({ createdAt: -1 })
+        .sort({
+          createdAt: -1,
+        })
         .lean();
 
     const formattedIncidents =
-      incidents.map((incident) => {
-        const intervention =
-          interventions.find(
-            (item) =>
-              String(item.incidentId) ===
-              String(incident._id)
-          );
+      incidents.map(
+        (incident) => {
+          const intervention =
+            interventions.find(
+              (item) =>
+                String(
+                  item.incidentId
+                ) ===
+                String(
+                  incident._id
+                )
+            );
 
-        return {
-          ...incident,
-          intervention:
-            intervention || null,
-          effectiveStatus: intervention
-            ? intervention.status
-            : incident.status,
-        };
-      });
+          return {
+            ...incident,
+
+            intervention:
+              intervention ||
+              null,
+
+            effectiveStatus:
+              intervention
+                ? intervention.status
+                : incident.status,
+          };
+        }
+      );
 
     return res
       .status(200)
-      .json(formattedIncidents);
+      .json(
+        formattedIncidents
+      );
   } catch (err) {
     console.error(
       "Get Incidents Error:",
@@ -751,7 +1032,8 @@ export const getIncidents = async (req, res) => {
 
     return res.status(500).json({
       message:
-        err.message || "Server error",
+        err.message ||
+        "Server error",
     });
   }
 };
@@ -771,7 +1053,8 @@ export const createIncident = async (
       category,
       action,
       level,
-      studentId: adminStudentId,
+      studentId:
+        adminStudentId,
     } = req.body;
 
     let studentId;
@@ -780,10 +1063,14 @@ export const createIncident = async (
        STUDENT CREATION
     ===================================================== */
 
-    if (req.user.role === "student") {
+    if (
+      req.user.role ===
+      "student"
+    ) {
       const student =
         await Student.findOne({
-          createdBy: req.userId,
+          createdBy:
+            req.userId,
         });
 
       if (!student) {
@@ -793,26 +1080,31 @@ export const createIncident = async (
         });
       }
 
-      studentId = student._id;
+      studentId =
+        student._id;
     }
 
     /* =====================================================
        ADMIN CREATION
     ===================================================== */
 
-    else if (req.user.role === "admin") {
+    else if (
+      req.user.role ===
+      "admin"
+    ) {
       if (!adminStudentId) {
         return res.status(400).json({
-          message: "studentId required",
+          message:
+            "studentId required",
         });
       }
 
-      studentId = adminStudentId;
-    }
-
-    else {
+      studentId =
+        adminStudentId;
+    } else {
       return res.status(403).json({
-        message: "Forbidden",
+        message:
+          "Forbidden",
       });
     }
 
@@ -828,7 +1120,8 @@ export const createIncident = async (
         category,
         action,
         level,
-        status: "received",
+        status:
+          "received",
         evidence: [],
         caseLogs: [],
       });
@@ -854,12 +1147,16 @@ export const createIncident = async (
         level: "Medium",
       });
 
-    let riskLevel = "Low";
+    let riskLevel =
+      "Low";
 
     if (highCount > 0) {
       riskLevel = "High";
-    } else if (medCount > 0) {
-      riskLevel = "Medium";
+    } else if (
+      medCount > 0
+    ) {
+      riskLevel =
+        "Medium";
     }
 
     await Student.findByIdAndUpdate(
@@ -876,18 +1173,33 @@ export const createIncident = async (
 
     await notifyStudent({
       studentId,
-      title: "Incident Notice",
-      message: `A new incident has been recorded: "${title}".`,
-      type: "warning",
+
+      title:
+        "Incident Notice",
+
+      message:
+        `A new incident has been recorded: "${title}".`,
+
+      type:
+        "warning",
+
       priority:
-        level?.toLowerCase() === "high"
+        level?.toLowerCase() ===
+        "high"
           ? "high"
           : "medium",
+
       data: {
-        type: "incident",
+        type:
+          "incident",
+
         incidentId:
           incident._id.toString(),
-        status: "received",
+
+        status:
+          "received",
+
+        level,
       },
     });
 
@@ -896,24 +1208,40 @@ export const createIncident = async (
     ===================================================== */
 
     const adminAlertSetting =
-      level?.toLowerCase() === "high"
+      level?.toLowerCase() ===
+      "high"
         ? "highRiskAlerts"
         : "emailAlerts";
 
     await notifyAdmins({
-      title: "New Incident Report",
-      message: `A new incident has been recorded for a student: "${title}".`,
-      type: "warning",
+      title:
+        "New Incident Report",
+
+      message:
+        `A new incident has been recorded for a student: "${title}".`,
+
+      type:
+        "warning",
+
       priority:
-        level?.toLowerCase() === "high"
+        level?.toLowerCase() ===
+        "high"
           ? "high"
           : "medium",
-      settingKey: adminAlertSetting,
+
+      settingKey:
+        adminAlertSetting,
+
       data: {
-        type: "incident_created",
+        type:
+          "incident_created",
+
         incidentId:
           incident._id.toString(),
-        status: "received",
+
+        status:
+          "received",
+
         level,
       },
     });
@@ -927,9 +1255,9 @@ export const createIncident = async (
       incident
     );
 
-    return res.status(201).json(
-      incident
-    );
+    return res
+      .status(201)
+      .json(incident);
   } catch (err) {
     console.error(
       "createIncident error:",
@@ -937,7 +1265,8 @@ export const createIncident = async (
     );
 
     return res.status(500).json({
-      message: err.message,
+      message:
+        err.message,
     });
   }
 };
@@ -946,362 +1275,417 @@ export const createIncident = async (
    GET INCIDENT BY ID
 ========================================================= */
 
-export const getIncidentById = async (
-  req,
-  res
-) => {
-  try {
-    const incident =
-      await Incident.findById(
-        req.params.id
-      )
-        .populate(
-          "studentId",
-          "firstName middleName lastName grade gender studentId profilePhoto"
+export const getIncidentById =
+  async (req, res) => {
+    try {
+      const incident =
+        await Incident.findById(
+          req.params.id
         )
-        .populate({
-          path: "reportId",
-          populate: {
-            path: "reporterId",
-            model: "User",
-            select:
-              "firstName lastName name email",
-          },
-        })
-        .lean();
+          .populate(
+            "studentId",
+            "firstName middleName lastName grade gender studentId profilePhoto"
+          )
+          .populate({
+            path: "reportId",
+            populate: {
+              path: "reporterId",
+              model: "User",
+              select:
+                "firstName lastName name email",
+            },
+          })
+          .lean();
 
-    if (!incident) {
-      return res.status(404).json({
+      if (!incident) {
+        return res.status(404).json({
+          message:
+            "Incident not found",
+        });
+      }
+
+      const intervention =
+        await Intervention.findOne({
+          incidentId:
+            incident._id,
+        })
+          .sort({
+            createdAt: -1,
+          })
+          .lean();
+
+      const effectiveStatus =
+        intervention
+          ? intervention.status
+          : incident.status;
+
+      return res.json({
+        ...incident,
+
+        intervention:
+          intervention ||
+          null,
+
+        effectiveStatus,
+      });
+    } catch (err) {
+      console.error(
+        "getIncidentById error:",
+        err
+      );
+
+      return res.status(500).json({
         message:
-          "Incident not found",
+          err.message,
       });
     }
-
-    const intervention =
-      await Intervention.findOne({
-        incidentId: incident._id,
-      })
-        .sort({ createdAt: -1 })
-        .lean();
-
-    const effectiveStatus =
-      intervention
-        ? intervention.status
-        : incident.status;
-
-    return res.json({
-      ...incident,
-      intervention:
-        intervention || null,
-      effectiveStatus,
-    });
-  } catch (err) {
-    console.error(
-      "getIncidentById error:",
-      err
-    );
-
-    return res.status(500).json({
-      message: err.message,
-    });
-  }
-};
+  };
 
 /* =========================================================
    COMPLETE INCIDENT
 ========================================================= */
 
-export const completeIncident = async (
-  req,
-  res
-) => {
-  try {
-    const incident =
-      await Incident.findById(
-        req.params.id
+export const completeIncident =
+  async (req, res) => {
+    try {
+      const incident =
+        await Incident.findById(
+          req.params.id
+        );
+
+      if (!incident) {
+        return res.status(404).json({
+          message:
+            "Incident not found",
+        });
+      }
+
+      const user =
+        req.user;
+
+      const log = {
+        stage:
+          "completed",
+
+        note:
+          "Incident marked as completed",
+
+        time:
+          new Date(),
+
+        changedBy:
+          user?._id ||
+          null,
+
+        changedByName:
+          user?.name ||
+          "Admin",
+      };
+
+      incident.status =
+        "completed";
+
+      incident.completedAt =
+        new Date();
+
+      incident.caseLogs.push(
+        log
       );
 
-    if (!incident) {
-      return res.status(404).json({
+      await incident.save();
+
+      /* =====================================================
+         STUDENT
+      ===================================================== */
+
+      await notifyStudent({
+        studentId:
+          incident.studentId,
+
+        title:
+          "Incident Completed",
+
         message:
-          "Incident not found",
-      });
-    }
+          "Your incident has been marked as completed.",
 
-    const user = req.user;
-
-    const log = {
-      stage: "completed",
-      note: "Incident marked as completed",
-      time: new Date(),
-      changedBy:
-        user?._id || null,
-      changedByName:
-        user?.name || "Admin",
-    };
-
-    incident.status = "completed";
-    incident.completedAt =
-      new Date();
-
-    incident.caseLogs.push(log);
-
-    await incident.save();
-
-    /* =====================================================
-       STUDENT
-    ===================================================== */
-
-    await notifyStudent({
-      studentId:
-        incident.studentId,
-      title:
-        "Incident Completed",
-      message:
-        "Your incident has been marked as completed.",
-      type:
-        "incident_completed",
-      priority: "low",
-      data: {
         type:
           "incident_completed",
-        incidentId:
-          incident._id.toString(),
-        status: "completed",
-      },
-    });
 
-    /* =====================================================
-       REPORT
-    ===================================================== */
+        priority:
+          "low",
 
-    if (incident.reportId) {
-      const report =
-        await Report.findByIdAndUpdate(
-          incident.reportId,
+        data: {
+          type:
+            "incident_completed",
+
+          incidentId:
+            incident._id.toString(),
+
+          status:
+            "completed",
+
+          level:
+            incident.level,
+        },
+      });
+
+      /* =====================================================
+         REPORT
+      ===================================================== */
+
+      if (
+        incident.reportId
+      ) {
+        const report =
+          await Report.findByIdAndUpdate(
+            incident.reportId,
+            {
+              status:
+                "completed",
+            },
+            {
+              new: true,
+            }
+          );
+
+        io.emit(
+          "reportUpdated",
           {
-            status: "completed",
-          },
-          {
-            new: true,
+            reportId:
+              incident.reportId,
+
+            status:
+              "completed",
           }
         );
 
+        console.log(
+          "✅ Connected report updated:",
+          report?._id,
+          "→",
+          report?.status
+        );
+      }
+
+      /* =====================================================
+         ADMIN ALERT
+      ===================================================== */
+
+      await notifyAdmins({
+        title:
+          "Incident Completed",
+
+        message:
+          "An incident has been marked as completed.",
+
+        type:
+          "success",
+
+        priority:
+          "low",
+
+        settingKey:
+          "emailAlerts",
+
+        data: {
+          type:
+            "incident_completed",
+
+          incidentId:
+            incident._id.toString(),
+
+          status:
+            "completed",
+        },
+      });
+
+      /* =====================================================
+         REAL-TIME
+      ===================================================== */
+
       io.emit(
-        "reportUpdated",
+        "caseUpdated",
+        incident
+      );
+
+      io.emit(
+        "caseLogAdded",
         {
-          reportId:
-            incident.reportId,
-          status: "completed",
+          caseId:
+            incident._id,
+
+          log,
         }
       );
 
-      console.log(
-        "✅ Connected report updated:",
-        report?._id,
-        "→",
-        report?.status
+      return res.json({
+        message:
+          "Incident and connected report marked as completed",
+
+        incident,
+      });
+    } catch (err) {
+      console.error(
+        "completeIncident error:",
+        err
       );
+
+      return res.status(500).json({
+        message:
+          err.message,
+      });
     }
-
-    /* =====================================================
-       ADMIN ALERT
-    ===================================================== */
-
-    await notifyAdmins({
-      title:
-        "Incident Completed",
-      message:
-        "An incident has been marked as completed.",
-      type: "success",
-      priority: "low",
-      settingKey:
-        "emailAlerts",
-      data: {
-        type:
-          "incident_completed",
-        incidentId:
-          incident._id.toString(),
-        status:
-          "completed",
-      },
-    });
-
-    /* =====================================================
-       REAL-TIME
-    ===================================================== */
-
-    io.emit(
-      "caseUpdated",
-      incident
-    );
-
-    io.emit(
-      "caseLogAdded",
-      {
-        caseId: incident._id,
-        log,
-      }
-    );
-
-    return res.json({
-      message:
-        "Incident and connected report marked as completed",
-      incident,
-    });
-  } catch (err) {
-    console.error(
-      "completeIncident error:",
-      err
-    );
-
-    return res.status(500).json({
-      message:
-        err.message,
-    });
-  }
-};
+  };
 
 /* =========================================================
    DELETE INCIDENT
 ========================================================= */
 
-export const deleteIncident = async (
-  req,
-  res
-) => {
-  try {
-    if (req.user.role !== "admin") {
-      return res.status(403).json({
-        message: "Forbidden",
-      });
-    }
+export const deleteIncident =
+  async (req, res) => {
+    try {
+      if (
+        req.user.role !==
+        "admin"
+      ) {
+        return res.status(403).json({
+          message:
+            "Forbidden",
+        });
+      }
 
-    const incident =
-      await Incident.findById(
+      const incident =
+        await Incident.findById(
+          req.params.id
+        );
+
+      if (!incident) {
+        return res.status(404).json({
+          message:
+            "Incident not found",
+        });
+      }
+
+      const studentId =
+        incident.studentId;
+
+      await Incident.findByIdAndDelete(
         req.params.id
       );
 
-    if (!incident) {
-      return res.status(404).json({
+      const totalIncidents =
+        await Incident.countDocuments({
+          studentId,
+        });
+
+      const highCount =
+        await Incident.countDocuments({
+          studentId,
+          level: "High",
+        });
+
+      const medCount =
+        await Incident.countDocuments({
+          studentId,
+          level: "Medium",
+        });
+
+      let riskLevel =
+        "Low";
+
+      if (highCount > 0) {
+        riskLevel =
+          "High";
+      } else if (
+        medCount > 0
+      ) {
+        riskLevel =
+          "Medium";
+      }
+
+      await Student.findByIdAndUpdate(
+        studentId,
+        {
+          totalIncidents,
+          riskLevel,
+        }
+      );
+
+      io.emit(
+        "caseDeleted",
+        {
+          caseId:
+            req.params.id,
+        }
+      );
+
+      return res.json({
         message:
-          "Incident not found",
+          "Incident deleted",
+      });
+    } catch (err) {
+      console.error(
+        "deleteIncident error:",
+        err
+      );
+
+      return res.status(500).json({
+        message:
+          err.message,
       });
     }
-
-    const studentId =
-      incident.studentId;
-
-    await Incident.findByIdAndDelete(
-      req.params.id
-    );
-
-    const totalIncidents =
-      await Incident.countDocuments({
-        studentId,
-      });
-
-    const highCount =
-      await Incident.countDocuments({
-        studentId,
-        level: "High",
-      });
-
-    const medCount =
-      await Incident.countDocuments({
-        studentId,
-        level: "Medium",
-      });
-
-    let riskLevel = "Low";
-
-    if (highCount > 0) {
-      riskLevel = "High";
-    } else if (medCount > 0) {
-      riskLevel = "Medium";
-    }
-
-    await Student.findByIdAndUpdate(
-      studentId,
-      {
-        totalIncidents,
-        riskLevel,
-      }
-    );
-
-    io.emit(
-      "caseDeleted",
-      {
-        caseId: req.params.id,
-      }
-    );
-
-    return res.json({
-      message:
-        "Incident deleted",
-    });
-  } catch (err) {
-    console.error(
-      "deleteIncident error:",
-      err
-    );
-
-    return res.status(500).json({
-      message:
-        err.message,
-    });
-  }
-};
+  };
 
 /* =========================================================
    GET INCIDENTS BY STUDENT
 ========================================================= */
 
-export const getIncidentsByStudent = async (
-  req,
-  res
-) => {
-  try {
-    const studentId =
-      req.params.id;
+export const getIncidentsByStudent =
+  async (req, res) => {
+    try {
+      const studentId =
+        req.params.id;
 
-    if (
-      !studentId ||
-      !mongoose.Types.ObjectId.isValid(
-        studentId
-      )
-    ) {
-      return res.status(400).json({
+      if (
+        !studentId ||
+        !mongoose.Types.ObjectId.isValid(
+          studentId
+        )
+      ) {
+        return res.status(400).json({
+          message:
+            "Invalid or missing studentId",
+
+          received:
+            studentId,
+        });
+      }
+
+      const incidents =
+        await Incident.find({
+          studentId:
+            new mongoose.Types.ObjectId(
+              studentId
+            ),
+        })
+          .populate(
+            "studentId",
+            "firstName middleName lastName studentId grade gender profilePhoto"
+          )
+          .sort({
+            createdAt: -1,
+          });
+
+      return res.json(
+        incidents
+      );
+    } catch (err) {
+      return res.status(500).json({
         message:
-          "Invalid or missing studentId",
-        received: studentId,
+          err.message,
       });
     }
-
-    const incidents =
-      await Incident.find({
-        studentId:
-          new mongoose.Types.ObjectId(
-            studentId
-          ),
-      })
-        .populate(
-          "studentId",
-          "firstName middleName lastName studentId grade gender profilePhoto"
-        )
-        .sort({
-          createdAt: -1,
-        });
-
-    return res.json(
-      incidents
-    );
-  } catch (err) {
-    return res.status(500).json({
-      message: err.message,
-    });
-  }
-};
+  };
 
 /* =========================================================
    REQUEST STUDENT STATEMENT
@@ -1328,10 +1712,13 @@ export const requestStudentStatement =
       const log = {
         stage:
           "STATEMENT REQUESTED",
+
         note:
           note ||
           "Student statement requested",
-        time: new Date(),
+
+        time:
+          new Date(),
       };
 
       incident.statementStatus =
@@ -1340,7 +1727,9 @@ export const requestStudentStatement =
       incident.statementRequestedAt =
         new Date();
 
-      incident.caseLogs.push(log);
+      incident.caseLogs.push(
+        log
+      );
 
       await incident.save();
 
@@ -1351,18 +1740,31 @@ export const requestStudentStatement =
       await notifyStudent({
         studentId:
           incident.studentId,
+
         title:
           "Statement Requested",
+
         message:
           "A statement has been requested for your incident.",
+
         type:
           "statement_request",
-        priority: "medium",
+
+        priority:
+          "medium",
+
         data: {
           type:
             "statement_request",
+
           incidentId:
             incident._id.toString(),
+
+          status:
+            incident.status,
+
+          level:
+            incident.level,
         },
       });
 
@@ -1373,15 +1775,23 @@ export const requestStudentStatement =
       await notifyAdmins({
         title:
           "Student Statement Requested",
+
         message:
           "A student statement has been requested for an incident.",
-        type: "update",
-        priority: "low",
+
+        type:
+          "update",
+
+        priority:
+          "low",
+
         settingKey:
           "emailAlerts",
+
         data: {
           type:
             "statement_requested",
+
           incidentId:
             incident._id.toString(),
         },
@@ -1397,6 +1807,7 @@ export const requestStudentStatement =
         {
           caseId:
             incident._id,
+
           log,
         }
       );
@@ -1404,6 +1815,7 @@ export const requestStudentStatement =
       return res.json({
         message:
           "Statement request sent",
+
         incident,
       });
     } catch (err) {
@@ -1444,10 +1856,16 @@ export const submitStudentStatement =
       const log = {
         stage:
           "STUDENT STATEMENT SUBMITTED",
-        note: statement,
-        time: new Date(),
+
+        note:
+          statement,
+
+        time:
+          new Date(),
+
         changedBy:
           req.user._id,
+
         changedByName:
           req.user.name,
       };
@@ -1461,7 +1879,9 @@ export const submitStudentStatement =
       incident.statementSubmittedAt =
         new Date();
 
-      incident.caseLogs.push(log);
+      incident.caseLogs.push(
+        log
+      );
 
       await incident.save();
 
@@ -1472,15 +1892,23 @@ export const submitStudentStatement =
       await notifyAdmins({
         title:
           "Student Statement Submitted",
+
         message:
           "A student has submitted a statement for an incident.",
-        type: "update",
-        priority: "medium",
+
+        type:
+          "update",
+
+        priority:
+          "medium",
+
         settingKey:
           "emailAlerts",
+
         data: {
           type:
             "statement_submitted",
+
           incidentId:
             incident._id.toString(),
         },
@@ -1500,6 +1928,7 @@ export const submitStudentStatement =
         {
           caseId:
             incident._id,
+
           log,
         }
       );
@@ -1507,6 +1936,7 @@ export const submitStudentStatement =
       return res.json({
         message:
           "Statement submitted",
+
         incident,
       });
     } catch (err) {
@@ -1569,10 +1999,16 @@ export const manualStudentStatement =
       const log = {
         stage:
           "saved-student-statement",
-        note: statement,
-        time: new Date(),
+
+        note:
+          statement,
+
+        time:
+          new Date(),
+
         changedBy:
           user._id,
+
         changedByName:
           user.name,
       };
@@ -1590,19 +2026,31 @@ export const manualStudentStatement =
       await notifyStudent({
         studentId:
           incident.studentId,
+
         title:
           "Incident Update",
+
         message:
           'Your incident status is now "saved-student-statement".',
-        type: "update",
-        priority: "low",
+
+        type:
+          "update",
+
+        priority:
+          "low",
+
         data: {
           type:
             "incident_update",
+
           incidentId:
             incident._id.toString(),
+
           status:
             "saved-student-statement",
+
+          level:
+            incident.level,
         },
       });
 
@@ -1613,17 +2061,26 @@ export const manualStudentStatement =
       await notifyAdmins({
         title:
           "Student Statement Updated",
+
         message:
           "A student statement has been added to an incident.",
-        type: "update",
-        priority: "medium",
+
+        type:
+          "update",
+
+        priority:
+          "medium",
+
         settingKey:
           "emailAlerts",
+
         data: {
           type:
             "incident_update",
+
           incidentId:
             incident._id.toString(),
+
           status:
             "saved-student-statement",
         },
@@ -1645,6 +2102,7 @@ export const manualStudentStatement =
       return res.json({
         message:
           "Manual statement saved",
+
         incident:
           populated,
       });
@@ -1755,7 +2213,9 @@ export const updateIncidentStatus =
         return res.status(400).json({
           message:
             "Invalid status value",
-          attempted: status,
+
+          attempted:
+            status,
         });
       }
 
@@ -1792,16 +2252,21 @@ export const updateIncidentStatus =
       if (
         !allowedTransitions[
           incident.status
-        ]?.includes(status) &&
+        ]?.includes(
+          status
+        ) &&
         status !==
           incident.status
       ) {
         return res.status(400).json({
           message:
             "Invalid status transition",
+
           current:
             incident.status,
-          attempted: status,
+
+          attempted:
+            status,
         });
       }
 
@@ -1810,7 +2275,8 @@ export const updateIncidentStatus =
       =================================================== */
 
       if (
-        status === "reviewing" &&
+        status ===
+          "reviewing" &&
         !incident.reviewedBy
       ) {
         incident.reviewedBy =
@@ -1843,20 +2309,29 @@ export const updateIncidentStatus =
       =================================================== */
 
       const log = {
-        stage: status,
-        note: note || "",
+        stage:
+          status,
+
+        note:
+          note || "",
+
         changedBy:
           user._id,
+
         changedByName:
           user.name,
-        time: new Date(),
+
+        time:
+          new Date(),
       };
 
       incident.caseLogs.push(
         log
       );
 
-      if (escalationInfo) {
+      if (
+        escalationInfo
+      ) {
         incident.escalationInfo =
           escalationInfo;
       }
@@ -1896,6 +2371,7 @@ export const updateIncidentStatus =
           {
             reportId:
               incident.reportId,
+
             status:
               "completed",
           }
@@ -1904,7 +2380,27 @@ export const updateIncidentStatus =
 
       /* ===================================================
          STUDENT NOTIFICATION
+         
+         IMPORTANT:
+         Every incident status uses notificationType
+         "incident", except High-risk notifications.
+
+         notificationService.js will check:
+         - mute
+         - incidentUpdates
+         - highRiskAlerts
+         - sound
+         - vibration
       =================================================== */
+
+      const isHighRiskIncident =
+        incident.level?.toLowerCase() ===
+        "high";
+
+      const studentNotificationType =
+        isHighRiskIncident
+          ? "high-risk"
+          : "incident";
 
       await notifyStudent({
         studentId:
@@ -1929,8 +2425,10 @@ export const updateIncidentStatus =
             : "update",
 
         priority:
-          status ===
-          "completed"
+          isHighRiskIncident
+            ? "high"
+            : status ===
+              "completed"
             ? "low"
             : "medium",
 
@@ -1938,10 +2436,18 @@ export const updateIncidentStatus =
           type:
             "incident_update",
 
+          notificationType:
+            studentNotificationType,
+
           incidentId:
             incident._id.toString(),
 
+          previousStatus,
+
           status,
+
+          level:
+            incident.level,
         },
       });
 
@@ -2019,6 +2525,7 @@ export const updateIncidentStatus =
         {
           caseId:
             incident._id,
+
           log,
         }
       );
@@ -2026,6 +2533,7 @@ export const updateIncidentStatus =
       return res.json({
         message:
           "Incident status updated successfully",
+
         incident:
           populated,
       });
@@ -2041,3 +2549,4 @@ export const updateIncidentStatus =
       });
     }
   };
+
