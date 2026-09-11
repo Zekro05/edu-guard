@@ -25,7 +25,7 @@ import { getOffenseSeverity } from "../utils/offenseSeverity.js";
 
 import { upload } from "../middleware/upload.js";
 
-import { sendPushNotification } from "../utils/pushNotification.js";
+import { sendPushNotification } from "../services/notificationService.js";
 import { sendNotificationEmail } from "../mailer/emails.js";
 
 const router = express.Router();

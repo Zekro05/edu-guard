@@ -33,7 +33,7 @@ import { User } from "./models/userModel.js";
 
 import {
   sendPushNotification,
-} from "./utils/pushNotification.js";
+} from "./services/notificationService.js";
 
 import { fileURLToPath } from "url";
 

@@ -4,7 +4,7 @@ import Student from "../models/studentModel.js";
 import User from "../models/userModel.js";
 import Notification from "../models/Notification.js";
 import { io } from "../server.js";
-import { sendPushNotification } from "../utils/pushNotification.js";
+import { sendPushNotification } from "../services/notificationService.js";
 
 /* ================= CREATE INTERVENTION ================= */
 export const createIntervention = async (req, res) => {

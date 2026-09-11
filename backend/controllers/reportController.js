@@ -11,7 +11,7 @@ import { io } from "../server.js";
 
 import { getDisciplineAction } from "../utils/disciplineEngine.js";
 
-import { sendPushNotification } from "../utils/pushNotification.js";
+import { sendPushNotification } from "../services/notificationService.js";
 
 import { sendWebPushNotification } from "../utils/webPushNotification.js";
 

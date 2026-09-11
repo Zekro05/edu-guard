@@ -6,7 +6,7 @@ import Notification from "../models/Notification.js";
 import User from "../models/userModel.js";
 import Report from "../models/reportModel.js";
 
-import { sendPushNotification } from "../utils/pushNotification.js";
+import { sendPushNotification } from "../services/notificationService.js";
 import { io } from "../server.js";
 import { sendNotificationEmail } from "../mailer/emails.js";
 

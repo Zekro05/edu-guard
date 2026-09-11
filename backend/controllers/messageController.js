@@ -5,7 +5,7 @@ import { createNotification } from "../utils/createNotification.js";
 import { io } from "../server.js";
 import { User } from "../models/userModel.js";
 
-import { sendPushNotification } from "../utils/pushNotification.js";
+import { sendPushNotification } from "../services/notificationService.js";
 import { sendWebPushNotification } from "../utils/webPushNotification.js";
 
 /* =========================================================
