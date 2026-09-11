@@ -53,14 +53,24 @@ export const sendPushNotification = async ({
     console.log("========================================");
     console.log("Title:", title);
     console.log("Body:", body);
-    console.log("Token:", `${token.substring(0, 20)}...`);
+    console.log(
+      "Token:",
+      `${token.substring(0, 20)}...`
+    );
     console.log("Data:", stringData);
     console.log("========================================");
 
-    const response = await admin.messaging().send(message);
+    const response =
+      await admin.messaging().send(message);
 
-    console.log("✅ FCM notification sent successfully");
-    console.log("FCM Message ID:", response);
+    console.log(
+      "✅ FCM notification sent successfully"
+    );
+
+    console.log(
+      "FCM Message ID:",
+      response
+    );
 
     return response;
   } catch (error) {

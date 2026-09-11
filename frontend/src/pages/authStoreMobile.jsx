@@ -8,10 +8,9 @@ import {
   requestPermission,
   registerRemoteMessages,
   getToken,
-  onMessage,
   onTokenRefresh,
   AuthorizationStatus,
-} from "../../config/firebase.js";
+} from "../config/firebase";
 
 /* =========================================================
    API
@@ -33,139 +32,127 @@ let cachedToken = null;
 
 let cachedPushToken = null;
 
-const PUSH_TOKEN_STORAGE_KEY =
-  "eduGuardPushToken";
+const PUSH_TOKEN_STORAGE_KEY = "eduGuardPushToken";
 
 /* =========================================================
-   FCM LISTENER CLEANUP
+   FCM TOKEN REFRESH LISTENER
 ========================================================= */
 
 let unsubscribeFCMTokenRefresh = null;
-let unsubscribeFCMMessage = null;
 
 /* =========================================================
    REGISTER FCM TOKEN
    ANDROID + IOS
 ========================================================= */
 
-const registerForPushNotificationsAsync =
-  async () => {
-    try {
-      console.log("====================================");
-      console.log("🔥 REGISTERING FCM");
-      console.log("====================================");
+const registerForPushNotificationsAsync = async () => {
+  try {
+    console.log("====================================");
+    console.log("🔥 REGISTERING FCM");
+    console.log("====================================");
 
-      /* =====================================================
-         WEB CHECK
-      ===================================================== */
+    /* =====================================================
+       WEB CHECK
+    ===================================================== */
 
-      if (Platform.OS === "web") {
-        console.log(
-          "⚠️ FCM push notifications are not supported in this mobile setup on web."
-        );
-
-        return null;
-      }
-
-      /* =====================================================
-         REGISTER DEVICE FOR REMOTE MESSAGES
-
-         Required for native Firebase messaging.
-         Works for Android and iOS.
-      ===================================================== */
-
+    if (Platform.OS === "web") {
       console.log(
-        "📱 Registering device for remote messages..."
+        "⚠️ FCM push notifications are not supported in this mobile setup on web."
       );
-
-      const registered =
-        await registerRemoteMessages();
-
-      if (!registered) {
-        console.log(
-          "❌ Failed to register device for remote messages."
-        );
-
-        return null;
-      }
-
-      console.log(
-        "✅ Device registered for remote messages."
-      );
-
-      /* =====================================================
-         REQUEST NOTIFICATION PERMISSION
-      ===================================================== */
-
-      console.log(
-        "🔔 Requesting notification permission..."
-      );
-
-      const authStatus =
-        await requestPermission();
-
-      const enabled =
-        authStatus ===
-          AuthorizationStatus.AUTHORIZED ||
-        authStatus ===
-          AuthorizationStatus.PROVISIONAL;
-
-      console.log(
-        "🔔 FCM authorization status:",
-        authStatus
-      );
-
-      if (!enabled) {
-        console.log(
-          "❌ FCM notification permission denied."
-        );
-
-        return null;
-      }
-
-      console.log(
-        "✅ FCM notification permission granted."
-      );
-
-      /* =====================================================
-         GET FCM REGISTRATION TOKEN
-
-         Same FCM token mechanism for Android + iOS.
-      ===================================================== */
-
-      console.log(
-        "📱 Requesting FCM registration token..."
-      );
-
-      const token = await getToken();
-
-      if (!token) {
-        console.log(
-          "❌ FCM token was not generated."
-        );
-
-        return null;
-      }
-
-      console.log("====================================");
-      console.log("🔥 FCM TOKEN:");
-      console.log(token);
-      console.log("====================================");
-
-      return token;
-    } catch (error) {
-      console.error("====================================");
-      console.error("❌ FCM REGISTRATION ERROR");
-      console.error(
-        error?.response?.data ||
-          error?.message ||
-          error
-      );
-      console.error("====================================");
 
       return null;
     }
-  };
+
+    /* =====================================================
+       REGISTER DEVICE FOR REMOTE MESSAGES
+    ===================================================== */
+
+    console.log(
+      "📱 Registering device for remote messages..."
+    );
+
+    const registered = await registerRemoteMessages();
+
+    if (!registered) {
+      console.log(
+        "❌ Failed to register device for remote messages."
+      );
+
+      return null;
+    }
+
+    console.log(
+      "✅ Device registered for remote messages."
+    );
+
+    /* =====================================================
+       REQUEST NOTIFICATION PERMISSION
+    ===================================================== */
+
+    console.log(
+      "🔔 Requesting notification permission..."
+    );
+
+    const authStatus = await requestPermission();
+
+    const enabled =
+      authStatus === AuthorizationStatus.AUTHORIZED ||
+      authStatus === AuthorizationStatus.PROVISIONAL;
+
+    console.log(
+      "🔔 FCM authorization status:",
+      authStatus
+    );
+
+    if (!enabled) {
+      console.log(
+        "❌ FCM notification permission denied."
+      );
+
+      return null;
+    }
+
+    console.log(
+      "✅ FCM notification permission granted."
+    );
+
+    /* =====================================================
+       GET FCM REGISTRATION TOKEN
+    ===================================================== */
+
+    console.log(
+      "📱 Requesting FCM registration token..."
+    );
+
+    const token = await getToken();
+
+    if (!token) {
+      console.log(
+        "❌ FCM token was not generated."
+      );
+
+      return null;
+    }
+
+    console.log("====================================");
+    console.log("🔥 FCM TOKEN:");
+    console.log(token);
+    console.log("====================================");
+
+    return token;
+  } catch (error) {
+    console.error("====================================");
+    console.error("❌ FCM REGISTRATION ERROR");
+    console.error(
+      error?.response?.data ||
+        error?.message ||
+        error
+    );
+    console.error("====================================");
+
+    return null;
+  }
+};
 
 /* =========================================================
    GET PLATFORM
@@ -201,10 +188,9 @@ const getCurrentPushToken = async () => {
        LOCAL STORAGE
     ===================================================== */
 
-    const storedToken =
-      await AsyncStorage.getItem(
-        PUSH_TOKEN_STORAGE_KEY
-      );
+    const storedToken = await AsyncStorage.getItem(
+      PUSH_TOKEN_STORAGE_KEY
+    );
 
     if (storedToken) {
       cachedPushToken = storedToken;
@@ -315,8 +301,7 @@ const savePushTokenToBackend = async () => {
        PLATFORM
     ===================================================== */
 
-    const platform =
-      getPushPlatform();
+    const platform = getPushPlatform();
 
     console.log(
       "📡 Saving FCM token to backend..."
@@ -335,15 +320,14 @@ const savePushTokenToBackend = async () => {
        SAVE TOKEN
     ===================================================== */
 
-    const response =
-      await API.post(
-        "/api/auth/save-push-token",
-        {
-          token,
-          platform,
-          provider: "fcm",
-        }
-      );
+    const response = await API.post(
+      "/api/auth/save-push-token",
+      {
+        token,
+        platform,
+        provider: "fcm",
+      }
+    );
 
     console.log("====================================");
     console.log("✅ FCM TOKEN SAVED");
@@ -370,84 +354,26 @@ const savePushTokenToBackend = async () => {
 ========================================================= */
 
 const removePushTokenFromBackend = async () => {
+  /*
+    The current backend does not expose
+    DELETE /api/auth/remove-push-token.
+
+    Therefore we only clear the local cache.
+  */
+
   try {
-    /* =====================================================
-       DON'T TRY WITHOUT AUTH
-    ===================================================== */
-
-    if (!cachedToken) {
-      console.log(
-        "⚠️ No authentication token. FCM token removal skipped."
-      );
-
-      return true;
-    }
-
-    /* =====================================================
-       GET CURRENT DEVICE FCM TOKEN
-    ===================================================== */
-
-    const token =
-      await getCurrentPushToken();
-
-    if (!token) {
-      console.log(
-        "⚠️ No current FCM token found."
-      );
-
-      return true;
-    }
-
-    console.log("====================================");
-    console.log(
-      "🗑️ REMOVING CURRENT DEVICE FCM TOKEN"
-    );
-    console.log("====================================");
-
-    console.log(
-      "TOKEN:",
-      token
-    );
-
-    /* =====================================================
-       REMOVE ONLY THIS DEVICE TOKEN
-    ===================================================== */
-
-    const response =
-      await API.delete(
-        "/api/auth/remove-push-token",
-        {
-          data: {
-            token,
-          },
-        }
-      );
-
-    console.log("====================================");
-    console.log(
-      "✅ CURRENT DEVICE FCM TOKEN REMOVED"
-    );
-    console.log(response.data);
-    console.log("====================================");
-
-    /* =====================================================
-       CLEAR LOCAL TOKEN ONLY AFTER BACKEND SUCCESS
-    ===================================================== */
-
     await clearCachedPushToken();
+
+    console.log(
+      "🧹 Local FCM token cache cleared during logout."
+    );
 
     return true;
   } catch (error) {
-    console.error("====================================");
     console.error(
-      "❌ REMOVE FCM TOKEN ERROR"
+      "❌ CLEAR FCM TOKEN ERROR:",
+      error?.message || error
     );
-    console.error(
-      error?.response?.data ||
-        error?.message ||
-        error
-    );
-    console.error("====================================");
 
     return false;
   }
@@ -472,66 +398,73 @@ const setupFCMTokenRefresh = () => {
        LISTEN FOR FCM TOKEN CHANGES
     ===================================================== */
 
-    unsubscribeFCMTokenRefresh =
-      onTokenRefresh(
-        async (newToken) => {
-          console.log("====================================");
-          console.log(
-            "🔥 FCM TOKEN REFRESHED"
-          );
-          console.log("====================================");
+    unsubscribeFCMTokenRefresh = onTokenRefresh(
+      async (newToken) => {
+        console.log("====================================");
+        console.log("🔥 FCM TOKEN REFRESHED");
+        console.log("====================================");
 
-          console.log(
-            "NEW FCM TOKEN:",
-            newToken
-          );
+        console.log(
+          "NEW FCM TOKEN:",
+          newToken
+        );
 
-          try {
-            if (!cachedToken) {
-              console.log(
-                "⚠️ No authenticated user. Refreshed FCM token will not be saved yet."
-              );
-
-              return;
-            }
-
-            const platform =
-              getPushPlatform();
-
-            /* =============================================
-               SAVE NEW TOKEN TO BACKEND
-            ============================================= */
-
-            await API.post(
-              "/api/auth/save-push-token",
-              {
-                token: newToken,
-                platform,
-                provider: "fcm",
-              }
-            );
-
-            /* =============================================
-               UPDATE LOCAL CACHE
-            ============================================= */
-
-            await cachePushToken(
-              newToken
-            );
-
+        try {
+          if (!cachedToken) {
             console.log(
-              "✅ Refreshed FCM token saved."
+              "⚠️ No authenticated user. Refreshed FCM token will not be saved yet."
             );
-          } catch (error) {
-            console.error(
-              "❌ FAILED TO SAVE REFRESHED FCM TOKEN:",
-              error?.response?.data ||
-                error?.message ||
-                error
-            );
+
+            return;
           }
+
+          if (!newToken) {
+            console.log(
+              "⚠️ Refreshed FCM token is empty."
+            );
+
+            return;
+          }
+
+          const platform = getPushPlatform();
+
+          /* =============================================
+             SAVE NEW TOKEN TO BACKEND
+          ============================================= */
+
+          const response = await API.post(
+            "/api/auth/save-push-token",
+            {
+              token: newToken,
+              platform,
+              provider: "fcm",
+            }
+          );
+
+          /* =============================================
+             UPDATE LOCAL CACHE
+          ============================================= */
+
+          await cachePushToken(newToken);
+
+          console.log(
+            "✅ Refreshed FCM token saved."
+          );
+
+          console.log(
+            "Backend response:",
+            response.data
+          );
+        } catch (error) {
+          console.error(
+            "❌ FAILED TO SAVE REFRESHED FCM TOKEN:",
+            error?.response?.data ||
+              error?.message ||
+              error
+          );
         }
-      );
+      }
+    );
 
     console.log(
       "✅ FCM token refresh listener ready."
@@ -539,57 +472,6 @@ const setupFCMTokenRefresh = () => {
   } catch (error) {
     console.error(
       "❌ FCM TOKEN REFRESH SETUP ERROR:",
-      error?.message || error
-    );
-  }
-};
-
-/* =========================================================
-   SETUP FCM FOREGROUND MESSAGE LISTENER
-========================================================= */
-
-const setupFCMMessageListener = () => {
-  try {
-    /* =====================================================
-       CLEAN UP EXISTING LISTENER
-    ===================================================== */
-
-    if (unsubscribeFCMMessage) {
-      unsubscribeFCMMessage();
-      unsubscribeFCMMessage = null;
-    }
-
-    /* =====================================================
-       LISTEN FOR FOREGROUND FCM MESSAGES
-    ===================================================== */
-
-    unsubscribeFCMMessage =
-      onMessage(
-        async (remoteMessage) => {
-          console.log("====================================");
-          console.log(
-            "🔥 FCM FOREGROUND MESSAGE"
-          );
-          console.log("====================================");
-
-          console.log(
-            JSON.stringify(
-              remoteMessage,
-              null,
-              2
-            )
-          );
-
-          console.log("====================================");
-        }
-      );
-
-    console.log(
-      "✅ FCM foreground message listener ready."
-    );
-  } catch (error) {
-    console.error(
-      "❌ FCM MESSAGE LISTENER ERROR:",
       error?.message || error
     );
   }
@@ -604,11 +486,6 @@ const cleanupFCMListeners = () => {
     if (unsubscribeFCMTokenRefresh) {
       unsubscribeFCMTokenRefresh();
       unsubscribeFCMTokenRefresh = null;
-    }
-
-    if (unsubscribeFCMMessage) {
-      unsubscribeFCMMessage();
-      unsubscribeFCMMessage = null;
     }
 
     console.log(
@@ -739,32 +616,55 @@ const connectSocketSafely = (userId) => {
 };
 
 /* =========================================================
-   SETUP FCM AFTER AUTHENTICATION
+   REGISTER FCM AFTER AUTHENTICATION
 ========================================================= */
 
-const setupFCMAfterAuthentication =
-  async () => {
+const registerFCMAfterAuthentication = () => {
+  setTimeout(() => {
     try {
-      /* =================================================
-         START LISTENERS FIRST
-      ================================================= */
+      const authStore =
+        useAuthStore?.getState?.();
 
-      setupFCMTokenRefresh();
+      if (!authStore?.isAuthenticated) {
+        console.log(
+          "⚠️ FCM registration skipped: user is not authenticated."
+        );
 
-      setupFCMMessageListener();
+        return;
+      }
 
-      /* =================================================
-         REGISTER DEVICE + SAVE TOKEN
-      ================================================= */
-
-      await savePushTokenToBackend();
-    } catch (error) {
       console.log(
-        "SETUP FCM AFTER AUTH ERROR:",
-        error?.message
+        "🚀 Starting FCM registration after authentication..."
+      );
+
+      authStore
+        .registerPushNotifications()
+        .then((result) => {
+          if (result?.success) {
+            console.log(
+              "✅ FCM registration completed successfully."
+            );
+          } else {
+            console.log(
+              "⚠️ FCM registration did not complete:",
+              result?.error || "Unknown error"
+            );
+          }
+        })
+        .catch((error) => {
+          console.error(
+            "❌ FCM registration failed:",
+            error?.message || error
+          );
+        });
+    } catch (error) {
+      console.error(
+        "❌ FCM AUTO REGISTRATION ERROR:",
+        error?.message || error
       );
     }
-  };
+  }, 500);
+};
 
 /* =========================================================
    AUTH STORE
@@ -831,9 +731,7 @@ export const useAuthStore = create(
           }
         );
 
-        await cachePushToken(
-          token
-        );
+        await cachePushToken(token);
 
         console.log(
           "✅ FCM token saved."
@@ -864,53 +762,66 @@ export const useAuthStore = create(
        REGISTER CURRENT DEVICE
     ===================================================== */
 
-    registerPushNotifications:
-      async () => {
-        try {
-          if (!get().isAuthenticated) {
-            console.log(
-              "⚠️ Cannot register FCM: user is not authenticated."
-            );
-
-            return {
-              success: false,
-              error:
-                "User is not authenticated.",
-            };
-          }
-
-          /* ===============================================
-             SETUP LISTENERS
-          =============================================== */
-
-          setupFCMTokenRefresh();
-
-          setupFCMMessageListener();
-
-          /* ===============================================
-             REGISTER + SAVE TOKEN
-          =============================================== */
-
-          const success =
-            await savePushTokenToBackend();
-
-          return {
-            success,
-          };
-        } catch (error) {
-          console.error(
-            "REGISTER FCM ERROR:",
-            error
+    registerPushNotifications: async () => {
+      try {
+        if (!get().isAuthenticated) {
+          console.log(
+            "⚠️ Cannot register FCM: user is not authenticated."
           );
 
           return {
             success: false,
             error:
-              error?.message ||
-              "Failed to register FCM notifications.",
+              "User is not authenticated.",
           };
         }
-      },
+
+        console.log("====================================");
+        console.log(
+          "🔥 STARTING DEVICE FCM REGISTRATION"
+        );
+        console.log("====================================");
+
+        /* ===============================================
+           SETUP TOKEN REFRESH LISTENER
+        =============================================== */
+
+        setupFCMTokenRefresh();
+
+        /* ===============================================
+           REGISTER + SAVE TOKEN
+        =============================================== */
+
+        const success =
+          await savePushTokenToBackend();
+
+        if (success) {
+          console.log(
+            "✅ DEVICE FCM REGISTRATION SUCCESSFUL"
+          );
+        } else {
+          console.log(
+            "❌ DEVICE FCM REGISTRATION FAILED"
+          );
+        }
+
+        return {
+          success,
+        };
+      } catch (error) {
+        console.error(
+          "REGISTER FCM ERROR:",
+          error
+        );
+
+        return {
+          success: false,
+          error:
+            error?.message ||
+            "Failed to register FCM notifications.",
+        };
+      }
+    },
 
     /* =====================================================
        REMOVE CURRENT DEVICE FCM TOKEN
@@ -1181,12 +1092,10 @@ export const useAuthStore = create(
         );
 
         /* =================================================
-           RE-REGISTER FCM
+           REGISTER FCM FOR RESTORED SESSION
         ================================================= */
 
-        setTimeout(() => {
-          setupFCMAfterAuthentication();
-        }, 500);
+        registerFCMAfterAuthentication();
       } catch (error) {
         console.log(
           "CHECK AUTH ERROR:",
@@ -1219,6 +1128,13 @@ export const useAuthStore = create(
           set({
             isAuthenticated: true,
           });
+
+          /* =================================================
+             TRY FCM REGISTRATION EVEN AFTER
+             NON-AUTHENTICATION ERROR
+          ================================================= */
+
+          registerFCMAfterAuthentication();
         }
       } finally {
         set({
@@ -1431,12 +1347,10 @@ export const useAuthStore = create(
         );
 
         /* =================================================
-           REGISTER FCM
+           REGISTER FCM AFTER LOGIN
         ================================================= */
 
-        setTimeout(() => {
-          setupFCMAfterAuthentication();
-        }, 500);
+        registerFCMAfterAuthentication();
 
         return {
           success: true,
@@ -1653,15 +1567,13 @@ export const useAuthStore = create(
           connectSocketSafely(
             userData._id
           );
+
+          /* =============================================
+             REGISTER FCM AFTER OTP LOGIN
+          ============================================= */
+
+          registerFCMAfterAuthentication();
         }, 150);
-
-        /* =================================================
-           REGISTER FCM AFTER OTP
-        ================================================= */
-
-        setTimeout(() => {
-          setupFCMAfterAuthentication();
-        }, 700);
 
         Alert.alert(
           "Success",
@@ -1775,7 +1687,7 @@ export const useAuthStore = create(
         }
 
         /* =================================================
-           CLEANUP FCM LISTENERS
+           CLEANUP FCM LISTENER
         ================================================= */
 
         cleanupFCMListeners();

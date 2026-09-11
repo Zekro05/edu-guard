@@ -5,8 +5,11 @@ import {
   saveFCMToken,
   removePushToken,
 } from "../controllers/notificationController.js";
+import User from "../models/userModel.js";
+import { sendPushNotification } from "../services/notificationService.js";
 
 import { verifyToken } from "../middleware/verifyToken.js";
+
 
 const router = express.Router();
 
@@ -623,5 +626,89 @@ function getTimeAgo(date) {
     diff / 86400
   )} day(s) ago`;
 }
+
+router.post("/test-push", verifyToken, async (req, res) => {
+  try {
+    const { userId, title, body } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required",
+      });
+    }
+
+    const user = await User.findById(userId).select(
+      "email pushTokens"
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const fcmTokens = Array.isArray(user.pushTokens)
+      ? user.pushTokens.filter(
+          (item) =>
+            item?.token &&
+            item?.provider === "fcm" &&
+            item?.platform === "ios"
+        )
+      : [];
+
+    if (!fcmTokens.length) {
+      return res.status(400).json({
+        success: false,
+        message: "No iOS FCM token found for this user",
+        pushTokens: user.pushTokens || [],
+      });
+    }
+
+    const results = [];
+
+    for (const pushToken of fcmTokens) {
+      try {
+        const result = await sendPushNotification({
+          token: pushToken.token,
+          title: title || "EduGuard Test",
+          body: body || "This is a test notification from Postman.",
+          data: {
+            type: "test",
+            timestamp: Date.now().toString(),
+          },
+        });
+
+        results.push({
+          platform: pushToken.platform,
+          provider: pushToken.provider,
+          success: !!result,
+          result,
+        });
+      } catch (error) {
+        results.push({
+          platform: pushToken.platform,
+          provider: pushToken.provider,
+          success: false,
+          error: error.message,
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "FCM test completed",
+      results,
+    });
+  } catch (error) {
+    console.error("TEST PUSH ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+});
 
 export default router;
