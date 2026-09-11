@@ -15,8 +15,7 @@ router.get("/", verifyToken, async (req, res) => {
 
     const logs = await HistoryLog.find(filter)
       .populate("user", "name email")
-      .sort({ createdAt: -1 })
-      .limit(100);
+      .sort({ createdAt: -1 });
 
     res.status(200).json(logs);
   } catch (error) {

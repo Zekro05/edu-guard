@@ -6,15 +6,18 @@ import {
   ChevronLeft,
   ChevronRight,
   RefreshCw,
+  Printer,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { API } from "../../lib/api";
+import HistoryLogsReport from "../../components/reports/HistoryLogsReport";
 
 const HistoryLogs = () => {
   const [logs, setLogs] = useState([]);
   const [category, setCategory] = useState("");
   const [role, setRole] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   const [currentPage, setCurrentPage] = useState(1);
   const logsPerPage = 10;
@@ -31,9 +34,7 @@ const HistoryLogs = () => {
         withCredentials: true,
       });
 
-      const data = Array.isArray(res.data)
-        ? res.data
-        : res.data.logs || [];
+      const data = Array.isArray(res.data) ? res.data : res.data.logs || [];
 
       setLogs(data);
       setCurrentPage(1);
@@ -53,7 +54,7 @@ const HistoryLogs = () => {
 
   const currentLogs = logs.slice(
     (currentPage - 1) * logsPerPage,
-    currentPage * logsPerPage
+    currentPage * logsPerPage,
   );
 
   return (
@@ -295,6 +296,31 @@ const HistoryLogs = () => {
 
                 {loading ? "Loading..." : "Refresh"}
               </button>
+
+              <button
+                onClick={() => setShowReport(true)}
+                className="
+                flex
+                items-center
+                justify-center
+                gap-2
+                px-4
+                py-2.5
+                rounded-xl
+                bg-gray-900
+                hover:bg-gray-800
+                text-white
+                text-xs
+                font-semibold
+                shadow-sm
+                hover:shadow-md
+                transition-all
+                duration-200
+              "
+              >
+                <Printer size={14} />
+                Printable Report
+              </button>
             </div>
           </div>
         </div>
@@ -334,10 +360,7 @@ const HistoryLogs = () => {
                 <LoadingRows />
               ) : (
                 currentLogs.map((log) => (
-                  <LogRow
-                    key={log._id || log.id}
-                    log={log}
-                  />
+                  <LogRow key={log._id || log.id} log={log} />
                 ))
               )}
 
@@ -357,10 +380,7 @@ const HistoryLogs = () => {
                           mb-3
                         "
                       >
-                        <FileText
-                          size={21}
-                          className="text-gray-300"
-                        />
+                        <FileText size={21} className="text-gray-300" />
                       </div>
 
                       <p className="text-sm font-semibold text-gray-700">
@@ -404,17 +424,13 @@ const HistoryLogs = () => {
                 {currentLogs.length}
               </span>{" "}
               of{" "}
-              <span className="font-semibold text-gray-600">
-                {logs.length}
-              </span>{" "}
+              <span className="font-semibold text-gray-600">{logs.length}</span>{" "}
               records
             </p>
 
             <div className="flex items-center gap-2">
               <button
-                onClick={() =>
-                  setCurrentPage((p) => Math.max(p - 1, 1))
-                }
+                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
                 disabled={currentPage === 1}
                 className="
                   w-9
@@ -457,9 +473,7 @@ const HistoryLogs = () => {
 
               <button
                 onClick={() =>
-                  setCurrentPage((p) =>
-                    Math.min(p + 1, totalPages)
-                  )
+                  setCurrentPage((p) => Math.min(p + 1, totalPages))
                 }
                 disabled={currentPage === totalPages}
                 className="
@@ -486,6 +500,14 @@ const HistoryLogs = () => {
           </div>
         )}
       </section>
+      {showReport && (
+        <HistoryLogsReport
+          logs={logs}
+          category={category}
+          role={role}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </div>
   );
 };
@@ -496,12 +518,7 @@ export default HistoryLogs;
    LOG SUMMARY
 ========================================================= */
 
-const LogSummary = ({
-  icon,
-  label,
-  value,
-  description,
-}) => (
+const LogSummary = ({ icon, label, value, description }) => (
   <div
     className="
       bg-white
@@ -514,9 +531,7 @@ const LogSummary = ({
   >
     <div className="flex items-start justify-between">
       <div>
-        <p className="text-xs font-semibold text-gray-400">
-          {label}
-        </p>
+        <p className="text-xs font-semibold text-gray-400">{label}</p>
 
         <p className="text-xl font-extrabold tracking-tight text-gray-900 mt-2">
           {value}
@@ -539,9 +554,7 @@ const LogSummary = ({
       </div>
     </div>
 
-    <p className="text-[11px] text-gray-400 mt-4">
-      {description}
-    </p>
+    <p className="text-[11px] text-gray-400 mt-4">{description}</p>
 
     <div className="mt-4 h-1 w-10 rounded-full bg-green-500" />
   </div>
@@ -572,10 +585,7 @@ const LogRow = ({ log }) => {
               flex-shrink-0
             "
           >
-            <Clock3
-              size={15}
-              className="text-gray-400"
-            />
+            <Clock3 size={15} className="text-gray-400" />
           </div>
 
           <div>
@@ -618,10 +628,7 @@ const LogRow = ({ log }) => {
 
       <td className="px-6 py-4 min-w-[280px]">
         <div className="flex items-start gap-2">
-          <FileText
-            size={14}
-            className="text-gray-300 mt-0.5 flex-shrink-0"
-          />
+          <FileText size={14} className="text-gray-300 mt-0.5 flex-shrink-0" />
 
           <p className="text-xs text-gray-500 leading-relaxed">
             {log.details || "—"}
@@ -644,9 +651,7 @@ const RoleBadge = ({ role }) => {
     Student: "bg-gray-50 text-gray-600 border-gray-100",
   };
 
-  const style =
-    styles[role] ||
-    "bg-gray-50 text-gray-500 border-gray-100";
+  const style = styles[role] || "bg-gray-50 text-gray-500 border-gray-100";
 
   return (
     <span
@@ -672,10 +677,10 @@ const RoleBadge = ({ role }) => {
             role === "Admin"
               ? "bg-green-500"
               : role === "Guidance"
-              ? "bg-blue-500"
-              : role === "Teacher"
-              ? "bg-amber-500"
-              : "bg-gray-400"
+                ? "bg-blue-500"
+                : role === "Teacher"
+                  ? "bg-amber-500"
+                  : "bg-gray-400"
           }
         `}
       />

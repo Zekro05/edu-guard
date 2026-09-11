@@ -28,6 +28,7 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import notificationSettingsRoutes from "./routes/notificationSettings.js";
 import pushNotificationRoutes from "./routes/pushNotificationRoutes.js";
 import settingsRoutes from "./routes/settings.js";
+import researchReferenceRoutes from "./routes/researchReferenceRoutes.js";
 
 import { User } from "./models/userModel.js";
 
@@ -304,6 +305,10 @@ app.use("/api/notification-settings", notificationSettingsRoutes);
 app.use("/api/push-notifications", pushNotificationRoutes);
 
 app.use("/api/settings", settingsRoutes);
+app.use(
+  "/api/research-references",
+  researchReferenceRoutes,
+);
 
 /* =========================================================
    USERS

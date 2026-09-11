@@ -32,6 +32,8 @@ import {
   Timer,
   LogOut,
   Printer,
+  BookOpen,
+  Loader2,
 } from "lucide-react";
 
 import { useAuthStore } from "../store/authStore";
@@ -70,6 +72,13 @@ const InterventionPage = () => {
   const [cases, setCases] = useState([]);
   const [interventions, setInterventions] = useState([]);
 
+  /*
+    Keep all reports because:
+    - the current report can provide the detailed incident overview
+    - previous reports can be used only as secondary context by AI
+  */
+  const [reports, setReports] = useState([]);
+
   const [notifications, setNotifications] = useState([]);
   const [openNotif, setOpenNotif] = useState(false);
 
@@ -81,11 +90,23 @@ const InterventionPage = () => {
     description: "",
   });
 
+  /* =========================================================
+     AI RECOMMENDATION STATE
+  ========================================================= */
+
+  const [aiRecommendations, setAiRecommendations] = useState({});
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+
   const loggedInUser =
     JSON.parse(localStorage.getItem("user"))?.name ||
     adminName ||
     "Unknown User";
 
+  /*
+    These are the ONLY conclusions that the AI recommendation
+    is allowed to use.
+  */
   const options = [
     "warning",
     "call a parent",
@@ -113,14 +134,20 @@ const InterventionPage = () => {
 
   const fetchData = async () => {
     try {
-      const [incidentRes, interventionRes] = await Promise.all([
-        API.get("/api/incidents"),
-        API.get("/api/interventions"),
-      ]);
+      const [incidentRes, interventionRes, reportsRes] =
+        await Promise.all([
+          API.get("/api/incidents"),
+          API.get("/api/interventions"),
+          API.get("/api/reports"),
+        ]);
 
       const incidentsData = incidentRes.data || [];
 
-      const reports = incidentsData.map((i) => {
+      const reportsData = reportsRes.data?.reports || [];
+
+      setReports(reportsData);
+
+      const casesData = incidentsData.map((i) => {
         const student = i.studentId || {};
 
         return {
@@ -142,18 +169,36 @@ const InterventionPage = () => {
               new Date(student.birthDate).getFullYear()
             : "N/A",
 
+          /*
+            CURRENT INCIDENT DATA
+          */
           offense: i.title || "No title",
-          status: i.status,
+          title: i.title || "No title",
+
+          status: i.status || "received",
+
+          level: i.level || "Low",
+          category: i.category || "Uncategorized",
+
+          studentStatement: i.studentStatement || "",
+
+          createdAt: i.createdAt || null,
+
+          reportId: i.reportId || null,
+
+          action: i.action || "",
+
+          caseLogs: i.caseLogs || [],
         };
       });
 
-      setCases(reports);
+      setCases(casesData);
 
       const interventionData = interventionRes.data || [];
       setInterventions(interventionData);
 
       setNotifications(
-        reports.slice(0, 10).map((r) => ({
+        casesData.slice(0, 10).map((r) => ({
           id: r._id,
           title: "Case Requires Intervention",
           text: r.offense,
@@ -207,44 +252,782 @@ const InterventionPage = () => {
     return "ongoing";
   };
 
-  const recommendAction = (offense) => {
-    const o = (offense || "").toLowerCase();
+  /* =========================================================
+     AI RECOMMENDATION HELPERS
+  ========================================================= */
 
-    if (o.includes("fighting")) return "Suspension";
-    if (o.includes("bullying")) return "Call a Parent";
-    if (o.includes("cheating")) return "Warning";
+  /*
+    Get every incident belonging to this student.
 
-    return "Behavior Monitoring";
+    IMPORTANT:
+    The current incident is separated from previous incidents.
+    This prevents the current incident from being mixed together
+    with historical incidents.
+  */
+  const getStudentIncidents = (studentId) => {
+    if (!studentId) return [];
+
+    return cases.filter(
+      (incident) =>
+        String(incident.studentId) === String(studentId),
+    );
   };
+
+  /*
+    Get reports belonging to the student.
+  */
+  const getStudentReports = (studentId) => {
+    if (!studentId) return [];
+
+    return reports.filter(
+      (report) =>
+        String(
+          report.studentId?._id ||
+            report.studentId,
+        ) === String(studentId),
+    );
+  };
+
+  /*
+    Risk is supporting context only.
+    It must NOT replace the current incident as the main
+    basis for the recommendation.
+  */
+  const getRiskLevelForStudent = (studentId) => {
+    const studentIncidents = getStudentIncidents(studentId);
+
+    if (!studentIncidents.length) {
+      return "Low";
+    }
+
+    const high = studentIncidents.filter(
+      (i) =>
+        String(i.level || "").toLowerCase() === "high",
+    ).length;
+
+    const medium = studentIncidents.filter(
+      (i) =>
+        String(i.level || "").toLowerCase() === "medium",
+    ).length;
+
+    if (high >= 2) return "High";
+    if (high >= 1 || medium >= 2) return "Medium";
+
+    return "Low";
+  };
+
+  /*
+    Convert different possible AI conclusion formats into
+    the exact four allowed intervention conclusions.
+  */
+  const normalizeConclusion = (
+    recommendation = "",
+    explicitConclusion = "",
+    fallbackLevel = "Low",
+  ) => {
+    const combined =
+      `${explicitConclusion} ${recommendation}`.toLowerCase();
+
+    /*
+      Check the strongest/more specific terms first.
+    */
+
+    if (
+      /\bsuspension\b/i.test(combined)
+    ) {
+      return "Suspension";
+    }
+
+    if (
+      /\bcommunity\s+service\b/i.test(combined)
+    ) {
+      return "Community Service";
+    }
+
+    if (
+      /\bcall\s+(a\s+)?parent\b/i.test(combined) ||
+      /\bparent\s+conference\b/i.test(combined) ||
+      /\bparent\s+meeting\b/i.test(combined)
+    ) {
+      return "Call a Parent";
+    }
+
+    if (
+      /\bwarning\b/i.test(combined)
+    ) {
+      return "Warning";
+    }
+
+    /*
+      If the AI did not provide a valid conclusion, use the
+      current incident severity only as a fallback.
+
+      This fallback is NOT presented as a separate AI analysis.
+      It only guarantees that the UI always has one valid
+      conclusion.
+    */
+    const level = String(fallbackLevel || "Low").toLowerCase();
+
+    if (level === "high") {
+      return "Suspension";
+    }
+
+    if (level === "medium") {
+      return "Call a Parent";
+    }
+
+    return "Warning";
+  };
+
+  /*
+    Make sure the final recommendation ALWAYS ends with:
+
+    Conclusion: Warning
+    Conclusion: Call a Parent
+    Conclusion: Community Service
+    Conclusion: Suspension
+  */
+  const ensureRecommendationConclusion = (
+    recommendation,
+    explicitConclusion,
+    fallbackLevel,
+  ) => {
+    const cleanRecommendation =
+      String(
+        recommendation ||
+          "No specific intervention recommendation was generated.",
+      ).trim();
+
+    const conclusion = normalizeConclusion(
+      cleanRecommendation,
+      explicitConclusion,
+      fallbackLevel,
+    );
+
+    /*
+      Remove an existing conclusion from the end so that we
+      don't produce:
+
+      Conclusion: Warning
+      Conclusion: Suspension
+    */
+    const withoutOldConclusion = cleanRecommendation
+      .replace(
+        /\s*(?:final\s+)?conclusion\s*:\s*(warning|call\s+a\s+parent|community\s+service|suspension)\s*\.?\s*$/i,
+        "",
+      )
+      .trim();
+
+    return {
+      text: `${withoutOldConclusion}\n\nConclusion: ${conclusion}`,
+      conclusion,
+    };
+  };
+
+  /*
+    Normalize the backend response so the frontend has one
+    predictable AI object.
+  */
+  const normalizeAIRecommendation = (
+    analysis,
+    fallbackLevel = "Low",
+  ) => {
+    if (!analysis) {
+      return null;
+    }
+
+    const interventions = Array.isArray(
+      analysis.interventions,
+    )
+      ? analysis.interventions
+      : [];
+
+    const firstIntervention =
+      interventions[0] || null;
+
+    if (!firstIntervention) {
+      const fallbackRecommendation =
+        analysis.notes ||
+        "The available evidence does not provide enough information for a specific intervention recommendation.";
+
+      const finalized =
+        ensureRecommendationConclusion(
+          fallbackRecommendation,
+          analysis.conclusion,
+          fallbackLevel,
+        );
+
+      return {
+        recommendation: finalized.text,
+
+        conclusion: finalized.conclusion,
+
+        basis:
+          analysis.notes ||
+          "The available behavioral data does not provide enough evidence for a specific intervention.",
+
+        references: Array.isArray(
+          analysis.researchReferences,
+        )
+          ? analysis.researchReferences
+          : [],
+
+        referenceIds: [],
+
+        summary: analysis.summary || "",
+        risk: analysis.risk || "",
+        prediction: analysis.prediction || "",
+        pattern: analysis.pattern || "",
+        notes: analysis.notes || "",
+      };
+    }
+
+    const finalized =
+      ensureRecommendationConclusion(
+        firstIntervention.recommendation ||
+          "No specific intervention recommended.",
+        firstIntervention.conclusion ||
+          analysis.conclusion,
+        fallbackLevel,
+      );
+
+    return {
+      recommendation: finalized.text,
+
+      conclusion: finalized.conclusion,
+
+      basis:
+        firstIntervention.basis ||
+        "Recommendation generated from the current incident and supporting behavioral records.",
+
+      references: Array.isArray(
+        firstIntervention.references,
+      )
+        ? firstIntervention.references
+        : [],
+
+      referenceIds: Array.isArray(
+        firstIntervention.referenceIds,
+      )
+        ? firstIntervention.referenceIds
+        : [],
+
+      summary: analysis.summary || "",
+      risk: analysis.risk || "",
+      prediction: analysis.prediction || "",
+      pattern: analysis.pattern || "",
+      notes: analysis.notes || "",
+    };
+  };
+
+  const getAIRecommendation = (incidentId) => {
+    return (
+      aiRecommendations[String(incidentId)] ||
+      null
+    );
+  };
+
+  /* =========================================================
+     RUN AI RECOMMENDATION
+  ========================================================= */
+
+  const runAIRecommendation = async (
+    caseData,
+  ) => {
+    if (!caseData?.studentId) {
+      return;
+    }
+
+    const incidentId = String(
+      caseData.incidentId,
+    );
+
+    /*
+      Avoid calling Gemini again if this case was already
+      analyzed during the current page session.
+    */
+    if (aiRecommendations[incidentId]) {
+      return;
+    }
+
+    try {
+      setAiLoading(true);
+      setAiError("");
+
+      /*
+        =====================================================
+        CURRENT INCIDENT
+        =====================================================
+
+        This is the MOST IMPORTANT object sent to the AI.
+
+        The AI should answer:
+
+        "What intervention is most appropriate for THIS
+        incident?"
+      */
+
+      const currentIncidentReport =
+        reports.find(
+          (report) =>
+            String(report._id) ===
+            String(caseData.reportId),
+        );
+
+      const currentIncident = {
+        incidentId: caseData.incidentId,
+
+        title:
+          caseData.offense ||
+          caseData.title ||
+          "No title",
+
+        category:
+          caseData.category ||
+          "Uncategorized",
+
+        level:
+          caseData.level ||
+          "Low",
+
+        status:
+          caseData.status ||
+          "received",
+
+        studentStatement:
+          caseData.studentStatement ||
+          "",
+
+        action:
+          caseData.action ||
+          "",
+
+        createdAt:
+          caseData.createdAt ||
+          null,
+
+        /*
+          Include the original report details when available.
+          These are part of the current incident overview.
+        */
+        reportId:
+          caseData.reportId ||
+          null,
+
+        reportOffense:
+          currentIncidentReport?.offense ||
+          "",
+
+        description:
+          currentIncidentReport?.description ||
+          "",
+
+        location:
+          currentIncidentReport?.location ||
+          "",
+
+        date:
+          currentIncidentReport?.date ||
+          null,
+
+        time:
+          currentIncidentReport?.time ||
+          "",
+
+        evidence:
+          currentIncidentReport?.evidence ||
+          [],
+      };
+
+      /*
+        =====================================================
+        PREVIOUS INCIDENTS
+        =====================================================
+
+        Previous incidents are deliberately separated from
+        the current incident.
+
+        They are SECONDARY context only.
+      */
+
+      const studentIncidents =
+        getStudentIncidents(
+          caseData.studentId,
+        );
+
+      const previousIncidents =
+        studentIncidents
+          .filter(
+            (incident) =>
+              String(
+                incident.incidentId,
+              ) !==
+              String(
+                caseData.incidentId,
+              ),
+          )
+          .map(
+            (incident) => ({
+              incidentId:
+                incident.incidentId,
+
+              title:
+                incident.offense ||
+                incident.title ||
+                "No title",
+
+              category:
+                incident.category ||
+                "Uncategorized",
+
+              level:
+                incident.level ||
+                "Low",
+
+              status:
+                incident.status ||
+                "received",
+
+              studentStatement:
+                incident.studentStatement ||
+                "",
+
+              action:
+                incident.action ||
+                "",
+
+              createdAt:
+                incident.createdAt ||
+                null,
+            }),
+          );
+
+      /*
+        =====================================================
+        STUDENT REPORT HISTORY
+        =====================================================
+
+        Reports are supporting evidence only.
+      */
+
+      const studentReports =
+        getStudentReports(
+          caseData.studentId,
+        );
+
+      const formattedReports =
+        studentReports.map(
+          (report) => ({
+            reportId:
+              report._id,
+
+            offense:
+              report.offense ||
+              "",
+
+            description:
+              report.description ||
+              "",
+
+            location:
+              report.location ||
+              "",
+
+            date:
+              report.date ||
+              null,
+
+            time:
+              report.time ||
+              "",
+
+            status:
+              report.status ||
+              "",
+
+            evidence:
+              report.evidence ||
+              [],
+          }),
+        );
+
+      /*
+        =====================================================
+        RISK
+        =====================================================
+
+        Risk is secondary context. It does not override the
+        current incident.
+      */
+
+      const riskLevel =
+        getRiskLevelForStudent(
+          caseData.studentId,
+        );
+
+      /*
+        =====================================================
+        TIMELINE
+        =====================================================
+
+        Explicitly mark the current incident and historical
+        incidents so the backend/AI can distinguish them.
+      */
+
+      const timeline = [
+        {
+          type: "current-incident",
+          ...currentIncident,
+        },
+
+        ...previousIncidents.map(
+          (incident) => ({
+            type: "previous-incident",
+            ...incident,
+          }),
+        ),
+      ];
+
+      /*
+        Keep incidents for backward compatibility with the
+        existing /student-analysis endpoint.
+
+        The CURRENT INCIDENT is always first.
+      */
+      const incidents = [
+        currentIncident,
+        ...previousIncidents,
+      ];
+
+      /*
+        =====================================================
+        AI REQUEST
+        =====================================================
+      */
+
+      const response =
+        await API.post(
+          "/api/gemini/student-analysis",
+          {
+            /*
+              PRIMARY DATA
+            */
+            currentIncident,
+
+            /*
+              SUPPORTING CONTEXT
+            */
+            grade:
+              caseData.grade,
+
+            riskLevel,
+
+            previousIncidents,
+
+            timeline,
+
+            incidents,
+
+            reports:
+              formattedReports,
+
+            /*
+              Tell the backend exactly what conclusion format
+              the frontend requires.
+            */
+            requiredConclusionOptions:
+              [
+                "Warning",
+                "Call a Parent",
+                "Community Service",
+                "Suspension",
+              ],
+
+            recommendationInstruction:
+              "Base the recommendation primarily on the CURRENT INCIDENT. Previous incidents and reports are secondary context only. The recommendation must end with a conclusion using exactly one of: Warning, Call a Parent, Community Service, or Suspension. Include the supplied research support when relevant and explain the evidence basis.",
+          },
+          {
+            timeout: 90000,
+          },
+        );
+
+      if (!response.data?.success) {
+        throw new Error(
+          response.data?.message ||
+            "AI analysis failed.",
+        );
+      }
+
+      /*
+        Make sure the recommendation ALWAYS has a valid
+        conclusion even if the backend response did not
+        explicitly format it correctly.
+      */
+      const normalized =
+        normalizeAIRecommendation(
+          response.data,
+          caseData.level ||
+            "Low",
+        );
+
+      setAiRecommendations(
+        (prev) => ({
+          ...prev,
+          [incidentId]:
+            normalized,
+        }),
+      );
+    } catch (error) {
+      console.error(
+        "❌ AI recommendation error:",
+        error.response?.data ||
+          error.message,
+      );
+
+      let message =
+        "Unable to generate an AI recommendation.";
+
+      if (
+        error.response?.status ===
+        429
+      ) {
+        message =
+          "AI service is temporarily rate-limited. Please try again later.";
+      } else if (
+        error.response?.status ===
+        503
+      ) {
+        message =
+          "AI service is temporarily busy. Please try again later.";
+      } else if (
+        error.code ===
+        "ECONNABORTED"
+      ) {
+        message =
+          "AI analysis took too long to complete.";
+      }
+
+      setAiError(message);
+
+      /*
+        Store a fallback object so the UI doesn't break.
+
+        IMPORTANT:
+        This is explicitly marked as an error and is NOT
+        presented as a research-backed AI result.
+      */
+      setAiRecommendations(
+        (prev) => ({
+          ...prev,
+
+          [incidentId]: {
+            recommendation:
+              "AI recommendation unavailable",
+
+            conclusion: null,
+
+            basis: message,
+
+            references: [],
+
+            referenceIds: [],
+
+            summary: "",
+            risk: "",
+            prediction: "",
+            pattern: "",
+
+            error: true,
+          },
+        }),
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  /*
+    Display a concise recommendation on the case card.
+  */
+  const getRecommendationLabel = (
+    caseData,
+  ) => {
+    const aiResult =
+      getAIRecommendation(
+        caseData.incidentId,
+      );
+
+    if (
+      aiResult?.conclusion
+    ) {
+      return aiResult.conclusion;
+    }
+
+    if (
+      aiLoading &&
+      selected?.incidentId ===
+        caseData.incidentId
+    ) {
+      return "Analyzing...";
+    }
+
+    return "View AI recommendation";
+  };
+
+  /* =========================================================
+     DATE HELPERS
+  ========================================================= */
 
   const formatDate = (date) => {
     if (!date) return "N/A";
 
-    const parsed = new Date(date);
+    const parsed =
+      new Date(date);
 
-    if (Number.isNaN(parsed.getTime())) return date;
+    if (
+      Number.isNaN(
+        parsed.getTime(),
+      )
+    ) {
+      return date;
+    }
 
-    return parsed.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    return parsed.toLocaleDateString(
+      "en-US",
+      {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      },
+    );
   };
 
-  const formatDateTime = (date) => {
+  const formatDateTime = (
+    date,
+  ) => {
     if (!date) return "N/A";
 
-    const parsed = new Date(date);
+    const parsed =
+      new Date(date);
 
-    if (Number.isNaN(parsed.getTime())) return date;
+    if (
+      Number.isNaN(
+        parsed.getTime(),
+      )
+    ) {
+      return date;
+    }
 
-    return parsed.toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    return parsed.toLocaleString(
+      "en-US",
+      {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      },
+    );
   };
 
   /* =========================================================
@@ -255,18 +1038,31 @@ const InterventionPage = () => {
     try {
       if (!selected) return;
 
-      await API.post("/api/interventions", {
-        studentId: selected.studentId,
-        incidentId: selected.incidentId,
+      await API.post(
+        "/api/interventions",
+        {
+          studentId:
+            selected.studentId,
 
-        type: form.type,
-        description: form.description,
+          incidentId:
+            selected.incidentId,
 
-        interventionBy: loggedInUser,
-        approvedBy: loggedInUser,
-      });
+          type: form.type,
 
-      addAuditLog(`Created intervention: ${form.type}`);
+          description:
+            form.description,
+
+          interventionBy:
+            loggedInUser,
+
+          approvedBy:
+            loggedInUser,
+        },
+      );
+
+      addAuditLog(
+        `Created intervention: ${form.type}`,
+      );
 
       await fetchData();
 
@@ -278,7 +1074,10 @@ const InterventionPage = () => {
       setOpen(false);
       setSelected(null);
     } catch (err) {
-      console.error(err.response?.data || err.message);
+      console.error(
+        err.response?.data ||
+          err.message,
+      );
     }
   };
 
@@ -286,17 +1085,28 @@ const InterventionPage = () => {
      COMPLETE
   ========================================================= */
 
-  const markComplete = async (id) => {
+  const markComplete = async (
+    id,
+  ) => {
     try {
-      await API.put(`/api/interventions/${id}/resolve`, {
-        completedBy: loggedInUser,
-      });
+      await API.put(
+        `/api/interventions/${id}/resolve`,
+        {
+          completedBy:
+            loggedInUser,
+        },
+      );
 
-      addAuditLog("Marked intervention as completed");
+      addAuditLog(
+        "Marked intervention as completed",
+      );
 
       await fetchData();
     } catch (err) {
-      console.error(err.response?.data || err.message);
+      console.error(
+        err.response?.data ||
+          err.message,
+      );
     }
   };
 
@@ -304,99 +1114,139 @@ const InterventionPage = () => {
      INTERVENTION CASES
   ========================================================= */
 
-  /*
-    An intervention case is:
+  const interventionCases =
+    useMemo(() => {
+      return cases.filter(
+        (c) => {
+          const interventionList =
+            getIncidentInterventions(
+              c.incidentId,
+            );
 
-    1. An incident currently marked "intervention-ready"
-       and therefore available for a new intervention
-
-    OR
-
-    2. An incident that already has an intervention
-
-    This is important because once an intervention is completed,
-    the backend may change the incident status. We still need
-    the case to remain visible in the intervention page.
-  */
-
-  const interventionCases = useMemo(() => {
-    return cases.filter((c) => {
-      const interventionList = getIncidentInterventions(c.incidentId);
-
-      return (
-        c.status === "intervention-ready" ||
-        interventionList.length > 0
+          return (
+            c.status ===
+              "intervention-ready" ||
+            interventionList.length >
+              0
+          );
+        },
       );
-    });
-  }, [cases, interventions]);
+    }, [
+      cases,
+      interventions,
+    ]);
 
   /* =========================================================
      FILTER
   ========================================================= */
 
-  const filtered = useMemo(() => {
-    return interventionCases.filter((c) => {
-      const status = getIncidentInterventionStatus(c.incidentId);
+  const filtered =
+    useMemo(() => {
+      return interventionCases.filter(
+        (c) => {
+          const status =
+            getIncidentInterventionStatus(
+              c.incidentId,
+            );
 
-      // Status filter
-      if (tab !== "all" && tab !== status) {
-        return false;
-      }
+          if (
+            tab !== "all" &&
+            tab !== status
+          ) {
+            return false;
+          }
 
-      // Search filter
-      const searchTerm = search.trim().toLowerCase();
+          const searchTerm =
+            search
+              .trim()
+              .toLowerCase();
 
-      if (
-        searchTerm &&
-        !c.studentName.toLowerCase().includes(searchTerm) &&
-        !c.offense.toLowerCase().includes(searchTerm)
-      ) {
-        return false;
-      }
+          if (
+            searchTerm &&
+            !c.studentName
+              .toLowerCase()
+              .includes(
+                searchTerm,
+              ) &&
+            !c.offense
+              .toLowerCase()
+              .includes(
+                searchTerm,
+              )
+          ) {
+            return false;
+          }
 
-      return true;
-    });
-  }, [interventionCases, tab, search]);
+          return true;
+        },
+      );
+    }, [
+      interventionCases,
+      tab,
+      search,
+    ]);
 
   /* =========================================================
      STATS
   ========================================================= */
 
   const stats = {
-    total: interventionCases.length,
+    total:
+      interventionCases.length,
 
-    ongoing: interventionCases.filter(
-      (c) => getIncidentInterventionStatus(c.incidentId) === "ongoing",
-    ).length,
+    ongoing:
+      interventionCases.filter(
+        (c) =>
+          getIncidentInterventionStatus(
+            c.incidentId,
+          ) === "ongoing",
+      ).length,
 
-    completed: interventionCases.filter(
-      (c) => getIncidentInterventionStatus(c.incidentId) === "completed",
-    ).length,
+    completed:
+      interventionCases.filter(
+        (c) =>
+          getIncidentInterventionStatus(
+            c.incidentId,
+          ) === "completed",
+      ).length,
 
-    pending: interventionCases.filter(
-      (c) => getIncidentInterventionStatus(c.incidentId) === "none",
-    ).length,
+    pending:
+      interventionCases.filter(
+        (c) =>
+          getIncidentInterventionStatus(
+            c.incidentId,
+          ) === "none",
+      ).length,
   };
 
   /* =========================================================
      STATUS
   ========================================================= */
 
-  const getStatusConfig = (status) => {
-    if (status === "completed") {
+  const getStatusConfig = (
+    status,
+  ) => {
+    if (
+      status ===
+      "completed"
+    ) {
       return {
         label: "Completed",
         icon: CheckCircle2,
-        badge: "bg-emerald-50 text-emerald-700 border-emerald-100",
+        badge:
+          "bg-emerald-50 text-emerald-700 border-emerald-100",
         dot: "bg-emerald-500",
       };
     }
 
-    if (status === "ongoing") {
+    if (
+      status === "ongoing"
+    ) {
       return {
         label: "Ongoing",
         icon: Activity,
-        badge: "bg-amber-50 text-amber-700 border-amber-100",
+        badge:
+          "bg-amber-50 text-amber-700 border-amber-100",
         dot: "bg-amber-500",
       };
     }
@@ -404,7 +1254,8 @@ const InterventionPage = () => {
     return {
       label: "Pending",
       icon: Clock3,
-      badge: "bg-blue-50 text-blue-700 border-blue-100",
+      badge:
+        "bg-blue-50 text-blue-700 border-blue-100",
       dot: "bg-blue-500",
     };
   };
@@ -413,10 +1264,19 @@ const InterventionPage = () => {
      META
   ========================================================= */
 
-  const Meta = ({ label, value, icon: Icon }) => (
+  const Meta = ({
+    label,
+    value,
+    icon: Icon,
+  }) => (
     <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4">
       <div className="flex items-center gap-2 mb-2">
-        {Icon && <Icon size={13} className="text-gray-400" />}
+        {Icon && (
+          <Icon
+            size={13}
+            className="text-gray-400"
+          />
+        )}
 
         <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">
           {label}
@@ -428,6 +1288,22 @@ const InterventionPage = () => {
       </p>
     </div>
   );
+
+  /* =========================================================
+     OPEN CASE
+  ========================================================= */
+
+  const openCase = async (
+    caseData,
+  ) => {
+    setSelected(caseData);
+    setOpenTimeline(null);
+    setOpen(true);
+
+    await runAIRecommendation(
+      caseData,
+    );
+  };
 
   /* =========================================================
      RETURN
@@ -455,7 +1331,10 @@ const InterventionPage = () => {
 
               <div>
                 <h1 className="text-xl font-extrabold tracking-tight text-gray-900">
-                  Guid<span className="text-green-600">Ed</span>
+                  Guid
+                  <span className="text-green-600">
+                    Ed
+                  </span>
                 </h1>
 
                 <p className="text-[9px] uppercase tracking-widest text-gray-400 font-semibold">
@@ -479,37 +1358,77 @@ const InterventionPage = () => {
 
           <div className="space-y-1">
             <Nav
-              icon={<LayoutDashboard size={18} />}
+              icon={
+                <LayoutDashboard
+                  size={18}
+                />
+              }
               label="Dashboard"
-              onClick={() => navigate("/dashboard")}
+              onClick={() =>
+                navigate(
+                  "/dashboard",
+                )
+              }
             />
 
             <Nav
-              icon={<Users size={18} />}
+              icon={
+                <Users size={18} />
+              }
               label="Students"
-              onClick={() => navigate("/students")}
+              onClick={() =>
+                navigate(
+                  "/students",
+                )
+              }
             />
 
             <Nav
-              icon={<ShieldX size={18} />}
+              icon={
+                <ShieldX
+                  size={18}
+                />
+              }
               label="Guidance"
-              onClick={() => navigate("/guidance")}
+              onClick={() =>
+                navigate(
+                  "/guidance",
+                )
+              }
             />
 
             <Nav
-              icon={<ChartNoAxesCombined size={18} />}
+              icon={
+                <ChartNoAxesCombined
+                  size={18}
+                />
+              }
               label="Reports"
-              onClick={() => navigate("/reports")}
+              onClick={() =>
+                navigate(
+                  "/reports",
+                )
+              }
             />
 
             <Nav
-              icon={<BriefcaseBusiness size={18} />}
+              icon={
+                <BriefcaseBusiness
+                  size={18}
+                />
+              }
               label="Cases"
-              onClick={() => navigate("/cases")}
+              onClick={() =>
+                navigate("/cases")
+              }
             />
 
             <Nav
-              icon={<HandHelping size={18} />}
+              icon={
+                <HandHelping
+                  size={18}
+                />
+              }
               label="Interventions"
               active
             />
@@ -522,9 +1441,15 @@ const InterventionPage = () => {
           </p>
 
           <Nav
-            icon={<Settings size={18} />}
+            icon={
+              <Settings size={18} />
+            }
             label="Settings"
-            onClick={() => navigate("/settings")}
+            onClick={() =>
+              navigate(
+                "/settings",
+              )
+            }
           />
         </div>
 
@@ -539,13 +1464,20 @@ const InterventionPage = () => {
                     src={adminPhoto}
                     alt={adminName}
                     className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
+                    onError={(
+                      e,
+                    ) => {
+                      e.currentTarget.style.display =
+                        "none";
                     }}
                   />
                 ) : (
                   <span className="text-green-700 font-bold">
-                    {adminName.charAt(0).toUpperCase()}
+                    {adminName
+                      .charAt(
+                        0,
+                      )
+                      .toUpperCase()}
                   </span>
                 )}
 
@@ -595,16 +1527,20 @@ const InterventionPage = () => {
       ===================================================== */}
 
       <main className="flex-1 overflow-y-auto">
-        {/* ===================================================
-            HEADER
-        =================================================== */}
+        {/* HEADER */}
 
         <header className="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-gray-100">
           <div className="px-8 py-6 flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 text-xs text-gray-400 mb-2">
-                <span>Guidance</span>
-                <ChevronRight size={13} />
+                <span>
+                  Guidance
+                </span>
+
+                <ChevronRight
+                  size={13}
+                />
+
                 <span className="text-green-600 font-medium">
                   Interventions
                 </span>
@@ -615,8 +1551,8 @@ const InterventionPage = () => {
               </h2>
 
               <p className="text-sm text-gray-500 mt-1.5">
-                Manage student interventions, sanctions, and rehabilitation
-                plans.
+                Manage student interventions,
+                sanctions, and rehabilitation plans.
               </p>
             </div>
 
@@ -624,7 +1560,11 @@ const InterventionPage = () => {
 
             <div className="relative">
               <button
-                onClick={() => setOpenNotif(!openNotif)}
+                onClick={() =>
+                  setOpenNotif(
+                    !openNotif,
+                  )
+                }
                 className="
                   relative
                   w-11 h-11
@@ -640,7 +1580,8 @@ const InterventionPage = () => {
               >
                 <Bell size={18} />
 
-                {notifications.length > 0 && (
+                {notifications.length >
+                  0 && (
                   <span
                     className="
                       absolute
@@ -661,7 +1602,10 @@ const InterventionPage = () => {
                       border-white
                     "
                   >
-                    {notifications.length > 9 ? "9+" : notifications.length}
+                    {notifications.length >
+                    9
+                      ? "9+"
+                      : notifications.length}
                   </span>
                 )}
               </button>
@@ -669,9 +1613,21 @@ const InterventionPage = () => {
               <AnimatePresence>
                 {openNotif && (
                   <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.97 }}
+                    initial={{
+                      opacity: 0,
+                      y: 8,
+                      scale: 0.97,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                      scale: 1,
+                    }}
+                    exit={{
+                      opacity: 0,
+                      y: 8,
+                      scale: 0.97,
+                    }}
                     className="
                       absolute
                       right-0
@@ -697,12 +1653,15 @@ const InterventionPage = () => {
                       </div>
 
                       <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
-                        <Sparkles size={15} />
+                        <Sparkles
+                          size={15}
+                        />
                       </div>
                     </div>
 
                     <div className="max-h-[380px] overflow-y-auto">
-                      {notifications.length === 0 ? (
+                      {notifications.length ===
+                      0 ? (
                         <div className="py-12 text-center">
                           <Bell
                             size={24}
@@ -714,42 +1673,63 @@ const InterventionPage = () => {
                           </p>
                         </div>
                       ) : (
-                        notifications.map((n) => (
-                          <motion.div
-                            key={n.id}
-                            whileHover={{ backgroundColor: "#f9fafb" }}
-                            className="px-5 py-4 border-b border-gray-100 cursor-pointer"
-                          >
-                            <div className="flex gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                                <AlertCircle size={16} />
-                              </div>
+                        notifications.map(
+                          (n) => (
+                            <motion.div
+                              key={n.id}
+                              whileHover={{
+                                backgroundColor:
+                                  "#f9fafb",
+                              }}
+                              className="px-5 py-4 border-b border-gray-100 cursor-pointer"
+                            >
+                              <div className="flex gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                                  <AlertCircle
+                                    size={
+                                      16
+                                    }
+                                  />
+                                </div>
 
-                              <div className="min-w-0">
-                                <p className="font-semibold text-sm text-gray-900">
-                                  {n.title}
-                                </p>
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-sm text-gray-900">
+                                    {
+                                      n.title
+                                    }
+                                  </p>
 
-                                <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                                  {n.text}
-                                </p>
+                                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                    {
+                                      n.text
+                                    }
+                                  </p>
 
-                                <div className="flex items-center justify-between gap-3 mt-2">
-                                  <span className="text-[11px] font-semibold text-green-700 truncate">
-                                    {n.student}
-                                  </span>
+                                  <div className="flex items-center justify-between gap-3 mt-2">
+                                    <span className="text-[11px] font-semibold text-green-700 truncate">
+                                      {
+                                        n.student
+                                      }
+                                    </span>
 
-                                  <span className="text-[10px] text-gray-400 shrink-0">
-                                    {new Date(n.time).toLocaleTimeString([], {
-                                      hour: "numeric",
-                                      minute: "2-digit",
-                                    })}
-                                  </span>
+                                    <span className="text-[10px] text-gray-400 shrink-0">
+                                      {new Date(
+                                        n.time,
+                                      ).toLocaleTimeString(
+                                        [],
+                                        {
+                                          hour: "numeric",
+                                          minute:
+                                            "2-digit",
+                                        },
+                                      )}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </motion.div>
-                        ))
+                            </motion.div>
+                          ),
+                        )
                       )}
                     </div>
                   </motion.div>
@@ -759,14 +1739,10 @@ const InterventionPage = () => {
           </div>
         </header>
 
-        {/* ===================================================
-            CONTENT
-        =================================================== */}
+        {/* CONTENT */}
 
         <div className="p-8 max-w-[1600px] mx-auto">
-          {/* =================================================
-              OVERVIEW
-          ================================================= */}
+          {/* OVERVIEW */}
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
             <div>
@@ -775,12 +1751,17 @@ const InterventionPage = () => {
               </h3>
 
               <p className="text-sm text-gray-400 mt-1">
-                Monitor the current state of student intervention cases.
+                Monitor the current state of student
+                intervention cases.
               </p>
             </div>
 
             <button
-              onClick={() => setShowPrintableReport(true)}
+              onClick={() =>
+                setShowPrintableReport(
+                  true,
+                )
+              }
               className="
                 h-10
                 px-4
@@ -806,20 +1787,22 @@ const InterventionPage = () => {
             </button>
           </div>
 
-          {/* =================================================
-              STATS
-          ================================================= */}
+          {/* STATS */}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
             <StatCard
-              icon={<FileText size={18} />}
+              icon={
+                <FileText size={18} />
+              }
               label="Total Cases"
               value={stats.total}
               description="All intervention-ready cases"
             />
 
             <StatCard
-              icon={<Timer size={18} />}
+              icon={
+                <Timer size={18} />
+              }
               label="Ongoing"
               value={stats.ongoing}
               description="Currently being handled"
@@ -828,16 +1811,24 @@ const InterventionPage = () => {
             />
 
             <StatCard
-              icon={<CircleCheck size={18} />}
+              icon={
+                <CircleCheck
+                  size={18}
+                />
+              }
               label="Completed"
-              value={stats.completed}
+              value={
+                stats.completed
+              }
               description="Successfully resolved"
               iconBg="bg-emerald-50"
               iconColor="text-emerald-600"
             />
 
             <StatCard
-              icon={<Clock3 size={18} />}
+              icon={
+                <Clock3 size={18} />
+              }
               label="Pending"
               value={stats.pending}
               description="Awaiting intervention"
@@ -846,9 +1837,7 @@ const InterventionPage = () => {
             />
           </div>
 
-          {/* =================================================
-              SEARCH + FILTER
-          ================================================= */}
+          {/* SEARCH + FILTER */}
 
           <div
             className="
@@ -861,8 +1850,6 @@ const InterventionPage = () => {
             "
           >
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              {/* SEARCH */}
-
               <div
                 className="
                   flex
@@ -882,7 +1869,10 @@ const InterventionPage = () => {
                   transition
                 "
               >
-                <Search size={17} className="text-gray-400 shrink-0" />
+                <Search
+                  size={17}
+                  className="text-gray-400 shrink-0"
+                />
 
                 <input
                   className="
@@ -894,21 +1884,25 @@ const InterventionPage = () => {
                     placeholder:text-gray-400
                   "
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) =>
+                    setSearch(
+                      e.target.value,
+                    )
+                  }
                   placeholder="Search student or offense..."
                 />
 
                 {search && (
                   <button
-                    onClick={() => setSearch("")}
+                    onClick={() =>
+                      setSearch("")
+                    }
                     className="text-gray-400 hover:text-gray-700"
                   >
                     <X size={15} />
                   </button>
                 )}
               </div>
-
-              {/* TABS */}
 
               <div className="flex items-center gap-2 overflow-x-auto pb-1">
                 {[
@@ -928,21 +1922,30 @@ const InterventionPage = () => {
                     id: "completed",
                     label: "Completed",
                   },
-                ].map((item) => (
-                  <Tab
-                    key={item.id}
-                    label={item.label}
-                    active={tab === item.id}
-                    onClick={() => setTab(item.id)}
-                  />
-                ))}
+                ].map(
+                  (item) => (
+                    <Tab
+                      key={item.id}
+                      label={
+                        item.label
+                      }
+                      active={
+                        tab ===
+                        item.id
+                      }
+                      onClick={() =>
+                        setTab(
+                          item.id,
+                        )
+                      }
+                    />
+                  ),
+                )}
               </div>
             </div>
           </div>
 
-          {/* =================================================
-              RESULTS HEADER
-          ================================================= */}
+          {/* RESULTS HEADER */}
 
           <div className="flex items-center justify-between mb-4 px-1">
             <div>
@@ -951,8 +1954,12 @@ const InterventionPage = () => {
               </p>
 
               <p className="text-xs text-gray-400 mt-0.5">
-                Showing {filtered.length}{" "}
-                {filtered.length === 1 ? "case" : "cases"}
+                Showing{" "}
+                {filtered.length}{" "}
+                {filtered.length ===
+                1
+                  ? "case"
+                  : "cases"}
               </p>
             </div>
 
@@ -966,9 +1973,7 @@ const InterventionPage = () => {
             )}
           </div>
 
-          {/* =================================================
-              CASES
-          ================================================= */}
+          {/* CASES */}
 
           <div
             className="
@@ -979,7 +1984,8 @@ const InterventionPage = () => {
               p-5
             "
           >
-            {filtered.length === 0 ? (
+            {filtered.length ===
+            0 ? (
               <div className="min-h-[420px] flex items-center justify-center">
                 <div className="text-center max-w-sm">
                   <div
@@ -996,7 +2002,9 @@ const InterventionPage = () => {
                       mb-4
                     "
                   >
-                    <ClipboardCheck size={28} />
+                    <ClipboardCheck
+                      size={28}
+                    />
                   </div>
 
                   <h3 className="text-lg font-bold text-gray-900">
@@ -1004,15 +2012,22 @@ const InterventionPage = () => {
                   </h3>
 
                   <p className="text-sm text-gray-400 mt-2 leading-relaxed">
-                    There are no cases matching your current search or
-                    intervention filter.
+                    There are no cases matching your
+                    current search or intervention
+                    filter.
                   </p>
 
-                  {(search || tab !== "all") && (
+                  {(search ||
+                    tab !==
+                      "all") && (
                     <button
                       onClick={() => {
-                        setSearch("");
-                        setTab("all");
+                        setSearch(
+                          "",
+                        );
+                        setTab(
+                          "all",
+                        );
                       }}
                       className="
                         mt-5
@@ -1037,249 +2052,315 @@ const InterventionPage = () => {
                 layout
                 className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
               >
-                {filtered.map((c) => {
-                  const status = getIncidentInterventionStatus(c.incidentId);
+                {filtered.map(
+                  (c) => {
+                    const status =
+                      getIncidentInterventionStatus(
+                        c.incidentId,
+                      );
 
-                  const statusConfig = getStatusConfig(status);
-                  const StatusIcon = statusConfig.icon;
+                    const statusConfig =
+                      getStatusConfig(
+                        status,
+                      );
 
-                  const interventionCount = getIncidentInterventions(
-                    c.incidentId,
-                  ).length;
+                    const StatusIcon =
+                      statusConfig.icon;
 
-                  return (
-                    <motion.div
-                      layout
-                      key={c._id}
-                      whileHover={{
-                        y: -3,
-                        boxShadow:
-                          "0 12px 30px rgba(15, 23, 42, 0.07)",
-                      }}
-                      transition={{
-                        duration: 0.2,
-                      }}
-                      onClick={() => {
-                        setSelected(c);
-                        setOpenTimeline(null);
-                        setOpen(true);
-                      }}
-                      className="
-                        group
-                        bg-white
-                        border
-                        border-gray-100
-                        rounded-2xl
-                        p-5
-                        cursor-pointer
-                        transition-all
-                        relative
-                        overflow-hidden
-                      "
-                    >
-                      {/* TOP */}
+                    const interventionCount =
+                      getIncidentInterventions(
+                        c.incidentId,
+                      ).length;
 
-                      <div className="flex items-start justify-between gap-4">
-                        <div
-                          className="
-                            w-12
-                            h-12
-                            rounded-xl
-                            bg-green-50
-                            text-green-700
-                            flex
-                            items-center
-                            justify-center
-                            font-bold
-                            text-sm
-                            shrink-0
-                          "
-                        >
-                          {getInitials(c.studentName)}
-                        </div>
+                    const aiResult =
+                      getAIRecommendation(
+                        c.incidentId,
+                      );
 
-                        <div
-                          className={`
-                            flex
-                            items-center
-                            gap-1.5
-                            px-2.5
-                            py-1.5
-                            rounded-lg
-                            border
-                            text-[10px]
-                            font-bold
-                            uppercase
-                            tracking-wide
-                            ${statusConfig.badge}
-                          `}
-                        >
-                          <StatusIcon size={11} />
-                          {statusConfig.label}
-                        </div>
-                      </div>
+                    return (
+                      <motion.div
+                        layout
+                        key={c._id}
+                        whileHover={{
+                          y: -3,
+                          boxShadow:
+                            "0 12px 30px rgba(15, 23, 42, 0.07)",
+                        }}
+                        transition={{
+                          duration: 0.2,
+                        }}
+                        onClick={() =>
+                          openCase(c)
+                        }
+                        className="
+                          group
+                          bg-white
+                          border
+                          border-gray-100
+                          rounded-2xl
+                          p-5
+                          cursor-pointer
+                          transition-all
+                          relative
+                          overflow-hidden
+                        "
+                      >
+                        {/* TOP */}
 
-                      {/* STUDENT */}
+                        <div className="flex items-start justify-between gap-4">
+                          <div
+                            className="
+                              w-12
+                              h-12
+                              rounded-xl
+                              bg-green-50
+                              text-green-700
+                              flex
+                              items-center
+                              justify-center
+                              font-bold
+                              text-sm
+                              shrink-0
+                            "
+                          >
+                            {getInitials(
+                              c.studentName,
+                            )}
+                          </div>
 
-                      <div className="mt-4">
-                        <h3
-                          className="
-                            text-base
-                            font-bold
-                            text-gray-900
-                            group-hover:text-green-700
-                            transition-colors
-                          "
-                        >
-                          {c.studentName}
-                        </h3>
-
-                        <p className="text-xs text-gray-400 mt-1">
-                          {c.grade} • {c.studentCode} • {c.gender}
-                        </p>
-                      </div>
-
-                      {/* INCIDENT */}
-
-                      <div className="mt-5">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-5 h-5 rounded-md bg-gray-100 flex items-center justify-center">
-                            <AlertCircle
-                              size={11}
-                              className="text-gray-500"
+                          <div
+                            className={`
+                              flex
+                              items-center
+                              gap-1.5
+                              px-2.5
+                              py-1.5
+                              rounded-lg
+                              border
+                              text-[10px]
+                              font-bold
+                              uppercase
+                              tracking-wide
+                              ${statusConfig.badge}
+                            `}
+                          >
+                            <StatusIcon
+                              size={
+                                11
+                              }
                             />
+
+                            {
+                              statusConfig.label
+                            }
+                          </div>
+                        </div>
+
+                        {/* STUDENT */}
+
+                        <div className="mt-4">
+                          <h3
+                            className="
+                              text-base
+                              font-bold
+                              text-gray-900
+                              group-hover:text-green-700
+                              transition-colors
+                            "
+                          >
+                            {
+                              c.studentName
+                            }
+                          </h3>
+
+                          <p className="text-xs text-gray-400 mt-1">
+                            {c.grade} •{" "}
+                            {
+                              c.studentCode
+                            }{" "}
+                            •{" "}
+                            {
+                              c.gender
+                            }
+                          </p>
+                        </div>
+
+                        {/* INCIDENT */}
+
+                        <div className="mt-5">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-5 h-5 rounded-md bg-gray-100 flex items-center justify-center">
+                              <AlertCircle
+                                size={
+                                  11
+                                }
+                                className="text-gray-500"
+                              />
+                            </div>
+
+                            <p
+                              className="
+                                text-[10px]
+                                uppercase
+                                tracking-wider
+                                font-bold
+                                text-gray-400
+                              "
+                            >
+                              Incident
+                            </p>
                           </div>
 
                           <p
                             className="
-                              text-[10px]
-                              uppercase
-                              tracking-wider
-                              font-bold
-                              text-gray-400
+                              text-sm
+                              text-gray-700
+                              leading-relaxed
+                              line-clamp-2
+                              min-h-[40px]
                             "
                           >
-                            Incident
+                            {
+                              c.offense
+                            }
                           </p>
                         </div>
 
-                        <p
+                        {/* AI */}
+
+                        <div
                           className="
-                            text-sm
-                            text-gray-700
-                            leading-relaxed
-                            line-clamp-2
-                            min-h-[40px]
+                            mt-5
+                            p-3.5
+                            rounded-xl
+                            bg-green-50/70
+                            border
+                            border-green-100
                           "
                         >
-                          {c.offense}
-                        </p>
-                      </div>
-
-                      {/* AI */}
-
-                      <div
-                        className="
-                          mt-5
-                          p-3.5
-                          rounded-xl
-                          bg-green-50/70
-                          border
-                          border-green-100
-                        "
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="
-                                w-7
-                                h-7
-                                rounded-lg
-                                bg-white
-                                text-green-600
-                                flex
-                                items-center
-                                justify-center
-                              "
-                            >
-                              <Brain size={14} />
-                            </div>
-
-                            <div>
-                              <p
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div
                                 className="
-                                  text-[9px]
-                                  uppercase
-                                  tracking-wider
-                                  font-bold
+                                  w-7
+                                  h-7
+                                  rounded-lg
+                                  bg-white
                                   text-green-600
+                                  flex
+                                  items-center
+                                  justify-center
+                                  shrink-0
                                 "
                               >
-                                AI Recommendation
-                              </p>
+                                {aiLoading &&
+                                selected?.incidentId ===
+                                  c.incidentId ? (
+                                  <Loader2
+                                    size={
+                                      14
+                                    }
+                                    className="animate-spin"
+                                  />
+                                ) : (
+                                  <Brain
+                                    size={
+                                      14
+                                    }
+                                  />
+                                )}
+                              </div>
 
-                              <p
-                                className="
-                                  text-xs
-                                  font-semibold
-                                  text-green-900
-                                  mt-0.5
-                                "
-                              >
-                                {recommendAction(c.offense)}
-                              </p>
+                              <div className="min-w-0">
+                                <p
+                                  className="
+                                    text-[9px]
+                                    uppercase
+                                    tracking-wider
+                                    font-bold
+                                    text-green-600
+                                  "
+                                >
+                                  AI Recommendation
+                                </p>
+
+                                <p
+                                  className="
+                                    text-xs
+                                    font-semibold
+                                    text-green-900
+                                    mt-0.5
+                                    line-clamp-2
+                                  "
+                                >
+                                  {aiResult?.conclusion ||
+                                    (aiLoading &&
+                                    selected?.incidentId ===
+                                      c.incidentId
+                                      ? "Analyzing..."
+                                      : "Open case to analyze")}
+                                </p>
+                              </div>
                             </div>
+
+                            <ChevronRight
+                              size={15}
+                              className="
+                                text-green-400
+                                group-hover:translate-x-0.5
+                                transition
+                                shrink-0
+                              "
+                            />
+                          </div>
+                        </div>
+
+                        {/* FOOTER */}
+
+                        <div
+                          className="
+                            flex
+                            items-center
+                            justify-between
+                            mt-5
+                            pt-4
+                            border-t
+                            border-gray-100
+                          "
+                        >
+                          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                            <HandHelping
+                              size={
+                                13
+                              }
+                            />
+
+                            {
+                              interventionCount
+                            }{" "}
+                            {interventionCount ===
+                            1
+                              ? "intervention"
+                              : "interventions"}
                           </div>
 
-                          <ChevronRight
-                            size={15}
+                          <span
                             className="
-                              text-green-400
-                              group-hover:translate-x-0.5
+                              text-xs
+                              font-semibold
+                              text-green-600
+                              opacity-0
+                              group-hover:opacity-100
                               transition
                             "
-                          />
+                          >
+                            View Case →
+                          </span>
                         </div>
-                      </div>
-
-                      {/* FOOTER */}
-
-                      <div
-                        className="
-                          flex
-                          items-center
-                          justify-between
-                          mt-5
-                          pt-4
-                          border-t
-                          border-gray-100
-                        "
-                      >
-                        <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                          <HandHelping size={13} />
-
-                          {interventionCount}{" "}
-                          {interventionCount === 1
-                            ? "intervention"
-                            : "interventions"}
-                        </div>
-
-                        <span
-                          className="
-                            text-xs
-                            font-semibold
-                            text-green-600
-                            opacity-0
-                            group-hover:opacity-100
-                            transition
-                          "
-                        >
-                          View Case →
-                        </span>
-                      </div>
-                    </motion.div>
-                  );
-                })}
+                      </motion.div>
+                    );
+                  },
+                )}
               </motion.div>
             )}
           </div>
@@ -1291,1133 +2372,1611 @@ const InterventionPage = () => {
       ===================================================== */}
 
       <AnimatePresence>
-        {open && selected && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="
-              fixed
-              inset-0
-              z-50
-              flex
-              items-center
-              justify-center
-              p-5
-              bg-gray-950/40
-              backdrop-blur-sm
-            "
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) {
-                setOpen(false);
-              }
-            }}
-          >
+        {open &&
+          selected && (
             <motion.div
               initial={{
                 opacity: 0,
-                scale: 0.97,
-                y: 16,
               }}
               animate={{
                 opacity: 1,
-                scale: 1,
-                y: 0,
               }}
               exit={{
                 opacity: 0,
-                scale: 0.97,
-                y: 16,
-              }}
-              transition={{
-                type: "spring",
-                stiffness: 260,
-                damping: 28,
               }}
               className="
-                w-full
-                max-w-6xl
-                max-h-[92vh]
-                bg-[#F8FAFC]
-                rounded-3xl
-                shadow-2xl
-                overflow-hidden
-                border
-                border-white
+                fixed
+                inset-0
+                z-50
                 flex
-                flex-col
+                items-center
+                justify-center
+                p-5
+                bg-gray-950/40
+                backdrop-blur-sm
               "
+              onMouseDown={(
+                e,
+              ) => {
+                if (
+                  e.target ===
+                  e.currentTarget
+                ) {
+                  setOpen(false);
+                }
+              }}
             >
-              {/* =================================================
-                  MODAL HEADER
-              ================================================= */}
-
-              <div
+              <motion.div
+                initial={{
+                  opacity: 0,
+                  scale: 0.97,
+                  y: 16,
+                }}
+                animate={{
+                  opacity: 1,
+                  scale: 1,
+                  y: 0,
+                }}
+                exit={{
+                  opacity: 0,
+                  scale: 0.97,
+                  y: 16,
+                }}
+                transition={{
+                  type: "spring",
+                  stiffness: 260,
+                  damping: 28,
+                }}
                 className="
-                  px-7
-                  py-5
-                  bg-white
-                  border-b
-                  border-gray-100
+                  w-full
+                  max-w-6xl
+                  max-h-[92vh]
+                  bg-[#F8FAFC]
+                  rounded-3xl
+                  shadow-2xl
+                  overflow-hidden
+                  border
+                  border-white
                   flex
-                  items-center
-                  justify-between
-                  shrink-0
+                  flex-col
                 "
               >
-                <div className="flex items-center gap-4">
-                  <div
-                    className="
-                      w-12
-                      h-12
-                      rounded-xl
-                      bg-green-50
-                      text-green-700
-                      flex
-                      items-center
-                      justify-center
-                      font-bold
-                    "
-                  >
-                    {getInitials(selected.studentName)}
-                  </div>
+                {/* MODAL HEADER */}
 
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-lg font-bold text-gray-900">
-                        {selected.studentName}
-                      </h2>
-
-                      <span
-                        className="
-                          px-2
-                          py-1
-                          rounded-md
-                          bg-blue-50
-                          text-blue-700
-                          text-[9px]
-                          font-bold
-                          uppercase
-                          tracking-wide
-                        "
-                      >
-                        Intervention
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-gray-400 mt-1">
-                      {selected.grade} • {selected.studentCode} •{" "}
-                      {selected.gender}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setOpen(false)}
+                <div
                   className="
-                    w-9
-                    h-9
-                    rounded-xl
-                    bg-gray-50
-                    border
-                    border-gray-200
-                    text-gray-500
+                    px-7
+                    py-5
+                    bg-white
+                    border-b
+                    border-gray-100
                     flex
                     items-center
-                    justify-center
-                    hover:bg-gray-100
-                    hover:text-gray-700
-                    transition
+                    justify-between
+                    shrink-0
                   "
                 >
-                  <X size={17} />
-                </button>
-              </div>
-
-              {/* =================================================
-                  MODAL BODY
-              ================================================= */}
-
-              <div
-                className="
-                  grid
-                  grid-cols-1
-                  lg:grid-cols-12
-                  gap-6
-                  p-7
-                  overflow-y-auto
-                "
-              >
-                {/* =================================================
-                    LEFT
-                ================================================= */}
-
-                <div className="lg:col-span-5 space-y-5">
-                  {/* STUDENT SUMMARY */}
-
-                  <div
-                    className="
-                      bg-white
-                      border
-                      border-gray-100
-                      rounded-2xl
-                      p-5
-                      shadow-sm
-                    "
-                  >
-                    <div className="flex items-center gap-2 mb-4">
-                      <div
-                        className="
-                          w-7
-                          h-7
-                          rounded-lg
-                          bg-gray-100
-                          text-gray-500
-                          flex
-                          items-center
-                          justify-center
-                        "
-                      >
-                        <UserRound size={14} />
-                      </div>
-
-                      <h3 className="text-sm font-bold text-gray-900">
-                        Student Information
-                      </h3>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <Meta
-                        label="Student"
-                        value={selected.studentName}
-                        icon={UserRound}
-                      />
-
-                      <Meta
-                        label="Student ID"
-                        value={selected.studentCode}
-                      />
-
-                      <Meta label="Grade" value={selected.grade} />
-
-                      <Meta label="Gender" value={selected.gender} />
-                    </div>
-                  </div>
-
-                  {/* INCIDENT */}
-
-                  <div
-                    className="
-                      bg-white
-                      border
-                      border-gray-100
-                      rounded-2xl
-                      p-5
-                      shadow-sm
-                    "
-                  >
-                    <div className="flex items-center gap-2 mb-3">
-                      <div
-                        className="
-                          w-7
-                          h-7
-                          rounded-lg
-                          bg-red-50
-                          text-red-500
-                          flex
-                          items-center
-                          justify-center
-                        "
-                      >
-                        <AlertCircle size={14} />
-                      </div>
-
-                      <div>
-                        <h3 className="text-sm font-bold text-gray-900">
-                          Incident Overview
-                        </h3>
-
-                        <p className="text-[10px] text-gray-400">
-                          Report requiring intervention
-                        </p>
-                      </div>
-                    </div>
-
+                  <div className="flex items-center gap-4">
                     <div
                       className="
-                        p-4
+                        w-12
+                        h-12
                         rounded-xl
-                        bg-gray-50
-                        border
-                        border-gray-100
+                        bg-green-50
+                        text-green-700
+                        flex
+                        items-center
+                        justify-center
+                        font-bold
                       "
                     >
-                      <p
-                        className="
-                          text-sm
-                          text-gray-700
-                          leading-relaxed
-                        "
-                      >
-                        {selected.offense}
+                      {getInitials(
+                        selected.studentName,
+                      )}
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-bold text-gray-900">
+                          {
+                            selected.studentName
+                          }
+                        </h2>
+
+                        <span
+                          className="
+                            px-2
+                            py-1
+                            rounded-md
+                            bg-blue-50
+                            text-blue-700
+                            text-[9px]
+                            font-bold
+                            uppercase
+                            tracking-wide
+                          "
+                        >
+                          Intervention
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-gray-400 mt-1">
+                        {selected.grade}{" "}
+                        •{" "}
+                        {
+                          selected.studentCode
+                        }{" "}
+                        •{" "}
+                        {
+                          selected.gender
+                        }
                       </p>
                     </div>
                   </div>
 
-                  {/* AI */}
-
-                  <div
+                  <button
+                    onClick={() =>
+                      setOpen(false)
+                    }
                     className="
-                      rounded-2xl
+                      w-9
+                      h-9
+                      rounded-xl
+                      bg-gray-50
                       border
-                      border-green-100
-                      bg-green-50/80
-                      p-5
+                      border-gray-200
+                      text-gray-500
+                      flex
+                      items-center
+                      justify-center
+                      hover:bg-gray-100
+                      hover:text-gray-700
+                      transition
                     "
                   >
-                    <div className="flex items-center gap-3 mb-3">
-                      <div
-                        className="
-                          w-9
-                          h-9
-                          rounded-xl
-                          bg-white
-                          text-green-600
-                          flex
-                          items-center
-                          justify-center
-                        "
-                      >
-                        <Brain size={17} />
-                      </div>
-
-                      <div>
-                        <p
-                          className="
-                            text-[10px]
-                            uppercase
-                            tracking-wider
-                            font-bold
-                            text-green-600
-                          "
-                        >
-                          AI Recommendation
-                        </p>
-
-                        <p
-                          className="
-                            text-base
-                            font-bold
-                            text-green-900
-                            mt-0.5
-                          "
-                        >
-                          {recommendAction(selected.offense)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-green-700/70 leading-relaxed">
-                      Suggested based on the recorded incident and behavioral
-                      analysis.
-                    </p>
-                  </div>
-
-                  {/* CASE STATS */}
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <Meta
-                      label="Case Status"
-                      value={
-                        getStatusConfig(
-                          getIncidentInterventionStatus(
-                            selected.incidentId,
-                          ),
-                        ).label
-                      }
-                      icon={Activity}
+                    <X
+                      size={17}
                     />
-
-                    <Meta
-                      label="Interventions"
-                      value={
-                        getIncidentInterventions(selected.incidentId).length
-                      }
-                      icon={HandHelping}
-                    />
-                  </div>
-
-                  {/* AUDIT */}
-
-                  <div
-                    className="
-                      bg-white
-                      border
-                      border-gray-100
-                      rounded-2xl
-                      p-5
-                    "
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-bold text-gray-900">
-                        Recent Activity
-                      </h4>
-
-                      <Activity size={15} className="text-gray-400" />
-                    </div>
-
-                    <div className="space-y-3 max-h-32 overflow-y-auto">
-                      {auditLog.length === 0 ? (
-                        <div
-                          className="
-                            py-3
-                            text-center
-                            text-xs
-                            text-gray-400
-                          "
-                        >
-                          No actions recorded yet.
-                        </div>
-                      ) : (
-                        auditLog.map((a) => (
-                          <div
-                            key={a.id}
-                            className="
-                              flex
-                              items-start
-                              justify-between
-                              gap-3
-                              text-xs
-                            "
-                          >
-                            <div className="flex items-start gap-2">
-                              <span
-                                className="
-                                  mt-1
-                                  w-1.5
-                                  h-1.5
-                                  rounded-full
-                                  bg-green-500
-                                  shrink-0
-                                "
-                              />
-
-                              <span className="text-gray-600">
-                                {a.action}
-                              </span>
-                            </div>
-
-                            <span
-                              className="
-                                text-[10px]
-                                text-gray-400
-                                shrink-0
-                              "
-                            >
-                              {new Date(a.time).toLocaleTimeString([], {
-                                hour: "numeric",
-                                minute: "2-digit",
-                              })}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+                  </button>
                 </div>
 
-                {/* =================================================
-                    RIGHT
-                ================================================= */}
+                {/* MODAL BODY */}
 
-                <div className="lg:col-span-7 space-y-5">
-                  {/* TIMELINE */}
+                <div
+                  className="
+                    grid
+                    grid-cols-1
+                    lg:grid-cols-12
+                    gap-6
+                    p-7
+                    overflow-y-auto
+                  "
+                >
+                  {/* LEFT */}
 
-                  <div
-                    className="
-                      bg-white
-                      border
-                      border-gray-100
-                      rounded-2xl
-                      shadow-sm
-                      p-5
-                    "
-                  >
+                  <div className="lg:col-span-5 space-y-5">
+                    {/* STUDENT SUMMARY */}
+
                     <div
                       className="
-                        flex
-                        items-center
-                        justify-between
-                        mb-5
+                        bg-white
+                        border
+                        border-gray-100
+                        rounded-2xl
+                        p-5
+                        shadow-sm
                       "
                     >
-                      <div>
-                        <h3 className="text-sm font-bold text-gray-900">
-                          Intervention Timeline
-                        </h3>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div
+                          className="
+                            w-7
+                            h-7
+                            rounded-lg
+                            bg-gray-100
+                            text-gray-500
+                            flex
+                            items-center
+                            justify-center
+                          "
+                        >
+                          <UserRound
+                            size={
+                              14
+                            }
+                          />
+                        </div>
 
-                        <p className="text-xs text-gray-400 mt-1">
-                          Track all actions taken for this case.
-                        </p>
+                        <h3 className="text-sm font-bold text-gray-900">
+                          Student Information
+                        </h3>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <Meta
+                          label="Student"
+                          value={
+                            selected.studentName
+                          }
+                          icon={
+                            UserRound
+                          }
+                        />
+
+                        <Meta
+                          label="Student ID"
+                          value={
+                            selected.studentCode
+                          }
+                        />
+
+                        <Meta
+                          label="Grade"
+                          value={
+                            selected.grade
+                          }
+                        />
+
+                        <Meta
+                          label="Gender"
+                          value={
+                            selected.gender
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {/* INCIDENT */}
+
+                    <div
+                      className="
+                        bg-white
+                        border
+                        border-gray-100
+                        rounded-2xl
+                        p-5
+                        shadow-sm
+                      "
+                    >
+                      <div className="flex items-center gap-2 mb-3">
+                        <div
+                          className="
+                            w-7
+                            h-7
+                            rounded-lg
+                            bg-red-50
+                            text-red-500
+                            flex
+                            items-center
+                            justify-center
+                          "
+                        >
+                          <AlertCircle
+                            size={
+                              14
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <h3 className="text-sm font-bold text-gray-900">
+                            Incident Overview
+                          </h3>
+
+                          <p className="text-[10px] text-gray-400">
+                            Current incident being reviewed
+                          </p>
+                        </div>
                       </div>
 
                       <div
                         className="
-                          w-8
-                          h-8
-                          rounded-lg
-                          bg-green-50
-                          text-green-600
-                          flex
-                          items-center
-                          justify-center
+                          p-4
+                          rounded-xl
+                          bg-gray-50
+                          border
+                          border-gray-100
+                          space-y-4
                         "
                       >
-                        <Clock3 size={15} />
+                        {/* OFFENSE */}
+
+                        <div>
+                          <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400 mb-1">
+                            Offense / Incident
+                          </p>
+
+                          <p
+                            className="
+                              text-sm
+                              font-semibold
+                              text-gray-800
+                              leading-relaxed
+                            "
+                          >
+                            {
+                              selected.offense
+                            }
+                          </p>
+                        </div>
+
+                        {/* CATEGORY + LEVEL */}
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400 mb-1">
+                              Category
+                            </p>
+
+                            <p className="text-xs font-semibold text-gray-700">
+                              {
+                                selected.category
+                              }
+                            </p>
+                          </div>
+
+                          <div>
+                            <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400 mb-1">
+                              Severity
+                            </p>
+
+                            <p className="text-xs font-semibold text-gray-700">
+                              {
+                                selected.level
+                              }
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* STUDENT STATEMENT */}
+
+                        {selected.studentStatement && (
+                          <div>
+                            <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400 mb-1">
+                              Student Statement
+                            </p>
+
+                            <p className="text-xs text-gray-600 leading-relaxed">
+                              {
+                                selected.studentStatement
+                              }
+                            </p>
+                          </div>
+                        )}
+
+                        {/* REPORT DESCRIPTION */}
+
+                        {(() => {
+                          const currentReport =
+                            reports.find(
+                              (
+                                report,
+                              ) =>
+                                String(
+                                  report._id,
+                                ) ===
+                                String(
+                                  selected.reportId,
+                                ),
+                            );
+
+                          if (
+                            !currentReport?.description
+                          ) {
+                            return null;
+                          }
+
+                          return (
+                            <div>
+                              <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400 mb-1">
+                                Report Description
+                              </p>
+
+                              <p className="text-xs text-gray-600 leading-relaxed">
+                                {
+                                  currentReport.description
+                                }
+                              </p>
+                            </div>
+                          );
+                        })()}
+
+                        {/* DATE / LOCATION */}
+
+                        {(() => {
+                          const currentReport =
+                            reports.find(
+                              (
+                                report,
+                              ) =>
+                                String(
+                                  report._id,
+                                ) ===
+                                String(
+                                  selected.reportId,
+                                ),
+                            );
+
+                          if (
+                            !currentReport
+                          ) {
+                            return null;
+                          }
+
+                          return (
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400 mb-1">
+                                  Location
+                                </p>
+
+                                <p className="text-xs font-semibold text-gray-700">
+                                  {
+                                    currentReport.location ||
+                                    "N/A"
+                                  }
+                                </p>
+                              </div>
+
+                              <div>
+                                <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400 mb-1">
+                                  Date
+                                </p>
+
+                                <p className="text-xs font-semibold text-gray-700">
+                                  {formatDate(
+                                    currentReport.date,
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      {getIncidentInterventions(selected.incidentId)
-                        .length === 0 ? (
+                    {/* AI */}
+
+                    {(() => {
+                      const aiResult =
+                        getAIRecommendation(
+                          selected.incidentId,
+                        );
+
+                      return (
                         <div
                           className="
-                            py-10
-                            text-center
-                            rounded-xl
-                            bg-gray-50
+                            rounded-2xl
                             border
-                            border-dashed
-                            border-gray-200
+                            border-green-100
+                            bg-green-50/80
+                            p-5
                           "
                         >
-                          <HandHelping
-                            size={24}
-                            className="mx-auto text-gray-300 mb-2"
-                          />
+                          <div className="flex items-center gap-3 mb-3">
+                            <div
+                              className="
+                                w-9
+                                h-9
+                                rounded-xl
+                                bg-white
+                                text-green-600
+                                flex
+                                items-center
+                                justify-center
+                              "
+                            >
+                              {aiLoading ? (
+                                <Loader2
+                                  size={
+                                    17
+                                  }
+                                  className="animate-spin"
+                                />
+                              ) : (
+                                <Brain
+                                  size={
+                                    17
+                                  }
+                                />
+                              )}
+                            </div>
 
-                          <p className="text-sm font-medium text-gray-500">
-                            No interventions yet
-                          </p>
-
-                          <p className="text-xs text-gray-400 mt-1">
-                            Create the first intervention below.
-                          </p>
-                        </div>
-                      ) : (
-                        getIncidentInterventions(selected.incidentId).map(
-                          (i) => {
-                            const isOpen = openTimeline === i._id;
-
-                            const completed =
-                              String(i.status || "").toLowerCase() ===
-                              "completed";
-
-                            return (
-                              <div
-                                key={i._id}
+                            <div>
+                              <p
                                 className="
-                                  border
-                                  border-gray-100
-                                  rounded-xl
-                                  overflow-hidden
+                                  text-[10px]
+                                  uppercase
+                                  tracking-wider
+                                  font-bold
+                                  text-green-600
                                 "
                               >
-                                <button
-                                  onClick={() =>
-                                    setOpenTimeline(
-                                      isOpen ? null : i._id,
-                                    )
+                                AI Recommendation
+                              </p>
+
+                              <p
+                                className="
+                                  text-base
+                                  font-bold
+                                  text-green-900
+                                  mt-0.5
+                                "
+                              >
+                                {aiLoading
+                                  ? "Analyzing current incident..."
+                                  : aiResult?.conclusion ||
+                                    "AI recommendation unavailable"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* FULL RECOMMENDATION */}
+
+                          {aiResult?.recommendation && (
+                            <div className="mt-4">
+                              <p className="text-[10px] uppercase tracking-wider font-bold text-green-700/60 mb-2">
+                                Recommendation & Conclusion
+                              </p>
+
+                              <div className="p-3.5 rounded-xl bg-white/80 border border-green-100">
+                                <p className="text-xs text-green-800 leading-relaxed whitespace-pre-line">
+                                  {
+                                    aiResult.recommendation
                                   }
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* EVIDENCE BASIS */}
+
+                          {aiResult?.basis && (
+                            <div className="mt-4">
+                              <p className="text-[10px] uppercase tracking-wider font-bold text-green-700/60 mb-1">
+                                Evidence Basis
+                              </p>
+
+                              <p className="text-xs text-green-700/80 leading-relaxed">
+                                {
+                                  aiResult.basis
+                                }
+                              </p>
+                            </div>
+                          )}
+
+                          {/* RESEARCH */}
+
+                          {aiResult?.references
+                            ?.length >
+                            0 && (
+                            <div className="mt-4 pt-4 border-t border-green-100">
+                              <div className="flex items-center gap-2 mb-2">
+                                <BookOpen
+                                  size={
+                                    13
+                                  }
+                                  className="text-green-700"
+                                />
+
+                                <p className="text-[10px] uppercase tracking-wider font-bold text-green-700">
+                                  Research Support
+                                </p>
+                              </div>
+
+                              <div className="space-y-2">
+                                {aiResult.references
+                                  .slice(
+                                    0,
+                                    3,
+                                  )
+                                  .map(
+                                    (
+                                      reference,
+                                      index,
+                                    ) => (
+                                      <div
+                                        key={
+                                          reference.referenceId ||
+                                          index
+                                        }
+                                        className="
+                                          p-3
+                                          rounded-xl
+                                          bg-white/80
+                                          border
+                                          border-green-100
+                                        "
+                                      >
+                                        <p className="text-xs font-semibold text-green-900 leading-relaxed">
+                                          {
+                                            reference.citation ||
+                                            reference.title ||
+                                            "Research reference"
+                                          }
+                                        </p>
+
+                                        {reference.doi && (
+                                          <p className="text-[10px] text-green-700/60 mt-1">
+                                            DOI:{" "}
+                                            {
+                                              reference.doi
+                                            }
+                                          </p>
+                                        )}
+                                      </div>
+                                    ),
+                                  )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* ERROR */}
+
+                          {aiResult?.error && (
+                            <p className="text-xs text-amber-700 mt-3">
+                              {
+                                aiResult.basis
+                              }
+                            </p>
+                          )}
+
+                          {/* LOADING */}
+
+                          {!aiResult &&
+                            aiLoading && (
+                              <div className="mt-3 flex items-center gap-2 text-xs text-green-700">
+                                <Loader2
+                                  size={
+                                    13
+                                  }
+                                  className="animate-spin"
+                                />
+
+                                <span>
+                                  Analyzing the current incident and relevant research...
+                                </span>
+                              </div>
+                            )}
+
+                          {/* EMPTY */}
+
+                          {!aiResult &&
+                            !aiLoading && (
+                              <p className="text-xs text-green-700/70 leading-relaxed">
+                                Opened case will be analyzed primarily from the current incident overview, with previous behavioral records used only as supporting context.
+                              </p>
+                            )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* CASE STATS */}
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Meta
+                        label="Case Status"
+                        value={
+                          getStatusConfig(
+                            getIncidentInterventionStatus(
+                              selected.incidentId,
+                            ),
+                          ).label
+                        }
+                        icon={
+                          Activity
+                        }
+                      />
+
+                      <Meta
+                        label="Interventions"
+                        value={
+                          getIncidentInterventions(
+                            selected.incidentId,
+                          ).length
+                        }
+                        icon={
+                          HandHelping
+                        }
+                      />
+                    </div>
+
+                    {/* AUDIT */}
+
+                    <div
+                      className="
+                        bg-white
+                        border
+                        border-gray-100
+                        rounded-2xl
+                        p-5
+                      "
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-bold text-gray-900">
+                          Recent Activity
+                        </h4>
+
+                        <Activity
+                          size={
+                            15
+                          }
+                          className="text-gray-400"
+                        />
+                      </div>
+
+                      <div className="space-y-3 max-h-32 overflow-y-auto">
+                        {auditLog.length ===
+                        0 ? (
+                          <div
+                            className="
+                              py-3
+                              text-center
+                              text-xs
+                              text-gray-400
+                            "
+                          >
+                            No actions recorded yet.
+                          </div>
+                        ) : (
+                          auditLog.map(
+                            (a) => (
+                              <div
+                                key={
+                                  a.id
+                                }
+                                className="
+                                  flex
+                                  items-start
+                                  justify-between
+                                  gap-3
+                                  text-xs
+                                "
+                              >
+                                <div className="flex items-start gap-2">
+                                  <span
+                                    className="
+                                      mt-1
+                                      w-1.5
+                                      h-1.5
+                                      rounded-full
+                                      bg-green-500
+                                      shrink-0
+                                    "
+                                  />
+
+                                  <span className="text-gray-600">
+                                    {
+                                      a.action
+                                    }
+                                  </span>
+                                </div>
+
+                                <span
                                   className="
-                                    w-full
-                                    flex
-                                    items-center
-                                    justify-between
-                                    p-4
-                                    text-left
-                                    hover:bg-gray-50
-                                    transition
+                                    text-[10px]
+                                    text-gray-400
+                                    shrink-0
                                   "
                                 >
-                                  <div className="flex items-center gap-3">
-                                    <div
-                                      className="
-                                        relative
-                                        flex
-                                        flex-col
-                                        items-center
-                                      "
-                                    >
-                                      <div
-                                        className={`
-                                          w-8
-                                          h-8
-                                          rounded-lg
-                                          flex
-                                          items-center
-                                          justify-center
-                                          ${
-                                            completed
-                                              ? "bg-emerald-50 text-emerald-600"
-                                              : "bg-amber-50 text-amber-600"
-                                          }
-                                        `}
-                                      >
-                                        {completed ? (
-                                          <CheckCircle2 size={15} />
-                                        ) : (
-                                          <Activity size={15} />
-                                        )}
-                                      </div>
-                                    </div>
+                                  {new Date(
+                                    a.time,
+                                  ).toLocaleTimeString(
+                                    [],
+                                    {
+                                      hour: "numeric",
+                                      minute:
+                                        "2-digit",
+                                    },
+                                  )}
+                                </span>
+                              </div>
+                            ),
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-                                    <div>
-                                      <p
+                  {/* RIGHT */}
+
+                  <div className="lg:col-span-7 space-y-5">
+                    {/* TIMELINE */}
+
+                    <div
+                      className="
+                        bg-white
+                        border
+                        border-gray-100
+                        rounded-2xl
+                        shadow-sm
+                        p-5
+                      "
+                    >
+                      <div
+                        className="
+                          flex
+                          items-center
+                          justify-between
+                          mb-5
+                        "
+                      >
+                        <div>
+                          <h3 className="text-sm font-bold text-gray-900">
+                            Intervention Timeline
+                          </h3>
+
+                          <p className="text-xs text-gray-400 mt-1">
+                            Track all actions taken
+                            for this case.
+                          </p>
+                        </div>
+
+                        <div
+                          className="
+                            w-8
+                            h-8
+                            rounded-lg
+                            bg-green-50
+                            text-green-600
+                            flex
+                            items-center
+                            justify-center
+                          "
+                        >
+                          <Clock3
+                            size={
+                              15
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        {getIncidentInterventions(
+                          selected.incidentId,
+                        ).length ===
+                        0 ? (
+                          <div
+                            className="
+                              py-10
+                              text-center
+                              rounded-xl
+                              bg-gray-50
+                              border
+                              border-dashed
+                              border-gray-200
+                            "
+                          >
+                            <HandHelping
+                              size={
+                                24
+                              }
+                              className="mx-auto text-gray-300 mb-2"
+                            />
+
+                            <p className="text-sm font-medium text-gray-500">
+                              No interventions yet
+                            </p>
+
+                            <p className="text-xs text-gray-400 mt-1">
+                              Create the first intervention below.
+                            </p>
+                          </div>
+                        ) : (
+                          getIncidentInterventions(
+                            selected.incidentId,
+                          ).map(
+                            (i) => {
+                              const isOpen =
+                                openTimeline ===
+                                i._id;
+
+                              const completed =
+                                String(
+                                  i.status ||
+                                    "",
+                                ).toLowerCase() ===
+                                "completed";
+
+                              return (
+                                <div
+                                  key={
+                                    i._id
+                                  }
+                                  className="
+                                    border
+                                    border-gray-100
+                                    rounded-xl
+                                    overflow-hidden
+                                  "
+                                >
+                                  <button
+                                    onClick={() =>
+                                      setOpenTimeline(
+                                        isOpen
+                                          ? null
+                                          : i._id,
+                                      )
+                                    }
+                                    className="
+                                      w-full
+                                      flex
+                                      items-center
+                                      justify-between
+                                      p-4
+                                      text-left
+                                      hover:bg-gray-50
+                                      transition
+                                    "
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div
                                         className="
-                                          text-sm
-                                          font-bold
-                                          text-gray-800
-                                          capitalize
+                                          relative
+                                          flex
+                                          flex-col
+                                          items-center
                                         "
                                       >
-                                        {i.type}
-                                      </p>
-
-                                      <div
-                                        className="
-                                          flex
-                                          items-center
-                                          gap-2
-                                          mt-1
-                                        "
-                                      >
-                                        <span
+                                        <div
                                           className={`
-                                            w-1.5
-                                            h-1.5
-                                            rounded-full
+                                            w-8
+                                            h-8
+                                            rounded-lg
+                                            flex
+                                            items-center
+                                            justify-center
                                             ${
                                               completed
-                                                ? "bg-emerald-500"
-                                                : "bg-amber-500"
+                                                ? "bg-emerald-50 text-emerald-600"
+                                                : "bg-amber-50 text-amber-600"
                                             }
                                           `}
-                                        />
+                                        >
+                                          {completed ? (
+                                            <CheckCircle2
+                                              size={
+                                                15
+                                              }
+                                            />
+                                          ) : (
+                                            <Activity
+                                              size={
+                                                15
+                                              }
+                                            />
+                                          )}
+                                        </div>
+                                      </div>
 
-                                        <span
+                                      <div>
+                                        <p
                                           className="
-                                            text-[10px]
-                                            text-gray-400
-                                            uppercase
-                                            font-semibold
+                                            text-sm
+                                            font-bold
+                                            text-gray-800
+                                            capitalize
                                           "
                                         >
-                                          {i.status}
-                                        </span>
+                                          {
+                                            i.type
+                                          }
+                                        </p>
 
-                                        {i.createdAt && (
-                                          <>
-                                            <span className="text-gray-300">
-                                              •
-                                            </span>
+                                        <div
+                                          className="
+                                            flex
+                                            items-center
+                                            gap-2
+                                            mt-1
+                                          "
+                                        >
+                                          <span
+                                            className={`
+                                              w-1.5
+                                              h-1.5
+                                              rounded-full
+                                              ${
+                                                completed
+                                                  ? "bg-emerald-500"
+                                                  : "bg-amber-500"
+                                              }
+                                            `}
+                                          />
 
-                                            <span
-                                              className="
-                                                text-[10px]
-                                                text-gray-400
-                                              "
-                                            >
-                                              {formatDate(i.createdAt)}
-                                            </span>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <ChevronRight
-                                    size={16}
-                                    className={`
-                                      text-gray-400
-                                      transition-transform
-                                      ${
-                                        isOpen
-                                          ? "rotate-90"
-                                          : ""
-                                      }
-                                    `}
-                                  />
-                                </button>
-
-                                <AnimatePresence>
-                                  {isOpen && (
-                                    <motion.div
-                                      initial={{
-                                        height: 0,
-                                        opacity: 0,
-                                      }}
-                                      animate={{
-                                        height: "auto",
-                                        opacity: 1,
-                                      }}
-                                      exit={{
-                                        height: 0,
-                                        opacity: 0,
-                                      }}
-                                      className="
-                                        border-t
-                                        border-gray-100
-                                      "
-                                    >
-                                      <div className="p-4 space-y-4">
-                                        {/* DESCRIPTION */}
-
-                                        <div>
-                                          <p
+                                          <span
                                             className="
                                               text-[10px]
-                                              uppercase
-                                              tracking-wider
-                                              font-bold
                                               text-gray-400
-                                              mb-2
+                                              uppercase
+                                              font-semibold
                                             "
                                           >
-                                            Intervention Plan
-                                          </p>
+                                            {
+                                              i.status
+                                            }
+                                          </span>
 
-                                          <div
-                                            className="
-                                              p-3.5
-                                              rounded-xl
-                                              bg-gray-50
-                                              border
-                                              border-gray-100
-                                            "
-                                          >
+                                          {i.createdAt && (
+                                            <>
+                                              <span className="text-gray-300">
+                                                •
+                                              </span>
+
+                                              <span
+                                                className="
+                                                  text-[10px]
+                                                  text-gray-400
+                                                "
+                                              >
+                                                {formatDate(
+                                                  i.createdAt,
+                                                )}
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <ChevronRight
+                                      size={
+                                        16
+                                      }
+                                      className={`
+                                        text-gray-400
+                                        transition-transform
+                                        ${
+                                          isOpen
+                                            ? "rotate-90"
+                                            : ""
+                                        }
+                                      `}
+                                    />
+                                  </button>
+
+                                  <AnimatePresence>
+                                    {isOpen && (
+                                      <motion.div
+                                        initial={{
+                                          height: 0,
+                                          opacity: 0,
+                                        }}
+                                        animate={{
+                                          height:
+                                            "auto",
+                                          opacity: 1,
+                                        }}
+                                        exit={{
+                                          height: 0,
+                                          opacity: 0,
+                                        }}
+                                        className="border-t border-gray-100"
+                                      >
+                                        <div className="p-4 space-y-4">
+                                          {/* DESCRIPTION */}
+
+                                          <div>
                                             <p
                                               className="
-                                                text-sm
-                                                text-gray-600
-                                                leading-relaxed
+                                                text-[10px]
+                                                uppercase
+                                                tracking-wider
+                                                font-bold
+                                                text-gray-400
+                                                mb-2
                                               "
                                             >
-                                              {i.description ||
-                                                "No description provided."}
+                                              Intervention Plan
                                             </p>
-                                          </div>
-                                        </div>
 
-                                        {/* META */}
-
-                                        <div className="grid grid-cols-2 gap-3">
-                                          <Meta
-                                            label="Intervention By"
-                                            value={i.interventionBy}
-                                          />
-
-                                          <Meta
-                                            label="Approved By"
-                                            value={i.approvedBy}
-                                          />
-
-                                          <Meta
-                                            label="Created At"
-                                            value={formatDateTime(
-                                              i.createdAt,
-                                            )}
-                                          />
-
-                                          <Meta
-                                            label="Completed By"
-                                            value={i.completedBy}
-                                          />
-                                        </div>
-
-                                        {/* AUDIT TRAIL */}
-
-                                        {i.auditLogs?.length > 0 && (
-                                          <div
-                                            className="
-                                              border
-                                              border-gray-100
-                                              rounded-xl
-                                              overflow-hidden
-                                            "
-                                          >
                                             <div
                                               className="
-                                                px-3
-                                                py-2.5
+                                                p-3.5
+                                                rounded-xl
                                                 bg-gray-50
-                                                border-b
+                                                border
                                                 border-gray-100
                                               "
                                             >
                                               <p
                                                 className="
-                                                  text-[10px]
-                                                  uppercase
-                                                  tracking-wider
-                                                  font-bold
-                                                  text-gray-500
+                                                  text-sm
+                                                  text-gray-600
+                                                  leading-relaxed
                                                 "
                                               >
-                                                Audit Trail
+                                                {i.description ||
+                                                  "No description provided."}
                                               </p>
                                             </div>
+                                          </div>
 
-                                            {i.auditLogs.map(
-                                              (log, idx) => (
-                                                <div
-                                                  key={idx}
+                                          {/* META */}
+
+                                          <div className="grid grid-cols-2 gap-3">
+                                            <Meta
+                                              label="Intervention By"
+                                              value={
+                                                i.interventionBy
+                                              }
+                                            />
+
+                                            <Meta
+                                              label="Approved By"
+                                              value={
+                                                i.approvedBy
+                                              }
+                                            />
+
+                                            <Meta
+                                              label="Created At"
+                                              value={formatDateTime(
+                                                i.createdAt,
+                                              )}
+                                            />
+
+                                            <Meta
+                                              label="Completed By"
+                                              value={
+                                                i.completedBy
+                                              }
+                                            />
+                                          </div>
+
+                                          {/* AUDIT TRAIL */}
+
+                                          {i.auditLogs
+                                            ?.length >
+                                            0 && (
+                                            <div
+                                              className="
+                                                border
+                                                border-gray-100
+                                                rounded-xl
+                                                overflow-hidden
+                                              "
+                                            >
+                                              <div
+                                                className="
+                                                  px-3
+                                                  py-2.5
+                                                  bg-gray-50
+                                                  border-b
+                                                  border-gray-100
+                                                "
+                                              >
+                                                <p
                                                   className="
-                                                    px-3
-                                                    py-3
-                                                    flex
-                                                    items-start
-                                                    justify-between
-                                                    gap-4
-                                                    border-b
-                                                    last:border-b-0
-                                                    border-gray-100
+                                                    text-[10px]
+                                                    uppercase
+                                                    tracking-wider
+                                                    font-bold
+                                                    text-gray-500
                                                   "
                                                 >
-                                                  <div>
-                                                    <p
+                                                  Audit Trail
+                                                </p>
+                                              </div>
+
+                                              {i.auditLogs.map(
+                                                (
+                                                  log,
+                                                  idx,
+                                                ) => (
+                                                  <div
+                                                    key={
+                                                      idx
+                                                    }
+                                                    className="
+                                                      px-3
+                                                      py-3
+                                                      flex
+                                                      items-start
+                                                      justify-between
+                                                      gap-4
+                                                      border-b
+                                                      last:border-b-0
+                                                      border-gray-100
+                                                    "
+                                                  >
+                                                    <div>
+                                                      <p
+                                                        className="
+                                                          text-xs
+                                                          font-semibold
+                                                          text-gray-700
+                                                        "
+                                                      >
+                                                        {
+                                                          log.action
+                                                        }
+                                                      </p>
+
+                                                      {log.note && (
+                                                        <p
+                                                          className="
+                                                            text-[11px]
+                                                            text-gray-400
+                                                            mt-1
+                                                          "
+                                                        >
+                                                          {
+                                                            log.note
+                                                          }
+                                                        </p>
+                                                      )}
+                                                    </div>
+
+                                                    <div
                                                       className="
-                                                        text-xs
-                                                        font-semibold
-                                                        text-gray-700
+                                                        text-right
+                                                        shrink-0
                                                       "
                                                     >
-                                                      {log.action}
-                                                    </p>
-
-                                                    {log.note && (
                                                       <p
                                                         className="
                                                           text-[11px]
+                                                          font-medium
+                                                          text-gray-600
+                                                        "
+                                                      >
+                                                        {
+                                                          log.by
+                                                        }
+                                                      </p>
+
+                                                      <p
+                                                        className="
+                                                          text-[9px]
                                                           text-gray-400
                                                           mt-1
                                                         "
                                                       >
-                                                        {log.note}
+                                                        {formatDateTime(
+                                                          log.createdAt ||
+                                                            log.time,
+                                                        )}
                                                       </p>
-                                                    )}
+                                                    </div>
                                                   </div>
+                                                ),
+                                              )}
+                                            </div>
+                                          )}
 
-                                                  <div
-                                                    className="
-                                                      text-right
-                                                      shrink-0
-                                                    "
-                                                  >
-                                                    <p
-                                                      className="
-                                                        text-[11px]
-                                                        font-medium
-                                                        text-gray-600
-                                                      "
-                                                    >
-                                                      {log.by}
-                                                    </p>
+                                          {/* COMPLETE */}
 
-                                                    <p
-                                                      className="
-                                                        text-[9px]
-                                                        text-gray-400
-                                                        mt-1
-                                                      "
-                                                    >
-                                                      {formatDateTime(
-                                                        log.createdAt ||
-                                                          log.time,
-                                                      )}
-                                                    </p>
-                                                  </div>
-                                                </div>
-                                              ),
-                                            )}
-                                          </div>
-                                        )}
-
-                                        {/* COMPLETE */}
-
-                                        {!completed && (
-                                          <button
-                                            onClick={() =>
-                                              markComplete(i._id)
-                                            }
-                                            className="
-                                              w-full
-                                              h-10
-                                              rounded-xl
-                                              bg-green-600
-                                              hover:bg-green-700
-                                              text-white
-                                              text-xs
-                                              font-semibold
-                                              flex
-                                              items-center
-                                              justify-center
-                                              gap-2
-                                              transition
-                                              active:scale-[0.99]
-                                            "
-                                          >
-                                            <CheckCircle2 size={15} />
-                                            Mark Intervention Complete
-                                          </button>
-                                        )}
-                                      </div>
-                                    </motion.div>
-                                  )}
-                                </AnimatePresence>
-                              </div>
-                            );
-                          },
-                        )
-                      )}
-                    </div>
-                  </div>
-
-                  {/* CREATE */}
-
-                  <div
-                    className="
-                      bg-white
-                      border
-                      border-gray-100
-                      rounded-2xl
-                      shadow-sm
-                      p-5
-                    "
-                  >
-                    <div className="flex items-center gap-3 mb-5">
-                      <div
-                        className="
-                          w-9
-                          h-9
-                          rounded-xl
-                          bg-green-50
-                          text-green-600
-                          flex
-                          items-center
-                          justify-center
-                        "
-                      >
-                        <Plus size={17} />
-                      </div>
-
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-900">
-                          Create Intervention
-                        </h4>
-
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          Add a new action or rehabilitation plan.
-                        </p>
+                                          {!completed && (
+                                            <button
+                                              onClick={() =>
+                                                markComplete(
+                                                  i._id,
+                                                )
+                                              }
+                                              className="
+                                                w-full
+                                                h-10
+                                                rounded-xl
+                                                bg-green-600
+                                                hover:bg-green-700
+                                                text-white
+                                                text-xs
+                                                font-semibold
+                                                flex
+                                                items-center
+                                                justify-center
+                                                gap-2
+                                                transition
+                                                active:scale-[0.99]
+                                              "
+                                            >
+                                              <CheckCircle2
+                                                size={
+                                                  15
+                                                }
+                                              />
+                                              Mark Intervention
+                                              Complete
+                                            </button>
+                                          )}
+                                        </div>
+                                      </motion.div>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
+                              );
+                            },
+                          )
+                        )}
                       </div>
                     </div>
 
-                    <div className="space-y-4">
-                      <div>
-                        <label
-                          className="
-                            block
-                            text-[10px]
-                            uppercase
-                            tracking-wider
-                            font-bold
-                            text-gray-400
-                            mb-2
-                          "
-                        >
-                          Intervention Type
-                        </label>
+                    {/* CREATE */}
 
-                        <select
-                          value={form.type}
-                          onChange={(e) =>
-                            setForm({
-                              ...form,
-                              type: e.target.value,
-                            })
-                          }
+                    <div
+                      className="
+                        bg-white
+                        border
+                        border-gray-100
+                        rounded-2xl
+                        shadow-sm
+                        p-5
+                      "
+                    >
+                      <div className="flex items-center gap-3 mb-5">
+                        <div
                           className="
-                            w-full
-                            h-11
-                            bg-gray-50
-                            border
-                            border-gray-200
+                            w-9
+                            h-9
                             rounded-xl
-                            px-4
-                            text-sm
-                            text-gray-700
-                            outline-none
-                            focus:border-green-300
-                            focus:ring-4
-                            focus:ring-green-50
-                            transition
+                            bg-green-50
+                            text-green-600
+                            flex
+                            items-center
+                            justify-center
                           "
                         >
-                          {options.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
+                          <Plus
+                            size={
+                              17
+                            }
+                          />
+                        </div>
+
+                        <div>
+                          <h4 className="text-sm font-bold text-gray-900">
+                            Create Intervention
+                          </h4>
+
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            Add a new action or
+                            rehabilitation plan.
+                          </p>
+                        </div>
                       </div>
 
-                      <div>
-                        <label
-                          className="
-                            block
-                            text-[10px]
-                            uppercase
-                            tracking-wider
-                            font-bold
-                            text-gray-400
-                            mb-2
-                          "
-                        >
-                          Intervention Plan
-                        </label>
+                      <div className="space-y-4">
+                        <div>
+                          <label
+                            className="
+                              block
+                              text-[10px]
+                              uppercase
+                              tracking-wider
+                              font-bold
+                              text-gray-400
+                              mb-2
+                            "
+                          >
+                            Intervention Type
+                          </label>
 
-                        <textarea
-                          rows={4}
-                          value={form.description}
-                          placeholder="Describe the intervention plan, expected outcome, or follow-up actions..."
-                          onChange={(e) =>
-                            setForm({
-                              ...form,
-                              description: e.target.value,
-                            })
-                          }
-                          className="
-                            w-full
-                            bg-gray-50
-                            border
-                            border-gray-200
-                            rounded-xl
-                            px-4
-                            py-3
-                            text-sm
-                            text-gray-700
-                            placeholder:text-gray-400
-                            outline-none
-                            resize-none
-                            focus:border-green-300
-                            focus:ring-4
-                            focus:ring-green-50
-                            transition
-                          "
-                        />
+                          <select
+                            value={
+                              form.type
+                            }
+                            onChange={(
+                              e,
+                            ) =>
+                              setForm({
+                                ...form,
+                                type:
+                                  e
+                                    .target
+                                    .value,
+                              })
+                            }
+                            className="
+                              w-full
+                              h-11
+                              bg-gray-50
+                              border
+                              border-gray-200
+                              rounded-xl
+                              px-4
+                              text-sm
+                              text-gray-700
+                              outline-none
+                              focus:border-green-300
+                              focus:ring-4
+                              focus:ring-green-50
+                              transition
+                            "
+                          >
+                            {options.map(
+                              (
+                                opt,
+                              ) => (
+                                <option
+                                  key={
+                                    opt
+                                  }
+                                  value={
+                                    opt
+                                  }
+                                >
+                                  {opt}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label
+                            className="
+                              block
+                              text-[10px]
+                              uppercase
+                              tracking-wider
+                              font-bold
+                              text-gray-400
+                              mb-2
+                            "
+                          >
+                            Intervention Plan
+                          </label>
+
+                          <textarea
+                            rows={4}
+                            value={
+                              form.description
+                            }
+                            placeholder="Describe the intervention plan, expected outcome, or follow-up actions..."
+                            onChange={(
+                              e,
+                            ) =>
+                              setForm({
+                                ...form,
+                                description:
+                                  e
+                                    .target
+                                    .value,
+                              })
+                            }
+                            className="
+                              w-full
+                              bg-gray-50
+                              border
+                              border-gray-200
+                              rounded-xl
+                              px-4
+                              py-3
+                              text-sm
+                              text-gray-700
+                              placeholder:text-gray-400
+                              outline-none
+                              resize-none
+                              focus:border-green-300
+                              focus:ring-4
+                              focus:ring-green-50
+                              transition
+                            "
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* =================================================
-                  MODAL FOOTER
-              ================================================= */}
+                {/* MODAL FOOTER */}
 
-              <div
-                className="
-                  px-7
-                  py-4
-                  bg-white
-                  border-t
-                  border-gray-100
-                  flex
-                  items-center
-                  justify-between
-                  shrink-0
-                "
-              >
-                <button
-                  onClick={() =>
-                    exportInterventionPDF(selected, interventions)
-                  }
+                <div
                   className="
-                    h-10
-                    px-4
-                    rounded-xl
-                    border
-                    border-gray-200
+                    px-7
+                    py-4
                     bg-white
-                    text-gray-600
-                    text-xs
-                    font-semibold
+                    border-t
+                    border-gray-100
                     flex
                     items-center
-                    gap-2
-                    hover:bg-gray-50
-                    transition
+                    justify-between
+                    shrink-0
                   "
                 >
-                  <Download size={14} />
-                  Export Report
-                </button>
-
-                <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setOpen(false)}
+                    onClick={() =>
+                      exportInterventionPDF(
+                        selected,
+                        interventions,
+                      )
+                    }
                     className="
                       h-10
                       px-4
                       rounded-xl
-                      bg-gray-50
                       border
                       border-gray-200
+                      bg-white
                       text-gray-600
-                      text-xs
-                      font-semibold
-                      hover:bg-gray-100
-                      transition
-                    "
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    onClick={submit}
-                    disabled={!form.description.trim()}
-                    className="
-                      h-10
-                      px-5
-                      rounded-xl
-                      bg-green-600
-                      hover:bg-green-700
-                      disabled:bg-gray-300
-                      disabled:cursor-not-allowed
-                      text-white
                       text-xs
                       font-semibold
                       flex
                       items-center
                       gap-2
+                      hover:bg-gray-50
                       transition
                     "
                   >
-                    <CheckCircle2 size={14} />
-                    Save Intervention
+                    <Download
+                      size={14}
+                    />
+                    Export Report
                   </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() =>
+                        setOpen(false)
+                      }
+                      className="
+                        h-10
+                        px-4
+                        rounded-xl
+                        bg-gray-50
+                        border
+                        border-gray-200
+                        text-gray-600
+                        text-xs
+                        font-semibold
+                        hover:bg-gray-100
+                        transition
+                      "
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      onClick={
+                        submit
+                      }
+                      disabled={
+                        !form.description.trim()
+                      }
+                      className="
+                        h-10
+                        px-5
+                        rounded-xl
+                        bg-green-600
+                        hover:bg-green-700
+                        disabled:bg-gray-300
+                        disabled:cursor-not-allowed
+                        text-white
+                        text-xs
+                        font-semibold
+                        flex
+                        items-center
+                        gap-2
+                        transition
+                      "
+                    >
+                      <CheckCircle2
+                        size={
+                          14
+                        }
+                      />
+                      Save Intervention
+                    </button>
+                  </div>
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
+          )}
       </AnimatePresence>
 
       {showPrintableReport && (
         <InterventionPrintableReport
           cases={cases}
-          interventions={interventions}
-          onClose={() => setShowPrintableReport(false)}
+          interventions={
+            interventions
+          }
+          onClose={() =>
+            setShowPrintableReport(
+              false,
+            )
+          }
         />
       )}
     </div>
@@ -2428,7 +3987,12 @@ const InterventionPage = () => {
    NAV
 ========================================================= */
 
-const Nav = ({ icon, label, onClick, active }) => (
+const Nav = ({
+  icon,
+  label,
+  onClick,
+  active,
+}) => (
   <button
     onClick={onClick}
     className={`
@@ -2474,9 +4038,15 @@ const Nav = ({ icon, label, onClick, active }) => (
    TAB
 ========================================================= */
 
-const Tab = ({ label, active, onClick }) => (
+const Tab = ({
+  label,
+  active,
+  onClick,
+}) => (
   <motion.button
-    whileTap={{ scale: 0.97 }}
+    whileTap={{
+      scale: 0.97,
+    }}
     onClick={onClick}
     className={`
       h-10
@@ -2510,7 +4080,9 @@ const StatCard = ({
   iconColor = "text-green-600",
 }) => (
   <motion.div
-    whileHover={{ y: -2 }}
+    whileHover={{
+      y: -2,
+    }}
     className="
       bg-white
       border
@@ -2543,13 +4115,19 @@ const StatCard = ({
       </span>
     </div>
 
-    <p className="text-xs font-medium text-gray-400 mt-5">{label}</p>
+    <p className="text-xs font-medium text-gray-400 mt-5">
+      {label}
+    </p>
 
     <div className="flex items-end justify-between gap-3 mt-1">
-      <h2 className="text-2xl font-black text-gray-900">{value}</h2>
+      <h2 className="text-2xl font-black text-gray-900">
+        {value}
+      </h2>
     </div>
 
-    <p className="text-[10px] text-gray-400 mt-1">{description}</p>
+    <p className="text-[10px] text-gray-400 mt-1">
+      {description}
+    </p>
   </motion.div>
 );
 

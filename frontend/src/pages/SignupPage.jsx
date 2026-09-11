@@ -68,6 +68,58 @@ export const LightColors = {
 const TEST_ADMIN_KEY = "GuidEdAdmin123";
 
 /* =========================================================
+   PASSWORD VALIDATION
+========================================================= */
+
+const validatePassword = (password) => {
+  const errors = [];
+
+  if (password.length < 8) {
+    errors.push("at least 8 characters");
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    errors.push("one uppercase letter");
+  }
+
+  if (!/[a-z]/.test(password)) {
+    errors.push("one lowercase letter");
+  }
+
+  if (!/[0-9]/.test(password)) {
+    errors.push("one number");
+  }
+
+  if (!/[!@#$%^&*(),.?":{}|<>_\-\\[\]';+/=~`]/.test(password)) {
+    errors.push("one special character");
+  }
+
+  const weakPasswords = [
+    "password",
+    "password123",
+    "12345678",
+    "123456789",
+    "1234567890",
+    "qwerty",
+    "qwerty123",
+    "admin",
+    "admin123",
+    "letmein",
+    "welcome",
+    "abc123",
+    "iloveyou",
+    "11111111",
+    "00000000",
+  ];
+
+  if (weakPasswords.includes(password.toLowerCase())) {
+    errors.push("a stronger password");
+  }
+
+  return errors;
+};
+
+/* =========================================================
    CROPPED IMAGE HELPER
 ========================================================= */
 
@@ -193,6 +245,20 @@ const SignupPage = () => {
 
   const { signup, verifyOTP, otpRequired, setOtpRequired, error, isLoading } =
     useAuthStore();
+
+  /* =========================================================
+     PASSWORD STATE
+========================================================= */
+
+  const passwordErrors = validatePassword(password);
+
+  const isPasswordValid =
+    password.length > 0 && passwordErrors.length === 0;
+
+  const passwordsMatch =
+    password.length > 0 &&
+    confirmPassword.length > 0 &&
+    password === confirmPassword;
 
   /* =========================================================
      CLEANUP PHOTO URL
@@ -393,7 +459,20 @@ const SignupPage = () => {
     }
 
     /* -----------------------------------------
-       Password validation
+       Password strength validation
+    ----------------------------------------- */
+
+    const currentPasswordErrors = validatePassword(password);
+
+    if (currentPasswordErrors.length > 0) {
+      setLocalError(
+        `Password must contain ${currentPasswordErrors.join(", ")}.`,
+      );
+      return;
+    }
+
+    /* -----------------------------------------
+       Confirm password validation
     ----------------------------------------- */
 
     if (password !== confirmPassword) {
@@ -1184,8 +1263,6 @@ const SignupPage = () => {
                       onChange={(e) => {
                         setAccountType(e.target.value);
 
-                        /* Reset role-specific fields */
-
                         setStudentId("");
                         setGrade("");
                         setEmployeeId("");
@@ -1375,7 +1452,13 @@ const SignupPage = () => {
                       type="password"
                       placeholder="Password"
                       value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+
+                        if (localError) {
+                          setLocalError("");
+                        }
+                      }}
                     />
 
                     <Input
@@ -1383,13 +1466,135 @@ const SignupPage = () => {
                       type="password"
                       placeholder="Confirm Password"
                       value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+
+                        if (localError) {
+                          setLocalError("");
+                        }
+                      }}
                     />
                   </div>
 
                   {/* PASSWORD STRENGTH */}
 
                   <PasswordStrengthMeter password={password} />
+
+                  {/* PASSWORD REQUIREMENTS */}
+
+                  {password.length > 0 && (
+                    <div
+                      className="
+                        rounded-2xl
+                        border
+                        bg-white
+                        p-4
+                      "
+                      style={{
+                        borderColor: LightColors.border,
+                      }}
+                    >
+                      <p
+                        className="text-sm font-bold mb-3"
+                        style={{
+                          color: LightColors.textPrimary,
+                        }}
+                      >
+                        Password Requirements
+                      </p>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {[
+                          {
+                            label: "At least 8 characters",
+                            valid: password.length >= 8,
+                          },
+                          {
+                            label: "One uppercase letter",
+                            valid: /[A-Z]/.test(password),
+                          },
+                          {
+                            label: "One lowercase letter",
+                            valid: /[a-z]/.test(password),
+                          },
+                          {
+                            label: "One number",
+                            valid: /[0-9]/.test(password),
+                          },
+                          {
+                            label: "One special character",
+                            valid:
+                              /[!@#$%^&*(),.?":{}|<>_\-\\[\]';+/=~`]/.test(
+                                password,
+                              ),
+                          },
+                          {
+                            label: "Not a common password",
+                            valid: ![
+                              "password",
+                              "password123",
+                              "12345678",
+                              "123456789",
+                              "1234567890",
+                              "qwerty",
+                              "qwerty123",
+                              "admin",
+                              "admin123",
+                              "letmein",
+                              "welcome",
+                              "abc123",
+                              "iloveyou",
+                              "11111111",
+                              "00000000",
+                            ].includes(password.toLowerCase()),
+                          },
+                        ].map((requirement) => (
+                          <div
+                            key={requirement.label}
+                            className="flex items-center gap-2 text-xs sm:text-sm"
+                          >
+                            <CheckCircle2
+                              className="w-4 h-4 shrink-0"
+                              style={{
+                                color: requirement.valid
+                                  ? LightColors.success
+                                  : LightColors.textMuted,
+                              }}
+                            />
+
+                            <span
+                              style={{
+                                color: requirement.valid
+                                  ? LightColors.success
+                                  : LightColors.textSecondary,
+                              }}
+                            >
+                              {requirement.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* PASSWORD MATCH */}
+
+                  {confirmPassword.length > 0 && (
+                    <div
+                      className="flex items-center gap-2 text-sm font-medium"
+                      style={{
+                        color: passwordsMatch
+                          ? LightColors.success
+                          : LightColors.danger,
+                      }}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+
+                      {passwordsMatch
+                        ? "Passwords match."
+                        : "Passwords do not match."}
+                    </div>
+                  )}
 
                   {/* =================================================
                       PROFILE PHOTO
@@ -1644,7 +1849,12 @@ const SignupPage = () => {
                       scale: 0.985,
                     }}
                     type="submit"
-                    disabled={isLoading || !acceptedPolicy}
+                    disabled={
+                      isLoading ||
+                      !acceptedPolicy ||
+                      !isPasswordValid ||
+                      !passwordsMatch
+                    }
                     className="
                       w-full
                       h-14
@@ -2362,3 +2572,4 @@ The Student Discipline Management System aims to modernize school discipline pro
 };
 
 export default SignupPage;
+
