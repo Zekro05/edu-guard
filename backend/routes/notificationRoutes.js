@@ -1,212 +1,245 @@
 import express from "express";
-import Notification from "../models/Notification.js";
+import  Notification  from "../models/Notification.js";
+import  User  from "../models/userModel.js";
+import { sendPushNotification } from "../services/notificationService.js";
+import { verifyToken } from "../middleware/verifyToken.js";
 
 import {
   saveFCMToken,
   removePushToken,
+  getNotificationSettings,
+  updateNotificationSettings,
 } from "../controllers/notificationController.js";
-import User from "../models/userModel.js";
-import { sendPushNotification } from "../services/notificationService.js";
-
-import { verifyToken } from "../middleware/verifyToken.js";
-
 
 const router = express.Router();
 
 /* =========================================================
-   SAVE FCM TOKEN
-
-   POST /api/notifications/fcm-token
+   HELPER
 ========================================================= */
 
+const getTimeAgo = (date) => {
+  if (!date) return "";
+
+  const now = new Date();
+  const created = new Date(date);
+
+  const diff = Math.floor((now - created) / 1000);
+
+  if (diff < 10) return "Just now";
+  if (diff < 60) return `${diff} seconds ago`;
+
+  const minutes = Math.floor(diff / 60);
+  if (minutes < 60) {
+    return `${minutes} minute${minutes !== 1 ? "s" : ""} ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours} hour${hours !== 1 ? "s" : ""} ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) {
+    return `${days} day${days !== 1 ? "s" : ""} ago`;
+  }
+
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4) {
+    return `${weeks} week${weeks !== 1 ? "s" : ""} ago`;
+  }
+
+  const months = Math.floor(days / 30);
+
+  if (months < 12) {
+    return `${months} month${months !== 1 ? "s" : ""} ago`;
+  }
+
+  const years = Math.floor(days / 365);
+
+  return `${years} year${years !== 1 ? "s" : ""} ago`;
+};
+
+
+/* =========================================================
+   FORMAT NOTIFICATION
+========================================================= */
+
+const formatNotification = (notification) => {
+  return {
+    id: notification._id?.toString(),
+    _id: notification._id?.toString(),
+
+    user: notification.user
+      ? notification.user.toString()
+      : null,
+
+    title: notification.title || "Notification",
+
+    message: notification.message || "",
+
+    type: notification.type || "general",
+
+    priority: notification.priority || "low",
+
+    isRead: notification.isRead ?? false,
+
+    data: notification.data || {},
+
+    relatedId: notification.relatedId
+      ? notification.relatedId.toString()
+      : null,
+
+    relatedType: notification.relatedType || null,
+
+    createdAt: notification.createdAt,
+
+    updatedAt: notification.updatedAt,
+
+    timeAgo: getTimeAgo(notification.createdAt),
+  };
+};
+
+
+/* =========================================================
+   PUSH TOKEN ROUTES
+========================================================= */
+
+/*
+   Save native FCM token
+*/
 router.post(
   "/fcm-token",
   verifyToken,
   saveFCMToken
 );
 
-/* =========================================================
-   REMOVE FCM TOKEN
 
-   POST /api/notifications/remove-token
-========================================================= */
-
+/*
+   Remove native FCM token
+*/
 router.post(
   "/remove-token",
   verifyToken,
   removePushToken
 );
 
+
+/* =========================================================
+   NOTIFICATION SETTINGS
+========================================================= */
+
+/*
+   Get notification settings
+*/
+router.get(
+  "/settings",
+  verifyToken,
+  getNotificationSettings
+);
+
+
+/*
+   Update notification settings
+*/
+router.put(
+  "/settings",
+  verifyToken,
+  updateNotificationSettings
+);
+
+
 /* =========================================================
    GET CURRENT USER NOTIFICATIONS
-
+   IMPORTANT:
+   This should be the main endpoint used by mobile.
+   
    GET /api/notifications
-
-   IMPORTANT:
-   The authenticated user's ID comes from req.userId.
-
-   Notification model uses:
-   user: ObjectId
 ========================================================= */
 
-router.get(
-  "/",
-  verifyToken,
-  async (req, res) => {
-    try {
-      if (!req.userId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized.",
-        });
-      }
+router.get("/", verifyToken, async (req, res) => {
+  try {
+    const userId = req.userId;
 
-      const notifications = await Notification.find({
-        user: req.userId,
-      })
-        .sort({
-          createdAt: -1,
-        })
-        .lean();
+    console.log("\n========================================");
+    console.log("🔔 GET CURRENT USER NOTIFICATIONS");
+    console.log("========================================");
+    console.log("Authenticated User ID:", userId);
 
-      const formatted = notifications.map((n) => ({
-        id: n._id.toString(),
-
-        title: n.title,
-
-        message: n.message,
-
-        type: n.type,
-
-        priority: n.priority,
-
-        isRead: n.isRead,
-
-        data: n.data || {},
-
-        relatedId: n.relatedId
-          ? n.relatedId.toString()
-          : null,
-
-        relatedType: n.relatedType || null,
-
-        createdAt: n.createdAt,
-
-        updatedAt: n.updatedAt,
-
-        timeAgo: getTimeAgo(n.createdAt),
-      }));
-
-      return res.status(200).json({
-        success: true,
-        notifications: formatted,
-      });
-    } catch (err) {
-      console.error(
-        "❌ GET NOTIFICATIONS ERROR:",
-        err
-      );
-
-      return res.status(500).json({
+    if (!userId) {
+      return res.status(401).json({
         success: false,
-        message: err.message,
+        message: "User authentication required",
       });
     }
+
+    const notifications = await Notification.find({
+      user: userId,
+    })
+      .sort({
+        createdAt: -1,
+      })
+      .limit(100)
+      .lean();
+
+    const unreadCount = notifications.filter(
+      (notification) => !notification.isRead
+    ).length;
+
+    const formattedNotifications = notifications.map(
+      formatNotification
+    );
+
+    console.log(
+      "📦 Notifications found:",
+      formattedNotifications.length
+    );
+
+    console.log(
+      "🔵 Unread notifications:",
+      unreadCount
+    );
+
+    if (formattedNotifications.length > 0) {
+      console.log(
+        "📝 Latest notification:",
+        formattedNotifications[0].title
+      );
+    }
+
+    console.log("========================================\n");
+
+    return res.status(200).json({
+      success: true,
+
+      notifications: formattedNotifications,
+
+      unreadCount,
+    });
+
+  } catch (error) {
+    console.error(
+      "❌ GET CURRENT USER NOTIFICATIONS ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+
+      message: "Failed to fetch notifications",
+
+      error:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : undefined,
+    });
   }
-);
+});
+
 
 /* =========================================================
-   LEGACY GET USER NOTIFICATIONS
-
-   GET /api/notifications/:userId
-
-   Kept for compatibility with your existing mobile UI.
-
+   GET UNREAD NOTIFICATIONS
    IMPORTANT:
-   The requested userId must match the authenticated user.
-========================================================= */
-
-router.get(
-  "/:userId",
-  verifyToken,
-  async (req, res) => {
-    try {
-      if (!req.userId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized.",
-        });
-      }
-
-      if (
-        String(req.userId) !==
-        String(req.params.userId)
-      ) {
-        return res.status(403).json({
-          success: false,
-          message:
-            "You can only access your own notifications.",
-        });
-      }
-
-      const notifications = await Notification.find({
-        user: req.userId,
-      })
-        .sort({
-          createdAt: -1,
-        })
-        .lean();
-
-      const formatted = notifications.map((n) => ({
-        id: n._id.toString(),
-
-        title: n.title,
-
-        message: n.message,
-
-        type: n.type,
-
-        priority: n.priority,
-
-        isRead: n.isRead,
-
-        data: n.data || {},
-
-        relatedId: n.relatedId
-          ? n.relatedId.toString()
-          : null,
-
-        relatedType: n.relatedType || null,
-
-        createdAt: n.createdAt,
-
-        updatedAt: n.updatedAt,
-
-        timeAgo: getTimeAgo(n.createdAt),
-      }));
-
-      return res.status(200).json({
-        success: true,
-        notifications: formatted,
-      });
-    } catch (err) {
-      console.error(
-        "❌ GET USER NOTIFICATIONS ERROR:",
-        err
-      );
-
-      return res.status(500).json({
-        success: false,
-        message: err.message,
-      });
-    }
-  }
-);
-
-/* =========================================================
-   GET ONLY UNREAD
-
-   GET /api/notifications/:userId/unread
+   This route MUST come before /:userId
 ========================================================= */
 
 router.get(
@@ -214,83 +247,186 @@ router.get(
   verifyToken,
   async (req, res) => {
     try {
-      if (!req.userId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized.",
-        });
-      }
+      const authenticatedUserId = req.userId;
+
+      const requestedUserId = req.params.userId;
+
+      console.log("\n========================================");
+      console.log("🔵 GET UNREAD NOTIFICATIONS");
+      console.log("========================================");
+      console.log(
+        "Authenticated User:",
+        authenticatedUserId
+      );
+      console.log(
+        "Requested User:",
+        requestedUserId
+      );
 
       if (
-        String(req.userId) !==
-        String(req.params.userId)
+        authenticatedUserId.toString() !==
+        requestedUserId.toString()
       ) {
         return res.status(403).json({
           success: false,
           message:
-            "You can only access your own notifications.",
+            "You are not allowed to access these notifications",
         });
       }
 
       const notifications = await Notification.find({
-        user: req.userId,
+        user: authenticatedUserId,
         isRead: false,
       })
         .sort({
           createdAt: -1,
         })
+        .limit(100)
         .lean();
 
-      const formatted = notifications.map((n) => ({
-        id: n._id.toString(),
+      const formattedNotifications =
+        notifications.map(formatNotification);
 
-        title: n.title,
+      console.log(
+        "📦 Unread notifications found:",
+        formattedNotifications.length
+      );
 
-        message: n.message,
-
-        type: n.type,
-
-        priority: n.priority,
-
-        isRead: n.isRead,
-
-        data: n.data || {},
-
-        relatedId: n.relatedId
-          ? n.relatedId.toString()
-          : null,
-
-        relatedType: n.relatedType || null,
-
-        createdAt: n.createdAt,
-
-        updatedAt: n.updatedAt,
-
-        timeAgo: getTimeAgo(n.createdAt),
-      }));
+      console.log("========================================\n");
 
       return res.status(200).json({
         success: true,
-        notifications: formatted,
+
+        notifications: formattedNotifications,
+
+        unreadCount: formattedNotifications.length,
       });
-    } catch (err) {
+
+    } catch (error) {
       console.error(
         "❌ GET UNREAD NOTIFICATIONS ERROR:",
-        err
+        error
       );
 
       return res.status(500).json({
         success: false,
-        message: err.message,
+        message:
+          "Failed to fetch unread notifications",
       });
     }
   }
 );
 
-/* =========================================================
-   MARK ONE NOTIFICATION AS READ
 
-   PUT /api/notifications/read/:id
+/* =========================================================
+   GET NOTIFICATIONS BY USER ID
+   Compatibility endpoint:
+   
+   GET /api/notifications/:userId
+========================================================= */
+
+router.get(
+  "/:userId",
+  verifyToken,
+  async (req, res) => {
+    try {
+      const authenticatedUserId = req.userId;
+
+      const requestedUserId = req.params.userId;
+
+      console.log("\n========================================");
+      console.log("🔔 GET NOTIFICATIONS BY USER ID");
+      console.log("========================================");
+      console.log(
+        "Authenticated User ID:",
+        authenticatedUserId
+      );
+      console.log(
+        "Requested User ID:",
+        requestedUserId
+      );
+
+      /*
+         Prevent one user from reading another
+         user's notifications.
+      */
+
+      if (
+        authenticatedUserId.toString() !==
+        requestedUserId.toString()
+      ) {
+        console.log(
+          "❌ User ID mismatch"
+        );
+
+        return res.status(403).json({
+          success: false,
+
+          message:
+            "You are not allowed to access these notifications",
+        });
+      }
+
+      const notifications = await Notification.find({
+        user: authenticatedUserId,
+      })
+        .sort({
+          createdAt: -1,
+        })
+        .limit(100)
+        .lean();
+
+      const unreadCount = notifications.filter(
+        (notification) => !notification.isRead
+      ).length;
+
+      const formattedNotifications =
+        notifications.map(formatNotification);
+
+      console.log(
+        "📦 Notifications found:",
+        formattedNotifications.length
+      );
+
+      console.log(
+        "🔵 Unread:",
+        unreadCount
+      );
+
+      console.log("========================================\n");
+
+      return res.status(200).json({
+        success: true,
+
+        notifications: formattedNotifications,
+
+        unreadCount,
+      });
+
+    } catch (error) {
+      console.error(
+        "❌ GET NOTIFICATIONS BY USER ERROR:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+
+        message:
+          "Failed to fetch notifications",
+
+        error:
+          process.env.NODE_ENV === "development"
+            ? error.message
+            : undefined,
+      });
+    }
+  }
+);
+
+
+/* =========================================================
+   MARK SINGLE NOTIFICATION AS READ
 ========================================================= */
 
 router.put(
@@ -298,28 +434,33 @@ router.put(
   verifyToken,
   async (req, res) => {
     try {
-      if (!req.userId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized.",
-        });
-      }
+      const userId = req.userId;
+
+      const notificationId = req.params.id;
+
+      console.log("\n========================================");
+      console.log("📖 MARK NOTIFICATION AS READ");
+      console.log("========================================");
+      console.log("User:", userId);
+      console.log(
+        "Notification:",
+        notificationId
+      );
 
       const notification =
         await Notification.findOneAndUpdate(
           {
-            _id: req.params.id,
+            _id: notificationId,
 
-            // IMPORTANT:
-            // model field is "user", NOT "userId"
-            user: req.userId,
+            user: userId,
           },
+
           {
             $set: {
               isRead: true,
-              readAt: new Date(),
             },
           },
+
           {
             new: true,
           }
@@ -328,32 +469,47 @@ router.put(
       if (!notification) {
         return res.status(404).json({
           success: false,
-          message: "Notification not found.",
+
+          message:
+            "Notification not found",
         });
       }
 
+      console.log(
+        "✅ Notification marked as read"
+      );
+
+      console.log("========================================\n");
+
       return res.status(200).json({
         success: true,
-        notification,
+
+        message:
+          "Notification marked as read",
+
+        notification:
+          formatNotification(notification),
       });
-    } catch (err) {
+
+    } catch (error) {
       console.error(
-        "❌ MARK NOTIFICATION READ ERROR:",
-        err
+        "❌ MARK AS READ ERROR:",
+        error
       );
 
       return res.status(500).json({
         success: false,
-        message: err.message,
+
+        message:
+          "Failed to mark notification as read",
       });
     }
   }
 );
 
-/* =========================================================
-   MARK ALL AS READ
 
-   PUT /api/notifications/read-all
+/* =========================================================
+   MARK ALL NOTIFICATIONS AS READ
 ========================================================= */
 
 router.put(
@@ -361,67 +517,64 @@ router.put(
   verifyToken,
   async (req, res) => {
     try {
-      if (!req.userId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized.",
-        });
-      }
+      const userId = req.userId;
+
+      console.log("\n========================================");
+      console.log("📖 MARK ALL NOTIFICATIONS AS READ");
+      console.log("========================================");
+      console.log("User:", userId);
 
       const result =
         await Notification.updateMany(
           {
-            user: req.userId,
+            user: userId,
+
             isRead: false,
           },
+
           {
             $set: {
               isRead: true,
-              readAt: new Date(),
             },
           }
         );
 
+      console.log(
+        "✅ Notifications updated:",
+        result.modifiedCount
+      );
+
+      console.log("========================================\n");
+
       return res.status(200).json({
         success: true,
+
         message:
-          "All notifications marked as read.",
+          "All notifications marked as read",
+
         modifiedCount:
           result.modifiedCount,
       });
-    } catch (err) {
+
+    } catch (error) {
       console.error(
-        "❌ MARK ALL NOTIFICATIONS READ ERROR:",
-        err
+        "❌ MARK ALL AS READ ERROR:",
+        error
       );
 
       return res.status(500).json({
         success: false,
-        message: err.message,
+
+        message:
+          "Failed to mark all notifications as read",
       });
     }
   }
 );
 
+
 /* =========================================================
    CREATE NOTIFICATION
-
-   POST /api/notifications
-
-   Useful for testing/admin usage.
-
-   Body:
-   {
-     "userId": "...",
-     "title": "...",
-     "message": "...",
-     "type": "general",
-     "priority": "low",
-     "data": {}
-   }
-
-   The request still accepts "userId" from the frontend,
-   but saves it to the model's "user" field.
 ========================================================= */
 
 router.post(
@@ -433,115 +586,135 @@ router.post(
         userId,
         title,
         message,
-        type,
-        priority,
-        data,
+        type = "general",
+        priority = "low",
+        data = {},
         relatedId,
         relatedType,
       } = req.body;
 
+      console.log("\n========================================");
+      console.log("🔔 CREATE NOTIFICATION");
+      console.log("========================================");
+      console.log("Target User:", userId);
+      console.log("Title:", title);
+      console.log("Type:", type);
+
       if (!userId) {
         return res.status(400).json({
           success: false,
+
           message:
-            "Notification userId is required.",
+            "userId is required",
         });
       }
 
-      const notif =
-        await Notification.create({
-          // IMPORTANT:
-          // Notification model uses "user"
-          user: userId,
-
-          title:
-            title || "EduGuard",
+      if (!title) {
+        return res.status(400).json({
+          success: false,
 
           message:
-            message || "",
+            "Notification title is required",
+        });
+      }
 
-          type:
-            type || "general",
+      if (!message) {
+        return res.status(400).json({
+          success: false,
 
-          priority:
-            priority || "low",
+          message:
+            "Notification message is required",
+        });
+      }
 
-          isRead: false,
+      /*
+         IMPORTANT:
+         Notification model uses "user",
+         NOT "userId".
+      */
 
-          data: data || {},
+      const notification =
+        await Notification.create({
+          user: userId,
+
+          title,
+
+          message,
+
+          type,
+
+          priority,
+
+          data,
 
           relatedId:
             relatedId || null,
 
           relatedType:
             relatedType || null,
+
+          isRead: false,
         });
 
-      /* ===================================================
-         SOCKET.IO
-      =================================================== */
+      console.log(
+        "✅ Notification saved:",
+        notification._id.toString()
+      );
+
+      /*
+         Socket notification
+      */
 
       const io = req.app.get("io");
 
       if (io) {
-        io.to(String(userId)).emit(
+        io.to(userId.toString()).emit(
           "newNotification",
-          {
-            id: notif._id.toString(),
+          formatNotification(notification)
+        );
 
-            title: notif.title,
-
-            message: notif.message,
-
-            type: notif.type,
-
-            priority: notif.priority,
-
-            isRead: notif.isRead,
-
-            data: notif.data || {},
-
-            relatedId:
-              notif.relatedId
-                ? notif.relatedId.toString()
-                : null,
-
-            relatedType:
-              notif.relatedType || null,
-
-            createdAt:
-              notif.createdAt,
-
-            updatedAt:
-              notif.updatedAt,
-
-            timeAgo: "Just now",
-          }
+        console.log(
+          "📡 Socket notification emitted to:",
+          userId.toString()
         );
       }
 
+      console.log("========================================\n");
+
       return res.status(201).json({
         success: true,
-        notification: notif,
+
+        message:
+          "Notification created successfully",
+
+        notification:
+          formatNotification(notification),
       });
-    } catch (err) {
+
+    } catch (error) {
       console.error(
         "❌ CREATE NOTIFICATION ERROR:",
-        err
+        error
       );
 
       return res.status(500).json({
         success: false,
-        message: err.message,
+
+        message:
+          "Failed to create notification",
+
+        error:
+          process.env.NODE_ENV === "development"
+            ? error.message
+            : undefined,
       });
     }
   }
 );
 
+
 /* =========================================================
    DELETE NOTIFICATION
-
-   DELETE /api/notifications/:id
 ========================================================= */
 
 router.delete(
@@ -549,166 +722,199 @@ router.delete(
   verifyToken,
   async (req, res) => {
     try {
-      if (!req.userId) {
-        return res.status(401).json({
-          success: false,
-          message: "Unauthorized.",
-        });
-      }
+      const userId = req.userId;
 
-      const notification =
+      const notificationId =
+        req.params.id;
+
+      console.log("\n========================================");
+      console.log("🗑️ DELETE NOTIFICATION");
+      console.log("========================================");
+      console.log("User:", userId);
+      console.log(
+        "Notification:",
+        notificationId
+      );
+
+      const deletedNotification =
         await Notification.findOneAndDelete({
-          _id: req.params.id,
+          _id: notificationId,
 
-          // IMPORTANT:
-          // model field is "user"
-          user: req.userId,
+          user: userId,
         });
 
-      if (!notification) {
+      if (!deletedNotification) {
         return res.status(404).json({
           success: false,
-          message: "Notification not found.",
+
+          message:
+            "Notification not found",
         });
       }
+
+      console.log(
+        "✅ Notification deleted"
+      );
+
+      console.log("========================================\n");
 
       return res.status(200).json({
         success: true,
+
         message:
-          "Notification deleted successfully.",
+          "Notification deleted successfully",
       });
-    } catch (err) {
+
+    } catch (error) {
       console.error(
         "❌ DELETE NOTIFICATION ERROR:",
-        err
+        error
       );
 
       return res.status(500).json({
         success: false,
-        message: err.message,
+
+        message:
+          "Failed to delete notification",
       });
     }
   }
 );
 
+
 /* =========================================================
-   TIME AGO HELPER
+   TEST FCM PUSH
 ========================================================= */
 
-function getTimeAgo(date) {
-  if (!date) {
-    return "Just now";
-  }
+router.post(
+  "/test-push",
+  verifyToken,
+  async (req, res) => {
+    try {
+      const userId = req.userId;
 
-  const diff = Math.floor(
-    (Date.now() -
-      new Date(date).getTime()) /
-      1000
-  );
+      console.log("\n========================================");
+      console.log("📱 TEST FCM PUSH");
+      console.log("========================================");
+      console.log("User:", userId);
 
-  if (diff < 60) {
-    return "Just now";
-  }
+      const user =
+        await User.findById(userId);
 
-  if (diff < 3600) {
-    return `${Math.floor(
-      diff / 60
-    )} min ago`;
-  }
-
-  if (diff < 86400) {
-    return `${Math.floor(
-      diff / 3600
-    )} hr ago`;
-  }
-
-  return `${Math.floor(
-    diff / 86400
-  )} day(s) ago`;
-}
-
-router.post("/test-push", verifyToken, async (req, res) => {
-  try {
-    const { userId, title, body } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: "userId is required",
-      });
-    }
-
-    const user = await User.findById(userId).select(
-      "email pushTokens"
-    );
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    const fcmTokens = Array.isArray(user.pushTokens)
-      ? user.pushTokens.filter(
-          (item) =>
-            item?.token &&
-            item?.provider === "fcm" &&
-            item?.platform === "ios"
-        )
-      : [];
-
-    if (!fcmTokens.length) {
-      return res.status(400).json({
-        success: false,
-        message: "No iOS FCM token found for this user",
-        pushTokens: user.pushTokens || [],
-      });
-    }
-
-    const results = [];
-
-    for (const pushToken of fcmTokens) {
-      try {
-        const result = await sendPushNotification({
-          token: pushToken.token,
-          title: title || "EduGuard Test",
-          body: body || "This is a test notification from Postman.",
-          data: {
-            type: "test",
-            timestamp: Date.now().toString(),
-          },
-        });
-
-        results.push({
-          platform: pushToken.platform,
-          provider: pushToken.provider,
-          success: !!result,
-          result,
-        });
-      } catch (error) {
-        results.push({
-          platform: pushToken.platform,
-          provider: pushToken.provider,
+      if (!user) {
+        return res.status(404).json({
           success: false,
-          error: error.message,
+
+          message:
+            "User not found",
         });
       }
+
+      const fcmTokens =
+        (user.pushTokens || []).filter(
+          (pushToken) =>
+            pushToken.provider === "fcm" &&
+            pushToken.token
+        );
+
+      console.log(
+        "📱 FCM tokens found:",
+        fcmTokens.length
+      );
+
+      if (fcmTokens.length === 0) {
+        return res.status(400).json({
+          success: false,
+
+          message:
+            "No FCM tokens registered for this user",
+        });
+      }
+
+      const results = [];
+
+      for (const pushToken of fcmTokens) {
+        try {
+          console.log(
+            "📡 Sending FCM to:",
+            pushToken.platform
+          );
+
+          const result =
+            await sendPushNotification({
+              token: pushToken.token,
+
+              title: "📱 GuidED Test",
+
+              body:
+                "Hello! This is a real FCM push test from GuidED.",
+
+              data: {
+                type: "test",
+
+                timestamp:
+                  Date.now().toString(),
+              },
+            });
+
+          results.push({
+            platform:
+              pushToken.platform,
+
+            success: true,
+
+            result,
+          });
+
+        } catch (error) {
+          console.error(
+            "❌ FCM send failed:",
+            error.message
+          );
+
+          results.push({
+            platform:
+              pushToken.platform,
+
+            success: false,
+
+            error: error.message,
+          });
+        }
+      }
+
+      console.log("========================================\n");
+
+      return res.status(200).json({
+        success: true,
+
+        message:
+          "FCM test completed",
+
+        results,
+      });
+
+    } catch (error) {
+      console.error(
+        "❌ TEST FCM ERROR:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+
+        message:
+          "Failed to send FCM test notification",
+
+        error:
+          process.env.NODE_ENV === "development"
+            ? error.message
+            : undefined,
+      });
     }
-
-    return res.json({
-      success: true,
-      message: "FCM test completed",
-      results,
-    });
-  } catch (error) {
-    console.error("TEST PUSH ERROR:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
   }
-});
+);
+
 
 export default router;
+

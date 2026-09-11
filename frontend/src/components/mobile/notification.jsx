@@ -66,7 +66,9 @@ export default function Notification() {
 
   const socketRef = useRef(null);
 
-  const appStateRef = useRef(AppState.currentState);
+  const appStateRef = useRef(
+    AppState.currentState
+  );
 
   /* =========================================================
      AUTH HEADERS
@@ -74,7 +76,10 @@ export default function Notification() {
 
   const getAuthHeaders = useCallback(() => {
     if (!token) {
-      console.log("⚠️ No authentication token available.");
+      console.log(
+        "⚠️ No authentication token available."
+      );
+
       return {};
     }
 
@@ -87,70 +92,85 @@ export default function Notification() {
      NORMALIZE NOTIFICATION
   ========================================================= */
 
-  const normalizeNotification = useCallback((notification) => {
-    if (!notification) {
-      return null;
-    }
+  const normalizeNotification = useCallback(
+    (notification) => {
+      if (!notification) {
+        return null;
+      }
 
-    const id = notification._id || notification.id || null;
+      const id =
+        notification._id ||
+        notification.id ||
+        null;
 
-    if (!id) {
-      return null;
-    }
+      if (!id) {
+        console.log(
+          "⚠️ Notification has no ID:",
+          notification
+        );
 
-    return {
-      ...notification,
+        return null;
+      }
 
-      _id: String(id),
+      return {
+        ...notification,
 
-      id: String(id),
+        _id: String(id),
 
-      isRead: notification.isRead ?? false,
+        id: String(id),
 
-      data: notification.data || {},
+        isRead:
+          notification.isRead ?? false,
 
-      createdAt:
-        notification.createdAt ||
-        new Date().toISOString(),
-    };
-  }, []);
+        data:
+          notification.data || {},
+
+        createdAt:
+          notification.createdAt ||
+          new Date().toISOString(),
+
+        updatedAt:
+          notification.updatedAt ||
+          notification.createdAt ||
+          new Date().toISOString(),
+
+        timeAgo:
+          notification.timeAgo ||
+          null,
+      };
+    },
+    []
+  );
 
   /* =========================================================
-     FETCH NOTIFICATIONS FROM MONGODB
+     FETCH NOTIFICATIONS
      
      IMPORTANT:
-     MongoDB is the source of truth.
+     The authenticated backend endpoint is:
 
-     We MERGE the database results with the current UI list
-     instead of blindly replacing the list.
+     GET /api/notifications
 
-     This prevents a realtime notification from disappearing
-     when the API response temporarily lags behind Socket.IO
-     or FCM.
+     We do NOT need to send user._id anymore.
+
+     The backend gets the current user from req.userId.
   ========================================================= */
 
   const fetchNotifications = useCallback(
     async (isRefresh = false) => {
-      if (!user?._id) {
-        console.log(
-          "⚠️ No logged-in user. Cannot fetch notifications."
-        );
-
-        setNotifications([]);
-
-        setLoading(false);
-
-        return;
-      }
+      /*
+      =======================================================
+      TOKEN CHECK
+      =======================================================
+      */
 
       if (!token) {
         console.log(
-          "⚠️ No authentication token. Cannot fetch notifications."
+          "⚠️ No authentication token."
         );
 
-        setNotifications([]);
-
         setLoading(false);
+
+        setRefreshing(false);
 
         return;
       }
@@ -163,19 +183,24 @@ export default function Notification() {
         }
 
         console.log("");
-        console.log(
-          "===================================="
-        );
-        console.log(
-          "🔔 FETCHING STUDENT NOTIFICATIONS"
-        );
+
         console.log(
           "===================================="
         );
 
         console.log(
-          "User ID:",
-          user._id
+          "🔔 FETCHING STUDENT NOTIFICATIONS"
+        );
+
+        console.log(
+          "===================================="
+        );
+
+        console.log(
+          "User from authStore:",
+          user?._id ||
+            user?.id ||
+            "not available"
         );
 
         console.log(
@@ -183,8 +208,24 @@ export default function Notification() {
           !!token
         );
 
+        /*
+        =====================================================
+        IMPORTANT CHANGE
+
+        OLD:
+
+        /api/notifications/${user._id}
+
+        NEW:
+
+        /api/notifications
+
+        The backend gets req.userId from JWT.
+        =====================================================
+        */
+
         const url =
-          `${API_URL}/api/notifications/${user._id}`;
+          `${API_URL}/api/notifications`;
 
         console.log(
           "Request URL:",
@@ -194,7 +235,10 @@ export default function Notification() {
         const res = await axios.get(
           url,
           {
-            headers: getAuthHeaders(),
+            headers:
+              getAuthHeaders(),
+
+            timeout: 20000,
           }
         );
 
@@ -209,12 +253,16 @@ export default function Notification() {
         );
 
         /* =====================================================
-           SUPPORT DIFFERENT RESPONSE SHAPES
+           RESPONSE DATA
         ===================================================== */
 
         let data = [];
 
-        if (Array.isArray(res.data)) {
+        if (
+          Array.isArray(
+            res.data
+          )
+        ) {
           data = res.data;
         } else if (
           Array.isArray(
@@ -237,139 +285,28 @@ export default function Notification() {
           data.length
         );
 
+        console.log(
+          "🔵 Backend unread count:",
+          res.data?.unreadCount ??
+            "not provided"
+        );
+
         /* =====================================================
            NORMALIZE
         ===================================================== */
 
         const normalized = data
-          .map(normalizeNotification)
+          .map(
+            normalizeNotification
+          )
           .filter(Boolean);
 
         /* =====================================================
-           SORT DATABASE RESULTS
+           SORT
         ===================================================== */
 
-        normalized.sort((a, b) => {
-          const dateA =
-            new Date(
-              a.createdAt || 0
-            ).getTime();
-
-          const dateB =
-            new Date(
-              b.createdAt || 0
-            ).getTime();
-
-          return dateB - dateA;
-        });
-
-        /* =====================================================
-           LOG INDIVIDUAL NOTIFICATIONS
-        ===================================================== */
-
-        normalized.forEach(
-          (notification, index) => {
-            console.log(
-              `🔔 Notification ${index + 1}:`,
-              {
-                id: notification._id,
-                user: notification.user,
-                title: notification.title,
-                message: notification.message,
-                type: notification.type,
-                priority:
-                  notification.priority,
-                isRead:
-                  notification.isRead,
-                createdAt:
-                  notification.createdAt,
-              }
-            );
-          }
-        );
-
-        /* =====================================================
-           MERGE DATABASE RESULTS WITH CURRENT UI
-           
-           IMPORTANT:
-           Do NOT simply do:
-           
-           setNotifications(normalized)
-           
-           because a realtime notification can arrive just
-           before the database/API has finished updating.
-
-           Instead:
-           1. Keep notifications currently visible.
-           2. Apply database notifications.
-           3. Database version wins when IDs match.
-           4. Keep any newer realtime item temporarily present.
-        ===================================================== */
-
-        setNotifications((previous) => {
-          const mergedMap = new Map();
-
-          /*
-          -----------------------------------------------------
-          KEEP CURRENT UI NOTIFICATIONS
-          -----------------------------------------------------
-          */
-
-          previous.forEach((notification) => {
-            const id = String(
-              notification._id ||
-                notification.id
-            );
-
-            if (id) {
-              mergedMap.set(
-                id,
-                notification
-              );
-            }
-          });
-
-          /*
-          -----------------------------------------------------
-          APPLY DATABASE RESULTS
-          
-          If the same notification exists, the database
-          version replaces the current version.
-          -----------------------------------------------------
-          */
-
-          normalized.forEach((notification) => {
-            const id = String(
-              notification._id ||
-                notification.id
-            );
-
-            if (id) {
-              mergedMap.set(
-                id,
-                notification
-              );
-            }
-          });
-
-          /*
-          -----------------------------------------------------
-          CONVERT BACK TO ARRAY
-          -----------------------------------------------------
-          */
-
-          const merged =
-            Array.from(
-              mergedMap.values()
-            );
-
-          /*
-          -----------------------------------------------------
-          SORT NEWEST FIRST
-          -----------------------------------------------------
-          */
-
-          merged.sort((a, b) => {
+        normalized.sort(
+          (a, b) => {
             const dateA =
               new Date(
                 a.createdAt || 0
@@ -381,37 +318,177 @@ export default function Notification() {
               ).getTime();
 
             return dateB - dateA;
-          });
+          }
+        );
 
-          console.log(
-            "===================================="
-          );
+        /* =====================================================
+           LOG NOTIFICATIONS
+        ===================================================== */
 
-          console.log(
-            "✅ NOTIFICATION LIST MERGED"
-          );
+        normalized.forEach(
+          (
+            notification,
+            index
+          ) => {
+            console.log(
+              `🔔 Notification ${
+                index + 1
+              }:`,
+              {
+                id:
+                  notification._id,
 
-          console.log(
-            "Database notifications:",
-            normalized.length
-          );
+                user:
+                  notification.user,
 
-          console.log(
-            "Previous UI notifications:",
-            previous.length
-          );
+                title:
+                  notification.title,
 
-          console.log(
-            "Final UI notifications:",
-            merged.length
-          );
+                message:
+                  notification.message,
 
-          console.log(
-            "===================================="
-          );
+                type:
+                  notification.type,
 
-          return merged;
-        });
+                priority:
+                  notification.priority,
+
+                isRead:
+                  notification.isRead,
+
+                createdAt:
+                  notification.createdAt,
+              }
+            );
+          }
+        );
+
+        /* =====================================================
+           MERGE DATABASE RESULTS WITH CURRENT UI
+
+           MongoDB is still the source of truth.
+
+           Existing realtime notifications are retained
+           temporarily if they are not yet present in the
+           database response.
+        ===================================================== */
+
+        setNotifications(
+          (previous) => {
+            const mergedMap =
+              new Map();
+
+            /*
+            ---------------------------------------------------
+            KEEP CURRENT UI ITEMS
+            ---------------------------------------------------
+            */
+
+            previous.forEach(
+              (notification) => {
+                const id =
+                  String(
+                    notification._id ||
+                      notification.id ||
+                      ""
+                  );
+
+                if (id) {
+                  mergedMap.set(
+                    id,
+                    notification
+                  );
+                }
+              }
+            );
+
+            /*
+            ---------------------------------------------------
+            DATABASE ITEMS OVERRIDE OLD UI ITEMS
+            ---------------------------------------------------
+            */
+
+            normalized.forEach(
+              (notification) => {
+                const id =
+                  String(
+                    notification._id ||
+                      notification.id ||
+                      ""
+                  );
+
+                if (id) {
+                  mergedMap.set(
+                    id,
+                    notification
+                  );
+                }
+              }
+            );
+
+            /*
+            ---------------------------------------------------
+            ARRAY
+            ---------------------------------------------------
+            */
+
+            const merged =
+              Array.from(
+                mergedMap.values()
+              );
+
+            /*
+            ---------------------------------------------------
+            SORT NEWEST FIRST
+            ---------------------------------------------------
+            */
+
+            merged.sort(
+              (a, b) => {
+                const dateA =
+                  new Date(
+                    a.createdAt || 0
+                  ).getTime();
+
+                const dateB =
+                  new Date(
+                    b.createdAt || 0
+                  ).getTime();
+
+                return dateB - dateA;
+              }
+            );
+
+            console.log(
+              "===================================="
+            );
+
+            console.log(
+              "✅ NOTIFICATION LIST MERGED"
+            );
+
+            console.log(
+              "Database notifications:",
+              normalized.length
+            );
+
+            console.log(
+              "Previous UI notifications:",
+              previous.length
+            );
+
+            console.log(
+              "Final UI notifications:",
+              merged.length
+            );
+
+            console.log(
+              "===================================="
+            );
+
+            return merged;
+          }
+        );
 
         console.log(
           "✅ Notification list update completed."
@@ -442,20 +519,16 @@ export default function Notification() {
           err?.message
         );
 
-        /* =====================================================
-           AUTH ERROR
-        ===================================================== */
-
         if (
           err?.response?.status ===
           401
         ) {
           console.log(
-            "❌ Authentication failed while fetching notifications."
+            "❌ Authentication failed."
           );
 
           console.log(
-            "Check whether authStore.token contains the current JWT."
+            "The JWT may be expired or invalid."
           );
         }
 
@@ -464,13 +537,9 @@ export default function Notification() {
         );
 
         /*
-        IMPORTANT:
-
-        Do not clear the existing notifications during a
-        refresh error.
-
-        Otherwise a temporary network/backend problem could
-        make the notification list disappear.
+        =====================================================
+        DO NOT CLEAR EXISTING DATA DURING REFRESH ERROR
+        =====================================================
         */
 
         if (!isRefresh) {
@@ -483,8 +552,8 @@ export default function Notification() {
       }
     },
     [
-      user?._id,
       token,
+      user,
       getAuthHeaders,
       normalizeNotification,
     ]
@@ -497,21 +566,21 @@ export default function Notification() {
   useFocusEffect(
     useCallback(() => {
       console.log(
-        "📱 Notification screen focused"
+        "📱 Student notification screen focused"
       );
 
       fetchNotifications();
 
       return () => {
         console.log(
-          "📱 Notification screen unfocused"
+          "📱 Student notification screen unfocused"
         );
       };
     }, [fetchNotifications])
   );
 
   /* =========================================================
-     REFRESH WHEN APP RETURNS TO FOREGROUND
+     APP FOREGROUND
   ========================================================= */
 
   useEffect(() => {
@@ -550,13 +619,9 @@ export default function Notification() {
   }, [fetchNotifications]);
 
   /* =========================================================
-     FIREBASE FCM FOREGROUND MESSAGE
+     FCM FOREGROUND MESSAGE
      
-     IMPORTANT:
-     We DO NOT create a local notification here.
-
-     FCM is only used to tell the app:
-     "There may be a new notification. Refresh from MongoDB."
+     FCM is ONLY used as a trigger to refresh MongoDB.
   ========================================================= */
 
   useEffect(() => {
@@ -566,7 +631,9 @@ export default function Notification() {
 
     const unsubscribe =
       messaging().onMessage(
-        async (remoteMessage) => {
+        async (
+          remoteMessage
+        ) => {
           console.log("");
 
           console.log(
@@ -601,17 +668,14 @@ export default function Notification() {
           );
 
           /*
-          =====================================================
-          DO NOT USE expo-notifications
-          =====================================================
-
-          The backend already saves the notification
-          into MongoDB.
-
-          Just refresh the database list.
+          -----------------------------------------------------
+          Refresh MongoDB.
+          -----------------------------------------------------
           */
 
-          await fetchNotifications(true);
+          await fetchNotifications(
+            true
+          );
         }
       );
 
@@ -625,7 +689,7 @@ export default function Notification() {
   }, [fetchNotifications]);
 
   /* =========================================================
-     FIREBASE FCM NOTIFICATION OPENED FROM BACKGROUND
+     FCM BACKGROUND NOTIFICATION OPENED
   ========================================================= */
 
   useEffect(() => {
@@ -635,7 +699,9 @@ export default function Notification() {
 
     const unsubscribe =
       messaging().onNotificationOpenedApp(
-        async (remoteMessage) => {
+        async (
+          remoteMessage
+        ) => {
           console.log("");
 
           console.log(
@@ -664,7 +730,9 @@ export default function Notification() {
             "===================================="
           );
 
-          await fetchNotifications(true);
+          await fetchNotifications(
+            true
+          );
         }
       );
 
@@ -678,7 +746,7 @@ export default function Notification() {
   }, [fetchNotifications]);
 
   /* =========================================================
-     FIREBASE FCM NOTIFICATION OPENED FROM QUIT STATE
+     FCM QUIT STATE
   ========================================================= */
 
   useEffect(() => {
@@ -725,7 +793,9 @@ export default function Notification() {
             "===================================="
           );
 
-          await fetchNotifications(true);
+          await fetchNotifications(
+            true
+          );
         } catch (error) {
           console.log(
             "❌ Error checking initial FCM notification:",
@@ -743,13 +813,26 @@ export default function Notification() {
   }, [fetchNotifications]);
 
   /* =========================================================
-     SOCKET.IO REALTIME NOTIFICATIONS
+     SOCKET.IO
   ========================================================= */
 
   useEffect(() => {
-    if (!user?._id) {
+    /*
+    =====================================================
+    We still need the user ID for Socket.IO because the
+    socket server needs to know which room to join.
+
+    Accept both _id and id in case authStore shape differs.
+    =====================================================
+    */
+
+    const currentUserId =
+      user?._id ||
+      user?.id;
+
+    if (!currentUserId) {
       console.log(
-        "⚠️ No user ID. Socket not started."
+        "⚠️ No user ID. Student notification socket not started."
       );
 
       return;
@@ -771,7 +854,7 @@ export default function Notification() {
 
     console.log(
       "User ID:",
-      user._id
+      currentUserId
     );
 
     const socket = io(
@@ -826,17 +909,17 @@ export default function Notification() {
 
         console.log(
           "Registering user:",
-          user._id
+          currentUserId
         );
 
         socket.emit(
           "register",
-          user._id
+          currentUserId
         );
 
         socket.emit(
           "join",
-          user._id
+          currentUserId
         );
 
         console.log(
@@ -854,15 +937,7 @@ export default function Notification() {
     );
 
     /* =======================================================
-       NEW REALTIME NOTIFICATION
-       
-       IMPORTANT:
-       We do NOT add the socket object directly to the UI.
-
-       MongoDB is the source of truth.
-
-       We wait 1 second to allow the backend to finish
-       saving the notification, then fetch from MongoDB.
+       NEW NOTIFICATION
     ======================================================= */
 
     socket.on(
@@ -928,12 +1003,15 @@ export default function Notification() {
 
         /*
         =====================================================
-        WAIT FOR BACKEND DATABASE SAVE
+        WAIT A LITTLE BEFORE FETCHING
+
+        This gives the backend enough time to finish the
+        MongoDB save before the GET request runs.
         =====================================================
         */
 
         console.log(
-          "⏳ Waiting for notification database save..."
+          "⏳ Waiting for database save..."
         );
 
         setTimeout(() => {
@@ -941,7 +1019,9 @@ export default function Notification() {
             "🔄 Refreshing notifications from MongoDB..."
           );
 
-          fetchNotifications(true);
+          fetchNotifications(
+            true
+          );
         }, 1000);
       }
     );
@@ -959,11 +1039,9 @@ export default function Notification() {
         );
 
         setTimeout(() => {
-          console.log(
-            "🔄 Refreshing after generic notification..."
+          fetchNotifications(
+            true
           );
-
-          fetchNotifications(true);
         }, 1000);
       }
     );
@@ -981,11 +1059,9 @@ export default function Notification() {
         );
 
         setTimeout(() => {
-          console.log(
-            "🔄 Refreshing after student notification..."
+          fetchNotifications(
+            true
           );
-
-          fetchNotifications(true);
         }, 1000);
       }
     );
@@ -1003,7 +1079,9 @@ export default function Notification() {
         );
 
         setTimeout(() => {
-          fetchNotifications(true);
+          fetchNotifications(
+            true
+          );
         }, 1000);
       }
     );
@@ -1021,7 +1099,9 @@ export default function Notification() {
         );
 
         setTimeout(() => {
-          fetchNotifications(true);
+          fetchNotifications(
+            true
+          );
         }, 1000);
       }
     );
@@ -1069,12 +1149,12 @@ export default function Notification() {
 
         socket.emit(
           "register",
-          user._id
+          currentUserId
         );
 
         socket.emit(
           "join",
-          user._id
+          currentUserId
         );
       }
     );
@@ -1103,73 +1183,77 @@ export default function Notification() {
       }
     };
   }, [
-    user?._id,
+    user,
     fetchNotifications,
   ]);
 
   /* =========================================================
-     MARK AS READ
+     MARK NOTIFICATION AS READ
   ========================================================= */
 
-  const markAsRead = async (id) => {
-    if (!id) {
-      return;
-    }
+  const markAsRead =
+    async (id) => {
+      if (!id) {
+        return;
+      }
 
-    try {
-      console.log(
-        "📖 Marking notification as read:",
-        id
-      );
+      try {
+        console.log(
+          "📖 Marking notification as read:",
+          id
+        );
 
-      /*
-      =====================================================
-      UPDATE UI IMMEDIATELY
-      =====================================================
-      */
+        /*
+        =====================================================
+        UPDATE UI IMMEDIATELY
+        =====================================================
+        */
 
-      setNotifications(
-        (previous) =>
-          previous.map(
-            (notification) =>
-              String(
-                notification._id ||
-                  notification.id
-              ) === String(id)
-                ? {
-                    ...notification,
-                    isRead: true,
-                  }
-                : notification
-          )
-      );
+        setNotifications(
+          (previous) =>
+            previous.map(
+              (
+                notification
+              ) =>
+                String(
+                  notification._id ||
+                    notification.id
+                ) ===
+                String(id)
+                  ? {
+                      ...notification,
+                      isRead: true,
+                    }
+                  : notification
+            )
+        );
 
-      /*
-      =====================================================
-      UPDATE BACKEND
-      =====================================================
-      */
+        /*
+        =====================================================
+        UPDATE BACKEND
+        =====================================================
+        */
 
-      await axios.put(
-        `${API_URL}/api/notifications/read/${id}`,
-        {},
-        {
-          headers:
-            getAuthHeaders(),
-        }
-      );
+        await axios.put(
+          `${API_URL}/api/notifications/read/${id}`,
+          {},
+          {
+            headers:
+              getAuthHeaders(),
+          }
+        );
 
-      console.log(
-        "✅ Notification marked as read"
-      );
-    } catch (err) {
-      console.log(
-        "❌ Mark notification read error:",
-        err?.response?.data ||
-          err?.message
-      );
-    }
-  };
+        console.log(
+          "✅ Notification marked as read"
+        );
+      } catch (err) {
+        console.log(
+          "❌ Mark notification read error:",
+          err?.response?.data ||
+            err?.message
+        );
+      }
+    };
 
   /* =========================================================
      FILTERS
@@ -1206,8 +1290,10 @@ export default function Notification() {
           "updates"
         ) {
           return (
-            type === "update" ||
-            type === "success" ||
+            type ===
+              "update" ||
+            type ===
+              "success" ||
             dataType ===
               "report_accepted"
           );
@@ -1238,504 +1324,513 @@ export default function Notification() {
      NOTIFICATION DESIGN
   ========================================================= */
 
-  const getNotifDesign = (
-    notification
-  ) => {
-    const priority =
-      notification.priority?.toLowerCase();
+  const getNotifDesign =
+    (notification) => {
+      const priority =
+        notification.priority?.toLowerCase();
 
-    const type =
-      notification.type?.toLowerCase();
+      const type =
+        notification.type?.toLowerCase();
 
-    const dataType =
-      notification.data?.type?.toLowerCase();
+      const dataType =
+        notification.data?.type?.toLowerCase();
 
-    /* =====================================================
-       REPORT ACCEPTED
-    ===================================================== */
+      /* =====================================================
+         REPORT ACCEPTED
+      ===================================================== */
 
-    if (
-      dataType ===
-      "report_accepted"
-    ) {
-      return {
-        color:
-          colors.success ||
-          "#16A34A",
+      if (
+        dataType ===
+        "report_accepted"
+      ) {
+        return {
+          color:
+            colors.success ||
+            "#16A34A",
 
-        icon:
-          "checkmark-circle-outline",
+          icon:
+            "checkmark-circle-outline",
 
-        label:
-          "Report Accepted",
-      };
-    }
+          label:
+            "Report Accepted",
+        };
+      }
 
-    /* =====================================================
-       REPORT REJECTED
-    ===================================================== */
+      /* =====================================================
+         REPORT REJECTED
+      ===================================================== */
 
-    if (
-      dataType ===
-      "report_rejected"
-    ) {
-      return {
-        color:
-          colors.error ||
-          "#DC2626",
+      if (
+        dataType ===
+        "report_rejected"
+      ) {
+        return {
+          color:
+            colors.error ||
+            "#DC2626",
 
-        icon:
-          "close-circle-outline",
+          icon:
+            "close-circle-outline",
 
-        label:
-          "Report Rejected",
-      };
-    }
+          label:
+            "Report Rejected",
+        };
+      }
 
-    /* =====================================================
-       HIGH PRIORITY
-    ===================================================== */
+      /* =====================================================
+         HIGH PRIORITY
+      ===================================================== */
 
-    if (
-      priority ===
-      "high"
-    ) {
-      return {
-        color:
-          colors.error ||
-          "#DC2626",
+      if (
+        priority ===
+        "high"
+      ) {
+        return {
+          color:
+            colors.error ||
+            "#DC2626",
 
-        icon:
-          "warning-outline",
+          icon:
+            "warning-outline",
 
-        label:
-          "High Priority",
-      };
-    }
+          label:
+            "High Priority",
+        };
+      }
 
-    /* =====================================================
-       INTERVENTION
-    ===================================================== */
+      /* =====================================================
+         INTERVENTION
+      ===================================================== */
 
-    if (
-      type ===
-      "intervention"
-    ) {
-      return {
-        color:
-          colors.warning ||
-          "#F59E0B",
+      if (
+        type ===
+        "intervention"
+      ) {
+        return {
+          color:
+            colors.warning ||
+            "#F59E0B",
 
-        icon:
-          "school-outline",
+          icon:
+            "school-outline",
 
-        label:
-          "Intervention",
-      };
-    }
+          label:
+            "Intervention",
+        };
+      }
 
-    /* =====================================================
-       REPORT
-    ===================================================== */
+      /* =====================================================
+         REPORT
+      ===================================================== */
 
-    if (
-      type ===
-      "report"
-    ) {
-      return {
-        color:
-          colors.error ||
-          "#DC2626",
+      if (
+        type ===
+        "report"
+      ) {
+        return {
+          color:
+            colors.error ||
+            "#DC2626",
 
-        icon:
-          "document-text-outline",
+          icon:
+            "document-text-outline",
 
-        label:
-          "Report",
-      };
-    }
+          label:
+            "Report",
+        };
+      }
 
-    /* =====================================================
-       MESSAGE
-    ===================================================== */
+      /* =====================================================
+         MESSAGE
+      ===================================================== */
 
-    if (
-      type ===
-      "message"
-    ) {
+      if (
+        type ===
+        "message"
+      ) {
+        return {
+          color:
+            colors.primary,
+
+          icon:
+            "chatbubble-ellipses-outline",
+
+          label:
+            "Message",
+        };
+      }
+
+      /* =====================================================
+         UPDATE
+      ===================================================== */
+
+      if (
+        type ===
+        "update"
+      ) {
+        return {
+          color:
+            colors.warning ||
+            "#F59E0B",
+
+          icon:
+            "information-circle-outline",
+
+          label:
+            "Update",
+        };
+      }
+
+      /* =====================================================
+         SUCCESS
+      ===================================================== */
+
+      if (
+        type ===
+        "success"
+      ) {
+        return {
+          color:
+            colors.success ||
+            "#16A34A",
+
+          icon:
+            "checkmark-circle-outline",
+
+          label:
+            "Success",
+        };
+      }
+
+      /* =====================================================
+         WARNING
+      ===================================================== */
+
+      if (
+        type ===
+        "warning"
+      ) {
+        return {
+          color:
+            colors.warning ||
+            "#F59E0B",
+
+          icon:
+            "alert-circle-outline",
+
+          label:
+            "Warning",
+        };
+      }
+
+      /* =====================================================
+         REJECTED
+      ===================================================== */
+
+      if (
+        type ===
+        "rejected"
+      ) {
+        return {
+          color:
+            colors.error ||
+            "#DC2626",
+
+          icon:
+            "close-circle-outline",
+
+          label:
+            "Rejected",
+        };
+      }
+
+      /* =====================================================
+         GENERAL
+      ===================================================== */
+
       return {
         color:
           colors.primary,
 
         icon:
-          "chatbubble-ellipses-outline",
+          "notifications-outline",
 
         label:
-          "Message",
+          "Notification",
       };
-    }
-
-    /* =====================================================
-       UPDATE
-    ===================================================== */
-
-    if (
-      type ===
-      "update"
-    ) {
-      return {
-        color:
-          colors.warning ||
-          "#F59E0B",
-
-        icon:
-          "information-circle-outline",
-
-        label:
-          "Update",
-      };
-    }
-
-    /* =====================================================
-       SUCCESS
-    ===================================================== */
-
-    if (
-      type ===
-      "success"
-    ) {
-      return {
-        color:
-          colors.success ||
-          "#16A34A",
-
-        icon:
-          "checkmark-circle-outline",
-
-        label:
-          "Success",
-      };
-    }
-
-    /* =====================================================
-       WARNING
-    ===================================================== */
-
-    if (
-      type ===
-      "warning"
-    ) {
-      return {
-        color:
-          colors.warning ||
-          "#F59E0B",
-
-        icon:
-          "alert-circle-outline",
-
-        label:
-          "Warning",
-      };
-    }
-
-    /* =====================================================
-       REJECTED
-    ===================================================== */
-
-    if (
-      type ===
-      "rejected"
-    ) {
-      return {
-        color:
-          colors.error ||
-          "#DC2626",
-
-        icon:
-          "close-circle-outline",
-
-        label:
-          "Rejected",
-      };
-    }
-
-    /* =====================================================
-       GENERAL
-    ===================================================== */
-
-    return {
-      color:
-        colors.primary,
-
-      icon:
-        "notifications-outline",
-
-      label:
-        "Notification",
     };
-  };
 
   /* =========================================================
      RENDER NOTIFICATION
   ========================================================= */
 
-  const renderItem = ({
-    item,
-  }) => {
-    const {
-      color,
-      icon,
-      label,
-    } =
-      getNotifDesign(item);
+  const renderItem =
+    ({ item }) => {
+      const {
+        color,
+        icon,
+        label,
+      } =
+        getNotifDesign(
+          item
+        );
 
-    const notificationId =
-      item._id ||
-      item.id;
+      const notificationId =
+        item._id ||
+        item.id;
 
-    return (
-      <TouchableOpacity
-        activeOpacity={0.85}
-        onPress={() =>
-          markAsRead(
-            notificationId
-          )
-        }
-        style={[
-          styles.notifCard,
-          !item.isRead &&
-            styles.unreadCard,
-        ]}
-      >
-        <View
-          style={[
-            styles.notifLine,
-            {
-              backgroundColor:
-                color,
-            },
-          ]}
-        />
-
-        <View
-          style={[
-            styles.notifIconBox,
-            {
-              backgroundColor:
-                `${color}18`,
-            },
-          ]}
-        >
-          <Ionicons
-            name={icon}
-            size={22}
-            color={color}
-          />
-        </View>
-
-        <View
-          style={
-            styles.notifTextBox
+      return (
+        <TouchableOpacity
+          activeOpacity={
+            0.85
           }
+          onPress={() =>
+            markAsRead(
+              notificationId
+            )
+          }
+          style={[
+            styles.notifCard,
+            !item.isRead &&
+              styles.unreadCard,
+          ]}
         >
           <View
-            style={
-              styles.notifTopRow
-            }
-          >
-            <Text
-              style={[
-                styles.notifCategory,
-                {
+            style={[
+              styles.notifLine,
+              {
+                backgroundColor:
                   color,
-                },
-              ]}
-            >
-              {label}
-            </Text>
-
-            {!item.isRead && (
-              <View
-                style={[
-                  styles.unreadDot,
-                  {
-                    backgroundColor:
-                      color,
-                  },
-                ]}
-              />
-            )}
-          </View>
-
-          <Text
-            style={
-              styles.notifTitle
-            }
-            numberOfLines={2}
-          >
-            {item.title ||
-              "Notification"}
-          </Text>
-
-          <Text
-            style={
-              styles.notifMessage
-            }
-            numberOfLines={3}
-          >
-            {item.message ||
-              "You have a new notification."}
-          </Text>
+              },
+            ]}
+          />
 
           <View
-            style={
-              styles.notifBottomRow
-            }
+            style={[
+              styles.notifIconBox,
+              {
+                backgroundColor:
+                  `${color}18`,
+              },
+            ]}
           >
             <Ionicons
-              name="time-outline"
-              size={13}
-              color={
-                colors.textSecondary
-              }
+              name={icon}
+              size={22}
+              color={color}
             />
+          </View>
+
+          <View
+            style={
+              styles.notifTextBox
+            }
+          >
+            <View
+              style={
+                styles.notifTopRow
+              }
+            >
+              <Text
+                style={[
+                  styles.notifCategory,
+                  {
+                    color,
+                  },
+                ]}
+              >
+                {label}
+              </Text>
+
+              {!item.isRead && (
+                <View
+                  style={[
+                    styles.unreadDot,
+                    {
+                      backgroundColor:
+                        color,
+                    },
+                  ]}
+                />
+              )}
+            </View>
 
             <Text
               style={
-                styles.notifTime
+                styles.notifTitle
+              }
+              numberOfLines={
+                2
               }
             >
-              {item.timeAgo ||
-                (item.createdAt
-                  ? new Date(
-                      item.createdAt
-                    ).toLocaleString()
-                  : "Just now")}
+              {item.title ||
+                "Notification"}
             </Text>
 
-            {!item.isRead && (
-              <View
+            <Text
+              style={
+                styles.notifMessage
+              }
+              numberOfLines={
+                3
+              }
+            >
+              {item.message ||
+                "You have a new notification."}
+            </Text>
+
+            <View
+              style={
+                styles.notifBottomRow
+              }
+            >
+              <Ionicons
+                name="time-outline"
+                size={13}
+                color={
+                  colors.textSecondary
+                }
+              />
+
+              <Text
                 style={
-                  styles.newBadge
+                  styles.notifTime
                 }
               >
-                <Text
+                {item.timeAgo ||
+                  (item.createdAt
+                    ? new Date(
+                        item.createdAt
+                      ).toLocaleString()
+                    : "Just now")}
+              </Text>
+
+              {!item.isRead && (
+                <View
                   style={
-                    styles.newBadgeText
+                    styles.newBadge
                   }
                 >
-                  NEW
-                </Text>
-              </View>
-            )}
+                  <Text
+                    style={
+                      styles.newBadgeText
+                    }
+                  >
+                    NEW
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+        </TouchableOpacity>
+      );
+    };
 
   /* =========================================================
      EMPTY STATE
   ========================================================= */
 
-  const EmptyState = () => {
-    let title =
-      "No notifications yet";
+  const EmptyState =
+    () => {
+      let title =
+        "No notifications yet";
 
-    let message =
-      "You're all caught up. New alerts and updates will appear here.";
+      let message =
+        "You're all caught up. New alerts and updates will appear here.";
 
-    if (
-      activeTab ===
-      "high"
-    ) {
-      title =
-        "No high-priority alerts";
+      if (
+        activeTab ===
+        "high"
+      ) {
+        title =
+          "No high-priority alerts";
 
-      message =
-        "There are currently no high-priority notifications.";
-    }
+        message =
+          "There are currently no high-priority notifications.";
+      }
 
-    if (
-      activeTab ===
-      "updates"
-    ) {
-      title =
-        "No updates available";
+      if (
+        activeTab ===
+        "updates"
+      ) {
+        title =
+          "No updates available";
 
-      message =
-        "System updates and announcements will appear here.";
-    }
+        message =
+          "System updates and announcements will appear here.";
+      }
 
-    return (
-      <View
-        style={
-          styles.emptyContainer
-        }
-      >
+      return (
         <View
           style={
-            styles.emptyIconCircle
+            styles.emptyContainer
           }
         >
-          <Ionicons
-            name="notifications-off-outline"
-            size={38}
-            color={
-              colors.primary
+          <View
+            style={
+              styles.emptyIconCircle
             }
-          />
-        </View>
-
-        <Text
-          style={
-            styles.emptyTitle
-          }
-        >
-          {title}
-        </Text>
-
-        <Text
-          style={
-            styles.emptyMessage
-          }
-        >
-          {message}
-        </Text>
-
-        <TouchableOpacity
-          style={
-            styles.emptyButton
-          }
-          onPress={() =>
-            fetchNotifications(
-              true
-            )
-          }
-          activeOpacity={0.8}
-        >
-          <Ionicons
-            name="refresh-outline"
-            size={17}
-            color={
-              colors.textInverse
-            }
-          />
+          >
+            <Ionicons
+              name="notifications-off-outline"
+              size={38}
+              color={
+                colors.primary
+              }
+            />
+          </View>
 
           <Text
             style={
-              styles.emptyButtonText
+              styles.emptyTitle
             }
           >
-            Refresh
+            {title}
           </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
+
+          <Text
+            style={
+              styles.emptyMessage
+            }
+          >
+            {message}
+          </Text>
+
+          <TouchableOpacity
+            style={
+              styles.emptyButton
+            }
+            onPress={() =>
+              fetchNotifications(
+                true
+              )
+            }
+            activeOpacity={
+              0.8
+            }
+          >
+            <Ionicons
+              name="refresh-outline"
+              size={17}
+              color={
+                colors.textInverse
+              }
+            />
+
+            <Text
+              style={
+                styles.emptyButtonText
+              }
+            >
+              Refresh
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    };
 
   /* =========================================================
-     LOADING
+     LOADING SCREEN
   ========================================================= */
 
   if (loading) {
@@ -1856,7 +1951,9 @@ export default function Notification() {
           onPress={() =>
             router.back()
           }
-          activeOpacity={0.75}
+          activeOpacity={
+            0.75
+          }
         >
           <Ionicons
             name="arrow-back"
@@ -1885,7 +1982,8 @@ export default function Notification() {
               Notifications
             </Text>
 
-            {unreadCount > 0 && (
+            {unreadCount >
+              0 && (
               <View
                 style={
                   styles.unreadBadge
@@ -1916,7 +2014,9 @@ export default function Notification() {
       </LinearGradient>
 
       <View
-        style={styles.body}
+        style={
+          styles.body
+        }
       >
         <View
           style={
@@ -1974,6 +2074,10 @@ export default function Notification() {
           )}
         </View>
 
+        {/* =====================================================
+            FILTERS
+        ===================================================== */}
+
         <View
           style={
             styles.filterRow
@@ -1993,7 +2097,9 @@ export default function Notification() {
                 "all"
               )
             }
-            activeOpacity={0.8}
+            activeOpacity={
+              0.8
+            }
           >
             <Ionicons
               name="apps-outline"
@@ -2032,7 +2138,9 @@ export default function Notification() {
                 "high"
               )
             }
-            activeOpacity={0.8}
+            activeOpacity={
+              0.8
+            }
           >
             <Ionicons
               name="warning-outline"
@@ -2096,7 +2204,9 @@ export default function Notification() {
                 "updates"
               )
             }
-            activeOpacity={0.8}
+            activeOpacity={
+              0.8
+            }
           >
             <Ionicons
               name="information-circle-outline"
@@ -2121,6 +2231,10 @@ export default function Notification() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* =====================================================
+            NOTIFICATION LIST
+        ===================================================== */}
 
         {filteredNotifications.length ===
         0 ? (

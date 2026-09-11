@@ -12,6 +12,7 @@ import { sendNotificationEmail } from "../mailer/emails.js";
 
 /* =========================================================
    STUDENT NOTIFICATION HELPER
+   FCM ONLY
 ========================================================= */
 
 const notifyStudent = async ({
@@ -49,79 +50,127 @@ const notifyStudent = async ({
        DATABASE NOTIFICATION
     ===================================================== */
 
-    await Notification.create({
-      userId: user._id,
-      title,
-      message,
-      type,
-      priority,
-    });
+    try {
+      await Notification.create({
+        user: user._id,
+        title,
+        message,
+        type,
+        priority,
+      });
+
+      console.log(
+        `✅ Database notification created for ${user.email}`
+      );
+    } catch (notificationError) {
+      console.error(
+        `❌ Database notification failed for ${user.email}:`,
+        notificationError.message
+      );
+    }
 
     /* =====================================================
        SOCKET.IO
     ===================================================== */
 
-    io.to(user._id.toString()).emit("newNotification", {
-      id: Date.now(),
-      title,
-      message,
-      type,
-      priority,
-      isRead: false,
-      createdAt: new Date().toISOString(),
-      data,
-    });
+    try {
+      io.to(user._id.toString()).emit(
+        "newNotification",
+        {
+          id: Date.now(),
+          title,
+          message,
+          type,
+          priority,
+          isRead: false,
+          createdAt: new Date().toISOString(),
+          data,
+        }
+      );
 
-    /* =====================================================
-       EXPO PUSH
-    ===================================================== */
-
-    console.log("========================================");
-    console.log("📱 EXPO STUDENT PUSH DEBUG");
-    console.log("Notification Title:", title);
-    console.log("Notification Message:", message);
-    console.log("Notification Type:", type);
-    console.log("Incident ID:", data?.incidentId || "N/A");
-    console.log("Student User:", user.email);
-    console.log(
-      "Expo Push Token:",
-      user.expoPushToken || "NONE"
-    );
-    console.log("========================================");
-
-    if (user.expoPushToken) {
-      try {
-        const pushResult = await sendPushNotification({
-          token: user.expoPushToken,
-          title: "EduGuard 🔔",
-          body: `${title}: ${message}`,
-          data: {
-            type,
-            ...data,
-          },
-        });
-
-        console.log(
-          "✅ Student Expo push sent successfully"
-        );
-
-        console.log("📨 Expo Result:", pushResult);
-      } catch (pushError) {
-        console.error(
-          "❌ Student Expo push failed:",
-          pushError.message
-        );
-      }
-    } else {
       console.log(
-        "⚠️ Student has no Expo push token:",
-        user.email
+        `📡 Socket notification emitted to ${user.email}`
+      );
+    } catch (socketError) {
+      console.error(
+        `❌ Socket notification failed for ${user.email}:`,
+        socketError.message
       );
     }
 
+    /* =====================================================
+       FCM PUSH NOTIFICATION
+    ===================================================== */
+
+    console.log("========================================");
+    console.log("📱 FCM STUDENT PUSH DEBUG");
+    console.log("Notification Title:", title);
+    console.log("Notification Message:", message);
+    console.log("Notification Type:", type);
     console.log(
-      "✅ Student notification created for:",
-      user.email
+      "Incident ID:",
+      data?.incidentId || "N/A"
+    );
+    console.log("Student User:", user.email);
+
+    const fcmTokens = (user.pushTokens || [])
+      .filter(
+        (pushToken) =>
+          pushToken?.token &&
+          pushToken?.provider === "fcm"
+      )
+      .map(
+        (pushToken) => pushToken.token
+      );
+
+    console.log(
+      "FCM Token Count:",
+      fcmTokens.length
+    );
+
+    console.log("========================================");
+
+    if (!fcmTokens.length) {
+      console.log(
+        `⚠️ No FCM push token for ${user.email}`
+      );
+    } else {
+      for (const token of fcmTokens) {
+        try {
+          console.log(
+            `📱 Sending FCM push to ${user.email}...`
+          );
+
+          const pushResult =
+            await sendPushNotification({
+              token,
+              title: "EduGuard 🔔",
+              body: `${title}: ${message}`,
+              data: {
+                type,
+                ...data,
+              },
+            });
+
+          console.log(
+            `✅ Student FCM push sent successfully to ${user.email}`
+          );
+
+          console.log(
+            "📨 FCM Result:",
+            pushResult
+          );
+        } catch (pushError) {
+          console.error(
+            `❌ Student FCM push failed for ${user.email}:`,
+            pushError.message
+          );
+        }
+      }
+    }
+
+    console.log(
+      `✅ Student notification processing completed for ${user.email}`
     );
   } catch (error) {
     console.error(
@@ -133,22 +182,8 @@ const notifyStudent = async ({
 
 /* =========================================================
    ADMIN NOTIFICATION HELPER
+   FCM ONLY
 ========================================================= */
-
-/*
-  IMPORTANT:
-
-  This function is ONLY for ADMIN USERS.
-
-  It handles:
-
-  1. Database notification
-  2. Socket.IO notification
-  3. Admin mobile push notification
-  4. Admin email notification through Brevo
-
-  Student notifications are completely separate.
-*/
 
 const notifyAdmins = async ({
   title,
@@ -176,7 +211,7 @@ const notifyAdmins = async ({
     const admins = await User.find({
       role: "admin",
     }).select(
-      "_id email name firstName lastName notificationSettings expoPushToken"
+      "_id email name firstName lastName notificationSettings pushTokens"
     );
 
     if (!admins.length) {
@@ -223,13 +258,11 @@ const notifyAdmins = async ({
 
         /* =================================================
            DATABASE NOTIFICATION
-
-           This creates the in-app admin notification.
         ================================================= */
 
         try {
           await Notification.create({
-            userId: admin._id,
+            user: admin._id,
             title,
             message,
             type,
@@ -248,9 +281,6 @@ const notifyAdmins = async ({
 
         /* =================================================
            SOCKET.IO
-
-           Sends the notification immediately to the
-           logged-in admin web application.
         ================================================= */
 
         try {
@@ -280,51 +310,71 @@ const notifyAdmins = async ({
         }
 
         /* =================================================
-           ADMIN PUSH NOTIFICATION
+           FCM PUSH NOTIFICATION
         ================================================= */
 
-        if (admin.expoPushToken) {
-          try {
-            const pushResult =
-              await sendPushNotification({
-                token: admin.expoPushToken,
-                title: "EduGuard Admin Alert 🔔",
-                body: `${title}: ${message}`,
-                data: {
-                  type,
-                  ...data,
-                },
-              });
+        console.log("");
+        console.log("📱 ADMIN FCM PUSH");
 
-            console.log(
-              `📱 Admin push notification sent to ${admin.email}`
+        const fcmTokens =
+          (admin.pushTokens || [])
+            .filter(
+              (pushToken) =>
+                pushToken?.token &&
+                pushToken?.provider === "fcm"
+            )
+            .map(
+              (pushToken) =>
+                pushToken.token
             );
 
-            console.log(
-              "📨 Push Result:",
-              pushResult
-            );
-          } catch (pushError) {
-            console.error(
-              `❌ Admin push failed for ${admin.email}:`,
-              pushError.message
-            );
-          }
-        } else {
+        console.log(
+          `FCM Token Count for ${admin.email}:`,
+          fcmTokens.length
+        );
+
+        if (!fcmTokens.length) {
           console.log(
-            `⚠️ No Expo push token for ${admin.email}`
+            `⚠️ No FCM push token for ${admin.email}`
           );
+        } else {
+          for (const token of fcmTokens) {
+            try {
+              console.log(
+                `📱 Sending FCM push to ${admin.email}...`
+              );
+
+              const pushResult =
+                await sendPushNotification({
+                  token,
+                  title:
+                    "EduGuard Admin Alert 🔔",
+                  body: `${title}: ${message}`,
+                  data: {
+                    type,
+                    ...data,
+                  },
+                });
+
+              console.log(
+                `✅ Admin FCM push sent to ${admin.email}`
+              );
+
+              console.log(
+                "📨 FCM Result:",
+                pushResult
+              );
+            } catch (pushError) {
+              console.error(
+                `❌ Admin FCM push failed for ${admin.email}:`,
+                pushError.message
+              );
+            }
+          }
         }
 
         /* =================================================
            ADMIN EMAIL NOTIFICATION
-
-           THIS IS THE IMPORTANT FIX.
-
-           emailAlerts must be enabled for email delivery.
-
-           Your previous controller only logged that email
-           was allowed but NEVER called Brevo.
         ================================================= */
 
         if (
@@ -340,7 +390,10 @@ const notifyAdmins = async ({
             <html>
               <head>
                 <meta charset="UTF-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                <meta
+                  name="viewport"
+                  content="width=device-width, initial-scale=1.0"
+                />
                 <title>${title}</title>
               </head>
 
@@ -353,7 +406,6 @@ const notifyAdmins = async ({
                   color: #111827;
                 "
               >
-
                 <div
                   style="
                     max-width: 600px;
@@ -364,7 +416,6 @@ const notifyAdmins = async ({
                     border: 1px solid #e5e7eb;
                   "
                 >
-
                   <div
                     style="
                       padding: 24px;
@@ -397,7 +448,6 @@ const notifyAdmins = async ({
                       padding: 28px 24px;
                     "
                   >
-
                     <h2
                       style="
                         margin: 0 0 12px;
@@ -428,7 +478,6 @@ const notifyAdmins = async ({
                         margin-top: 20px;
                       "
                     >
-
                       <p
                         style="
                           margin: 0 0 8px;
@@ -513,7 +562,6 @@ const notifyAdmins = async ({
                           `
                           : ""
                       }
-
                     </div>
 
                     <p
@@ -528,11 +576,8 @@ const notifyAdmins = async ({
                       the EduGuard system. Please do not reply
                       directly to this email.
                     </p>
-
                   </div>
-
                 </div>
-
               </body>
             </html>
           `;
@@ -540,7 +585,8 @@ const notifyAdmins = async ({
           try {
             await sendNotificationEmail({
               to: admin.email,
-              subject: `EduGuard Admin Alert: ${title}`,
+              subject:
+                `EduGuard Admin Alert: ${title}`,
               html: emailHtml,
             });
 
@@ -559,7 +605,9 @@ const notifyAdmins = async ({
             );
           }
         } else {
-          if (settings.emailAlerts === false) {
+          if (
+            settings.emailAlerts === false
+          ) {
             console.log(
               `🔕 Email alerts disabled for ${admin.email}`
             );
@@ -583,9 +631,15 @@ const notifyAdmins = async ({
       }
     }
 
-    console.log("========================================");
-    console.log("🔔 ADMIN NOTIFICATION COMPLETE");
-    console.log("========================================");
+    console.log(
+      "========================================"
+    );
+    console.log(
+      "🔔 ADMIN NOTIFICATION COMPLETE"
+    );
+    console.log(
+      "========================================"
+    );
     console.log("");
   } catch (error) {
     console.error(
@@ -839,12 +893,6 @@ export const createIncident = async (
 
     /* =====================================================
        ADMIN ALERT
-
-       HIGH RISK:
-       highRiskAlerts
-
-       NORMAL INCIDENT:
-       emailAlerts
     ===================================================== */
 
     const adminAlertSetting =
@@ -1108,7 +1156,8 @@ export const completeIncident = async (
     );
 
     return res.status(500).json({
-      message: err.message,
+      message:
+        err.message,
     });
   }
 };
@@ -1198,7 +1247,8 @@ export const deleteIncident = async (
     );
 
     return res.status(500).json({
-      message: err.message,
+      message:
+        err.message,
     });
   }
 };
@@ -1854,8 +1904,6 @@ export const updateIncidentStatus =
 
       /* ===================================================
          STUDENT NOTIFICATION
-
-         ONLY the student gets this notification.
       =================================================== */
 
       await notifyStudent({
@@ -1899,14 +1947,6 @@ export const updateIncidentStatus =
 
       /* ===================================================
          ADMIN NOTIFICATION
-
-         ONLY the ADMIN gets this alert.
-
-         HIGH-RISK INCIDENT:
-         highRiskAlerts
-
-         NORMAL INCIDENT:
-         emailAlerts
       =================================================== */
 
       let adminSettingKey =
