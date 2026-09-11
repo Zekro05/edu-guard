@@ -31,44 +31,27 @@ import settingsRoutes from "./routes/settings.js";
 
 import { User } from "./models/userModel.js";
 
-import {
-  sendPushNotification,
-} from "./services/notificationService.js";
+import { sendPushNotification } from "./services/notificationService.js";
 
 import { fileURLToPath } from "url";
 
-const __filename =
-  fileURLToPath(
-    import.meta.url
-  );
+const __filename = fileURLToPath(import.meta.url);
 
-const __dirname =
-  path.dirname(
-    __filename
-  );
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
-const app =
-  express();
+const app = express();
 
-const server =
-  http.createServer(
-    app
-  );
+const server = http.createServer(app);
 
-const PORT =
-  process.env.PORT ||
-  5000;
+const PORT = process.env.PORT || 5000;
 
 /* =========================================================
    TRUST PROXY
 ========================================================= */
 
-app.set(
-  "trust proxy",
-  1
-);
+app.set("trust proxy", 1);
 
 /* =========================================================
    SECURITY HEADERS
@@ -78,25 +61,13 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: [
-          "'self'",
-        ],
+        defaultSrc: ["'self'"],
 
-        scriptSrc: [
-          "'self'",
-        ],
+        scriptSrc: ["'self'"],
 
-        styleSrc: [
-          "'self'",
-          "'unsafe-inline'",
-          "https://fonts.googleapis.com",
-        ],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
 
-        fontSrc: [
-          "'self'",
-          "https://fonts.gstatic.com",
-          "data:",
-        ],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
 
         imgSrc: [
           "'self'",
@@ -118,101 +89,74 @@ app.use(
           "http://localhost:19000",
         ],
 
-        objectSrc: [
-          "'none'",
-        ],
+        objectSrc: ["'none'"],
 
-        frameAncestors: [
-          "'none'",
-        ],
+        frameAncestors: ["'none'"],
 
-        baseUri: [
-          "'self'",
-        ],
+        baseUri: ["'self'"],
 
-        formAction: [
-          "'self'",
-        ],
+        formAction: ["'self'"],
 
         upgradeInsecureRequests:
-          process.env.NODE_ENV ===
-          "production"
-            ? []
-            : null,
+          process.env.NODE_ENV === "production" ? [] : null,
       },
     },
 
     frameguard: {
-      action:
-        "deny",
+      action: "deny",
     },
 
-    noSniff:
-      true,
+    noSniff: true,
 
     hsts: {
-      maxAge:
-        31536000,
+      maxAge: 31536000,
 
-      includeSubDomains:
-        true,
+      includeSubDomains: true,
 
-      preload:
-        true,
+      preload: true,
     },
 
     referrerPolicy: {
-      policy:
-        "strict-origin-when-cross-origin",
+      policy: "strict-origin-when-cross-origin",
     },
 
-    crossOriginEmbedderPolicy:
-      false,
+    crossOriginEmbedderPolicy: false,
 
     crossOriginOpenerPolicy: {
-      policy:
-        "same-origin",
+      policy: "same-origin",
     },
 
     crossOriginResourcePolicy: {
-      policy:
-        "cross-origin",
+      policy: "cross-origin",
     },
-  })
+  }),
 );
 
 /* =========================================================
    ADDITIONAL SECURITY HEADERS
 ========================================================= */
 
-app.use(
-  (req, res, next) => {
-    res.setHeader(
-      "Permissions-Policy",
-      [
-        "camera=()",
-        "microphone=()",
-        "geolocation=()",
-        "payment=()",
-        "usb=()",
-        "magnetometer=()",
-        "gyroscope=()",
-        "accelerometer=()",
-      ].join(", ")
-    );
+app.use((req, res, next) => {
+  res.setHeader(
+    "Permissions-Policy",
+    [
+      "camera=()",
+      "microphone=()",
+      "geolocation=()",
+      "payment=()",
+      "usb=()",
+      "magnetometer=()",
+      "gyroscope=()",
+      "accelerometer=()",
+    ].join(", "),
+  );
 
-    res.setHeader(
-      "X-DNS-Prefetch-Control",
-      "off"
-    );
+  res.setHeader("X-DNS-Prefetch-Control", "off");
 
-    res.removeHeader(
-      "X-Powered-By"
-    );
+  res.removeHeader("X-Powered-By");
 
-    next();
-  }
-);
+  next();
+});
 
 /* =========================================================
    BODY PARSERS
@@ -220,24 +164,19 @@ app.use(
 
 app.use(
   express.json({
-    limit:
-      "10mb",
-  })
+    limit: "10mb",
+  }),
 );
 
 app.use(
   express.urlencoded({
-    extended:
-      true,
+    extended: true,
 
-    limit:
-      "10mb",
-  })
+    limit: "10mb",
+  }),
 );
 
-app.use(
-  cookieParser()
-);
+app.use(cookieParser());
 
 /* =========================================================
    CORS
@@ -256,443 +195,244 @@ const allowedOrigins = [
   "https://guide-ed-mu.vercel.app",
 ];
 
-const isAllowedOrigin = (
-  origin
-) => {
+const isAllowedOrigin = (origin) => {
   if (!origin) {
     return true;
   }
 
-  return allowedOrigins.includes(
-    origin
-  );
+  return allowedOrigins.includes(origin);
 };
 
 app.use(
   cors({
-    origin:
-      function (
-        origin,
-        callback
-      ) {
-        if (
-          isAllowedOrigin(
-            origin
-          )
-        ) {
-          return callback(
-            null,
-            true
-          );
-        }
+    origin: function (origin, callback) {
+      if (isAllowedOrigin(origin)) {
+        return callback(null, true);
+      }
 
-        console.warn(
-          "🚫 CORS blocked:",
-          origin
-        );
+      console.warn("🚫 CORS blocked:", origin);
 
-        return callback(
-          new Error(
-            "Not allowed by CORS"
-          )
-        );
-      },
+      return callback(new Error("Not allowed by CORS"));
+    },
 
-    credentials:
-      true,
+    credentials: true,
 
-    methods: [
-      "GET",
-      "POST",
-      "PUT",
-      "PATCH",
-      "DELETE",
-      "OPTIONS",
-    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-    ],
+    allowedHeaders: ["Content-Type", "Authorization"],
 
     exposedHeaders: [],
-  })
+  }),
 );
 
 /* =========================================================
    GENERAL API RATE LIMIT
 ========================================================= */
 
-const generalLimiter =
-  rateLimit({
-    windowMs:
-      15 * 60 * 1000,
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
 
-    max:
-      500,
+  max: 500,
 
-    standardHeaders:
-      true,
+  standardHeaders: true,
 
-    legacyHeaders:
-      false,
+  legacyHeaders: false,
 
-    message: {
-      success:
-        false,
+  message: {
+    success: false,
 
-      message:
-        "Too many requests. Please try again later.",
-    },
+    message: "Too many requests. Please try again later.",
+  },
 
-    skip:
-      (req) =>
-        req.path ===
-        "/ping",
-  });
+  skip: (req) => req.path === "/ping",
+});
 
-app.use(
-  "/api",
-  generalLimiter
-);
+app.use("/api", generalLimiter);
 
 /* =========================================================
    AUTH RATE LIMIT
 ========================================================= */
 
-const authLimiter =
-  rateLimit({
-    windowMs:
-      15 * 60 * 1000,
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
 
-    max:
-      20,
+  max: 20,
 
-    standardHeaders:
-      true,
+  standardHeaders: true,
 
-    legacyHeaders:
-      false,
+  legacyHeaders: false,
 
-    message: {
-      success:
-        false,
+  message: {
+    success: false,
 
-      message:
-        "Too many authentication attempts. Please try again later.",
-    },
-  });
+    message: "Too many authentication attempts. Please try again later.",
+  },
+});
 
-app.use(
-  "/api/auth",
-  authLimiter
-);
+app.use("/api/auth", authLimiter);
 
 /* =========================================================
    ROUTES
 ========================================================= */
 
-app.use(
-  "/api/auth",
-  authRoutes
-);
+app.use("/api/auth", authRoutes);
 
-app.use(
-  "/api/students",
-  studentRoutes
-);
+app.use("/api/students", studentRoutes);
 
-app.use(
-  "/api/incidents",
-  incidentRoutes
-);
+app.use("/api/incidents", incidentRoutes);
 
-app.use(
-  "/api/reports",
-  reportRoutes
-);
+app.use("/api/reports", reportRoutes);
 
-app.use(
-  "/api/history",
-  historyRoutes
-);
+app.use("/api/history", historyRoutes);
 
-app.use(
-  "/api/gemini",
-  geminiRoutes
-);
+app.use("/api/gemini", geminiRoutes);
 
-app.use(
-  "/api/messages",
-  messageRoutes
-);
+app.use("/api/messages", messageRoutes);
 
-app.use(
-  "/api/notifications",
-  notificationRoutes
-);
+app.use("/api/notifications", notificationRoutes);
 
-app.use(
-  "/api/teacher-reports",
-  teacherReportRoutes
-);
+app.use("/api/teacher-reports", teacherReportRoutes);
 
-app.use(
-  "/api/interventions",
-  interventionRoutes
-);
+app.use("/api/interventions", interventionRoutes);
 
-app.use(
-  "/api/cases",
-  caseRoutes
-);
+app.use("/api/cases", caseRoutes);
 
-app.use(
-  "/api/upload",
-  uploadRoutes
-);
+app.use("/api/upload", uploadRoutes);
 
-app.use(
-  "/api/notification-settings",
-  notificationSettingsRoutes
-);
+app.use("/api/notification-settings", notificationSettingsRoutes);
 
-app.use(
-  "/api/push-notifications",
-  pushNotificationRoutes
-);
+app.use("/api/push-notifications", pushNotificationRoutes);
 
-app.use(
-  "/api/settings",
-  settingsRoutes
-);
+app.use("/api/settings", settingsRoutes);
 
 /* =========================================================
    USERS
 ========================================================= */
 
-app.get(
-  "/api/users",
-  async (
-    req,
-    res
-  ) => {
-    try {
-      const users =
-        await User.find();
+app.get("/api/users", async (req, res) => {
+  try {
+    const users = await User.find();
 
-      res.json(users);
-    } catch (err) {
-      console.error(
-        "❌ GET USERS ERROR:",
-        err
-      );
+    res.json(users);
+  } catch (err) {
+    console.error("❌ GET USERS ERROR:", err);
 
-      res.status(500).json({
-        success:
-          false,
+    res.status(500).json({
+      success: false,
 
-        message:
-          "Failed to retrieve users.",
-      });
-    }
+      message: "Failed to retrieve users.",
+    });
   }
-);
+});
 
 /* =========================================================
    HEALTH CHECK
 ========================================================= */
 
-app.get(
-  "/ping",
-  (
-    req,
-    res
-  ) => {
-    res.status(200).json({
-      ok:
-        true,
+app.get("/ping", (req, res) => {
+  res.status(200).json({
+    ok: true,
 
-      message:
-        "alive",
-    });
-  }
-);
+    message: "alive",
+  });
+});
 
 /* =========================================================
    SOCKET.IO
 ========================================================= */
 
-export const io =
-  new Server(
-    server,
-    {
-      cors: {
-        origin:
-          function (
-            origin,
-            callback
-          ) {
-            if (
-              isAllowedOrigin(
-                origin
-              )
-            ) {
-              return callback(
-                null,
-                true
-              );
-            }
+export const io = new Server(server, {
+  cors: {
+    origin: function (origin, callback) {
+      if (isAllowedOrigin(origin)) {
+        return callback(null, true);
+      }
 
-            console.warn(
-              "🚫 Socket.IO CORS blocked:",
-              origin
-            );
+      console.warn("🚫 Socket.IO CORS blocked:", origin);
 
-            return callback(
-              new Error(
-                "Not allowed by Socket.IO CORS"
-              )
-            );
-          },
+      return callback(new Error("Not allowed by Socket.IO CORS"));
+    },
 
-        methods: [
-          "GET",
-          "POST",
-        ],
+    methods: ["GET", "POST"],
 
-        credentials:
-          true,
-      },
+    credentials: true,
+  },
 
-      transports: [
-        "websocket",
-        "polling",
-      ],
-    }
-  );
+  transports: ["websocket", "polling"],
+});
 
 /* =========================================================
    TEST SOCKET NOTIFICATION
 ========================================================= */
 
-app.get(
-  "/api/test-notif",
-  (
-    req,
-    res
-  ) => {
-    io.emit(
-      "newNotification",
-      {
-        id:
-          Date.now(),
+app.get("/api/test-notif", (req, res) => {
+  io.emit("newNotification", {
+    id: Date.now(),
 
-        title:
-          "🔥 Test Notification",
+    title: "🔥 Test Notification",
 
-        message:
-          "Dashboard socket is working",
+    message: "Dashboard socket is working",
 
-        type:
-          "general",
+    type: "general",
 
-        priority:
-          "low",
+    priority: "low",
 
-        isRead:
-          false,
+    isRead: false,
 
-        createdAt:
-          new Date().toISOString(),
-      }
-    );
+    createdAt: new Date().toISOString(),
+  });
 
-    res.json({
-      ok:
-        true,
-    });
-  }
-);
+  res.json({
+    ok: true,
+  });
+});
 
 /* =========================================================
    ONLINE USERS
 ========================================================= */
 
-const onlineUsers =
-  new Map();
+const onlineUsers = new Map();
 
 /* =========================================================
    SEND SOCKET NOTIFICATION
 ========================================================= */
 
-export const sendNotification =
-  (
-    userId,
-    payload
-  ) => {
-    if (!userId) {
-      return;
-    }
+export const sendNotification = (userId, payload) => {
+  if (!userId) {
+    return;
+  }
 
-    io.to(
-      String(userId)
-    ).emit(
-      "newNotification",
-      payload
-    );
-  };
+  io.to(String(userId)).emit("newNotification", payload);
+};
 
 /* =========================================================
    SOCKET CONNECTION
 ========================================================= */
 
-io.on(
-  "connection",
-  (
-    socket
-  ) => {
-    console.log(
-      "🟢 Socket connected:",
-      socket.id
-    );
+io.on("connection", (socket) => {
+  console.log("🟢 Socket connected:", socket.id);
 
-    /* ===================================================
+  /* ===================================================
        REGISTER USER
     =================================================== */
 
-    socket.on(
-      "register",
-      (
-        userId
-      ) => {
-        if (!userId) {
-          console.log(
-            "⚠️ No user ID received"
-          );
+  socket.on("register", (userId) => {
+    if (!userId) {
+      console.log("⚠️ No user ID received");
 
-          return;
-        }
+      return;
+    }
 
-        const userIdString =
-          String(userId);
+    const userIdString = String(userId);
 
-        socket.join(
-          userIdString
-        );
+    socket.join(userIdString);
 
-        onlineUsers.set(
-          userIdString,
-          socket.id
-        );
+    onlineUsers.set(userIdString, socket.id);
 
-        console.log(
-          `👤 User registered: ${userIdString}`
-        );
-      }
-    );
+    console.log(`👤 User registered: ${userIdString}`);
+  });
 
-    /* ===================================================
+  /* ===================================================
        OPTIONAL JOIN EVENT
 
        Your frontend emits this too.
@@ -700,553 +440,350 @@ io.on(
        register and join.
     =================================================== */
 
-    socket.on(
-      "join",
-      (
-        userId
-      ) => {
-        if (!userId) {
-          return;
-        }
+  socket.on("join", (userId) => {
+    if (!userId) {
+      return;
+    }
 
-        const userIdString =
-          String(userId);
+    const userIdString = String(userId);
 
-        socket.join(
-          userIdString
-        );
+    socket.join(userIdString);
 
-        console.log(
-          `📡 User joined room: ${userIdString}`
-        );
-      }
-    );
+    console.log(`📡 User joined room: ${userIdString}`);
+  });
 
-    /* ===================================================
+  /* ===================================================
        SEND MESSAGE
     =================================================== */
 
-    socket.on(
-      "send_message",
-      async (
-        msg,
-        callback
-      ) => {
-        try {
-          console.log(
-            "📨 Socket message received:",
-            msg
-          );
+  socket.on("send_message", async (msg, callback) => {
+    try {
+      console.log("📨 Socket message received:", msg);
 
-          const {
-            sender,
-            receiver,
-            text,
-            clientMessageId,
-          } =
-            msg || {};
+      const { sender, receiver, text, clientMessageId } = msg || {};
 
-          if (
-            !sender ||
-            !receiver ||
-            !text?.trim()
-          ) {
-            if (
-              typeof callback ===
-              "function"
-            ) {
-              callback({
-                error:
-                  true,
+      if (!sender || !receiver || !text?.trim()) {
+        if (typeof callback === "function") {
+          callback({
+            error: true,
 
-                message:
-                  "Missing sender, receiver, or message text.",
-              });
-            }
+            message: "Missing sender, receiver, or message text.",
+          });
+        }
 
-            return;
-          }
+        return;
+      }
 
-          const chatId =
-            [
-              String(sender),
-              String(receiver),
-            ]
-              .sort()
-              .join("-");
+      const chatId = [String(sender), String(receiver)].sort().join("-");
 
-          /* =============================================
+      /* =============================================
              GET USERS
           ============================================= */
 
-          const senderUser =
-            await User.findById(
-              sender
-            ).select(
-              "name firstName middleName lastName email profilePhoto"
-            );
+      const senderUser = await User.findById(sender).select(
+        "name firstName middleName lastName email profilePhoto",
+      );
 
-          const receiverUser =
-            await User.findById(
-              receiver
-            ).select(
-              "pushTokens email name firstName middleName lastName profilePhoto"
-            );
+      const receiverUser = await User.findById(receiver).select(
+        "pushTokens email name firstName middleName lastName profilePhoto",
+      );
 
-          if (!senderUser) {
-            if (
-              typeof callback ===
-              "function"
-            ) {
-              callback({
-                error:
-                  true,
+      if (!senderUser) {
+        if (typeof callback === "function") {
+          callback({
+            error: true,
 
-                message:
-                  "Sender account not found.",
-              });
-            }
+            message: "Sender account not found.",
+          });
+        }
 
-            return;
-          }
+        return;
+      }
 
-          if (!receiverUser) {
-            if (
-              typeof callback ===
-              "function"
-            ) {
-              callback({
-                error:
-                  true,
+      if (!receiverUser) {
+        if (typeof callback === "function") {
+          callback({
+            error: true,
 
-                message:
-                  "Receiver account not found.",
-              });
-            }
+            message: "Receiver account not found.",
+          });
+        }
 
-            return;
-          }
+        return;
+      }
 
-          /* =============================================
+      /* =============================================
              SENDER INFO
           ============================================= */
 
-          const senderName =
-            senderUser.name ||
-            [
-              senderUser.firstName,
-              senderUser.middleName,
-              senderUser.lastName,
-            ]
-              .filter(Boolean)
-              .join(" ")
-              .trim() ||
-            "User";
+      const senderName =
+        senderUser.name ||
+        [senderUser.firstName, senderUser.middleName, senderUser.lastName]
+          .filter(Boolean)
+          .join(" ")
+          .trim() ||
+        "User";
 
-          const senderProfilePhoto =
-            senderUser.profilePhoto ||
-            null;
+      const senderProfilePhoto = senderUser.profilePhoto || null;
 
-          /* =============================================
+      /* =============================================
              SAVE MESSAGE
           ============================================= */
 
-          const message =
-            await Message.create({
-              chatId,
+      const message = await Message.create({
+        chatId,
 
-              sender,
+        sender,
 
-              receiver,
+        receiver,
 
-              text:
-                text.trim(),
+        text: text.trim(),
 
-              seen:
-                false,
-            });
+        seen: false,
+      });
 
-          console.log(
-            "💾 Message saved:",
-            message._id
-          );
+      console.log("💾 Message saved:", message._id);
 
-          /* =============================================
+      /* =============================================
              REALTIME MESSAGE
           ============================================= */
 
-          const realtimeMessage =
-            {
-              ...message.toObject(),
+      const realtimeMessage = {
+        ...message.toObject(),
 
-              sender:
-                String(sender),
+        sender: String(sender),
 
-              receiver:
-                String(receiver),
+        receiver: String(receiver),
 
-              senderName,
+        senderName,
 
-              senderProfilePhoto,
+        senderProfilePhoto,
 
-              clientMessageId:
-                clientMessageId ||
-                null,
-            };
+        clientMessageId: clientMessageId || null,
+      };
 
-          /* =============================================
+      /* =============================================
              SEND MESSAGE TO RECEIVER
           ============================================= */
 
-          io.to(
-            String(receiver)
-          ).emit(
-            "receive_message",
-            realtimeMessage
-          );
+      io.to(String(receiver)).emit("receive_message", realtimeMessage);
 
-          /* =============================================
+      /* =============================================
              SEND MESSAGE TO SENDER
           ============================================= */
 
-          io.to(
-            String(sender)
-          ).emit(
-            "receive_message",
-            realtimeMessage
-          );
+      io.to(String(sender)).emit("receive_message", realtimeMessage);
 
-          /* =============================================
+      /* =============================================
              SAVE NOTIFICATION
           ============================================= */
 
-          const notification =
-            await Notification.create({
-              userId:
-                receiver,
+      const notification = await Notification.create({
+        user: receiver,
 
-              title:
-                `New message from ${senderName}`,
+        title: `New message from ${senderName}`,
 
-              message:
-                text.trim(),
+        message: text.trim(),
 
-              type:
-                "message",
+        type: "message",
 
-              priority:
-                "low",
+        priority: "low",
 
-              isRead:
-                false,
+        isRead: false,
 
-              data: {
-                type:
-                  "message",
+        data: {
+          type: "message",
 
-                chatId,
+          chatId,
 
-                senderId:
-                  String(sender),
+          senderId: String(sender),
 
-                receiverId:
-                  String(receiver),
+          receiverId: String(receiver),
 
-                messageId:
-                  message._id.toString(),
-              },
-            });
+          messageId: message._id.toString(),
+        },
+      });
 
-          /* =============================================
+      /* =============================================
              SOCKET NOTIFICATION
           ============================================= */
 
-          io.to(
-            String(receiver)
-          ).emit(
-            "newNotification",
-            {
-              ...notification.toObject(),
+      io.to(String(receiver)).emit("newNotification", {
+        ...notification.toObject(),
 
-              id:
-                notification._id.toString(),
+        id: notification._id.toString(),
 
-              senderName,
+        senderName,
 
-              senderProfilePhoto,
-            }
-          );
+        senderProfilePhoto,
+      });
 
-          /* =============================================
+      /* =============================================
              GET EXPO TOKENS
 
              Android + iOS
           ============================================= */
 
-          const expoTokens =
-            Array.isArray(
-              receiverUser.pushTokens
-            )
-              ? receiverUser.pushTokens.filter(
-                  (pushToken) =>
-                    pushToken?.provider ===
-                      "expo" &&
-                    ["android", "ios"].includes(
-                      pushToken?.platform
-                    )
-                )
-              : [];
+      /* =============================================
+   GET FCM MOBILE TOKENS
 
-          console.log(
-            `📱 Expo tokens for ${receiverUser.email}:`,
-            expoTokens.length
-          );
+   Android + iOS
+============================================= */
 
-          /* =============================================
-             SEND PHONE PUSH
-          ============================================= */
+      const fcmTokens = Array.isArray(receiverUser.pushTokens)
+        ? receiverUser.pushTokens.filter(
+            (pushToken) =>
+              pushToken?.provider === "fcm" &&
+              ["android", "ios"].includes(pushToken?.platform) &&
+              pushToken?.token,
+          )
+        : [];
 
-          for (
-            const pushToken of expoTokens
-          ) {
-            try {
-              await sendPushNotification({
-                token:
-                  pushToken.token,
+      console.log(`📱 FCM tokens for ${receiverUser.email}:`, fcmTokens.length);
 
-                title:
-                  `💬 ${senderName}`,
+      /* =============================================
+   SEND PHONE PUSH
+============================================= */
 
-                body:
-                  text.trim(),
+      for (const pushToken of fcmTokens) {
+        try {
+          await sendPushNotification({
+            token: pushToken.token,
 
-                data: {
-                  type:
-                    "message",
+            title: `💬 ${senderName}`,
 
-                  chatId,
+            body: text.trim(),
 
-                  senderId:
-                    String(sender),
+            data: {
+              type: "message",
 
-                  receiverId:
-                    String(receiver),
+              chatId,
 
-                  messageId:
-                    message._id.toString(),
+              senderId: String(sender),
 
-                  notificationId:
-                    notification._id.toString(),
-                },
-              });
+              receiverId: String(receiver),
 
-              console.log(
-                "📱 Socket message push sent:",
-                receiverUser.email
-              );
-            } catch (
-              pushError
-            ) {
-              console.error(
-                "⚠️ SOCKET MESSAGE PUSH ERROR:",
-                pushError
-              );
-            }
-          }
+              messageId: message._id.toString(),
 
-          /* =============================================
+              notificationId: notification._id.toString(),
+            },
+          });
+
+          console.log("📱 Socket message FCM push sent:", receiverUser.email);
+        } catch (pushError) {
+          console.error("⚠️ SOCKET MESSAGE FCM PUSH ERROR:", pushError);
+        }
+      }
+
+      /* =============================================
              ACTIVITY FEED
           ============================================= */
 
-          io.emit(
-            "activity_feed",
-            {
-              type:
-                "message",
+      io.emit("activity_feed", {
+        type: "message",
 
-              message:
-                `💬 ${senderName}: ${text.trim()}`,
+        message: `💬 ${senderName}: ${text.trim()}`,
 
-              time:
-                new Date(),
-            }
-          );
+        time: new Date(),
+      });
 
-          /* =============================================
+      /* =============================================
              CALLBACK
           ============================================= */
 
-          if (
-            typeof callback ===
-            "function"
-          ) {
-            callback({
-              success:
-                true,
+      if (typeof callback === "function") {
+        callback({
+          success: true,
 
-              message:
-                realtimeMessage,
-            });
-          }
-        } catch (err) {
-          console.error(
-            "❌ SOCKET SEND MESSAGE ERROR:",
-            err
-          );
-
-          if (
-            typeof callback ===
-            "function"
-          ) {
-            callback({
-              error:
-                true,
-
-              message:
-                process.env.NODE_ENV ===
-                "production"
-                  ? "Failed to send message."
-                  : err.message,
-            });
-          }
-        }
+          message: realtimeMessage,
+        });
       }
-    );
+    } catch (err) {
+      console.error("❌ SOCKET SEND MESSAGE ERROR:", err);
 
-    /* ===================================================
+      if (typeof callback === "function") {
+        callback({
+          error: true,
+
+          message:
+            process.env.NODE_ENV === "production"
+              ? "Failed to send message."
+              : err.message,
+        });
+      }
+    }
+  });
+
+  /* ===================================================
        DISCONNECT
     =================================================== */
 
-    socket.on(
-      "disconnect",
-      () => {
-        console.log(
-          "🔴 Socket disconnected:",
-          socket.id
-        );
+  socket.on("disconnect", () => {
+    console.log("🔴 Socket disconnected:", socket.id);
 
-        for (
-          const [
-            userId,
-            socketId,
-          ] of onlineUsers.entries()
-        ) {
-          if (
-            socketId ===
-            socket.id
-          ) {
-            onlineUsers.delete(
-              userId
-            );
+    for (const [userId, socketId] of onlineUsers.entries()) {
+      if (socketId === socket.id) {
+        onlineUsers.delete(userId);
 
-            console.log(
-              `👤 User offline: ${userId}`
-            );
+        console.log(`👤 User offline: ${userId}`);
 
-            break;
-          }
-        }
+        break;
       }
-    );
-  }
-);
+    }
+  });
+});
 
 /* =========================================================
    EXPRESS ERROR HANDLER
 ========================================================= */
 
-app.use(
-  (
-    err,
-    req,
-    res,
-    next
-  ) => {
-    console.error(
-      "❌ SERVER ERROR:",
-      err
-    );
+app.use((err, req, res, next) => {
+  console.error("❌ SERVER ERROR:", err);
 
-    if (
-      err.message ===
-      "Not allowed by CORS"
-    ) {
-      return res.status(403).json({
-        success:
-          false,
+  if (err.message === "Not allowed by CORS") {
+    return res.status(403).json({
+      success: false,
 
-        message:
-          "Origin not allowed.",
-      });
-    }
-
-    if (
-      err.message ===
-      "Not allowed by Socket.IO CORS"
-    ) {
-      return res.status(403).json({
-        success:
-          false,
-
-        message:
-          "Socket origin not allowed.",
-      });
-    }
-
-    res.status(
-      err.status ||
-        500
-    ).json({
-      success:
-        false,
-
-      message:
-        process.env.NODE_ENV ===
-        "production"
-          ? "Internal server error."
-          : err.message,
+      message: "Origin not allowed.",
     });
   }
-);
+
+  if (err.message === "Not allowed by Socket.IO CORS") {
+    return res.status(403).json({
+      success: false,
+
+      message: "Socket origin not allowed.",
+    });
+  }
+
+  res.status(err.status || 500).json({
+    success: false,
+
+    message:
+      process.env.NODE_ENV === "production"
+        ? "Internal server error."
+        : err.message,
+  });
+});
 
 /* =========================================================
    SET SOCKET.IO INSTANCE
 ========================================================= */
 
-app.set(
-  "io",
-  io
-);
+app.set("io", io);
 
 /* =========================================================
    START SERVER
 ========================================================= */
 
-server.listen(
-  PORT,
-  "0.0.0.0",
-  async () => {
-    try {
-      await connectDB();
+server.listen(PORT, "0.0.0.0", async () => {
+  try {
+    await connectDB();
 
-      console.log(
-        "🚀 Server running on port:",
-        PORT
-      );
+    console.log("🚀 Server running on port:", PORT);
 
-      console.log(
-        `🔐 Environment: ${
-          process.env.NODE_ENV ||
-          "development"
-        }`
-      );
-    } catch (
-      error
-    ) {
-      console.error(
-        "❌ Database connection failed:",
-        error
-      );
-    }
+    console.log(`🔐 Environment: ${process.env.NODE_ENV || "development"}`);
+  } catch (error) {
+    console.error("❌ Database connection failed:", error);
   }
-);
+});
