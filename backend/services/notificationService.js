@@ -1,4 +1,5 @@
 import admin from "../config/firebase.js";
+import User from "../models/User.js";
 
 export const sendPushNotification = async ({
   token,
@@ -53,35 +54,73 @@ export const sendPushNotification = async ({
     console.log("========================================");
     console.log("Title:", title);
     console.log("Body:", body);
-    console.log(
-      "Token:",
-      `${token.substring(0, 20)}...`
-    );
+    console.log("Token:", `${token.substring(0, 20)}...`);
     console.log("Data:", stringData);
     console.log("========================================");
 
-    const response =
-      await admin.messaging().send(message);
+    const response = await admin.messaging().send(message);
 
-    console.log(
-      "✅ FCM notification sent successfully"
-    );
+    console.log("✅ FCM notification sent successfully");
+    console.log("FCM Message ID:", response);
 
-    console.log(
-      "FCM Message ID:",
-      response
-    );
-
-    return response;
+    return {
+      success: true,
+      messageId: response,
+    };
   } catch (error) {
     console.error("========================================");
     console.error("❌ FCM SEND ERROR");
     console.error("========================================");
     console.error("Code:", error?.code);
     console.error("Message:", error?.message);
-    console.error("Full error:", error);
+    console.error("Token:", `${token.substring(0, 20)}...`);
     console.error("========================================");
 
-    return null;
+    // =====================================================
+    // AUTOMATICALLY DELETE DEAD FCM TOKEN
+    // =====================================================
+
+    if (
+      error?.code ===
+      "messaging/registration-token-not-registered"
+    ) {
+      try {
+        const result = await User.updateMany(
+          {
+            "pushTokens.token": token,
+          },
+          {
+            $pull: {
+              pushTokens: {
+                token,
+              },
+            },
+          }
+        );
+
+        console.log("========================================");
+        console.log("🧹 DEAD FCM TOKEN REMOVED");
+        console.log("========================================");
+        console.log(
+          "Token:",
+          `${token.substring(0, 20)}...`
+        );
+        console.log(
+          "Users updated:",
+          result.modifiedCount
+        );
+        console.log("========================================");
+      } catch (cleanupError) {
+        console.error(
+          "❌ Failed to remove dead FCM token:"
+        );
+        console.error(cleanupError);
+      }
+    }
+
+    return {
+      success: false,
+      error: error?.code || "fcm_send_error",
+    };
   }
 };

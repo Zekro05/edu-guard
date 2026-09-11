@@ -354,26 +354,48 @@ const savePushTokenToBackend = async () => {
 ========================================================= */
 
 const removePushTokenFromBackend = async () => {
-  /*
-    The current backend does not expose
-    DELETE /api/auth/remove-push-token.
-
-    Therefore we only clear the local cache.
-  */
-
   try {
-    await clearCachedPushToken();
+    const token = await getCurrentPushToken();
+
+    if (!token) {
+      console.log(
+        "ℹ️ No cached FCM token found. Nothing to remove."
+      );
+
+      return true;
+    }
+
+    console.log("====================================");
+    console.log("🧹 REMOVING FCM TOKEN FROM BACKEND");
+    console.log("====================================");
+
+    console.log("Token:", token);
+
+    await API.delete(
+      "/api/auth/remove-push-token",
+      {
+        data: {
+          token,
+        },
+      }
+    );
 
     console.log(
-      "🧹 Local FCM token cache cleared during logout."
+      "✅ FCM token removed from backend."
     );
+
+    await clearCachedPushToken();
 
     return true;
   } catch (error) {
+    console.error("====================================");
+    console.error("❌ REMOVE FCM TOKEN ERROR");
     console.error(
-      "❌ CLEAR FCM TOKEN ERROR:",
-      error?.message || error
+      error?.response?.data ||
+        error?.message ||
+        error
     );
+    console.error("====================================");
 
     return false;
   }
