@@ -5,33 +5,121 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import { useEffect } from "react";
+
+import {
+  lazy,
+  Suspense,
+  useEffect,
+} from "react";
+
 import { Toaster } from "react-hot-toast";
 
 import FloatingShape from "./components/FloatingShape.jsx";
-import LoginPage from "./pages/LoginPage.jsx";
-import SignupPage from "./pages/SignupPage.jsx";
-import EmailVerificationPage from "./pages/EmailVerificationPage.jsx";
-import DashboardPage from "./pages/DashboardPage.jsx";
-import ForgotPasswordPage from "./pages/ForgotPassword.jsx";
-import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
-import NewPasswordPage from "./pages/NewPasswordPage.jsx";
-import StudentPage from "./pages/StudentPage.jsx";
-import ReportPage from "./pages/ReportPage.jsx";
-import SettingsPage from "./pages/SettingsPage.jsx";
-import GuidancePage from "./pages/GuidancePage.jsx";
-import InterventionPage from "./pages/InterventionPage.jsx";
-import CaseManagement from "./pages/CaseManagement.jsx";
-
-import GlobalNotifications from "./components/GlobalNotifications.jsx";
 
 import { useAuthStore } from "./store/authStore.js";
+
+/* =========================================================
+   LAZY-LOADED PAGES
+
+   IMPORTANT:
+   These pages are NOT downloaded when /login loads.
+
+   They are downloaded only when the user actually visits
+   that route.
+========================================================= */
+
+// Public pages
+const LoginPage = lazy(
+  () => import("./pages/LoginPage.jsx")
+);
+
+const SignupPage = lazy(
+  () => import("./pages/SignupPage.jsx")
+);
+
+const EmailVerificationPage = lazy(
+  () => import("./pages/EmailVerificationPage.jsx")
+);
+
+const ForgotPasswordPage = lazy(
+  () => import("./pages/ForgotPassword.jsx")
+);
+
+const ResetPasswordPage = lazy(
+  () => import("./pages/ResetPasswordPage.jsx")
+);
+
+const NewPasswordPage = lazy(
+  () => import("./pages/NewPasswordPage.jsx")
+);
+
+// Protected pages
+const DashboardPage = lazy(
+  () => import("./pages/DashboardPage.jsx")
+);
+
+const StudentPage = lazy(
+  () => import("./pages/StudentPage.jsx")
+);
+
+const ReportPage = lazy(
+  () => import("./pages/ReportPage.jsx")
+);
+
+const SettingsPage = lazy(
+  () => import("./pages/SettingsPage.jsx")
+);
+
+const GuidancePage = lazy(
+  () => import("./pages/GuidancePage.jsx")
+);
+
+const InterventionPage = lazy(
+  () => import("./pages/InterventionPage.jsx")
+);
+
+const CaseManagement = lazy(
+  () => import("./pages/CaseManagement.jsx")
+);
+
+/* =========================================================
+   GLOBAL NOTIFICATIONS
+
+   This is also lazy-loaded.
+
+   Firebase / notification-related code should NOT be part
+   of the initial /login JavaScript bundle.
+========================================================= */
+
+const GlobalNotifications = lazy(
+  () => import("./components/GlobalNotifications.jsx")
+);
+
+/* =========================================================
+   LOADING FALLBACK
+========================================================= */
+
+const PageLoader = () => {
+  return (
+    <div className="min-h-screen flex items-center justify-center text-white">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+
+        <p className="text-sm text-white/80">
+          Loading...
+        </p>
+      </div>
+    </div>
+  );
+};
 
 /* =========================================================
    PROTECTED ROUTE
 ========================================================= */
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({
+  children,
+}) => {
   const {
     isAuthenticated,
     user,
@@ -142,38 +230,7 @@ function App() {
   }, [checkAuth]);
 
   /* =======================================================
-     GLOBAL WEB FCM NOTIFICATION REGISTRATION
-     
-     This component stays mounted regardless of which
-     protected page the admin is currently viewing.
-
-     Therefore web FCM notifications can be received on:
-
-     /dashboard
-     /students
-     /guidance
-     /reports
-     /cases
-     /interventions
-     /settings
-  ======================================================= */
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      console.log(
-        "🔕 Global FCM listener waiting for authentication..."
-      );
-
-      return;
-    }
-
-    console.log(
-      "🌐 Admin authenticated - global notification system active."
-    );
-  }, [isAuthenticated]);
-
-  /* =======================================================
-     INACTIVITY AUTO-LOGOUT
+     AUTHENTICATED INACTIVITY AUTO-LOGOUT
   ======================================================= */
 
   useEffect(() => {
@@ -243,221 +300,226 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-green-900 to-emerald-900 flex items-center justify-center relative overflow-hidden">
 
-      {/* ===================================================
+      {/* =================================================
           FLOATING BACKGROUND
-      =================================================== */}
+      ================================================= */}
 
       <FloatingShape />
 
-      {/* ===================================================
+      {/* =================================================
           GLOBAL WEB FCM NOTIFICATIONS
 
-          IMPORTANT:
-          This is OUTSIDE <Routes>.
+          Still mounted globally when authenticated.
 
-          It will therefore remain mounted while navigating
-          around the entire authenticated web application.
-      =================================================== */}
+          The important difference is that the actual
+          notification code is now loaded lazily.
+      ================================================= */}
 
       {isAuthenticated && (
-        <GlobalNotifications />
+        <Suspense fallback={null}>
+          <GlobalNotifications />
+        </Suspense>
       )}
 
-      {/* ===================================================
+      {/* =================================================
           ROUTES
-      =================================================== */}
 
-      <Routes>
+          All pages are lazy-loaded.
+      ================================================= */}
 
-        {/* =================================================
-            DASHBOARD
-        ================================================= */}
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
 
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
+          {/* =================================================
+              DASHBOARD
+          ================================================= */}
 
-        {/* =================================================
-            STUDENTS
-        ================================================= */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/students"
-          element={
-            <ProtectedRoute>
-              <StudentPage />
-            </ProtectedRoute>
-          }
-        />
+          {/* =================================================
+              STUDENTS
+          ================================================= */}
 
-        {/* =================================================
-            GUIDANCE
-        ================================================= */}
+          <Route
+            path="/students"
+            element={
+              <ProtectedRoute>
+                <StudentPage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/guidance"
-          element={
-            <ProtectedRoute>
-              <GuidancePage />
-            </ProtectedRoute>
-          }
-        />
+          {/* =================================================
+              GUIDANCE
+          ================================================= */}
 
-        {/* =================================================
-            REPORTS
-        ================================================= */}
+          <Route
+            path="/guidance"
+            element={
+              <ProtectedRoute>
+                <GuidancePage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/reports"
-          element={
-            <ProtectedRoute>
-              <ReportPage />
-            </ProtectedRoute>
-          }
-        />
+          {/* =================================================
+              REPORTS
+          ================================================= */}
 
-        {/* =================================================
-            CASES
-        ================================================= */}
+          <Route
+            path="/reports"
+            element={
+              <ProtectedRoute>
+                <ReportPage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/cases"
-          element={
-            <ProtectedRoute>
-              <CaseManagement />
-            </ProtectedRoute>
-          }
-        />
+          {/* =================================================
+              CASES
+          ================================================= */}
 
-        {/* =================================================
-            INTERVENTIONS
-        ================================================= */}
+          <Route
+            path="/cases"
+            element={
+              <ProtectedRoute>
+                <CaseManagement />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/interventions"
-          element={
-            <ProtectedRoute>
-              <InterventionPage />
-            </ProtectedRoute>
-          }
-        />
+          {/* =================================================
+              INTERVENTIONS
+          ================================================= */}
 
-        {/* =================================================
-            SETTINGS
-        ================================================= */}
+          <Route
+            path="/interventions"
+            element={
+              <ProtectedRoute>
+                <InterventionPage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
-              <SettingsPage />
-            </ProtectedRoute>
-          }
-        />
+          {/* =================================================
+              SETTINGS
+          ================================================= */}
 
-        {/* =================================================
-            SIGNUP
-        ================================================= */}
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
 
-        <Route
-          path="/signup"
-          element={
-            <RedirectAuthenticatedUser>
-              <SignupPage />
-            </RedirectAuthenticatedUser>
-          }
-        />
+          {/* =================================================
+              SIGNUP
+          ================================================= */}
 
-        {/* =================================================
-            LOGIN
-        ================================================= */}
+          <Route
+            path="/signup"
+            element={
+              <RedirectAuthenticatedUser>
+                <SignupPage />
+              </RedirectAuthenticatedUser>
+            }
+          />
 
-        <Route
-          path="/login"
-          element={
-            <RedirectAuthenticatedUser>
-              <LoginPage />
-            </RedirectAuthenticatedUser>
-          }
-        />
+          {/* =================================================
+              LOGIN
+          ================================================= */}
 
-        {/* =================================================
-            FORGOT PASSWORD
-        ================================================= */}
+          <Route
+            path="/login"
+            element={
+              <RedirectAuthenticatedUser>
+                <LoginPage />
+              </RedirectAuthenticatedUser>
+            }
+          />
 
-        <Route
-          path="/forgot-password"
-          element={
-            <RedirectAuthenticatedUser>
-              <ForgotPasswordPage />
-            </RedirectAuthenticatedUser>
-          }
-        />
+          {/* =================================================
+              FORGOT PASSWORD
+          ================================================= */}
 
-        {/* =================================================
-            RESET PASSWORD
-        ================================================= */}
+          <Route
+            path="/forgot-password"
+            element={
+              <RedirectAuthenticatedUser>
+                <ForgotPasswordPage />
+              </RedirectAuthenticatedUser>
+            }
+          />
 
-        <Route
-          path="/reset-password"
-          element={
-            <RedirectAuthenticatedUser>
-              <ResetPasswordPage />
-            </RedirectAuthenticatedUser>
-          }
-        />
+          {/* =================================================
+              RESET PASSWORD
+          ================================================= */}
 
-        {/* =================================================
-            NEW PASSWORD
-        ================================================= */}
+          <Route
+            path="/reset-password"
+            element={
+              <RedirectAuthenticatedUser>
+                <ResetPasswordPage />
+              </RedirectAuthenticatedUser>
+            }
+          />
 
-        <Route
-          path="/reset-password/new"
-          element={
-            <RedirectAuthenticatedUser>
-              <NewPasswordPage />
-            </RedirectAuthenticatedUser>
-          }
-        />
+          {/* =================================================
+              NEW PASSWORD
+          ================================================= */}
 
-        {/* =================================================
-            EMAIL VERIFICATION
-        ================================================= */}
+          <Route
+            path="/reset-password/new"
+            element={
+              <RedirectAuthenticatedUser>
+                <NewPasswordPage />
+              </RedirectAuthenticatedUser>
+            }
+          />
 
-        <Route
-          path="/verify-email"
-          element={
-            <EmailVerificationPage />
-          }
-        />
+          {/* =================================================
+              EMAIL VERIFICATION
+          ================================================= */}
 
-        {/* =================================================
-            DEFAULT ROUTE
-        ================================================= */}
+          <Route
+            path="/verify-email"
+            element={
+              <EmailVerificationPage />
+            }
+          />
 
-        <Route
-          path="*"
-          element={
-            isAuthenticated ? (
-              <Navigate
-                to="/dashboard"
-                replace
-              />
-            ) : (
-              <Navigate
-                to="/login"
-                replace
-              />
-            )
-          }
-        />
+          {/* =================================================
+              DEFAULT ROUTE
+          ================================================= */}
 
-      </Routes>
+          <Route
+            path="*"
+            element={
+              isAuthenticated ? (
+                <Navigate
+                  to="/dashboard"
+                  replace
+                />
+              ) : (
+                <Navigate
+                  to="/login"
+                  replace
+                />
+              )
+            }
+          />
+
+        </Routes>
+      </Suspense>
 
       {/* ===================================================
           TOAST
@@ -469,6 +531,7 @@ function App() {
           duration: 4000,
         }}
       />
+
     </div>
   );
 }
