@@ -6,11 +6,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-import {
-  lazy,
-  Suspense,
-  useEffect,
-} from "react";
+import { lazy, Suspense, useEffect } from "react";
 
 import { Toaster } from "react-hot-toast";
 
@@ -20,94 +16,168 @@ import { useAuthStore } from "./store/authStore.js";
 
 /* =========================================================
    LAZY-LOADED PAGES
-
-   IMPORTANT:
-   These pages are NOT downloaded when /login loads.
-
-   They are downloaded only when the user actually visits
-   that route.
 ========================================================= */
 
 // Public pages
-const LoginPage = lazy(
-  () => import("./pages/LoginPage.jsx")
-);
+const LoginPage = lazy(() => import("./pages/LoginPage.jsx"));
 
-const SignupPage = lazy(
-  () => import("./pages/SignupPage.jsx")
-);
+const SignupPage = lazy(() => import("./pages/SignupPage.jsx"));
 
 const EmailVerificationPage = lazy(
-  () => import("./pages/EmailVerificationPage.jsx")
+  () => import("./pages/EmailVerificationPage.jsx"),
 );
 
-const ForgotPasswordPage = lazy(
-  () => import("./pages/ForgotPassword.jsx")
-);
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPassword.jsx"));
 
-const ResetPasswordPage = lazy(
-  () => import("./pages/ResetPasswordPage.jsx")
-);
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage.jsx"));
 
-const NewPasswordPage = lazy(
-  () => import("./pages/NewPasswordPage.jsx")
-);
+const NewPasswordPage = lazy(() => import("./pages/NewPasswordPage.jsx"));
 
 // Protected pages
-const DashboardPage = lazy(
-  () => import("./pages/DashboardPage.jsx")
-);
+const DashboardPage = lazy(() => import("./pages/DashboardPage.jsx"));
 
-const StudentPage = lazy(
-  () => import("./pages/StudentPage.jsx")
-);
+const StudentPage = lazy(() => import("./pages/StudentPage.jsx"));
 
-const ReportPage = lazy(
-  () => import("./pages/ReportPage.jsx")
-);
+const ReportPage = lazy(() => import("./pages/ReportPage.jsx"));
 
-const SettingsPage = lazy(
-  () => import("./pages/SettingsPage.jsx")
-);
+const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
 
-const GuidancePage = lazy(
-  () => import("./pages/GuidancePage.jsx")
-);
+const GuidancePage = lazy(() => import("./pages/GuidancePage.jsx"));
 
-const InterventionPage = lazy(
-  () => import("./pages/InterventionPage.jsx")
-);
+const InterventionPage = lazy(() => import("./pages/InterventionPage.jsx"));
 
-const CaseManagement = lazy(
-  () => import("./pages/CaseManagement.jsx")
-);
+const CaseManagement = lazy(() => import("./pages/CaseManagement.jsx"));
 
 /* =========================================================
    GLOBAL NOTIFICATIONS
-
-   This is also lazy-loaded.
-
-   Firebase / notification-related code should NOT be part
-   of the initial /login JavaScript bundle.
 ========================================================= */
 
 const GlobalNotifications = lazy(
-  () => import("./components/GlobalNotifications.jsx")
+  () => import("./components/GlobalNotifications.jsx"),
 );
 
 /* =========================================================
-   LOADING FALLBACK
+   EDU-GUARD LOADING SCREEN
 ========================================================= */
 
-const PageLoader = () => {
+const PageLoader = ({ message = "Preparing your workspace..." }) => {
   return (
-    <div className="min-h-screen flex items-center justify-center text-white">
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+    <div className="fixed inset-0 z-[9999] overflow-hidden bg-[#F7F9F8]">
+      {/* =================================================
+          SOFT BACKGROUND GLOW
+      ================================================= */}
 
-        <p className="text-sm text-white/80">
-          Loading...
-        </p>
+      <div className="absolute -top-32 -left-32 w-80 h-80 rounded-full bg-emerald-200/30 blur-3xl" />
+
+      <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-green-200/30 blur-3xl" />
+
+      <div className="absolute top-1/2 left-1/2 w-72 h-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-100/20 blur-3xl" />
+
+      {/* =================================================
+          FLOATING DECORATIVE SHAPES
+      ================================================= */}
+
+      <div className="absolute top-[15%] left-[12%] w-3 h-3 rounded-full bg-emerald-400/40 animate-pulse" />
+
+      <div
+        className="absolute top-[25%] right-[15%] w-2 h-2 rounded-full bg-green-500/30 animate-pulse"
+        style={{ animationDelay: "500ms" }}
+      />
+
+      <div
+        className="absolute bottom-[20%] left-[18%] w-2 h-2 rounded-full bg-emerald-500/30 animate-pulse"
+        style={{ animationDelay: "1000ms" }}
+      />
+
+      <div
+        className="absolute bottom-[28%] right-[12%] w-3 h-3 rounded-full bg-green-400/30 animate-pulse"
+        style={{ animationDelay: "1500ms" }}
+      />
+
+      {/* =================================================
+          CENTER CONTENT
+      ================================================= */}
+
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-6">
+        <div className="flex flex-col items-center text-center">
+          {/* =================================================
+              LOGO CONTAINER
+          ================================================= */}
+
+          <div className="relative mb-7">
+            {/* Soft glow */}
+            <div className="absolute inset-0 rounded-[28px] bg-emerald-400/20 blur-xl scale-125" />
+
+            {/* Logo card */}
+            <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-[26px] bg-white border border-emerald-100 shadow-[0_12px_40px_rgba(16,185,129,0.12)] flex items-center justify-center">
+              {/* Replace this with your actual logo if desired */}
+              <img
+                src="/school-logo.webp"
+                alt="GuidEd"
+                className="w-14 h-14 sm:w-16 sm:h-16 object-contain"
+              />
+            </div>
+
+            {/* =================================================
+                ROTATING RING
+            ================================================= */}
+
+            <div className="absolute -inset-2 rounded-[30px] border-2 border-transparent border-t-emerald-500/70 border-r-emerald-400/30 animate-spin" />
+          </div>
+
+          {/* =================================================
+              BRAND NAME
+          ================================================= */}
+
+          <div className="mb-2">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-800">
+              Guid<span className="text-emerald-600">Ed</span>
+            </h1>
+
+            <p className="mt-1 text-xs sm:text-sm font-medium tracking-wide text-gray-500">
+              Student Guidance
+            </p>
+          </div>
+
+          {/* =================================================
+              LOADING INDICATOR
+          ================================================= */}
+
+          <div className="mt-7 flex items-center gap-2">
+            <span
+              className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce"
+              style={{ animationDelay: "0ms" }}
+            />
+
+            <span
+              className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce"
+              style={{ animationDelay: "150ms" }}
+            />
+
+            <span
+              className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce"
+              style={{ animationDelay: "300ms" }}
+            />
+          </div>
+
+          {/* =================================================
+              STATUS MESSAGE
+          ================================================= */}
+
+          <p className="mt-4 text-sm text-gray-500">{message}</p>
+
+          {/* =================================================
+              SCHOOL BRANDING
+          ================================================= */}
+
+          <p className="mt-8 text-[10px] sm:text-xs text-gray-400 tracking-wide">
+            Our Lady of the Holy Rosary School
+          </p>
+
+          <p className="mt-1 text-[9px] sm:text-[10px] text-gray-400">
+            General Trias Campus
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -117,39 +187,19 @@ const PageLoader = () => {
    PROTECTED ROUTE
 ========================================================= */
 
-const ProtectedRoute = ({
-  children,
-}) => {
-  const {
-    isAuthenticated,
-    user,
-    isCheckingAuth,
-  } = useAuthStore();
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, user, isCheckingAuth } = useAuthStore();
 
   if (isCheckingAuth) {
-    return (
-      <div className="text-white text-center mt-20">
-        Checking authentication...
-      </div>
-    );
+    return <PageLoader message="Checking your account..." />;
   }
 
   if (!isAuthenticated) {
-    return (
-      <Navigate
-        to="/login"
-        replace
-      />
-    );
+    return <Navigate to="/login" replace />;
   }
 
   if (!user?.isVerified) {
-    return (
-      <Navigate
-        to="/verify-email"
-        replace
-      />
-    );
+    return <Navigate to="/verify-email" replace />;
   }
 
   return children;
@@ -159,31 +209,19 @@ const ProtectedRoute = ({
    REDIRECT AUTHENTICATED USERS
 ========================================================= */
 
-const RedirectAuthenticatedUser = ({
-  children,
-}) => {
-  const {
-    isAuthenticated,
-    user,
-    isCheckingAuth,
-  } = useAuthStore();
+const RedirectAuthenticatedUser = ({ children }) => {
+  const { isAuthenticated, user, isCheckingAuth } = useAuthStore();
 
   const location = useLocation();
 
   if (isCheckingAuth) {
-    return (
-      <div className="text-white text-center mt-20">
-        Checking authentication...
-      </div>
-    );
+    return <PageLoader message="Checking your account..." />;
   }
 
   /*
    * Allow signup even if a user is already authenticated.
    */
-  if (
-    location.pathname === "/signup"
-  ) {
+  if (location.pathname === "/signup") {
     return children;
   }
 
@@ -191,16 +229,8 @@ const RedirectAuthenticatedUser = ({
    * Redirect authenticated and verified users
    * away from login/auth pages.
    */
-  if (
-    isAuthenticated &&
-    user?.isVerified
-  ) {
-    return (
-      <Navigate
-        to="/dashboard"
-        replace
-      />
-    );
+  if (isAuthenticated && user?.isVerified) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -251,46 +281,28 @@ function App() {
     };
 
     activityEvents.forEach((event) => {
-      window.addEventListener(
-        event,
-        handleActivity
-      );
+      window.addEventListener(event, handleActivity);
     });
 
     startInactivityTimer(() => {
-      navigate(
-        "/login",
-        {
-          replace: true,
-        }
-      );
+      navigate("/login", {
+        replace: true,
+      });
     });
 
     return () => {
       activityEvents.forEach((event) => {
-        window.removeEventListener(
-          event,
-          handleActivity
-        );
+        window.removeEventListener(event, handleActivity);
       });
     };
-  }, [
-    isAuthenticated,
-    navigate,
-    resetInactivityTimer,
-    startInactivityTimer,
-  ]);
+  }, [isAuthenticated, navigate, resetInactivityTimer, startInactivityTimer]);
 
   /* =======================================================
      SHOW LOADING UNTIL AUTH IS CONFIRMED
   ======================================================= */
 
   if (isCheckingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-white text-lg">
-        Checking authentication...
-      </div>
-    );
+    return <PageLoader message="Checking your account..." />;
   }
 
   /* =======================================================
@@ -299,7 +311,6 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-green-900 to-emerald-900 flex items-center justify-center relative overflow-hidden">
-
       {/* =================================================
           FLOATING BACKGROUND
       ================================================= */}
@@ -308,11 +319,6 @@ function App() {
 
       {/* =================================================
           GLOBAL WEB FCM NOTIFICATIONS
-
-          Still mounted globally when authenticated.
-
-          The important difference is that the actual
-          notification code is now loaded lazily.
       ================================================= */}
 
       {isAuthenticated && (
@@ -323,17 +329,11 @@ function App() {
 
       {/* =================================================
           ROUTES
-
-          All pages are lazy-loaded.
       ================================================= */}
 
-      <Suspense fallback={<PageLoader />}>
+      <Suspense fallback={<PageLoader message="Loading your page..." />}>
         <Routes>
-
-          {/* =================================================
-              DASHBOARD
-          ================================================= */}
-
+          {/* DASHBOARD */}
           <Route
             path="/dashboard"
             element={
@@ -343,10 +343,7 @@ function App() {
             }
           />
 
-          {/* =================================================
-              STUDENTS
-          ================================================= */}
-
+          {/* STUDENTS */}
           <Route
             path="/students"
             element={
@@ -356,10 +353,7 @@ function App() {
             }
           />
 
-          {/* =================================================
-              GUIDANCE
-          ================================================= */}
-
+          {/* GUIDANCE */}
           <Route
             path="/guidance"
             element={
@@ -369,10 +363,7 @@ function App() {
             }
           />
 
-          {/* =================================================
-              REPORTS
-          ================================================= */}
-
+          {/* REPORTS */}
           <Route
             path="/reports"
             element={
@@ -382,10 +373,7 @@ function App() {
             }
           />
 
-          {/* =================================================
-              CASES
-          ================================================= */}
-
+          {/* CASES */}
           <Route
             path="/cases"
             element={
@@ -395,10 +383,7 @@ function App() {
             }
           />
 
-          {/* =================================================
-              INTERVENTIONS
-          ================================================= */}
-
+          {/* INTERVENTIONS */}
           <Route
             path="/interventions"
             element={
@@ -408,10 +393,7 @@ function App() {
             }
           />
 
-          {/* =================================================
-              SETTINGS
-          ================================================= */}
-
+          {/* SETTINGS */}
           <Route
             path="/settings"
             element={
@@ -421,10 +403,7 @@ function App() {
             }
           />
 
-          {/* =================================================
-              SIGNUP
-          ================================================= */}
-
+          {/* SIGNUP */}
           <Route
             path="/signup"
             element={
@@ -434,10 +413,7 @@ function App() {
             }
           />
 
-          {/* =================================================
-              LOGIN
-          ================================================= */}
-
+          {/* LOGIN */}
           <Route
             path="/login"
             element={
@@ -447,10 +423,7 @@ function App() {
             }
           />
 
-          {/* =================================================
-              FORGOT PASSWORD
-          ================================================= */}
-
+          {/* FORGOT PASSWORD */}
           <Route
             path="/forgot-password"
             element={
@@ -460,10 +433,7 @@ function App() {
             }
           />
 
-          {/* =================================================
-              RESET PASSWORD
-          ================================================= */}
-
+          {/* RESET PASSWORD */}
           <Route
             path="/reset-password"
             element={
@@ -473,10 +443,7 @@ function App() {
             }
           />
 
-          {/* =================================================
-              NEW PASSWORD
-          ================================================= */}
-
+          {/* NEW PASSWORD */}
           <Route
             path="/reset-password/new"
             element={
@@ -486,38 +453,20 @@ function App() {
             }
           />
 
-          {/* =================================================
-              EMAIL VERIFICATION
-          ================================================= */}
+          {/* EMAIL VERIFICATION */}
+          <Route path="/verify-email" element={<EmailVerificationPage />} />
 
-          <Route
-            path="/verify-email"
-            element={
-              <EmailVerificationPage />
-            }
-          />
-
-          {/* =================================================
-              DEFAULT ROUTE
-          ================================================= */}
-
+          {/* DEFAULT ROUTE */}
           <Route
             path="*"
             element={
               isAuthenticated ? (
-                <Navigate
-                  to="/dashboard"
-                  replace
-                />
+                <Navigate to="/dashboard" replace />
               ) : (
-                <Navigate
-                  to="/login"
-                  replace
-                />
+                <Navigate to="/login" replace />
               )
             }
           />
-
         </Routes>
       </Suspense>
 
@@ -531,7 +480,6 @@ function App() {
           duration: 4000,
         }}
       />
-
     </div>
   );
 }

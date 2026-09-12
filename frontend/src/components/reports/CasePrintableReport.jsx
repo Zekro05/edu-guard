@@ -1135,7 +1135,7 @@ const CasePrintableReport = ({ onClose }) => {
 
       const logo =
         await loadImageAsDataURL(
-          "/school-logo.png",
+          "/school-logo.webp",
         );
 
       let currentY = 12;
@@ -2699,7 +2699,7 @@ const CasePrintableReport = ({ onClose }) => {
                   "
                 >
                   <img
-                    src="/school-logo.png"
+                    src="/school-logo.webp"
                     alt="School Logo"
                     className="
                       w-full

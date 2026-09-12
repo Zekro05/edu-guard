@@ -2343,7 +2343,7 @@ const PrintableReport = ({ onClose }) => {
 
             <div className="text-center">
               <img
-                src="/school-logo.png"
+                src="/school-logo.webp"
                 alt="School Logo"
                 crossOrigin="anonymous"
                 className="

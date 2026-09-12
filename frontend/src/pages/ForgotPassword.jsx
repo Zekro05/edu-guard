@@ -221,7 +221,7 @@ const ForgotPasswordPage = () => {
               }}
             >
               <img
-                src="/school-logo.png"
+                src="/school-logo.webp"
                 alt="School Logo"
                 className="
                   w-full
@@ -781,7 +781,7 @@ const ForgotPasswordPage = () => {
                     }}
                   >
                     <img
-                      src="/school-logo.png"
+                      src="/school-logo.webp"
                       alt="School Logo"
                       className="
                         w-full

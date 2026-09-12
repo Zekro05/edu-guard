@@ -202,7 +202,7 @@ const DashboardPage = () => {
       /* LOGO */
 
       try {
-        const logoResponse = await fetch("/school-logo.png");
+        const logoResponse = await fetch("/school-logo.webp");
 
         const logoBlob = await logoResponse.blob();
 
@@ -1339,7 +1339,7 @@ Keep it professional, concise, and appropriate for school administrators.
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 xl:w-11 xl:h-11 flex items-center justify-center flex-shrink-0">
                 <img
-                  src="/school-logo.png"
+                  src="/school-logo.webp"
                   alt="School Logo"
                   className="w-full h-full object-contain"
                 />
@@ -1542,7 +1542,7 @@ Keep it professional, concise, and appropriate for school administrators.
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
                       <img
-                        src="/school-logo.png"
+                        src="/school-logo.webp"
                         alt="School Logo"
                         className="w-full h-full object-contain"
                       />

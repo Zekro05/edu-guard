@@ -769,7 +769,7 @@ const InterventionPrintableReport = ({
       try {
         const response =
           await fetch(
-            "/school-logo.png",
+            "/school-logo.webp",
           );
 
         if (response.ok) {
@@ -2006,7 +2006,7 @@ const InterventionPrintableReport = ({
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center shrink-0">
                     <img
-                      src="/school-logo.png"
+                      src="/school-logo.webp"
                       alt="School Logo"
                       className="w-12 h-12 object-contain"
                     />

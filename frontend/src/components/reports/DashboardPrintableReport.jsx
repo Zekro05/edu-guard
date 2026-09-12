@@ -864,7 +864,7 @@ const DashboardPrintableReport = ({
 
         const logoData =
           await loadImageAsDataURL(
-            "/school-logo.png",
+            "/school-logo.webp",
           );
 
         if (logoData) {
@@ -2434,7 +2434,7 @@ const DashboardPrintableReport = ({
 
               <div className="text-center">
                 <img
-                  src="/school-logo.png"
+                  src="/school-logo.webp"
                   alt="School Logo"
                   className="
                     w-16

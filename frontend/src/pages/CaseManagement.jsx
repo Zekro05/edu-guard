@@ -1234,7 +1234,7 @@ export default function CaseManagement() {
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 flex items-center justify-center">
                 <img
-                  src="/school-logo.png"
+                  src="/school-logo.webp"
                   alt="School Logo"
                   className="w-full h-full object-contain"
                 />

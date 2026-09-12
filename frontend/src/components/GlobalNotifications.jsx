@@ -257,7 +257,7 @@ const initialize = async () => {
                 body ||
                 "You have a new notification.",
 
-              icon: "/school-logo.png",
+              icon: "/school-logo.webp",
 
               data,
             },

@@ -211,7 +211,7 @@ const LoginPage = () => {
               }}
             >
               <img
-                src="/school-logo.png"
+                src="/school-logo.webp"
                 alt="School Logo"
                 className="w-full h-full object-contain p-2"
               />
@@ -639,7 +639,7 @@ const LoginPage = () => {
                     }}
                   >
                     <img
-                      src="/school-logo.png"
+                      src="/school-logo.webp"
                       alt="School Logo"
                       className="w-full h-full object-contain p-3 sm:p-4"
                     />

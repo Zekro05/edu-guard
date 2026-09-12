@@ -734,7 +734,7 @@ const HistoryLogsReport = ({
       try {
         logoData =
           await loadImageAsDataUrl(
-            "/school-logo.png"
+            "/school-logo.webp"
           );
       } catch {
         logoData = null;
@@ -1771,7 +1771,7 @@ const HistoryLogsReport = ({
               >
                 <div className="flex items-center gap-4">
                   <img
-                    src="/school-logo.png"
+                    src="/school-logo.webp"
                     alt="School Logo"
                     className="
                       w-16

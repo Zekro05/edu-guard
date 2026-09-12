@@ -280,7 +280,7 @@ const ResetPasswordOTPPage = () => {
               }}
             >
               <img
-                src="/school-logo.png"
+                src="/school-logo.webp"
                 alt="Our Lady of the Holy Rosary School"
                 className="w-8 h-8 sm:w-9 sm:h-9 object-contain"
               />
@@ -566,7 +566,7 @@ const ResetPasswordOTPPage = () => {
                     }}
                   >
                     <img
-                      src="/school-logo.png"
+                      src="/school-logo.webp"
                       alt="School Logo"
                       className="w-10 h-10 sm:w-11 sm:h-11 object-contain"
                     />
