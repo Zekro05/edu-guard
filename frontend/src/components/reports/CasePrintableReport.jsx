@@ -12,14 +12,17 @@ import {
   ShieldAlert,
   Activity,
   MapPin,
-  User2,
   RefreshCw,
+  UserRound,
+  Clock3,
+  CalendarRange,
 } from "lucide-react";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import { API } from "../../lib/api";
+import { useAuthStore } from "../../store/authStore";
 
 /* =========================================================
    DEFAULTS
@@ -27,6 +30,42 @@ import { API } from "../../lib/api";
 
 const DEFAULT_AVATAR =
   "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png";
+
+/* =========================================================
+   LOCAL DATE HELPERS
+========================================================= */
+
+const getLocalDateInput = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const getStartOfMonthInput = () => {
+  const now = new Date();
+
+  return getLocalDateInput(
+    new Date(now.getFullYear(), now.getMonth(), 1),
+  );
+};
+
+const getStartOfYearInput = () => {
+  const now = new Date();
+
+  return getLocalDateInput(
+    new Date(now.getFullYear(), 0, 1),
+  );
+};
+
+const getEndOfYearInput = () => {
+  const now = new Date();
+
+  return getLocalDateInput(
+    new Date(now.getFullYear(), 11, 31),
+  );
+};
 
 /* =========================================================
    OFFENSE MAP
@@ -223,16 +262,6 @@ const statusLabels = {
    GET CASE DATE
 ========================================================= */
 
-/*
-  Some incident records may not have a top-level `date`.
-  Depending on how the incident/report was created, the date
-  may instead be stored as `incidentDate`, `createdAt`, or
-  inside the populated report/reportId object.
-
-  We resolve all supported locations here so the printable
-  report and PDF always receive one normalized `date` value.
-*/
-
 const getCaseDate = (c = {}) => {
   return (
     c.date ||
@@ -257,10 +286,6 @@ const normalizeCase = (c) => {
     ? c.evidence
     : [];
 
-  /* =========================================================
-     FIND REPORTER
-  ========================================================= */
-
   const reporterUser =
     c.reportId?.reporterId ||
     c.report?.reporterId ||
@@ -282,10 +307,6 @@ const normalizeCase = (c) => {
 
   return {
     ...c,
-
-    /* =======================================================
-       NORMALIZED DATE
-    ======================================================= */
 
     date: getCaseDate(c),
 
@@ -348,10 +369,6 @@ const normalizeCase = (c) => {
       c.report?.location ||
       "Unknown location",
 
-    /* =======================================================
-       ACTUAL REPORTER
-    ======================================================= */
-
     reporter: reporterName,
 
     reporterId:
@@ -371,10 +388,87 @@ const normalizeCase = (c) => {
 };
 
 /* =========================================================
+   FORMATTERS
+========================================================= */
+
+const formatDate = (date) => {
+  if (!date) return "N/A";
+
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return "N/A";
+  }
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  });
+};
+
+const formatLongDate = (date) => {
+  if (!date) return "N/A";
+
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return "N/A";
+  }
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const formatDateTime = (date) => {
+  if (!date) return "N/A";
+
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return "N/A";
+  }
+
+  return parsed.toLocaleString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+};
+
+const formatShortDateTime = (date) => {
+  if (!date) return "N/A";
+
+  const parsed = new Date(date);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return "N/A";
+  }
+
+  return parsed.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
+/* =========================================================
    MAIN COMPONENT
 ========================================================= */
 
 const CasePrintableReport = ({ onClose }) => {
+  const { user } = useAuthStore();
+
   const [cases, setCases] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -390,11 +484,57 @@ const CasePrintableReport = ({ onClose }) => {
     useState("all");
 
   const [selectedDate, setSelectedDate] =
-    useState(
-      new Date()
-        .toISOString()
-        .split("T")[0],
+    useState(() =>
+      getLocalDateInput(),
     );
+
+  const [customStartDate, setCustomStartDate] =
+    useState(() =>
+      getStartOfMonthInput(),
+    );
+
+  const [customEndDate, setCustomEndDate] =
+    useState(() =>
+      getLocalDateInput(),
+    );
+
+  const [generatedAt, setGeneratedAt] =
+    useState(() => new Date());
+
+  /* =========================================================
+     CURRENT USER / GENERATOR
+  ========================================================= */
+
+  const generatedBy = useMemo(() => {
+    const fullName = [
+      user?.firstName,
+      user?.middleName,
+      user?.lastName,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+
+    return (
+      fullName ||
+      user?.name?.trim() ||
+      user?.email?.trim() ||
+      "GuidEd Administrator"
+    );
+  }, [user]);
+
+  const generatedByRole = useMemo(() => {
+    if (!user?.role) {
+      return "Administrator";
+    }
+
+    return (
+      String(user.role)
+        .charAt(0)
+        .toUpperCase() +
+      String(user.role).slice(1)
+    );
+  }, [user]);
 
   /* =========================================================
      FETCH CASES
@@ -413,6 +553,8 @@ const CasePrintableReport = ({ onClose }) => {
         : response.data?.incidents || [];
 
       setCases(data.map(normalizeCase));
+
+      setGeneratedAt(new Date());
     } catch (error) {
       console.error(
         "Failed to fetch cases:",
@@ -433,48 +575,6 @@ const CasePrintableReport = ({ onClose }) => {
   useEffect(() => {
     fetchCases();
   }, []);
-
-  /* =========================================================
-     FORMAT DATE
-  ========================================================= */
-
-  const formatDate = (date) => {
-    if (!date) return "N/A";
-
-    const parsed = new Date(date);
-
-    if (Number.isNaN(parsed.getTime())) {
-      return "N/A";
-    }
-
-    return parsed.toLocaleDateString(
-      "en-US",
-      {
-        month: "short",
-        day: "2-digit",
-        year: "numeric",
-      },
-    );
-  };
-
-  const formatLongDate = (date) => {
-    if (!date) return "N/A";
-
-    const parsed = new Date(date);
-
-    if (Number.isNaN(parsed.getTime())) {
-      return "N/A";
-    }
-
-    return parsed.toLocaleDateString(
-      "en-US",
-      {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      },
-    );
-  };
 
   /* =========================================================
      PERIOD FILTER
@@ -539,6 +639,45 @@ const CasePrintableReport = ({ onClose }) => {
   };
 
   /* =========================================================
+     CUSTOM RANGE FILTER
+  ========================================================= */
+
+  const isWithinCustomRange = (date) => {
+    if (!date) return false;
+
+    if (!customStartDate || !customEndDate) {
+      return false;
+    }
+
+    const start = new Date(
+      `${customStartDate}T00:00:00`,
+    );
+
+    const end = new Date(
+      `${customEndDate}T23:59:59.999`,
+    );
+
+    const caseDate = new Date(date);
+
+    if (
+      Number.isNaN(start.getTime()) ||
+      Number.isNaN(end.getTime()) ||
+      Number.isNaN(caseDate.getTime())
+    ) {
+      return false;
+    }
+
+    if (start > end) {
+      return false;
+    }
+
+    return (
+      caseDate >= start &&
+      caseDate <= end
+    );
+  };
+
+  /* =========================================================
      FILTERED CASES
   ========================================================= */
 
@@ -564,7 +703,15 @@ const CasePrintableReport = ({ onClose }) => {
         return false;
       }
 
-      if (
+      if (period === "custom") {
+        if (
+          !isWithinCustomRange(
+            caseData.date,
+          )
+        ) {
+          return false;
+        }
+      } else if (
         !isWithinPeriod(
           caseData.date,
           period,
@@ -582,6 +729,8 @@ const CasePrintableReport = ({ onClose }) => {
     riskFilter,
     period,
     selectedDate,
+    customStartDate,
+    customEndDate,
   ]);
 
   /* =========================================================
@@ -643,6 +792,147 @@ const CasePrintableReport = ({ onClose }) => {
   }, [filteredCases]);
 
   /* =========================================================
+     DATE RANGE
+  ========================================================= */
+
+  const dateRange = useMemo(() => {
+    if (period === "all") {
+      if (cases.length === 0) {
+        return {
+          start: null,
+          end: null,
+        };
+      }
+
+      const dates = cases
+        .map((item) =>
+          item.date
+            ? new Date(item.date)
+            : null,
+        )
+        .filter(
+          (date) =>
+            date &&
+            !Number.isNaN(
+              date.getTime(),
+            ),
+        )
+        .sort(
+          (a, b) =>
+            a.getTime() - b.getTime(),
+        );
+
+      return {
+        start: dates[0] || null,
+        end:
+          dates[dates.length - 1] ||
+          null,
+      };
+    }
+
+    if (period === "custom") {
+      return {
+        start: customStartDate
+          ? new Date(
+              `${customStartDate}T00:00:00`,
+            )
+          : null,
+        end: customEndDate
+          ? new Date(
+              `${customEndDate}T23:59:59.999`,
+            )
+          : null,
+      };
+    }
+
+    if (!selectedDate) {
+      return {
+        start: null,
+        end: null,
+      };
+    }
+
+    const target = new Date(
+      `${selectedDate}T00:00:00`,
+    );
+
+    if (Number.isNaN(target.getTime())) {
+      return {
+        start: null,
+        end: null,
+      };
+    }
+
+    if (period === "daily") {
+      return {
+        start: new Date(
+          target.getFullYear(),
+          target.getMonth(),
+          target.getDate(),
+        ),
+        end: new Date(
+          target.getFullYear(),
+          target.getMonth(),
+          target.getDate(),
+          23,
+          59,
+          59,
+          999,
+        ),
+      };
+    }
+
+    if (period === "monthly") {
+      return {
+        start: new Date(
+          target.getFullYear(),
+          target.getMonth(),
+          1,
+        ),
+        end: new Date(
+          target.getFullYear(),
+          target.getMonth() + 1,
+          0,
+          23,
+          59,
+          59,
+          999,
+        ),
+      };
+    }
+
+    if (period === "yearly") {
+      return {
+        start: new Date(
+          target.getFullYear(),
+          0,
+          1,
+        ),
+        end: new Date(
+          target.getFullYear(),
+          11,
+          31,
+          23,
+          59,
+          59,
+          999,
+        ),
+      };
+    }
+
+    return {
+      start: null,
+      end: null,
+    };
+  }, [
+    period,
+    selectedDate,
+    customStartDate,
+    customEndDate,
+    cases,
+  ]);
+
+  /* =========================================================
      PERIOD LABEL
   ========================================================= */
 
@@ -651,10 +941,31 @@ const CasePrintableReport = ({ onClose }) => {
       return "All Recorded Cases";
     }
 
+    if (period === "custom") {
+      if (
+        !customStartDate ||
+        !customEndDate
+      ) {
+        return "Custom Date Range";
+      }
+
+      const start = new Date(
+        `${customStartDate}T00:00:00`,
+      );
+
+      const end = new Date(
+        `${customEndDate}T00:00:00`,
+      );
+
+      return `${formatLongDate(
+        start,
+      )} – ${formatLongDate(end)}`;
+    }
+
     if (period === "daily") {
-      return `Daily Report • ${formatLongDate(
+      return formatLongDate(
         selectedDate,
-      )}`;
+      );
     }
 
     if (period === "monthly") {
@@ -662,13 +973,13 @@ const CasePrintableReport = ({ onClose }) => {
         `${selectedDate}T00:00:00`,
       );
 
-      return `Monthly Report • ${date.toLocaleDateString(
+      return date.toLocaleDateString(
         "en-US",
         {
           month: "long",
           year: "numeric",
         },
-      )}`;
+      );
     }
 
     if (period === "yearly") {
@@ -676,17 +987,68 @@ const CasePrintableReport = ({ onClose }) => {
         `${selectedDate}T00:00:00`,
       );
 
-      return `Yearly Report • ${date.getFullYear()}`;
+      return String(
+        date.getFullYear(),
+      );
     }
 
     return "Case Report";
-  }, [period, selectedDate]);
+  }, [
+    period,
+    selectedDate,
+    customStartDate,
+    customEndDate,
+  ]);
+
+  const periodTypeLabel = useMemo(() => {
+    if (period === "all") {
+      return "All Time";
+    }
+
+    if (period === "custom") {
+      return "Custom Range";
+    }
+
+    if (period === "daily") {
+      return "Daily";
+    }
+
+    if (period === "monthly") {
+      return "Monthly";
+    }
+
+    if (period === "yearly") {
+      return "Yearly";
+    }
+
+    return "Case Report";
+  }, [period]);
+
+  /* =========================================================
+     STATUS / RISK LABELS
+  ========================================================= */
+
+  const selectedStatusLabel =
+    statusFilter === "all"
+      ? "All Cases"
+      : statusLabels[
+          statusFilter
+        ] || statusFilter;
+
+  const selectedRiskLabel =
+    riskFilter === "all"
+      ? "All Risk Levels"
+      : `${riskFilter} Risk`;
 
   /* =========================================================
      PRINT
   ========================================================= */
 
   const handlePrint = () => {
+    if (loading) {
+      return;
+    }
+
     window.print();
   };
 
@@ -894,7 +1256,7 @@ const CasePrintableReport = ({ onClose }) => {
       currentY += 8;
 
       /* =====================================================
-         PERIOD BOX
+         REPORT INFORMATION BOX
       ===================================================== */
 
       pdf.setFillColor(
@@ -908,9 +1270,8 @@ const CasePrintableReport = ({ onClose }) => {
       pdf.roundedRect(
         margin,
         currentY,
-        pageWidth -
-          margin * 2,
-        18,
+        pageWidth - margin * 2,
+        38,
         3,
         3,
         "FD",
@@ -921,16 +1282,28 @@ const CasePrintableReport = ({ onClose }) => {
         "bold",
       );
 
-      pdf.setFontSize(8);
+      pdf.setFontSize(7);
 
       pdf.setTextColor(
-        ...dark,
+        ...gray,
       );
 
       pdf.text(
         "REPORT PERIOD",
         margin + 5,
-        currentY + 6,
+        currentY + 7,
+      );
+
+      pdf.text(
+        "DATE RANGE",
+        margin + 5,
+        currentY + 18,
+      );
+
+      pdf.text(
+        "GENERATED BY",
+        margin + 5,
+        currentY + 29,
       );
 
       pdf.setFont(
@@ -939,13 +1312,25 @@ const CasePrintableReport = ({ onClose }) => {
       );
 
       pdf.setTextColor(
-        ...gray,
+        ...dark,
+      );
+
+      pdf.text(
+        periodTypeLabel,
+        margin + 32,
+        currentY + 7,
       );
 
       pdf.text(
         periodLabel,
-        margin + 5,
-        currentY + 12,
+        margin + 32,
+        currentY + 18,
+      );
+
+      pdf.text(
+        generatedBy,
+        margin + 32,
+        currentY + 29,
       );
 
       pdf.setFont(
@@ -954,22 +1339,25 @@ const CasePrintableReport = ({ onClose }) => {
       );
 
       pdf.setTextColor(
-        ...dark,
+        ...gray,
       );
 
       pdf.text(
-        `Status: ${
-          statusFilter === "all"
-            ? "All"
-            : statusLabels[
-                statusFilter
-              ] || statusFilter
-        }`,
-        pageWidth - margin - 5,
-        currentY + 6,
-        {
-          align: "right",
-        },
+        "STATUS",
+        pageWidth - margin - 58,
+        currentY + 7,
+      );
+
+      pdf.text(
+        "RISK",
+        pageWidth - margin - 58,
+        currentY + 18,
+      );
+
+      pdf.text(
+        "GENERATED ON",
+        pageWidth - margin - 58,
+        currentY + 29,
       );
 
       pdf.setFont(
@@ -978,23 +1366,39 @@ const CasePrintableReport = ({ onClose }) => {
       );
 
       pdf.setTextColor(
-        ...gray,
+        ...dark,
       );
 
       pdf.text(
-        `Risk: ${
-          riskFilter === "all"
-            ? "All"
-            : riskFilter
-        }`,
+        selectedStatusLabel,
         pageWidth - margin - 5,
-        currentY + 12,
+        currentY + 7,
         {
           align: "right",
         },
       );
 
-      currentY += 24;
+      pdf.text(
+        selectedRiskLabel,
+        pageWidth - margin - 5,
+        currentY + 18,
+        {
+          align: "right",
+        },
+      );
+
+      pdf.text(
+        formatShortDateTime(
+          generatedAt,
+        ),
+        pageWidth - margin - 5,
+        currentY + 29,
+        {
+          align: "right",
+        },
+      );
+
+      currentY += 44;
 
       /* =====================================================
          SUMMARY CARDS
@@ -1018,7 +1422,7 @@ const CasePrintableReport = ({ onClose }) => {
           value: summary.ongoing,
         },
         {
-          label: "INTERVENTION",
+          label: "FOR INTERVENTION",
           value: summary.intervention,
         },
       ];
@@ -1234,15 +1638,13 @@ const CasePrintableReport = ({ onClose }) => {
         },
 
         styles: {
-          font:
-            "helvetica",
+          font: "helvetica",
           fontSize: 6.5,
           cellPadding: 2.2,
           textColor: dark,
           lineColor: border,
           lineWidth: 0.2,
-          overflow:
-            "linebreak",
+          overflow: "linebreak",
           valign: "middle",
         },
 
@@ -1335,6 +1737,9 @@ const CasePrintableReport = ({ onClose }) => {
       ===================================================== */
 
       if (filteredCases.length === 0) {
+        const emptyY =
+          currentY + 10;
+
         pdf.setFont(
           "helvetica",
           "normal",
@@ -1349,7 +1754,7 @@ const CasePrintableReport = ({ onClose }) => {
         pdf.text(
           "No cases found for the selected filters.",
           pageWidth / 2,
-          currentY + 10,
+          emptyY,
           {
             align: "center",
           },
@@ -1382,8 +1787,8 @@ const CasePrintableReport = ({ onClose }) => {
         );
 
         pdf.text(
-          `Generated ${formatLongDate(
-            new Date(),
+          `Generated by ${generatedBy} • ${formatShortDateTime(
+            generatedAt,
           )}`,
           margin,
           pageHeight - 4,
@@ -1394,14 +1799,24 @@ const CasePrintableReport = ({ onClose }) => {
          SAVE
       ===================================================== */
 
-      const safeDate =
-        selectedDate.replace(
-          /[^0-9-]/g,
-          "",
-        );
+      let safeDatePart =
+        selectedDate;
+
+      if (period === "custom") {
+        safeDatePart = `${customStartDate}-to-${customEndDate}`;
+      }
+
+      if (period === "all") {
+        safeDatePart = "all-time";
+      }
+
+      safeDatePart = safeDatePart.replace(
+        /[^0-9a-zA-Z-]/g,
+        "",
+      );
 
       pdf.save(
-        `GuidEd-Case-Management-Report-${safeDate}.pdf`,
+        `GuidEd-Case-Management-Report-${safeDatePart}.pdf`,
       );
     } catch (error) {
       console.error(
@@ -1418,15 +1833,19 @@ const CasePrintableReport = ({ onClose }) => {
   };
 
   /* =========================================================
-     STATUS LABEL
+     CUSTOM RANGE VALIDATION
   ========================================================= */
 
-  const selectedStatusLabel =
-    statusFilter === "all"
-      ? "All Cases"
-      : statusLabels[
-          statusFilter
-        ] || statusFilter;
+  const customRangeInvalid =
+    period === "custom" &&
+    customStartDate &&
+    customEndDate &&
+    new Date(
+      `${customStartDate}T00:00:00`,
+    ) >
+      new Date(
+        `${customEndDate}T23:59:59.999`,
+      );
 
   /* =========================================================
      RENDER
@@ -1469,6 +1888,16 @@ const CasePrintableReport = ({ onClose }) => {
             .case-print-document {
               overflow: visible !important;
               max-height: none !important;
+              background: white !important;
+              padding: 0 !important;
+            }
+
+            .case-print-paper {
+              box-shadow: none !important;
+              border-radius: 0 !important;
+              max-width: none !important;
+              width: 100% !important;
+              padding: 20px !important;
             }
 
             .case-print-table {
@@ -1574,8 +2003,8 @@ const CasePrintableReport = ({ onClose }) => {
                 </h2>
 
                 <p className="text-[10px] md:text-xs text-gray-400 mt-0.5">
-                  Generate a case summary for
-                  printing or PDF.
+                  Review, filter, print, or
+                  export case records.
                 </p>
               </div>
             </div>
@@ -1616,6 +2045,88 @@ const CasePrintableReport = ({ onClose }) => {
               flex-shrink-0
             "
           >
+            {/* PERIOD TABS */}
+
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CalendarRange
+                  size={14}
+                  className="text-green-600"
+                />
+
+                <p
+                  className="
+                    text-[9px]
+                    uppercase
+                    tracking-wider
+                    font-bold
+                    text-gray-400
+                  "
+                >
+                  Report Period
+                </p>
+              </div>
+
+              <div
+                className="
+                  flex
+                  flex-wrap
+                  gap-2
+                "
+              >
+                {[
+                  {
+                    value: "all",
+                    label: "All Time",
+                  },
+                  {
+                    value: "daily",
+                    label: "Daily",
+                  },
+                  {
+                    value: "monthly",
+                    label: "Monthly",
+                  },
+                  {
+                    value: "yearly",
+                    label: "Yearly",
+                  },
+                  {
+                    value: "custom",
+                    label: "Custom Range",
+                  },
+                ].map((item) => (
+                  <button
+                    key={item.value}
+                    onClick={() =>
+                      setPeriod(
+                        item.value,
+                      )
+                    }
+                    className={`
+                      px-3.5
+                      h-9
+                      rounded-xl
+                      text-[10px]
+                      font-bold
+                      transition
+                      border
+                      ${
+                        period ===
+                        item.value
+                          ? "bg-green-600 text-white border-green-600 shadow-sm"
+                          : "bg-white text-gray-500 border-gray-200 hover:border-green-200 hover:bg-green-50 hover:text-green-700"
+                      }
+                    `}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* FILTERS */}
+
             <div
               className="
                 grid
@@ -1755,130 +2266,233 @@ const CasePrintableReport = ({ onClose }) => {
                 </select>
               </div>
 
-              {/* PERIOD */}
+              {/* REFERENCE DATE */}
 
-              <div>
-                <label
-                  className="
-                    block
-                    text-[9px]
-                    uppercase
-                    tracking-wider
-                    font-bold
-                    text-gray-400
-                    mb-1.5
-                  "
-                >
-                  Report Period
-                </label>
-
-                <select
-                  value={period}
-                  onChange={(e) =>
-                    setPeriod(
-                      e.target.value,
-                    )
-                  }
-                  className="
-                    w-full
-                    h-10
-                    px-3
-                    rounded-xl
-                    border
-                    border-gray-200
-                    bg-white
-                    text-xs
-                    font-semibold
-                    text-gray-700
-                    outline-none
-                    focus:border-green-300
-                    focus:ring-4
-                    focus:ring-green-500/5
-                  "
-                >
-                  <option value="all">
-                    All Time
-                  </option>
-
-                  <option value="daily">
-                    Daily
-                  </option>
-
-                  <option value="monthly">
-                    Monthly
-                  </option>
-
-                  <option value="yearly">
-                    Yearly
-                  </option>
-                </select>
-              </div>
-
-              {/* DATE */}
-
-              <div>
-                <label
-                  className="
-                    block
-                    text-[9px]
-                    uppercase
-                    tracking-wider
-                    font-bold
-                    text-gray-400
-                    mb-1.5
-                  "
-                >
-                  Reference Date
-                </label>
-
+              {period !== "custom" && (
                 <div
-                  className="
-                    relative
-                    flex
-                    items-center
-                  "
+                  className={
+                    period === "all"
+                      ? "sm:col-span-2 lg:col-span-2"
+                      : ""
+                  }
                 >
-                  <CalendarDays
-                    size={14}
+                  <label
                     className="
-                      absolute
-                      left-3
+                      block
+                      text-[9px]
+                      uppercase
+                      tracking-wider
+                      font-bold
                       text-gray-400
-                      pointer-events-none
+                      mb-1.5
                     "
-                  />
+                  >
+                    Reference Date
+                  </label>
 
-                  <input
-                    type="date"
-                    value={
-                      selectedDate
-                    }
-                    onChange={(e) =>
-                      setSelectedDate(
-                        e.target.value,
-                      )
-                    }
+                  <div
                     className="
-                      w-full
-                      h-10
-                      pl-9
-                      pr-3
-                      rounded-xl
-                      border
-                      border-gray-200
-                      bg-white
-                      text-xs
-                      font-semibold
-                      text-gray-700
-                      outline-none
-                      focus:border-green-300
-                      focus:ring-4
-                      focus:ring-green-500/5
+                      relative
+                      flex
+                      items-center
                     "
-                  />
+                  >
+                    <CalendarDays
+                      size={14}
+                      className="
+                        absolute
+                        left-3
+                        text-gray-400
+                        pointer-events-none
+                      "
+                    />
+
+                    <input
+                      type="date"
+                      value={
+                        selectedDate
+                      }
+                      onChange={(e) =>
+                        setSelectedDate(
+                          e.target.value,
+                        )
+                      }
+                      className="
+                        w-full
+                        h-10
+                        pl-9
+                        pr-3
+                        rounded-xl
+                        border
+                        border-gray-200
+                        bg-white
+                        text-xs
+                        font-semibold
+                        text-gray-700
+                        outline-none
+                        focus:border-green-300
+                        focus:ring-4
+                        focus:ring-green-500/5
+                      "
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* CUSTOM RANGE */}
+
+              {period === "custom" && (
+                <>
+                  <div>
+                    <label
+                      className="
+                        block
+                        text-[9px]
+                        uppercase
+                        tracking-wider
+                        font-bold
+                        text-gray-400
+                        mb-1.5
+                      "
+                    >
+                      From Date
+                    </label>
+
+                    <div
+                      className="
+                        relative
+                        flex
+                        items-center
+                      "
+                    >
+                      <CalendarDays
+                        size={14}
+                        className="
+                          absolute
+                          left-3
+                          text-gray-400
+                          pointer-events-none
+                        "
+                      />
+
+                      <input
+                        type="date"
+                        value={
+                          customStartDate
+                        }
+                        onChange={(e) =>
+                          setCustomStartDate(
+                            e.target.value,
+                          )
+                        }
+                        className="
+                          w-full
+                          h-10
+                          pl-9
+                          pr-3
+                          rounded-xl
+                          border
+                          border-gray-200
+                          bg-white
+                          text-xs
+                          font-semibold
+                          text-gray-700
+                          outline-none
+                          focus:border-green-300
+                          focus:ring-4
+                          focus:ring-green-500/5
+                        "
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      className="
+                        block
+                        text-[9px]
+                        uppercase
+                        tracking-wider
+                        font-bold
+                        text-gray-400
+                        mb-1.5
+                      "
+                    >
+                      To Date
+                    </label>
+
+                    <div
+                      className="
+                        relative
+                        flex
+                        items-center
+                      "
+                    >
+                      <CalendarDays
+                        size={14}
+                        className="
+                          absolute
+                          left-3
+                          text-gray-400
+                          pointer-events-none
+                        "
+                      />
+
+                      <input
+                        type="date"
+                        value={
+                          customEndDate
+                        }
+                        onChange={(e) =>
+                          setCustomEndDate(
+                            e.target.value,
+                          )
+                        }
+                        className="
+                          w-full
+                          h-10
+                          pl-9
+                          pr-3
+                          rounded-xl
+                          border
+                          border-gray-200
+                          bg-white
+                          text-xs
+                          font-semibold
+                          text-gray-700
+                          outline-none
+                          focus:border-green-300
+                          focus:ring-4
+                          focus:ring-green-500/5
+                        "
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
+
+            {/* CUSTOM RANGE ERROR */}
+
+            {customRangeInvalid && (
+              <div
+                className="
+                  mt-3
+                  px-3
+                  py-2.5
+                  rounded-xl
+                  bg-red-50
+                  border
+                  border-red-100
+                  text-[10px]
+                  font-semibold
+                  text-red-600
+                "
+              >
+                The start date cannot be
+                later than the end date.
+              </div>
+            )}
 
             {/* ACTION BUTTONS */}
 
@@ -1887,81 +2501,157 @@ const CasePrintableReport = ({ onClose }) => {
                 flex
                 flex-col
                 sm:flex-row
-                justify-end
-                gap-2
+                items-stretch
+                sm:items-center
+                justify-between
+                gap-3
                 mt-4
               "
             >
-              <button
-                onClick={handleDownloadPDF}
-                disabled={
-                  downloading ||
-                  loading
-                }
+              <div
                 className="
-                  h-10
-                  px-4
-                  rounded-xl
-                  bg-green-600
-                  hover:bg-green-700
-                  disabled:bg-green-300
-                  text-white
-                  text-xs
-                  font-bold
                   flex
+                  flex-wrap
                   items-center
-                  justify-center
                   gap-2
-                  transition
-                  shadow-sm
                 "
               >
-                {downloading ? (
-                  <>
-                    <RefreshCw
-                      size={15}
-                      className="animate-spin"
-                    />
+                <span
+                  className="
+                    inline-flex
+                    items-center
+                    gap-1.5
+                    px-2.5
+                    py-1.5
+                    rounded-full
+                    bg-green-50
+                    border
+                    border-green-100
+                    text-[9px]
+                    font-bold
+                    text-green-700
+                  "
+                >
+                  <CalendarRange
+                    size={11}
+                  />
 
-                    Generating PDF...
-                  </>
-                ) : (
-                  <>
-                    <Download size={15} />
+                  {periodTypeLabel}
+                </span>
 
-                    Download PDF
-                  </>
-                )}
-              </button>
+                <span
+                  className="
+                    inline-flex
+                    items-center
+                    gap-1.5
+                    px-2.5
+                    py-1.5
+                    rounded-full
+                    bg-white
+                    border
+                    border-gray-200
+                    text-[9px]
+                    font-bold
+                    text-gray-500
+                  "
+                >
+                  {filteredCases.length}{" "}
+                  case
+                  {filteredCases.length !==
+                  1
+                    ? "s"
+                    : ""}
+                </span>
+              </div>
 
-              <button
-                onClick={handlePrint}
-                disabled={loading}
+              <div
                 className="
-                  h-10
-                  px-4
-                  rounded-xl
-                  bg-white
-                  border
-                  border-gray-200
-                  text-gray-700
-                  hover:border-green-200
-                  hover:bg-green-50
-                  hover:text-green-700
-                  text-xs
-                  font-bold
                   flex
-                  items-center
-                  justify-center
+                  flex-col
+                  sm:flex-row
+                  justify-end
                   gap-2
-                  transition
-                  shadow-sm
                 "
               >
-                <Printer size={15} />
+                <button
+                  onClick={
+                    handleDownloadPDF
+                  }
+                  disabled={
+                    downloading ||
+                    loading ||
+                    customRangeInvalid
+                  }
+                  className="
+                    h-10
+                    px-4
+                    rounded-xl
+                    bg-green-600
+                    hover:bg-green-700
+                    disabled:bg-green-300
+                    text-white
+                    text-xs
+                    font-bold
+                    flex
+                    items-center
+                    justify-center
+                    gap-2
+                    transition
+                    shadow-sm
+                  "
+                >
+                  {downloading ? (
+                    <>
+                      <RefreshCw
+                        size={15}
+                        className="animate-spin"
+                      />
 
-                Print Report
-              </button>
+                      Generating PDF...
+                    </>
+                  ) : (
+                    <>
+                      <Download
+                        size={15}
+                      />
+
+                      Download PDF
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={handlePrint}
+                  disabled={
+                    loading ||
+                    customRangeInvalid
+                  }
+                  className="
+                    h-10
+                    px-4
+                    rounded-xl
+                    bg-white
+                    border
+                    border-gray-200
+                    text-gray-700
+                    hover:border-green-200
+                    hover:bg-green-50
+                    hover:text-green-700
+                    text-xs
+                    font-bold
+                    flex
+                    items-center
+                    justify-center
+                    gap-2
+                    transition
+                    shadow-sm
+                  "
+                >
+                  <Printer size={15} />
+
+                  Print Report
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1981,6 +2671,7 @@ const CasePrintableReport = ({ onClose }) => {
           >
             <div
               className="
+                case-print-paper
                 bg-white
                 max-w-5xl
                 mx-auto
@@ -2083,7 +2774,7 @@ const CasePrintableReport = ({ onClose }) => {
               </div>
 
               {/* =================================================
-                  PERIOD INFORMATION
+                  REPORT INFORMATION
               ================================================= */}
 
               <div
@@ -2098,88 +2789,138 @@ const CasePrintableReport = ({ onClose }) => {
               >
                 <div
                   className="
-                    flex
-                    flex-col
-                    md:flex-row
-                    md:items-center
-                    md:justify-between
-                    gap-3
+                    grid
+                    grid-cols-1
+                    md:grid-cols-2
+                    gap-4
                   "
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
+                  {/* PERIOD */}
+
+                  <ReportMeta
+                    icon={
+                      <CalendarRange
+                        size={14}
+                      />
+                    }
+                    label="Report Period"
+                    value={
+                      periodTypeLabel
+                    }
+                  />
+
+                  {/* DATE RANGE */}
+
+                  <ReportMeta
+                    icon={
                       <CalendarDays
                         size={14}
-                        className="text-green-600"
                       />
+                    }
+                    label="Date Range"
+                    value={
+                      dateRange.start &&
+                      dateRange.end
+                        ? `${formatLongDate(
+                            dateRange.start,
+                          )} – ${formatLongDate(
+                            dateRange.end,
+                          )}`
+                        : "All available records"
+                    }
+                  />
 
-                      <p
-                        className="
-                          text-[9px]
-                          uppercase
-                          tracking-wider
-                          font-bold
-                          text-gray-400
-                        "
-                      >
-                        Report Period
-                      </p>
-                    </div>
+                  {/* GENERATED BY */}
 
-                    <p
-                      className="
-                        text-sm
-                        font-bold
-                        text-gray-900
-                        mt-1
-                      "
-                    >
-                      {periodLabel}
-                    </p>
-                  </div>
+                  <ReportMeta
+                    icon={
+                      <UserRound
+                        size={14}
+                      />
+                    }
+                    label="Generated By"
+                    value={
+                      generatedBy
+                    }
+                    subValue={
+                      generatedByRole
+                    }
+                  />
 
-                  <div
+                  {/* GENERATED ON */}
+
+                  <ReportMeta
+                    icon={
+                      <Clock3
+                        size={14}
+                      />
+                    }
+                    label="Generated On"
+                    value={formatDateTime(
+                      generatedAt,
+                    )}
+                  />
+                </div>
+
+                <div
+                  className="
+                    mt-4
+                    pt-4
+                    border-t
+                    border-gray-200
+                    flex
+                    flex-wrap
+                    gap-2
+                  "
+                >
+                  <span
                     className="
-                      flex
-                      flex-wrap
-                      gap-2
+                      px-2.5
+                      py-1.5
+                      rounded-full
+                      bg-green-50
+                      border
+                      border-green-200
+                      text-[9px]
+                      font-bold
+                      text-green-700
                     "
                   >
-                    <span
-                      className="
-                        px-2.5
-                        py-1.5
-                        rounded-full
-                        bg-green-50
-                        border
-                        border-green-200
-                        text-[9px]
-                        font-bold
-                        text-green-700
-                      "
-                    >
-                      {selectedStatusLabel}
-                    </span>
+                    {selectedStatusLabel}
+                  </span>
 
-                    <span
-                      className="
-                        px-2.5
-                        py-1.5
-                        rounded-full
-                        bg-white
-                        border
-                        border-gray-200
-                        text-[9px]
-                        font-bold
-                        text-gray-600
-                      "
-                    >
-                      {riskFilter ===
-                      "all"
-                        ? "All Risk Levels"
-                        : `${riskFilter} Risk`}
-                    </span>
-                  </div>
+                  <span
+                    className="
+                      px-2.5
+                      py-1.5
+                      rounded-full
+                      bg-white
+                      border
+                      border-gray-200
+                      text-[9px]
+                      font-bold
+                      text-gray-600
+                    "
+                  >
+                    {selectedRiskLabel}
+                  </span>
+
+                  <span
+                    className="
+                      px-2.5
+                      py-1.5
+                      rounded-full
+                      bg-white
+                      border
+                      border-gray-200
+                      text-[9px]
+                      font-bold
+                      text-gray-600
+                    "
+                  >
+                    {filteredCases.length}{" "}
+                    Records Included
+                  </span>
                 </div>
               </div>
 
@@ -2307,7 +3048,8 @@ const CasePrintableReport = ({ onClose }) => {
                         mt-0.5
                       "
                     >
-                      {filteredCases.length} case
+                      {filteredCases.length}{" "}
+                      case
                       {filteredCases.length !==
                       1
                         ? "s"
@@ -2460,7 +3202,8 @@ const CasePrintableReport = ({ onClose }) => {
                             >
                               Try changing
                               your report
-                              filters.
+                              filters or
+                              date range.
                             </p>
                           </td>
                         </tr>
@@ -2652,30 +3395,45 @@ const CasePrintableReport = ({ onClose }) => {
                   md:flex-row
                   md:items-center
                   md:justify-between
-                  gap-2
+                  gap-4
                 "
               >
                 <div>
-                  <p className="text-[9px] font-bold text-gray-500">
-                    Prepared by:
-                    GuidEd Administrator
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <UserRound
+                      size={13}
+                      className="text-green-600"
+                    />
 
-                  <p className="text-[8px] text-gray-400 mt-1">
-                    EduGuard Student
+                    <p className="text-[9px] font-bold text-gray-600">
+                      Prepared by:{" "}
+                      {generatedBy}
+                    </p>
+                  </div>
+
+                  <p className="text-[8px] text-gray-400 mt-1 ml-5">
+                    {generatedByRole} ·
+                    GuidEd Student
                     Discipline and
                     Monitoring System
                   </p>
                 </div>
 
                 <div className="text-left md:text-right">
-                  <p className="text-[8px] text-gray-400">
-                    Generated on
-                  </p>
+                  <div className="flex items-center md:justify-end gap-1.5">
+                    <Clock3
+                      size={11}
+                      className="text-gray-400"
+                    />
 
-                  <p className="text-[9px] font-semibold text-gray-600">
-                    {formatLongDate(
-                      new Date(),
+                    <p className="text-[8px] text-gray-400">
+                      Generated on
+                    </p>
+                  </div>
+
+                  <p className="text-[9px] font-semibold text-gray-600 mt-1">
+                    {formatDateTime(
+                      generatedAt,
                     )}
                   </p>
                 </div>
@@ -2685,6 +3443,70 @@ const CasePrintableReport = ({ onClose }) => {
         </div>
       </div>
     </>
+  );
+};
+
+/* =========================================================
+   REPORT META
+========================================================= */
+
+const ReportMeta = ({
+  icon,
+  label,
+  value,
+  subValue,
+}) => {
+  return (
+    <div className="flex items-start gap-2.5">
+      <div
+        className="
+          w-8
+          h-8
+          rounded-lg
+          bg-green-50
+          text-green-700
+          flex
+          items-center
+          justify-center
+          flex-shrink-0
+        "
+      >
+        {icon}
+      </div>
+
+      <div className="min-w-0">
+        <p
+          className="
+            text-[8px]
+            uppercase
+            tracking-wider
+            font-bold
+            text-gray-400
+          "
+        >
+          {label}
+        </p>
+
+        <p
+          className="
+            text-[10px]
+            md:text-[11px]
+            font-bold
+            text-gray-800
+            mt-0.5
+            break-words
+          "
+        >
+          {value}
+        </p>
+
+        {subValue && (
+          <p className="text-[8px] text-gray-400 mt-0.5">
+            {subValue}
+          </p>
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -2757,4 +3579,3 @@ const SummaryCard = ({
 };
 
 export default CasePrintableReport;
-

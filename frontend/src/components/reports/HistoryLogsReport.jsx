@@ -9,33 +9,88 @@ import {
   Users,
   ShieldCheck,
   Loader2,
+  CalendarDays,
 } from "lucide-react";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+import { useAuthStore } from "../../store/authStore";
+
 /* =========================================================
    HELPERS
 ========================================================= */
 
-const getPeriodRange = (period) => {
+const toDateInputValue = (date) => {
+  if (!date) return "";
+
+  const d = new Date(date);
+
+  if (Number.isNaN(d.getTime())) {
+    return "";
+  }
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const getTodayInputValue = () => {
+  return toDateInputValue(new Date());
+};
+
+const getMonthStartInputValue = () => {
   const now = new Date();
 
-  const start = new Date(now);
-  const end = new Date(now);
+  return toDateInputValue(
+    new Date(now.getFullYear(), now.getMonth(), 1)
+  );
+};
+
+/* =========================================================
+   GET PERIOD RANGE
+========================================================= */
+
+const getPeriodRange = (period, referenceDate) => {
+  if (period === "all") {
+    return null;
+  }
+
+  const base = referenceDate
+    ? new Date(`${referenceDate}T12:00:00`)
+    : new Date();
+
+  if (Number.isNaN(base.getTime())) {
+    return null;
+  }
+
+  const start = new Date(base);
+  const end = new Date(base);
+
+  /* =======================================================
+     DAILY
+  ======================================================= */
 
   if (period === "daily") {
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
   }
 
-  if (period === "weekly") {
-    const day = now.getDay();
+  /* =======================================================
+     WEEKLY
+     Monday - Sunday
+  ======================================================= */
 
-    // Monday = first day of week
+  if (period === "weekly") {
+    const day = base.getDay();
+
+    // Sunday = 0
+    // Monday = 1
     const diff = day === 0 ? 6 : day - 1;
 
-    start.setDate(now.getDate() - diff);
+    start.setDate(base.getDate() - diff);
     start.setHours(0, 0, 0, 0);
 
     end.setTime(start.getTime());
@@ -43,13 +98,21 @@ const getPeriodRange = (period) => {
     end.setHours(23, 59, 59, 999);
   }
 
+  /* =======================================================
+     MONTHLY
+  ======================================================= */
+
   if (period === "monthly") {
     start.setDate(1);
     start.setHours(0, 0, 0, 0);
 
-    end.setMonth(now.getMonth() + 1, 0);
+    end.setMonth(base.getMonth() + 1, 0);
     end.setHours(23, 59, 59, 999);
   }
+
+  /* =======================================================
+     YEARLY
+  ======================================================= */
 
   if (period === "yearly") {
     start.setMonth(0, 1);
@@ -59,7 +122,28 @@ const getPeriodRange = (period) => {
     end.setHours(23, 59, 59, 999);
   }
 
-  if (period === "all") {
+  return {
+    start,
+    end,
+  };
+};
+
+/* =========================================================
+   CUSTOM RANGE
+========================================================= */
+
+const getCustomRange = (startDate, endDate) => {
+  if (!startDate || !endDate) {
+    return null;
+  }
+
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T23:59:59.999`);
+
+  if (
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime())
+  ) {
     return null;
   }
 
@@ -69,6 +153,10 @@ const getPeriodRange = (period) => {
   };
 };
 
+/* =========================================================
+   PERIOD LABEL
+========================================================= */
+
 const getPeriodLabel = (period) => {
   const labels = {
     all: "All Time",
@@ -76,12 +164,37 @@ const getPeriodLabel = (period) => {
     weekly: "Weekly",
     monthly: "Monthly",
     yearly: "Yearly",
+    custom: "Custom Range",
   };
 
   return labels[period] || "All Time";
 };
 
+/* =========================================================
+   FORMAT DATE
+========================================================= */
+
 const formatDate = (value) => {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return date.toLocaleDateString("en-PH", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+};
+
+/* =========================================================
+   SHORT DATE
+========================================================= */
+
+const formatShortDate = (value) => {
   if (!value) return "—";
 
   const date = new Date(value);
@@ -96,6 +209,10 @@ const formatDate = (value) => {
     day: "numeric",
   });
 };
+
+/* =========================================================
+   FORMAT TIME
+========================================================= */
 
 const formatTime = (value) => {
   if (!value) return "—";
@@ -113,6 +230,10 @@ const formatTime = (value) => {
   });
 };
 
+/* =========================================================
+   FORMAT DATE + TIME
+========================================================= */
+
 const formatDateTime = (value) => {
   if (!value) return "—";
 
@@ -125,23 +246,53 @@ const formatDateTime = (value) => {
   return `${formatDate(value)} ${formatTime(value)}`;
 };
 
-const getDateRangeLabel = (period) => {
-  const range = getPeriodRange(period);
+/* =========================================================
+   FORMAT RANGE
+========================================================= */
 
+const formatRange = (range) => {
   if (!range) {
     return "All recorded history";
   }
 
-  return `${formatDate(range.start)} - ${formatDate(range.end)}`;
+  return `${formatDate(range.start)} - ${formatDate(
+    range.end
+  )}`;
 };
 
+/* =========================================================
+   SAFE TEXT
+========================================================= */
+
 const getSafeText = (value, fallback = "—") => {
-  if (value === null || value === undefined || value === "") {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
     return fallback;
   }
 
   return String(value);
 };
+
+/* =========================================================
+   GET LOG DATE
+========================================================= */
+
+const getLogDate = (log) => {
+  return (
+    log?.createdAt ||
+    log?.date ||
+    log?.timestamp ||
+    log?.updatedAt ||
+    null
+  );
+};
+
+/* =========================================================
+   LOAD IMAGE
+========================================================= */
 
 const loadImageAsDataUrl = async (src) => {
   try {
@@ -162,7 +313,11 @@ const loadImageAsDataUrl = async (src) => {
       reader.readAsDataURL(blob);
     });
   } catch (error) {
-    console.warn("Could not load school logo:", error);
+    console.warn(
+      "Could not load school logo:",
+      error
+    );
+
     return null;
   }
 };
@@ -177,8 +332,125 @@ const HistoryLogsReport = ({
   role = "",
   onClose,
 }) => {
+  /*
+   * Get the currently logged-in user.
+   *
+   * This allows the report to show:
+   * "Generated By: John Doe"
+   * instead of simply saying "GuidEd Administrator".
+   */
+  const { user } = useAuthStore();
+
+  /* =======================================================
+     GENERATED INFORMATION
+  ======================================================= */
+
+  /*
+   * Capture the generated time only once.
+   *
+   * This is important because we don't want the
+   * "Generated On" value to keep changing while
+   * the user is viewing the report.
+   */
+  const [generatedAt] = useState(() => new Date());
+
+  const generatedBy =
+    user?.name?.trim() ||
+    [
+      user?.firstName,
+      user?.middleName,
+      user?.lastName,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
+    user?.fullName?.trim() ||
+    user?.email ||
+    "GuidEd Administrator";
+
+  const generatedByRole =
+    user?.role || "Administrator";
+
+  /* =======================================================
+     REPORT FILTER STATE
+  ======================================================= */
+
   const [period, setPeriod] = useState("monthly");
-  const [downloading, setDownloading] = useState(false);
+
+  const [selectedDate, setSelectedDate] = useState(
+    getTodayInputValue()
+  );
+
+  const [customStartDate, setCustomStartDate] =
+    useState(getMonthStartInputValue());
+
+  const [customEndDate, setCustomEndDate] =
+    useState(getTodayInputValue());
+
+  const [downloading, setDownloading] =
+    useState(false);
+
+  /* =======================================================
+     CUSTOM RANGE VALIDATION
+  ======================================================= */
+
+  const customRangeError = useMemo(() => {
+    if (period !== "custom") {
+      return "";
+    }
+
+    if (!customStartDate || !customEndDate) {
+      return "Please select both a start date and an end date.";
+    }
+
+    const start = new Date(
+      `${customStartDate}T00:00:00`
+    );
+
+    const end = new Date(
+      `${customEndDate}T23:59:59.999`
+    );
+
+    if (
+      Number.isNaN(start.getTime()) ||
+      Number.isNaN(end.getTime())
+    ) {
+      return "Invalid custom date range.";
+    }
+
+    if (start > end) {
+      return "The start date cannot be later than the end date.";
+    }
+
+    return "";
+  }, [
+    period,
+    customStartDate,
+    customEndDate,
+  ]);
+
+  /* =======================================================
+     CURRENT REPORT RANGE
+  ======================================================= */
+
+  const reportRange = useMemo(() => {
+    if (period === "custom") {
+      return getCustomRange(
+        customStartDate,
+        customEndDate
+      );
+    }
+
+    return getPeriodRange(
+      period,
+      selectedDate
+    );
+  }, [
+    period,
+    selectedDate,
+    customStartDate,
+    customEndDate,
+  ]);
 
   /* =======================================================
      NORMALIZE LOGS
@@ -192,45 +464,80 @@ const HistoryLogsReport = ({
     return logs.map((log) => ({
       ...log,
 
-      date: log.createdAt || log.date || log.timestamp,
+      date: getLogDate(log),
 
       role:
-        log.role ||
-        log.userRole ||
-        log.actorRole ||
+        log?.role ||
+        log?.userRole ||
+        log?.actorRole ||
+        log?.user?.role ||
         "Unknown",
 
       category:
-        log.category ||
-        log.type ||
+        log?.category ||
+        log?.type ||
         "System",
 
       action:
-        log.action ||
-        log.event ||
-        log.activity ||
+        log?.action ||
+        log?.event ||
+        log?.activity ||
         "—",
 
       details:
-        log.details ||
-        log.description ||
-        log.message ||
+        log?.details ||
+        log?.description ||
+        log?.message ||
         "—",
     }));
   }, [logs]);
 
   /* =======================================================
-     FILTER BY PERIOD
+     FILTER LOGS
   ======================================================= */
 
   const filteredLogs = useMemo(() => {
-    const range = getPeriodRange(period);
-
-    if (!range) {
-      return normalizedLogs;
+    if (customRangeError) {
+      return [];
     }
 
     return normalizedLogs.filter((log) => {
+      /* ================================================
+         CATEGORY
+      ================================================ */
+
+      if (
+        category &&
+        String(log.category).toLowerCase() !==
+          String(category).toLowerCase()
+      ) {
+        return false;
+      }
+
+      /* ================================================
+         ROLE
+      ================================================ */
+
+      if (
+        role &&
+        String(log.role).toLowerCase() !==
+          String(role).toLowerCase()
+      ) {
+        return false;
+      }
+
+      /* ================================================
+         ALL TIME
+      ================================================ */
+
+      if (!reportRange) {
+        return true;
+      }
+
+      /* ================================================
+         DATE
+      ================================================ */
+
       if (!log.date) {
         return false;
       }
@@ -241,9 +548,18 @@ const HistoryLogsReport = ({
         return false;
       }
 
-      return date >= range.start && date <= range.end;
+      return (
+        date >= reportRange.start &&
+        date <= reportRange.end
+      );
     });
-  }, [normalizedLogs, period]);
+  }, [
+    normalizedLogs,
+    category,
+    role,
+    reportRange,
+    customRangeError,
+  ]);
 
   /* =======================================================
      SORT NEWEST FIRST
@@ -251,37 +567,97 @@ const HistoryLogsReport = ({
 
   const sortedLogs = useMemo(() => {
     return [...filteredLogs].sort((a, b) => {
-      const dateA = new Date(a.date || 0).getTime();
-      const dateB = new Date(b.date || 0).getTime();
+      const dateA = new Date(
+        a.date || 0
+      ).getTime();
+
+      const dateB = new Date(
+        b.date || 0
+      ).getTime();
 
       return dateB - dateA;
     });
   }, [filteredLogs]);
 
   /* =======================================================
+     ACTUAL RANGE FOR ALL TIME
+  ======================================================= */
+
+  const actualAllTimeRange = useMemo(() => {
+    const validDates = normalizedLogs
+      .map((log) => {
+        if (!log.date) return null;
+
+        const date = new Date(log.date);
+
+        return Number.isNaN(date.getTime())
+          ? null
+          : date;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a - b);
+
+    if (!validDates.length) {
+      return null;
+    }
+
+    return {
+      start: validDates[0],
+      end: validDates[validDates.length - 1],
+    };
+  }, [normalizedLogs]);
+
+  /* =======================================================
+     DISPLAY DATE RANGE
+  ======================================================= */
+
+  const displayDateRange = useMemo(() => {
+    if (period === "all") {
+      if (!actualAllTimeRange) {
+        return "All recorded history";
+      }
+
+      return `${formatDate(
+        actualAllTimeRange.start
+      )} - ${formatDate(
+        actualAllTimeRange.end
+      )}`;
+    }
+
+    if (period === "custom") {
+      if (customRangeError) {
+        return "Invalid custom range";
+      }
+
+      return formatRange(reportRange);
+    }
+
+    return formatRange(reportRange);
+  }, [
+    period,
+    reportRange,
+    actualAllTimeRange,
+    customRangeError,
+  ]);
+
+  /* =======================================================
      SUMMARY
   ======================================================= */
 
   const summary = useMemo(() => {
-    const uniqueUsers = new Set();
-
-    sortedLogs.forEach((log) => {
-      if (log.role) {
-        uniqueUsers.add(log.role);
-      }
-    });
-
+    const roles = new Set();
     const categories = new Set();
-
-    sortedLogs.forEach((log) => {
-      if (log.category) {
-        categories.add(log.category);
-      }
-    });
-
     const actions = new Set();
 
     sortedLogs.forEach((log) => {
+      if (log.role) {
+        roles.add(log.role);
+      }
+
+      if (log.category) {
+        categories.add(log.category);
+      }
+
       if (log.action) {
         actions.add(log.action);
       }
@@ -289,7 +665,7 @@ const HistoryLogsReport = ({
 
     return {
       total: sortedLogs.length,
-      roles: uniqueUsers.size,
+      roles: roles.size,
       categories: categories.size,
       actions: actions.size,
     };
@@ -300,6 +676,11 @@ const HistoryLogsReport = ({
   ======================================================= */
 
   const handlePrint = () => {
+    if (customRangeError) {
+      alert(customRangeError);
+      return;
+    }
+
     window.print();
   };
 
@@ -310,6 +691,11 @@ const HistoryLogsReport = ({
   const handleDownloadPDF = async () => {
     if (downloading) return;
 
+    if (customRangeError) {
+      alert(customRangeError);
+      return;
+    }
+
     try {
       setDownloading(true);
 
@@ -319,20 +705,37 @@ const HistoryLogsReport = ({
         format: "a4",
       });
 
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
+      const pageWidth =
+        doc.internal.pageSize.getWidth();
+
+      const pageHeight =
+        doc.internal.pageSize.getHeight();
 
       /* ===================================================
-         HEADER
+         TOP GREEN BAR
       =================================================== */
 
       doc.setFillColor(22, 163, 74);
-      doc.rect(0, 0, pageWidth, 8, "F");
+
+      doc.rect(
+        0,
+        0,
+        pageWidth,
+        8,
+        "F"
+      );
+
+      /* ===================================================
+         SCHOOL LOGO
+      =================================================== */
 
       let logoData = null;
 
       try {
-        logoData = await loadImageAsDataUrl("/school-logo.png");
+        logoData =
+          await loadImageAsDataUrl(
+            "/school-logo.png"
+          );
       } catch {
         logoData = null;
       }
@@ -348,53 +751,123 @@ const HistoryLogsReport = ({
             18
           );
         } catch {
-          // Continue without logo
+          // Continue without logo.
         }
       }
 
-      const titleX = logoData ? 38 : 15;
+      const titleX =
+        logoData ? 38 : 15;
 
-      doc.setFont("helvetica", "bold");
+      /* ===================================================
+         GUIDED
+      =================================================== */
+
+      doc.setFont(
+        "helvetica",
+        "bold"
+      );
+
       doc.setFontSize(18);
-      doc.setTextColor(22, 163, 74);
-      doc.text("GuidEd", titleX, 20);
 
-      doc.setFont("helvetica", "normal");
+      doc.setTextColor(
+        22,
+        163,
+        74
+      );
+
+      doc.text(
+        "GuidEd",
+        titleX,
+        20
+      );
+
+      /* ===================================================
+         SCHOOL NAME
+      =================================================== */
+
+      doc.setFont(
+        "helvetica",
+        "normal"
+      );
+
       doc.setFontSize(8);
-      doc.setTextColor(100, 100, 100);
+
+      doc.setTextColor(
+        100,
+        100,
+        100
+      );
+
       doc.text(
         "Our Lady of the Holy Rosary School - General Trias Campus",
         titleX,
         26
       );
 
-      doc.setFont("helvetica", "bold");
+      /* ===================================================
+         REPORT TITLE
+      =================================================== */
+
+      doc.setFont(
+        "helvetica",
+        "bold"
+      );
+
       doc.setFontSize(14);
-      doc.setTextColor(30, 30, 30);
+
+      doc.setTextColor(
+        30,
+        30,
+        30
+      );
+
       doc.text(
-        "System History Logs Report",
+        "SYSTEM HISTORY LOGS REPORT",
         15,
         43
       );
 
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(90, 90, 90);
+      /* ===================================================
+         METADATA
+      =================================================== */
+
+      doc.setFont(
+        "helvetica",
+        "normal"
+      );
+
+      doc.setFontSize(8);
+
+      doc.setTextColor(
+        80,
+        80,
+        80
+      );
 
       doc.text(
-        `Period: ${getPeriodLabel(period)}`,
+        `Generated By: ${generatedBy}`,
         15,
         50
       );
 
       doc.text(
-        `Date Range: ${getDateRangeLabel(period)}`,
+        `Generated On: ${formatDateTime(
+          generatedAt
+        )}`,
         15,
         56
       );
 
       doc.text(
-        `Generated: ${formatDateTime(new Date())}`,
+        `Generated Role: ${generatedByRole}`,
+        15,
+        62
+      );
+
+      doc.text(
+        `Report Period: ${getPeriodLabel(
+          period
+        )}`,
         pageWidth - 15,
         50,
         {
@@ -402,35 +875,49 @@ const HistoryLogsReport = ({
         }
       );
 
-      if (category) {
-        doc.text(
-          `Category Filter: ${category}`,
-          pageWidth - 15,
-          56,
-          {
-            align: "right",
-          }
-        );
-      }
+      doc.text(
+        `Date Range: ${displayDateRange}`,
+        pageWidth - 15,
+        56,
+        {
+          align: "right",
+        }
+      );
 
-      if (role) {
-        doc.text(
-          `Role Filter: ${role}`,
-          pageWidth - 15,
-          62,
-          {
-            align: "right",
-          }
-        );
-      }
+      doc.text(
+        `Category: ${
+          category || "All Categories"
+        }`,
+        pageWidth - 15,
+        62,
+        {
+          align: "right",
+        }
+      );
+
+      doc.text(
+        `Role: ${
+          role || "All Roles"
+        }`,
+        pageWidth - 15,
+        68,
+        {
+          align: "right",
+        }
+      );
 
       /* ===================================================
          SUMMARY
       =================================================== */
 
-      const summaryY = 69;
+      const summaryY = 75;
 
-      doc.setFillColor(248, 250, 249);
+      doc.setFillColor(
+        248,
+        250,
+        249
+      );
+
       doc.roundedRect(
         15,
         summaryY,
@@ -441,7 +928,8 @@ const HistoryLogsReport = ({
         "F"
       );
 
-      const boxWidth = (pageWidth - 45) / 4;
+      const boxWidth =
+        (pageWidth - 45) / 4;
 
       const summaryItems = [
         {
@@ -462,40 +950,84 @@ const HistoryLogsReport = ({
         },
       ];
 
-      summaryItems.forEach((item, index) => {
-        const x = 15 + index * (boxWidth + 5);
+      summaryItems.forEach(
+        (item, index) => {
+          const x =
+            15 +
+            index *
+              (boxWidth + 5);
 
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(7);
-        doc.setTextColor(110, 110, 110);
-        doc.text(item.label, x + 5, summaryY + 7);
+          doc.setFont(
+            "helvetica",
+            "normal"
+          );
 
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
-        doc.setTextColor(30, 30, 30);
-        doc.text(
-          String(item.value),
-          x + 5,
-          summaryY + 15
-        );
-      });
+          doc.setFontSize(7);
+
+          doc.setTextColor(
+            110,
+            110,
+            110
+          );
+
+          doc.text(
+            item.label,
+            x + 5,
+            summaryY + 7
+          );
+
+          doc.setFont(
+            "helvetica",
+            "bold"
+          );
+
+          doc.setFontSize(12);
+
+          doc.setTextColor(
+            30,
+            30,
+            30
+          );
+
+          doc.text(
+            String(item.value),
+            x + 5,
+            summaryY + 15
+          );
+        }
+      );
 
       /* ===================================================
          TABLE
       =================================================== */
 
-      const tableRows = sortedLogs.map((log, index) => [
-        index + 1,
-        formatDate(log.date),
-        formatTime(log.date),
-        getSafeText(log.role),
-        getSafeText(log.category),
-        getSafeText(log.action),
-        getSafeText(log.details),
-      ]);
+      const tableRows =
+        sortedLogs.map(
+          (log, index) => [
+            index + 1,
+            formatShortDate(
+              log.date
+            ),
+            formatTime(
+              log.date
+            ),
+            getSafeText(
+              log.role
+            ),
+            getSafeText(
+              log.category
+            ),
+            getSafeText(
+              log.action
+            ),
+            getSafeText(
+              log.details
+            ),
+          ]
+        );
 
       autoTable(doc, {
-        startY: 96,
+        startY: 102,
 
         head: [
           [
@@ -517,22 +1049,42 @@ const HistoryLogsReport = ({
           font: "helvetica",
           fontSize: 7,
           cellPadding: 2.5,
-          textColor: [45, 45, 45],
-          lineColor: [220, 225, 222],
+          textColor: [
+            45,
+            45,
+            45,
+          ],
+          lineColor: [
+            220,
+            225,
+            222,
+          ],
           lineWidth: 0.1,
           valign: "top",
         },
 
         headStyles: {
-          fillColor: [22, 163, 74],
-          textColor: [255, 255, 255],
+          fillColor: [
+            22,
+            163,
+            74,
+          ],
+          textColor: [
+            255,
+            255,
+            255,
+          ],
           fontStyle: "bold",
           fontSize: 7,
           halign: "left",
         },
 
         alternateRowStyles: {
-          fillColor: [248, 250, 249],
+          fillColor: [
+            248,
+            250,
+            249,
+          ],
         },
 
         columnStyles: {
@@ -571,19 +1123,39 @@ const HistoryLogsReport = ({
           right: 15,
         },
 
-        didDrawPage: (data) => {
-          /* ===============================================
+        didDrawPage: (
+          data
+        ) => {
+          /* =============================================
              FOOTER
-          =============================================== */
+          ============================================= */
 
-          doc.setFont("helvetica", "normal");
+          doc.setFont(
+            "helvetica",
+            "normal"
+          );
+
           doc.setFontSize(7);
-          doc.setTextColor(120, 120, 120);
+
+          doc.setTextColor(
+            120,
+            120,
+            120
+          );
 
           doc.text(
             "GuidEd - Student Guidance and Discipline Management System",
             15,
             pageHeight - 10
+          );
+
+          doc.text(
+            `Prepared by: ${generatedBy}`,
+            pageWidth / 2,
+            pageHeight - 10,
+            {
+              align: "center",
+            }
           );
 
           doc.text(
@@ -601,16 +1173,27 @@ const HistoryLogsReport = ({
          EMPTY REPORT
       =================================================== */
 
-      if (sortedLogs.length === 0) {
-        // Add a clear empty-state message if there are no records.
+      if (
+        sortedLogs.length === 0
+      ) {
         const emptyY =
           doc.lastAutoTable?.finalY
-            ? doc.lastAutoTable.finalY + 10
-            : 105;
+            ? doc.lastAutoTable
+                .finalY + 10
+            : 110;
 
-        doc.setFont("helvetica", "normal");
+        doc.setFont(
+          "helvetica",
+          "normal"
+        );
+
         doc.setFontSize(9);
-        doc.setTextColor(120, 120, 120);
+
+        doc.setTextColor(
+          120,
+          120,
+          120
+        );
 
         doc.text(
           "No history logs were recorded for the selected period and filters.",
@@ -626,15 +1209,29 @@ const HistoryLogsReport = ({
          FILE NAME
       =================================================== */
 
-      const date = new Date();
+      let filenameRange =
+        "all-time";
 
-      const dateStamp = [
-        date.getFullYear(),
-        String(date.getMonth() + 1).padStart(2, "0"),
-        String(date.getDate()).padStart(2, "0"),
-      ].join("-");
+      if (
+        reportRange &&
+        !customRangeError
+      ) {
+        const start =
+          toDateInputValue(
+            reportRange.start
+          );
 
-      const filename = `GuidEd-History-Logs-${period}-${dateStamp}.pdf`;
+        const end =
+          toDateInputValue(
+            reportRange.end
+          );
+
+        filenameRange =
+          `${start}-to-${end}`;
+      }
+
+      const filename =
+        `GuidEd-History-Logs-${period}-${filenameRange}.pdf`;
 
       doc.save(filename);
     } catch (error) {
@@ -651,9 +1248,9 @@ const HistoryLogsReport = ({
     }
   };
 
-  /* =======================================================
+  /* =========================================================
      RENDER
-  ======================================================= */
+  ========================================================= */
 
   return (
     <>
@@ -753,7 +1350,7 @@ const HistoryLogsReport = ({
           "
         >
           {/* =================================================
-              REPORT HEADER
+              REPORT HEADER / CONTROLS
           ================================================= */}
 
           <div
@@ -765,171 +1362,378 @@ const HistoryLogsReport = ({
               border-gray-100
               flex
               flex-col
-              lg:flex-row
-              lg:items-center
-              justify-between
               gap-4
             "
           >
-            <div className="flex items-center gap-3">
-              <div
-                className="
-                  w-11
-                  h-11
-                  rounded-2xl
-                  bg-green-50
-                  border
-                  border-green-100
-                  text-green-600
-                  flex
-                  items-center
-                  justify-center
-                "
-              >
-                <FileText size={20} />
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="
+                    w-11
+                    h-11
+                    rounded-2xl
+                    bg-green-50
+                    border
+                    border-green-100
+                    text-green-600
+                    flex
+                    items-center
+                    justify-center
+                  "
+                >
+                  <FileText size={20} />
+                </div>
+
+                <div>
+                  <h2 className="text-base font-extrabold text-gray-900">
+                    History Logs Report
+                  </h2>
+
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Printable system activity and audit report
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <h2 className="text-base font-extrabold text-gray-900">
-                  History Logs Report
-                </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* PRINT */}
 
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Printable system activity and audit report
-                </p>
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  className="
+                    flex
+                    items-center
+                    gap-2
+                    px-4
+                    py-2.5
+                    rounded-xl
+                    bg-gray-900
+                    hover:bg-gray-800
+                    text-white
+                    text-xs
+                    font-semibold
+                    transition
+                  "
+                >
+                  <Printer size={14} />
+                  Print
+                </button>
+
+                {/* PDF */}
+
+                <button
+                  type="button"
+                  onClick={
+                    handleDownloadPDF
+                  }
+                  disabled={downloading}
+                  className="
+                    flex
+                    items-center
+                    gap-2
+                    px-4
+                    py-2.5
+                    rounded-xl
+                    bg-green-600
+                    hover:bg-green-700
+                    disabled:bg-green-400
+                    disabled:cursor-not-allowed
+                    text-white
+                    text-xs
+                    font-semibold
+                    transition
+                  "
+                >
+                  {downloading ? (
+                    <Loader2
+                      size={14}
+                      className="animate-spin"
+                    />
+                  ) : (
+                    <Download
+                      size={14}
+                    />
+                  )}
+
+                  {downloading
+                    ? "Generating..."
+                    : "Download PDF"}
+                </button>
+
+                {/* CLOSE */}
+
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="
+                    w-10
+                    h-10
+                    rounded-xl
+                    border
+                    border-gray-200
+                    bg-white
+                    text-gray-500
+                    hover:bg-gray-50
+                    hover:text-gray-800
+                    flex
+                    items-center
+                    justify-center
+                    transition
+                  "
+                >
+                  <X size={18} />
+                </button>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            {/* =================================================
+                REPORT FILTERS
+            ================================================= */}
+
+            <div
+              className="
+                grid
+                grid-cols-1
+                md:grid-cols-2
+                xl:grid-cols-4
+                gap-3
+              "
+            >
               {/* PERIOD */}
 
-              <div
-                className="
-                  flex
-                  items-center
-                  gap-1
-                  bg-gray-50
-                  border
-                  border-gray-200
-                  rounded-xl
-                  p-1
-                "
-              >
-                {[
-                  ["all", "All"],
-                  ["daily", "Daily"],
-                  ["weekly", "Weekly"],
-                  ["monthly", "Monthly"],
-                  ["yearly", "Yearly"],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setPeriod(value)}
-                    className={`
-                      px-3
-                      py-2
-                      rounded-lg
-                      text-[11px]
-                      font-semibold
-                      transition
-                      ${
-                        period === value
-                          ? "bg-green-600 text-white shadow-sm"
-                          : "text-gray-500 hover:bg-white hover:text-gray-800"
-                      }
-                    `}
-                  >
-                    {label}
-                  </button>
-                ))}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1.5">
+                  Report Period
+                </label>
+
+                <select
+                  value={period}
+                  onChange={(e) =>
+                    setPeriod(
+                      e.target.value
+                    )
+                  }
+                  className="
+                    w-full
+                    px-3
+                    py-2.5
+                    rounded-xl
+                    border
+                    border-gray-200
+                    bg-white
+                    text-xs
+                    font-semibold
+                    text-gray-700
+                    outline-none
+                    focus:border-green-500
+                    focus:ring-2
+                    focus:ring-green-100
+                  "
+                >
+                  <option value="daily">
+                    Daily
+                  </option>
+
+                  <option value="weekly">
+                    Weekly
+                  </option>
+
+                  <option value="monthly">
+                    Monthly
+                  </option>
+
+                  <option value="yearly">
+                    Yearly
+                  </option>
+
+                  <option value="custom">
+                    Custom Range
+                  </option>
+
+                  <option value="all">
+                    All Time
+                  </option>
+                </select>
               </div>
 
-              {/* PRINT */}
+              {/* REFERENCE DATE */}
 
-              <button
-                type="button"
-                onClick={handlePrint}
-                className="
-                  flex
-                  items-center
-                  gap-2
-                  px-4
-                  py-2.5
-                  rounded-xl
-                  bg-gray-900
-                  hover:bg-gray-800
-                  text-white
-                  text-xs
-                  font-semibold
-                  transition
-                "
-              >
-                <Printer size={14} />
-                Print
-              </button>
+              {period !== "custom" &&
+                period !== "all" && (
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1.5">
+                      Reference Date
+                    </label>
 
-              {/* PDF */}
+                    <div className="relative">
+                      <CalendarDays
+                        size={14}
+                        className="
+                          absolute
+                          left-3
+                          top-1/2
+                          -translate-y-1/2
+                          text-gray-400
+                        "
+                      />
 
-              <button
-                type="button"
-                onClick={handleDownloadPDF}
-                disabled={downloading}
-                className="
-                  flex
-                  items-center
-                  gap-2
-                  px-4
-                  py-2.5
-                  rounded-xl
-                  bg-green-600
-                  hover:bg-green-700
-                  disabled:bg-green-400
-                  disabled:cursor-not-allowed
-                  text-white
-                  text-xs
-                  font-semibold
-                  transition
-                "
-              >
-                {downloading ? (
-                  <Loader2
-                    size={14}
-                    className="animate-spin"
-                  />
-                ) : (
-                  <Download size={14} />
+                      <input
+                        type="date"
+                        value={
+                          selectedDate
+                        }
+                        onChange={(e) =>
+                          setSelectedDate(
+                            e.target.value
+                          )
+                        }
+                        className="
+                          w-full
+                          pl-9
+                          pr-3
+                          py-2.5
+                          rounded-xl
+                          border
+                          border-gray-200
+                          bg-white
+                          text-xs
+                          font-semibold
+                          text-gray-700
+                          outline-none
+                          focus:border-green-500
+                          focus:ring-2
+                          focus:ring-green-100
+                        "
+                      />
+                    </div>
+                  </div>
                 )}
 
-                {downloading
-                  ? "Generating..."
-                  : "Download PDF"}
-              </button>
+              {/* CUSTOM START DATE */}
 
-              {/* CLOSE */}
+              {period === "custom" && (
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1.5">
+                    From Date
+                  </label>
 
-              <button
-                type="button"
-                onClick={onClose}
+                  <div className="relative">
+                    <CalendarDays
+                      size={14}
+                      className="
+                        absolute
+                        left-3
+                        top-1/2
+                        -translate-y-1/2
+                        text-gray-400
+                      "
+                    />
+
+                    <input
+                      type="date"
+                      value={
+                        customStartDate
+                      }
+                      onChange={(e) =>
+                        setCustomStartDate(
+                          e.target.value
+                        )
+                      }
+                      className="
+                        w-full
+                        pl-9
+                        pr-3
+                        py-2.5
+                        rounded-xl
+                        border
+                        border-gray-200
+                        bg-white
+                        text-xs
+                        font-semibold
+                        text-gray-700
+                        outline-none
+                        focus:border-green-500
+                        focus:ring-2
+                        focus:ring-green-100
+                      "
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* CUSTOM END DATE */}
+
+              {period === "custom" && (
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1.5">
+                    To Date
+                  </label>
+
+                  <div className="relative">
+                    <CalendarDays
+                      size={14}
+                      className="
+                        absolute
+                        left-3
+                        top-1/2
+                        -translate-y-1/2
+                        text-gray-400
+                      "
+                    />
+
+                    <input
+                      type="date"
+                      value={
+                        customEndDate
+                      }
+                      onChange={(e) =>
+                        setCustomEndDate(
+                          e.target.value
+                        )
+                      }
+                      className="
+                        w-full
+                        pl-9
+                        pr-3
+                        py-2.5
+                        rounded-xl
+                        border
+                        border-gray-200
+                        bg-white
+                        text-xs
+                        font-semibold
+                        text-gray-700
+                        outline-none
+                        focus:border-green-500
+                        focus:ring-2
+                        focus:ring-green-100
+                      "
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* CUSTOM RANGE ERROR */}
+
+            {customRangeError && (
+              <div
                 className="
-                  w-10
-                  h-10
+                  px-4
+                  py-3
                   rounded-xl
+                  bg-red-50
                   border
-                  border-gray-200
-                  bg-white
-                  text-gray-500
-                  hover:bg-gray-50
-                  hover:text-gray-800
-                  flex
-                  items-center
-                  justify-center
-                  transition
+                  border-red-100
+                  text-xs
+                  font-semibold
+                  text-red-600
                 "
               >
-                <X size={18} />
-              </button>
-            </div>
+                {customRangeError}
+              </div>
+            )}
           </div>
 
           {/* =================================================
@@ -1007,11 +1811,24 @@ const HistoryLogsReport = ({
 
                 <div className="text-right">
                   <p className="text-xs font-semibold text-gray-400">
-                    GENERATED
+                    GENERATED ON
                   </p>
 
                   <p className="text-sm font-bold text-gray-800 mt-1">
-                    {formatDateTime(new Date())}
+                    {formatDateTime(
+                      generatedAt
+                    )}
+                  </p>
+
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    By:{" "}
+                    <span className="font-semibold text-gray-700">
+                      {generatedBy}
+                    </span>
+                  </p>
+
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    {generatedByRole}
                   </p>
                 </div>
               </div>
@@ -1030,30 +1847,50 @@ const HistoryLogsReport = ({
                   user actions, and administrative events.
                 </p>
 
-                <div className="flex flex-wrap gap-2 mt-4">
-                  <ReportBadge
-                    label="Period"
-                    value={getPeriodLabel(period)}
+                {/* =========================================
+                    REPORT INFORMATION
+                ========================================= */}
+
+                <div className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  <ReportInfo
+                    label="Generated By"
+                    value={generatedBy}
                   />
 
-                  <ReportBadge
+                  <ReportInfo
+                    label="Generated On"
+                    value={formatDateTime(
+                      generatedAt
+                    )}
+                  />
+
+                  <ReportInfo
+                    label="Report Period"
+                    value={getPeriodLabel(
+                      period
+                    )}
+                  />
+
+                  <ReportInfo
                     label="Date Range"
-                    value={getDateRangeLabel(period)}
+                    value={displayDateRange}
                   />
 
-                  {category && (
-                    <ReportBadge
-                      label="Category"
-                      value={category}
-                    />
-                  )}
+                  <ReportInfo
+                    label="Category"
+                    value={
+                      category ||
+                      "All Categories"
+                    }
+                  />
 
-                  {role && (
-                    <ReportBadge
-                      label="Role"
-                      value={role}
-                    />
-                  )}
+                  <ReportInfo
+                    label="Role"
+                    value={
+                      role ||
+                      "All Roles"
+                    }
+                  />
                 </div>
               </div>
 
@@ -1071,27 +1908,45 @@ const HistoryLogsReport = ({
                 "
               >
                 <ReportSummary
-                  icon={<Activity size={17} />}
+                  icon={
+                    <Activity size={17} />
+                  }
                   label="Total Events"
-                  value={summary.total}
+                  value={
+                    summary.total
+                  }
                 />
 
                 <ReportSummary
-                  icon={<Users size={17} />}
+                  icon={
+                    <Users size={17} />
+                  }
                   label="Roles Represented"
-                  value={summary.roles}
+                  value={
+                    summary.roles
+                  }
                 />
 
                 <ReportSummary
-                  icon={<FileText size={17} />}
+                  icon={
+                    <FileText size={17} />
+                  }
                   label="Categories"
-                  value={summary.categories}
+                  value={
+                    summary.categories
+                  }
                 />
 
                 <ReportSummary
-                  icon={<ShieldCheck size={17} />}
+                  icon={
+                    <ShieldCheck
+                      size={17}
+                    />
+                  }
                   label="Unique Actions"
-                  value={summary.actions}
+                  value={
+                    summary.actions
+                  }
                 />
               </div>
 
@@ -1134,83 +1989,102 @@ const HistoryLogsReport = ({
                   </thead>
 
                   <tbody>
-                    {sortedLogs.map((log, index) => (
-                      <tr
-                        key={
-                          log._id ||
-                          log.id ||
-                          `${log.date}-${index}`
-                        }
-                        className={`
-                          border-b
-                          border-gray-100
-                          align-top
-                          ${
-                            index % 2 === 0
-                              ? "bg-white"
-                              : "bg-gray-50/70"
+                    {sortedLogs.map(
+                      (log, index) => (
+                        <tr
+                          key={
+                            log._id ||
+                            log.id ||
+                            `${log.date}-${index}`
                           }
-                        `}
-                      >
-                        <td className="px-3 py-3 text-gray-400 font-semibold">
-                          {index + 1}
-                        </td>
+                          className={`
+                            border-b
+                            border-gray-100
+                            align-top
+                            ${
+                              index %
+                                2 ===
+                              0
+                                ? "bg-white"
+                                : "bg-gray-50/70"
+                            }
+                          `}
+                        >
+                          <td className="px-3 py-3 text-gray-400 font-semibold">
+                            {index + 1}
+                          </td>
 
-                        <td className="px-3 py-3 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <Clock3
-                              size={13}
-                              className="text-gray-300"
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <Clock3
+                                size={13}
+                                className="text-gray-300"
+                              />
+
+                              <span className="font-semibold text-gray-700">
+                                {formatShortDate(
+                                  log.date
+                                )}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="px-3 py-3 whitespace-nowrap text-gray-500">
+                            {formatTime(
+                              log.date
+                            )}
+                          </td>
+
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <RoleBadge
+                              role={
+                                log.role
+                              }
                             />
+                          </td>
 
-                            <span className="font-semibold text-gray-700">
-                              {formatDate(log.date)}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span
+                              className="
+                                inline-flex
+                                px-2.5
+                                py-1
+                                rounded-lg
+                                bg-gray-50
+                                border
+                                border-gray-100
+                                text-[10px]
+                                font-semibold
+                                text-gray-600
+                              "
+                            >
+                              {getSafeText(
+                                log.category
+                              )}
                             </span>
-                          </div>
-                        </td>
+                          </td>
 
-                        <td className="px-3 py-3 whitespace-nowrap text-gray-500">
-                          {formatTime(log.date)}
-                        </td>
+                          <td className="px-3 py-3 min-w-[180px]">
+                            <p className="font-bold text-gray-800">
+                              {getSafeText(
+                                log.action
+                              )}
+                            </p>
+                          </td>
 
-                        <td className="px-3 py-3 whitespace-nowrap">
-                          <RoleBadge role={log.role} />
-                        </td>
+                          <td className="px-3 py-3 min-w-[320px]">
+                            <p className="text-gray-500 leading-relaxed whitespace-pre-wrap">
+                              {getSafeText(
+                                log.details
+                              )}
+                            </p>
+                          </td>
+                        </tr>
+                      )
+                    )}
 
-                        <td className="px-3 py-3 whitespace-nowrap">
-                          <span
-                            className="
-                              inline-flex
-                              px-2.5
-                              py-1
-                              rounded-lg
-                              bg-gray-50
-                              border
-                              border-gray-100
-                              text-[10px]
-                              font-semibold
-                              text-gray-600
-                            "
-                          >
-                            {getSafeText(log.category)}
-                          </span>
-                        </td>
-
-                        <td className="px-3 py-3 min-w-[180px]">
-                          <p className="font-bold text-gray-800">
-                            {getSafeText(log.action)}
-                          </p>
-                        </td>
-
-                        <td className="px-3 py-3 min-w-[320px]">
-                          <p className="text-gray-500 leading-relaxed whitespace-pre-wrap">
-                            {getSafeText(log.details)}
-                          </p>
-                        </td>
-                      </tr>
-                    ))}
-
-                    {sortedLogs.length === 0 && (
+                    {sortedLogs.length ===
+                      0 && (
                       <tr>
                         <td
                           colSpan="7"
@@ -1240,8 +2114,11 @@ const HistoryLogsReport = ({
                             </p>
 
                             <p className="text-xs text-gray-400 mt-1">
-                              No activity was recorded for
-                              the selected period and filters.
+                              No activity was
+                              recorded for
+                              the selected
+                              period and
+                              filters.
                             </p>
                           </div>
                         </td>
@@ -1270,10 +2147,21 @@ const HistoryLogsReport = ({
                   gap-2
                 "
               >
-                <p className="text-[10px] text-gray-400">
-                  GuidEd - Student Guidance and Discipline
-                  Management System
-                </p>
+                <div>
+                  <p className="text-[10px] text-gray-400">
+                    Prepared by:{" "}
+                    <span className="font-bold text-gray-600">
+                      {generatedBy}
+                    </span>
+                  </p>
+
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    Generated on:{" "}
+                    {formatDateTime(
+                      generatedAt
+                    )}
+                  </p>
+                </div>
 
                 <p className="text-[10px] text-gray-400">
                   Total records in report:{" "}
@@ -1291,36 +2179,35 @@ const HistoryLogsReport = ({
 };
 
 /* =========================================================
-   REPORT BADGE
+   REPORT INFO
 ========================================================= */
 
-const ReportBadge = ({ label, value }) => (
+const ReportInfo = ({
+  label,
+  value,
+}) => (
   <div
     className="
-      inline-flex
-      items-center
-      gap-1.5
-      px-3
-      py-1.5
-      rounded-lg
-      bg-gray-50
+      rounded-xl
       border
       border-gray-100
-      text-[10px]
+      bg-gray-50/60
+      px-3
+      py-2.5
     "
   >
-    <span className="font-semibold text-gray-400">
-      {label}:
-    </span>
+    <p className="text-[9px] font-bold uppercase tracking-wide text-gray-400">
+      {label}
+    </p>
 
-    <span className="font-bold text-gray-700">
+    <p className="text-[11px] font-bold text-gray-700 mt-1 break-words">
       {value}
-    </span>
+    </p>
   </div>
 );
 
 /* =========================================================
-   SUMMARY CARD
+   REPORT SUMMARY
 ========================================================= */
 
 const ReportSummary = ({
@@ -1370,14 +2257,19 @@ const ReportSummary = ({
    ROLE BADGE
 ========================================================= */
 
-const RoleBadge = ({ role }) => {
+const RoleBadge = ({
+  role,
+}) => {
   const styles = {
     Admin:
       "bg-green-50 text-green-700 border-green-100",
+
     Guidance:
       "bg-blue-50 text-blue-700 border-blue-100",
+
     Teacher:
       "bg-amber-50 text-amber-700 border-amber-100",
+
     Student:
       "bg-gray-50 text-gray-600 border-gray-100",
   };
@@ -1394,7 +2286,8 @@ const RoleBadge = ({ role }) => {
     "bg-gray-50 text-gray-500 border-gray-100";
 
   const dot =
-    dotStyles[role] || "bg-gray-400";
+    dotStyles[role] ||
+    "bg-gray-400";
 
   return (
     <span
