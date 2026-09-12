@@ -194,6 +194,8 @@ const allowedOrigins = [
 
   "https://edu-guard-backend.onrender.com",
   "https://guide-ed-mu.vercel.app",
+  "https://www.guided-olhrs.com",
+  "https://guided-olhrs.com",
 ];
 
 const isAllowedOrigin = (origin) => {
