@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Mail,
@@ -14,7 +14,7 @@ import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import Input from "../components/Input";
-import { useAuthStore } from "../store/authStore";
+import { useAuthStore} from "../store/authStore";
 import EmailVerificationPage from "./EmailVerificationPage";
 
 /* =========================================================
@@ -67,6 +67,7 @@ const LoginPage = () => {
     setOtpRequired,
     isLoading,
     error,
+    clearError,
   } = useAuthStore();
 
   /* =========================================================
@@ -87,6 +88,10 @@ const LoginPage = () => {
       toast.error(err.response?.data?.message || "Login failed");
     }
   };
+
+  useEffect(() => {
+  clearError();
+}, [clearError]);
 
   /* =========================================================
      OTP

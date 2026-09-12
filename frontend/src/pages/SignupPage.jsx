@@ -243,7 +243,7 @@ const SignupPage = () => {
      STORE
   ========================================================= */
 
-  const { signup, verifyOTP, otpRequired, setOtpRequired, error, isLoading } =
+  const { signup, verifyOTP, otpRequired, setOtpRequired, error, isLoading, clearError } =
     useAuthStore();
 
   /* =========================================================
@@ -259,6 +259,11 @@ const SignupPage = () => {
     password.length > 0 &&
     confirmPassword.length > 0 &&
     password === confirmPassword;
+
+    useEffect(() => {
+  clearError();
+  setLocalError("");
+}, [clearError]);
 
   /* =========================================================
      CLEANUP PHOTO URL

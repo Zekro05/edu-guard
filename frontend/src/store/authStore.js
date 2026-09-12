@@ -107,6 +107,10 @@ export const useAuthStore = create((set, get) => ({
 
   error: null,
 
+  clearError: () => {
+  set({ error: null });
+},
+
   isLoading: false,
 
   isAuthenticated: false,
