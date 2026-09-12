@@ -88,6 +88,240 @@ const formatDateTime = (date) => {
 };
 
 /* =========================================================
+   PDF COLOR HELPERS
+
+   html2canvas currently has problems parsing modern CSS
+   color functions such as:
+   - oklab()
+   - oklch()
+
+   Tailwind CSS can generate these automatically.
+
+   These helpers make sure the cloned PDF document does
+   not contain unsupported color functions.
+========================================================= */
+
+const hasUnsupportedColorFunction = (value) => {
+  if (!value || typeof value !== "string") {
+    return false;
+  }
+
+  const normalized = value.toLowerCase();
+
+  return (
+    normalized.includes("oklab(") ||
+    normalized.includes("oklch(")
+  );
+};
+
+const sanitizePdfElementStyles = (element) => {
+  try {
+    const computed = window.getComputedStyle(element);
+
+    /* =====================================================
+       BACKGROUND
+    ===================================================== */
+
+    if (
+      hasUnsupportedColorFunction(
+        computed.backgroundColor,
+      )
+    ) {
+      element.style.setProperty(
+        "background-color",
+        "#ffffff",
+        "important",
+      );
+    }
+
+    if (
+      hasUnsupportedColorFunction(
+        computed.backgroundImage,
+      )
+    ) {
+      element.style.setProperty(
+        "background-image",
+        "none",
+        "important",
+      );
+    }
+
+    /* =====================================================
+       TEXT
+    ===================================================== */
+
+    if (hasUnsupportedColorFunction(computed.color)) {
+      element.style.setProperty(
+        "color",
+        "#111827",
+        "important",
+      );
+    }
+
+    /* =====================================================
+       BORDERS
+    ===================================================== */
+
+    if (
+      hasUnsupportedColorFunction(
+        computed.borderTopColor,
+      )
+    ) {
+      element.style.setProperty(
+        "border-top-color",
+        "#e5e7eb",
+        "important",
+      );
+    }
+
+    if (
+      hasUnsupportedColorFunction(
+        computed.borderRightColor,
+      )
+    ) {
+      element.style.setProperty(
+        "border-right-color",
+        "#e5e7eb",
+        "important",
+      );
+    }
+
+    if (
+      hasUnsupportedColorFunction(
+        computed.borderBottomColor,
+      )
+    ) {
+      element.style.setProperty(
+        "border-bottom-color",
+        "#e5e7eb",
+        "important",
+      );
+    }
+
+    if (
+      hasUnsupportedColorFunction(
+        computed.borderLeftColor,
+      )
+    ) {
+      element.style.setProperty(
+        "border-left-color",
+        "#e5e7eb",
+        "important",
+      );
+    }
+
+    if (
+      hasUnsupportedColorFunction(
+        computed.borderColor,
+      )
+    ) {
+      element.style.setProperty(
+        "border-color",
+        "#e5e7eb",
+        "important",
+      );
+    }
+
+    /* =====================================================
+       SHADOWS
+    ===================================================== */
+
+    if (
+      hasUnsupportedColorFunction(
+        computed.boxShadow,
+      )
+    ) {
+      element.style.setProperty(
+        "box-shadow",
+        "none",
+        "important",
+      );
+    }
+
+    if (
+      hasUnsupportedColorFunction(
+        computed.textShadow,
+      )
+    ) {
+      element.style.setProperty(
+        "text-shadow",
+        "none",
+        "important",
+      );
+    }
+
+    /* =====================================================
+       OUTLINE
+    ===================================================== */
+
+    if (
+      hasUnsupportedColorFunction(
+        computed.outlineColor,
+      )
+    ) {
+      element.style.setProperty(
+        "outline-color",
+        "#e5e7eb",
+        "important",
+      );
+    }
+
+    /* =====================================================
+       SVG COLORS
+    ===================================================== */
+
+    if (
+      hasUnsupportedColorFunction(
+        computed.fill,
+      )
+    ) {
+      element.style.setProperty(
+        "fill",
+        "#111827",
+        "important",
+      );
+    }
+
+    if (
+      hasUnsupportedColorFunction(
+        computed.stroke,
+      )
+    ) {
+      element.style.setProperty(
+        "stroke",
+        "#111827",
+        "important",
+      );
+    }
+
+    /* =====================================================
+       CSS VARIABLES
+
+       Tailwind v4 can store colors inside CSS variables.
+       If one of those variables contains oklab/oklch,
+       remove it from the PDF clone.
+    ===================================================== */
+
+    for (let index = 0; index < computed.length; index++) {
+      const propertyName = computed[index];
+
+      if (!propertyName?.startsWith("--")) {
+        continue;
+      }
+
+      const propertyValue =
+        computed.getPropertyValue(propertyName);
+
+      if (hasUnsupportedColorFunction(propertyValue)) {
+        element.style.removeProperty(propertyName);
+      }
+    }
+  } catch {
+    // Ignore individual element style failures.
+  }
+};
+
+/* =========================================================
    REPORT STATUS HELPER
 ========================================================= */
 
@@ -170,7 +404,9 @@ const PrintableReport = ({ onClose }) => {
 
   const [customRangeError, setCustomRangeError] = useState("");
 
-  const [generatedAt, setGeneratedAt] = useState(() => new Date());
+  const [generatedAt, setGeneratedAt] = useState(
+    () => new Date(),
+  );
 
   const printableContentRef = useRef(null);
 
@@ -253,8 +489,21 @@ const PrintableReport = ({ onClose }) => {
       return "Please select both a start date and an end date.";
     }
 
-    const start = new Date(`${customStartDate}T00:00:00`);
-    const end = new Date(`${customEndDate}T23:59:59.999`);
+    const start = new Date(
+      `${customStartDate}T00:00:00`,
+    );
+
+    const end = new Date(
+      `${customEndDate}T23:59:59.999`,
+    );
+
+    if (Number.isNaN(start.getTime())) {
+      return "The start date is invalid.";
+    }
+
+    if (Number.isNaN(end.getTime())) {
+      return "The end date is invalid.";
+    }
 
     if (start > end) {
       return "The start date cannot be later than the end date.";
@@ -267,8 +516,7 @@ const PrintableReport = ({ onClose }) => {
      FETCH CUSTOM RANGE
      
      We use the existing yearly endpoint and filter the
-     returned reports locally. This allows custom ranges
-     without breaking the existing backend endpoint.
+     returned reports locally.
   ======================================================= */
 
   const fetchCustomRangeReports = async () => {
@@ -295,9 +543,13 @@ const PrintableReport = ({ onClose }) => {
 
     setCustomRangeError("");
 
-    const start = new Date(`${customStartDate}T00:00:00`);
+    const start = new Date(
+      `${customStartDate}T00:00:00`,
+    );
 
-    const end = new Date(`${customEndDate}T23:59:59.999`);
+    const end = new Date(
+      `${customEndDate}T23:59:59.999`,
+    );
 
     const startYear = start.getFullYear();
 
@@ -305,7 +557,11 @@ const PrintableReport = ({ onClose }) => {
 
     const years = [];
 
-    for (let year = startYear; year <= endYear; year++) {
+    for (
+      let year = startYear;
+      year <= endYear;
+      year++
+    ) {
       years.push(year);
     }
 
@@ -322,7 +578,8 @@ const PrintableReport = ({ onClose }) => {
     );
 
     const allReports = responses.flatMap(
-      (response) => response.data?.reports || [],
+      (response) =>
+        response.data?.reports || [],
     );
 
     /* =====================================================
@@ -332,7 +589,8 @@ const PrintableReport = ({ onClose }) => {
     const uniqueReports = Array.from(
       new Map(
         allReports.map((report, index) => [
-          report?._id || `${getReportDate(report)}-${index}`,
+          report?._id ||
+            `${getReportDate(report)}-${index}`,
           report,
         ]),
       ).values(),
@@ -342,21 +600,31 @@ const PrintableReport = ({ onClose }) => {
        FILTER BY CUSTOM RANGE
     ===================================================== */
 
-    const filteredReports = uniqueReports.filter((report) => {
-      const reportDateValue = getReportDate(report);
+    const filteredReports = uniqueReports.filter(
+      (report) => {
+        const reportDateValue =
+          getReportDate(report);
 
-      if (!reportDateValue) {
-        return false;
-      }
+        if (!reportDateValue) {
+          return false;
+        }
 
-      const reportDate = new Date(reportDateValue);
+        const reportDate = new Date(
+          reportDateValue,
+        );
 
-      if (Number.isNaN(reportDate.getTime())) {
-        return false;
-      }
+        if (
+          Number.isNaN(reportDate.getTime())
+        ) {
+          return false;
+        }
 
-      return reportDate >= start && reportDate <= end;
-    });
+        return (
+          reportDate >= start &&
+          reportDate <= end
+        );
+      },
+    );
 
     /* =====================================================
        CUSTOM SUMMARY
@@ -364,12 +632,14 @@ const PrintableReport = ({ onClose }) => {
 
     const accepted = filteredReports.filter(
       (report) =>
-        normalizeReportStatus(report) === "Accepted",
+        normalizeReportStatus(report) ===
+        "Accepted",
     ).length;
 
     const rejected = filteredReports.filter(
       (report) =>
-        normalizeReportStatus(report) === "Rejected",
+        normalizeReportStatus(report) ===
+        "Rejected",
     ).length;
 
     setReports(filteredReports);
@@ -410,7 +680,9 @@ const PrintableReport = ({ onClose }) => {
           },
         );
 
-        setReports(response.data?.reports || []);
+        setReports(
+          response.data?.reports || [],
+        );
 
         setSummary(
           response.data?.summary || {
@@ -420,12 +692,14 @@ const PrintableReport = ({ onClose }) => {
           },
         );
 
-        setPeriodInfo(response.data?.period || null);
+        setPeriodInfo(
+          response.data?.period || null,
+        );
       }
 
       /*
-       * This timestamp represents when this specific report
-       * was generated, not a constantly changing clock.
+       * Timestamp represents when this report
+       * was generated.
        */
 
       setGeneratedAt(new Date());
@@ -472,7 +746,10 @@ const PrintableReport = ({ onClose }) => {
 
   const formatPeriod = () => {
     if (period === "custom") {
-      if (!customStartDate || !customEndDate) {
+      if (
+        !customStartDate ||
+        !customEndDate
+      ) {
         return "Custom Range";
       }
 
@@ -487,9 +764,13 @@ const PrintableReport = ({ onClose }) => {
       return "Loading...";
     }
 
-    const start = new Date(periodInfo.start);
+    const start = new Date(
+      periodInfo.start,
+    );
 
-    const end = new Date(periodInfo.end);
+    const end = new Date(
+      periodInfo.end,
+    );
 
     if (Number.isNaN(start.getTime())) {
       return "N/A";
@@ -500,12 +781,14 @@ const PrintableReport = ({ onClose }) => {
     }
 
     if (period === "yearly") {
-      return start.getFullYear().toString();
+      return start
+        .getFullYear()
+        .toString();
     }
 
-    return `${formatDisplayDate(start)} – ${formatDisplayDate(
-      end,
-    )}`;
+    return `${formatDisplayDate(
+      start,
+    )} – ${formatDisplayDate(end)}`;
   };
 
   /* =======================================================
@@ -527,7 +810,9 @@ const PrintableReport = ({ onClose }) => {
 
     return `${formatDisplayDate(
       periodInfo.start,
-    )} – ${formatDisplayDate(periodInfo.end)}`;
+    )} – ${formatDisplayDate(
+      periodInfo.end,
+    )}`;
   };
 
   /* =======================================================
@@ -535,6 +820,21 @@ const PrintableReport = ({ onClose }) => {
   ======================================================= */
 
   const handlePrint = () => {
+    const validationError =
+      period === "custom"
+        ? validateCustomRange()
+        : "";
+
+    if (validationError) {
+      setCustomRangeError(
+        validationError,
+      );
+
+      alert(validationError);
+
+      return;
+    }
+
     window.print();
   };
 
@@ -571,17 +871,180 @@ const PrintableReport = ({ onClose }) => {
   };
 
   /* =======================================================
+     PREPARE PDF CLONE
+     
+     This creates a PDF-only copy of the report and
+     removes modern CSS color functions that html2canvas
+     cannot parse.
+  ======================================================= */
+
+  const preparePdfClone = (
+    originalElement,
+  ) => {
+    const clone =
+      originalElement.cloneNode(true);
+
+    clone.setAttribute(
+      "data-pdf-clone",
+      "true",
+    );
+
+    clone.style.position = "fixed";
+    clone.style.left = "-100000px";
+    clone.style.top = "0";
+
+    clone.style.width = `${originalElement.scrollWidth}px`;
+    clone.style.height = "auto";
+    clone.style.maxHeight = "none";
+    clone.style.overflow = "visible";
+
+    clone.style.backgroundColor =
+      "#ffffff";
+
+    clone.style.color =
+      "#111827";
+
+    clone.style.padding = "32px";
+
+    /*
+     * Add a PDF-safe stylesheet directly to the clone.
+     *
+     * These values intentionally avoid:
+     * - oklab()
+     * - oklch()
+     * - modern color functions
+     */
+
+    const safeStyle =
+      document.createElement("style");
+
+    safeStyle.setAttribute(
+      "data-pdf-safe-style",
+      "true",
+    );
+
+    safeStyle.textContent = `
+      * {
+        --tw-ring-color: #e5e7eb !important;
+        --tw-ring-offset-color: #ffffff !important;
+      }
+
+      html,
+      body {
+        background: #ffffff !important;
+        color: #111827 !important;
+      }
+
+      [class*="bg-"] {
+        box-shadow: none;
+      }
+
+      img {
+        max-width: 100%;
+      }
+    `;
+
+    clone.prepend(safeStyle);
+
+    document.body.appendChild(clone);
+
+    /*
+     * Sanitize every element.
+     */
+
+    const allElements = [
+      clone,
+      ...clone.querySelectorAll("*"),
+    ];
+
+    allElements.forEach(
+      sanitizePdfElementStyles,
+    );
+
+    /*
+     * Remove any inline style containing unsupported
+     * color functions.
+     */
+
+    allElements.forEach((element) => {
+      try {
+        const inlineStyle =
+          element.getAttribute("style");
+
+        if (
+          inlineStyle &&
+          hasUnsupportedColorFunction(
+            inlineStyle,
+          )
+        ) {
+          /*
+           * We cannot safely parse an arbitrary inline
+           * style string, so clear it and let the
+           * sanitized values above rebuild the important
+           * visual properties.
+           */
+
+          const computed =
+            window.getComputedStyle(
+              element,
+            );
+
+          if (
+            hasUnsupportedColorFunction(
+              computed.color,
+            )
+          ) {
+            element.style.color =
+              "#111827";
+          }
+
+          if (
+            hasUnsupportedColorFunction(
+              computed.backgroundColor,
+            )
+          ) {
+            element.style.backgroundColor =
+              "#ffffff";
+          }
+        }
+      } catch {
+        // Ignore.
+      }
+    });
+
+    return clone;
+  };
+
+  /* =======================================================
      DOWNLOAD PDF
   ======================================================= */
 
   const handleDownloadPDF = async () => {
     if (!printableContentRef.current) {
-      alert("Unable to prepare the report for download.");
+      alert(
+        "Unable to prepare the report for download.",
+      );
+
       return;
     }
 
     if (loading || downloading) {
       return;
+    }
+
+    if (period === "custom") {
+      const validationError =
+        validateCustomRange();
+
+      if (validationError) {
+        setCustomRangeError(
+          validationError,
+        );
+
+        alert(validationError);
+
+        return;
+      }
     }
 
     setDownloading(true);
@@ -592,224 +1055,355 @@ const PrintableReport = ({ onClose }) => {
       const originalElement =
         printableContentRef.current;
 
-      clone = originalElement.cloneNode(true);
+      /* ===================================================
+         CREATE PDF-SAFE CLONE
+      =================================================== */
 
-      /*
-       * IMPORTANT:
-       * Used for cleanup if html2canvas fails.
-       */
-
-      clone.setAttribute(
-        "data-pdf-clone",
-        "true",
+      clone = preparePdfClone(
+        originalElement,
       );
 
-      clone.style.position = "fixed";
-
-      clone.style.left = "-100000px";
-
-      clone.style.top = "0";
-
-      clone.style.width = `${originalElement.scrollWidth}px`;
-
-      clone.style.height = "auto";
-
-      clone.style.maxHeight = "none";
-
-      clone.style.overflow = "visible";
-
-      clone.style.backgroundColor = "#ffffff";
-
-      clone.style.color = "#111827";
-
-      clone.style.padding = "32px";
-
-      document.body.appendChild(clone);
-
-      /*
-       * =====================================================
-       * SAFE CSS COLORS
-       * =====================================================
-       */
-
-      const allElements = [
-        clone,
-        ...clone.querySelectorAll("*"),
-      ];
-
-      allElements.forEach((element) => {
-        try {
-          const computed =
-            window.getComputedStyle(element);
-
-          if (
-            computed.backgroundColor?.includes(
-              "oklch",
-            )
-          ) {
-            element.style.backgroundColor =
-              "#ffffff";
-          }
-
-          if (
-            computed.color?.includes("oklch")
-          ) {
-            element.style.color = "#111827";
-          }
-
-          if (
-            computed.borderTopColor?.includes(
-              "oklch",
-            )
-          ) {
-            element.style.borderTopColor =
-              "#e5e7eb";
-          }
-
-          if (
-            computed.borderRightColor?.includes(
-              "oklch",
-            )
-          ) {
-            element.style.borderRightColor =
-              "#e5e7eb";
-          }
-
-          if (
-            computed.borderBottomColor?.includes(
-              "oklch",
-            )
-          ) {
-            element.style.borderBottomColor =
-              "#e5e7eb";
-          }
-
-          if (
-            computed.borderLeftColor?.includes(
-              "oklch",
-            )
-          ) {
-            element.style.borderLeftColor =
-              "#e5e7eb";
-          }
-
-          if (
-            computed.boxShadow?.includes(
-              "oklch",
-            )
-          ) {
-            element.style.boxShadow = "none";
-          }
-
-          if (
-            computed.textShadow?.includes(
-              "oklch",
-            )
-          ) {
-            element.style.textShadow = "none";
-          }
-
-          if (
-            computed.outlineColor?.includes(
-              "oklch",
-            )
-          ) {
-            element.style.outlineColor =
-              "#e5e7eb";
-          }
-        } catch {
-          // Ignore individual style failures.
-        }
-      });
+      /* ===================================================
+         WAIT FOR IMAGES
+      =================================================== */
 
       await waitForImages(clone);
 
-      await new Promise((resolve) =>
-        setTimeout(resolve, 500),
-      );
-
       /*
-       * =====================================================
-       * CAPTURE
-       * =====================================================
+       * Give the browser enough time to apply the
+       * sanitized styles before html2canvas starts.
        */
 
-      const canvas = await html2canvas(clone, {
-        scale: 2,
+      await new Promise((resolve) =>
+        setTimeout(resolve, 300),
+      );
 
-        backgroundColor: "#ffffff",
+      /* ===================================================
+         CAPTURE
+      =================================================== */
 
-        useCORS: true,
+      const canvas =
+        await html2canvas(clone, {
+          scale: 2,
 
-        allowTaint: false,
+          backgroundColor:
+            "#ffffff",
 
-        logging: false,
+          useCORS: true,
 
-        imageTimeout: 15000,
+          allowTaint: false,
 
-        width: clone.scrollWidth,
+          logging: false,
 
-        height: clone.scrollHeight,
+          imageTimeout: 15000,
 
-        windowWidth: clone.scrollWidth,
+          width:
+            clone.scrollWidth,
 
-        windowHeight: clone.scrollHeight,
+          height:
+            clone.scrollHeight,
 
-        scrollX: 0,
+          windowWidth:
+            clone.scrollWidth,
 
-        scrollY: 0,
+          windowHeight:
+            clone.scrollHeight,
 
-        onclone: (clonedDocument) => {
-          const clonedElements = [
-            clonedDocument.documentElement,
-            clonedDocument.body,
-            ...clonedDocument.querySelectorAll(
-              "*",
-            ),
-          ];
+          scrollX: 0,
 
-          clonedElements.forEach((el) => {
+          scrollY: 0,
+
+          /*
+           * html2canvas creates another internal clone.
+           * Sanitize that clone too.
+           */
+
+          onclone: (
+            clonedDocument,
+          ) => {
             try {
-              const style =
-                window.getComputedStyle(el);
+              /*
+               * Add another PDF-safe stylesheet to the
+               * internal html2canvas document.
+               */
 
-              if (
-                style.backgroundColor?.includes(
-                  "oklch",
-                )
-              ) {
-                el.style.backgroundColor =
-                  "#ffffff";
-              }
+              const internalSafeStyle =
+                clonedDocument.createElement(
+                  "style",
+                );
 
-              if (
-                style.color?.includes("oklch")
-              ) {
-                el.style.color = "#111827";
-              }
+              internalSafeStyle.textContent = `
+                *,
+                *::before,
+                *::after {
+                  --tw-ring-color: #e5e7eb !important;
+                  --tw-ring-offset-color: #ffffff !important;
+                }
 
-              if (
-                style.borderColor?.includes(
-                  "oklch",
-                )
-              ) {
-                el.style.borderColor =
-                  "#e5e7eb";
-              }
+                html,
+                body {
+                  background: #ffffff !important;
+                  color: #111827 !important;
+                }
+              `;
 
-              if (
-                style.boxShadow?.includes(
-                  "oklch",
-                )
-              ) {
-                el.style.boxShadow = "none";
-              }
-            } catch {
-              // Ignore.
+              clonedDocument.head.appendChild(
+                internalSafeStyle,
+              );
+
+              const clonedElements = [
+                clonedDocument.documentElement,
+                clonedDocument.body,
+                ...clonedDocument.querySelectorAll(
+                  "*",
+                ),
+              ];
+
+              clonedElements.forEach(
+                (element) => {
+                  try {
+                    const computed =
+                      clonedDocument.defaultView.getComputedStyle(
+                        element,
+                      );
+
+                    /*
+                     * Background color
+                     */
+
+                    if (
+                      hasUnsupportedColorFunction(
+                        computed.backgroundColor,
+                      )
+                    ) {
+                      element.style.setProperty(
+                        "background-color",
+                        "#ffffff",
+                        "important",
+                      );
+                    }
+
+                    /*
+                     * Background image / gradients
+                     */
+
+                    if (
+                      hasUnsupportedColorFunction(
+                        computed.backgroundImage,
+                      )
+                    ) {
+                      element.style.setProperty(
+                        "background-image",
+                        "none",
+                        "important",
+                      );
+                    }
+
+                    /*
+                     * Text
+                     */
+
+                    if (
+                      hasUnsupportedColorFunction(
+                        computed.color,
+                      )
+                    ) {
+                      element.style.setProperty(
+                        "color",
+                        "#111827",
+                        "important",
+                      );
+                    }
+
+                    /*
+                     * Borders
+                     */
+
+                    if (
+                      hasUnsupportedColorFunction(
+                        computed.borderColor,
+                      )
+                    ) {
+                      element.style.setProperty(
+                        "border-color",
+                        "#e5e7eb",
+                        "important",
+                      );
+                    }
+
+                    if (
+                      hasUnsupportedColorFunction(
+                        computed.borderTopColor,
+                      )
+                    ) {
+                      element.style.setProperty(
+                        "border-top-color",
+                        "#e5e7eb",
+                        "important",
+                      );
+                    }
+
+                    if (
+                      hasUnsupportedColorFunction(
+                        computed.borderRightColor,
+                      )
+                    ) {
+                      element.style.setProperty(
+                        "border-right-color",
+                        "#e5e7eb",
+                        "important",
+                      );
+                    }
+
+                    if (
+                      hasUnsupportedColorFunction(
+                        computed.borderBottomColor,
+                      )
+                    ) {
+                      element.style.setProperty(
+                        "border-bottom-color",
+                        "#e5e7eb",
+                        "important",
+                      );
+                    }
+
+                    if (
+                      hasUnsupportedColorFunction(
+                        computed.borderLeftColor,
+                      )
+                    ) {
+                      element.style.setProperty(
+                        "border-left-color",
+                        "#e5e7eb",
+                        "important",
+                      );
+                    }
+
+                    /*
+                     * Shadows
+                     */
+
+                    if (
+                      hasUnsupportedColorFunction(
+                        computed.boxShadow,
+                      )
+                    ) {
+                      element.style.setProperty(
+                        "box-shadow",
+                        "none",
+                        "important",
+                      );
+                    }
+
+                    if (
+                      hasUnsupportedColorFunction(
+                        computed.textShadow,
+                      )
+                    ) {
+                      element.style.setProperty(
+                        "text-shadow",
+                        "none",
+                        "important",
+                      );
+                    }
+
+                    /*
+                     * Outline
+                     */
+
+                    if (
+                      hasUnsupportedColorFunction(
+                        computed.outlineColor,
+                      )
+                    ) {
+                      element.style.setProperty(
+                        "outline-color",
+                        "#e5e7eb",
+                        "important",
+                      );
+                    }
+
+                    /*
+                     * SVG
+                     */
+
+                    if (
+                      hasUnsupportedColorFunction(
+                        computed.fill,
+                      )
+                    ) {
+                      element.style.setProperty(
+                        "fill",
+                        "#111827",
+                        "important",
+                      );
+                    }
+
+                    if (
+                      hasUnsupportedColorFunction(
+                        computed.stroke,
+                      )
+                    ) {
+                      element.style.setProperty(
+                        "stroke",
+                        "#111827",
+                        "important",
+                      );
+                    }
+
+                    /*
+                     * CSS variables
+                     */
+
+                    for (
+                      let index = 0;
+                      index <
+                      computed.length;
+                      index++
+                    ) {
+                      const propertyName =
+                        computed[index];
+
+                      if (
+                        !propertyName?.startsWith(
+                          "--",
+                        )
+                      ) {
+                        continue;
+                      }
+
+                      const propertyValue =
+                        computed.getPropertyValue(
+                          propertyName,
+                        );
+
+                      if (
+                        hasUnsupportedColorFunction(
+                          propertyValue,
+                        )
+                      ) {
+                        element.style.removeProperty(
+                          propertyName,
+                        );
+                      }
+                    }
+                  } catch {
+                    // Ignore individual failures.
+                  }
+                },
+              );
+            } catch (cloneError) {
+              console.warn(
+                "PDF internal clone sanitization warning:",
+                cloneError,
+              );
             }
-          });
-        },
-      });
+          },
+        });
+
+      /* ===================================================
+         VALIDATE CANVAS
+      =================================================== */
 
       if (
         !canvas ||
@@ -821,11 +1415,9 @@ const PrintableReport = ({ onClose }) => {
         );
       }
 
-      /*
-       * =====================================================
-       * CREATE A4 PDF
-       * =====================================================
-       */
+      /* ===================================================
+         CREATE A4 PDF
+      =================================================== */
 
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -849,27 +1441,31 @@ const PrintableReport = ({ onClose }) => {
         pageHeight - margin * 2;
 
       const pixelsPerMM =
-        canvas.width / usableWidth;
+        canvas.width /
+        usableWidth;
 
-      const pageCanvasHeight = Math.floor(
-        usableHeight * pixelsPerMM,
-      );
+      const pageCanvasHeight =
+        Math.floor(
+          usableHeight *
+            pixelsPerMM,
+        );
 
       let currentY = 0;
 
       let pageNumber = 0;
 
-      /*
-       * =====================================================
-       * SPLIT INTO PAGES
-       * =====================================================
-       */
+      /* ===================================================
+         SPLIT INTO PAGES
+      =================================================== */
 
-      while (currentY < canvas.height) {
+      while (
+        currentY < canvas.height
+      ) {
         pageNumber++;
 
         const remainingHeight =
-          canvas.height - currentY;
+          canvas.height -
+          currentY;
 
         const currentPageHeight =
           Math.min(
@@ -878,15 +1474,20 @@ const PrintableReport = ({ onClose }) => {
           );
 
         const pageCanvas =
-          document.createElement("canvas");
+          document.createElement(
+            "canvas",
+          );
 
-        pageCanvas.width = canvas.width;
+        pageCanvas.width =
+          canvas.width;
 
         pageCanvas.height =
           currentPageHeight;
 
         const context =
-          pageCanvas.getContext("2d");
+          pageCanvas.getContext(
+            "2d",
+          );
 
         if (!context) {
           throw new Error(
@@ -894,7 +1495,8 @@ const PrintableReport = ({ onClose }) => {
           );
         }
 
-        context.fillStyle = "#ffffff";
+        context.fillStyle =
+          "#ffffff";
 
         context.fillRect(
           0,
@@ -940,14 +1542,13 @@ const PrintableReport = ({ onClose }) => {
           "FAST",
         );
 
-        currentY += currentPageHeight;
+        currentY +=
+          currentPageHeight;
       }
 
-      /*
-       * =====================================================
-       * PAGE NUMBERS
-       * =====================================================
-       */
+      /* ===================================================
+         PAGE NUMBERS
+      =================================================== */
 
       const pageCount =
         pdf.internal.getNumberOfPages();
@@ -982,11 +1583,9 @@ const PrintableReport = ({ onClose }) => {
         );
       }
 
-      /*
-       * =====================================================
-       * FILE NAME
-       * =====================================================
-       */
+      /* ===================================================
+         FILE NAME
+      =================================================== */
 
       let filePart;
 
@@ -1004,7 +1603,8 @@ const PrintableReport = ({ onClose }) => {
           "-",
         );
 
-      const fileName = `GuidEd-Student-Report-${period}-${safeFilePart}.pdf`;
+      const fileName =
+        `GuidEd-Student-Report-${period}-${safeFilePart}.pdf`;
 
       pdf.save(fileName);
     } catch (error) {
@@ -1020,9 +1620,9 @@ const PrintableReport = ({ onClose }) => {
         }`,
       );
     } finally {
-      /*
-       * Always remove the temporary clone.
-       */
+      /* =================================================
+         ALWAYS REMOVE TEMPORARY CLONES
+      ================================================= */
 
       if (
         clone &&
@@ -1033,14 +1633,20 @@ const PrintableReport = ({ onClose }) => {
         );
       }
 
-      const leftover =
-        document.querySelector(
+      const leftovers =
+        document.querySelectorAll(
           '[data-pdf-clone="true"]',
         );
 
-      if (leftover) {
-        leftover.remove();
-      }
+      leftovers.forEach(
+        (leftover) => {
+          try {
+            leftover.remove();
+          } catch {
+            // Ignore cleanup failures.
+          }
+        },
+      );
 
       setDownloading(false);
     }
@@ -1121,12 +1727,18 @@ const PrintableReport = ({ onClose }) => {
      STATUS STYLE
   ======================================================= */
 
-  const getStatusClasses = (reportStatus) => {
-    if (reportStatus === "Accepted") {
+  const getStatusClasses = (
+    reportStatus,
+  ) => {
+    if (
+      reportStatus === "Accepted"
+    ) {
       return "bg-green-50 text-green-700 border-green-100";
     }
 
-    if (reportStatus === "Rejected") {
+    if (
+      reportStatus === "Rejected"
+    ) {
       return "bg-red-50 text-red-700 border-red-100";
     }
 
@@ -1368,11 +1980,14 @@ const PrintableReport = ({ onClose }) => {
                   },
                 ].map((option) => {
                   const active =
-                    period === option.value;
+                    period ===
+                    option.value;
 
                   return (
                     <button
-                      key={option.value}
+                      key={
+                        option.value
+                      }
                       type="button"
                       onClick={() =>
                         setPeriod(
@@ -1420,7 +2035,9 @@ const PrintableReport = ({ onClose }) => {
                 <select
                   value={status}
                   onChange={(e) =>
-                    setStatus(e.target.value)
+                    setStatus(
+                      e.target.value,
+                    )
                   }
                   className="
                     w-full
@@ -1479,7 +2096,9 @@ const PrintableReport = ({ onClose }) => {
 
                     <input
                       type="date"
-                      value={selectedDate}
+                      value={
+                        selectedDate
+                      }
                       onChange={(e) =>
                         setSelectedDate(
                           e.target.value,
@@ -1524,7 +2143,9 @@ const PrintableReport = ({ onClose }) => {
 
                       <input
                         type="date"
-                        value={customStartDate}
+                        value={
+                          customStartDate
+                        }
                         onChange={(e) =>
                           setCustomStartDate(
                             e.target.value,
@@ -1568,7 +2189,9 @@ const PrintableReport = ({ onClose }) => {
 
                       <input
                         type="date"
-                        value={customEndDate}
+                        value={
+                          customEndDate
+                        }
                         onChange={(e) =>
                           setCustomEndDate(
                             e.target.value,
@@ -1622,7 +2245,9 @@ const PrintableReport = ({ onClose }) => {
               "
             >
               <button
-                onClick={handleDownloadPDF}
+                onClick={
+                  handleDownloadPDF
+                }
                 disabled={
                   loading ||
                   downloading ||
@@ -1655,7 +2280,9 @@ const PrintableReport = ({ onClose }) => {
               </button>
 
               <button
-                onClick={handlePrint}
+                onClick={
+                  handlePrint
+                }
                 disabled={
                   loading ||
                   downloading ||
@@ -1698,7 +2325,9 @@ const PrintableReport = ({ onClose }) => {
           ================================================= */}
 
           <div
-            ref={printableContentRef}
+            ref={
+              printableContentRef
+            }
             className="
               printable-document
               flex-1
@@ -1805,42 +2434,60 @@ const PrintableReport = ({ onClose }) => {
                   gap-4
                 "
               >
-                {/* PERIOD */}
-
                 <ReportInfo
-                  icon={<CalendarDays size={15} />}
+                  icon={
+                    <CalendarDays
+                      size={15}
+                    />
+                  }
                   label="Report Period"
-                  value={periodLabel}
+                  value={
+                    periodLabel
+                  }
                   detail={formatPeriod()}
                 />
 
-                {/* DATE RANGE */}
-
                 <ReportInfo
-                  icon={<CalendarRange size={15} />}
+                  icon={
+                    <CalendarRange
+                      size={15}
+                    />
+                  }
                   label="Date Range"
-                  value={getDateRange()}
+                  value={
+                    getDateRange()
+                  }
                   detail="Records covered"
                 />
 
-                {/* GENERATED BY */}
-
                 <ReportInfo
-                  icon={<UserRound size={15} />}
+                  icon={
+                    <UserRound
+                      size={15}
+                    />
+                  }
                   label="Generated By"
-                  value={generatedBy}
-                  detail={generatedRole}
+                  value={
+                    generatedBy
+                  }
+                  detail={
+                    generatedRole
+                  }
                 />
 
-                {/* GENERATED ON */}
-
                 <ReportInfo
-                  icon={<Clock3 size={15} />}
+                  icon={
+                    <Clock3
+                      size={15}
+                    />
+                  }
                   label="Generated On"
                   value={formatDateTime(
                     generatedAt,
                   )}
-                  detail={statusLabel}
+                  detail={
+                    statusLabel
+                  }
                 />
               </div>
             </div>
@@ -1860,25 +2507,37 @@ const PrintableReport = ({ onClose }) => {
             >
               <SummaryCard
                 title="Total Reviewed"
-                value={summary.total}
+                value={
+                  summary.total
+                }
                 icon={
-                  <ClipboardList size={17} />
+                  <ClipboardList
+                    size={17}
+                  />
                 }
               />
 
               <SummaryCard
                 title="Accepted"
-                value={summary.accepted}
+                value={
+                  summary.accepted
+                }
                 icon={
-                  <CheckCircle2 size={17} />
+                  <CheckCircle2
+                    size={17}
+                  />
                 }
               />
 
               <SummaryCard
                 title="Rejected"
-                value={summary.rejected}
+                value={
+                  summary.rejected
+                }
                 icon={
-                  <XCircle size={17} />
+                  <XCircle
+                    size={17}
+                  />
                 }
               />
             </div>
@@ -1911,7 +2570,8 @@ const PrintableReport = ({ onClose }) => {
                     Preparing the selected date range.
                   </p>
                 </div>
-              ) : reports.length === 0 ? (
+              ) : reports.length ===
+                0 ? (
                 <div
                   className="
                     py-16
@@ -1973,7 +2633,10 @@ const PrintableReport = ({ onClose }) => {
 
                     <tbody>
                       {reports.map(
-                        (report, index) => {
+                        (
+                          report,
+                          index,
+                        ) => {
                           const reportStatus =
                             normalizeReportStatus(
                               report,
@@ -1988,7 +2651,8 @@ const PrintableReport = ({ onClose }) => {
                               className="hover:bg-gray-50"
                             >
                               <td className="border border-gray-100 px-3 py-2.5 text-xs text-gray-500">
-                                {index + 1}
+                                {index +
+                                  1}
                               </td>
 
                               <td className="border border-gray-100 px-3 py-2.5 text-xs font-bold text-gray-900">
@@ -2037,7 +2701,9 @@ const PrintableReport = ({ onClose }) => {
                                     )}
                                   `}
                                 >
-                                  {reportStatus}
+                                  {
+                                    reportStatus
+                                  }
                                 </span>
                               </td>
                             </tr>
@@ -2081,7 +2747,9 @@ const PrintableReport = ({ onClose }) => {
                       justify-center
                     "
                   >
-                    <UserRound size={14} />
+                    <UserRound
+                      size={14}
+                    />
                   </div>
 
                   <div>
@@ -2118,7 +2786,8 @@ const PrintableReport = ({ onClose }) => {
                 </p>
 
                 <p className="text-[10px] text-gray-400 mt-0.5">
-                  Generated {formatDateTime(
+                  Generated{" "}
+                  {formatDateTime(
                     generatedAt,
                   )}
                 </p>
@@ -2233,4 +2902,3 @@ const SummaryCard = ({
 );
 
 export default PrintableReport;
-
