@@ -12,7 +12,8 @@ firebase.initializeApp({
   projectId: "eduguard-b7d1e",
   storageBucket: "eduguard-b7d1e.firebasestorage.app",
   messagingSenderId: "190851241122",
-  appId: "G-8CPRH7K0CE",
+  appId: "1:190851241122:web:5cda165864d5ff50d173fb",
+  measurementId: "G-8CPRH7K0CE",
 });
 
 const messaging = firebase.messaging();
