@@ -45,11 +45,8 @@ const removeWebPushToken = async () => {
     }
 
     console.log("====================================");
-
     console.log("🗑️ REMOVING WEB FCM TOKEN");
-
     console.log("Token:", fcmToken.substring(0, 20) + "...");
-
     console.log("====================================");
 
     const response = await API.delete("/api/auth/remove-push-token", {
@@ -59,27 +56,17 @@ const removeWebPushToken = async () => {
     });
 
     console.log("====================================");
-
     console.log("✅ WEB FCM TOKEN REMOVED");
-
     console.log(response.data);
-
     console.log("====================================");
 
-    /*
-    Remove the local copy only after
-    the backend successfully removed it.
-    */
     localStorage.removeItem("webFCMToken");
 
     return true;
   } catch (error) {
     console.error("====================================");
-
     console.error("❌ WEB FCM TOKEN REMOVAL ERROR");
-
     console.error(error?.response?.data || error?.message || error);
-
     console.error("====================================");
 
     return false;
@@ -93,7 +80,7 @@ const removeWebPushToken = async () => {
 export const useAuthStore = create((set, get) => ({
   /* =====================================================
        STATE
-    ===================================================== */
+  ===================================================== */
 
   user: null,
 
@@ -108,8 +95,10 @@ export const useAuthStore = create((set, get) => ({
   error: null,
 
   clearError: () => {
-  set({ error: null });
-},
+    set({
+      error: null,
+    });
+  },
 
   isLoading: false,
 
@@ -128,15 +117,128 @@ export const useAuthStore = create((set, get) => ({
   warningActive: false,
 
   /* =====================================================
+       SECURITY SETTINGS
+  ===================================================== */
+
+  securitySettings: {
+    twoFactorEnabled: true,
+    sessionTimeoutEnabled: true,
+  },
+
+  /* =====================================================
+       GET SECURITY SETTINGS
+  ===================================================== */
+
+  getSecuritySettings: async () => {
+    try {
+      const { data } = await API.get("/api/settings/security");
+
+      if (data?.success && data?.settings) {
+        set({
+          securitySettings: {
+            twoFactorEnabled: data.settings.twoFactorEnabled !== false,
+
+            sessionTimeoutEnabled:
+              data.settings.sessionTimeoutEnabled !== false,
+          },
+        });
+      }
+
+      return data;
+    } catch (err) {
+      const message =
+        err.response?.data?.message || "Failed to load security settings";
+
+      console.error("GET SECURITY SETTINGS ERROR:", message);
+
+      /*
+        Keep secure defaults if the request fails.
+      */
+      set({
+        securitySettings: {
+          twoFactorEnabled: true,
+          sessionTimeoutEnabled: true,
+        },
+      });
+
+      throw err;
+    }
+  },
+
+  /* =====================================================
+       UPDATE SECURITY SETTINGS
+  ===================================================== */
+
+  updateSecuritySettings: async (settings) => {
+    set({
+      isLoading: true,
+      error: null,
+    });
+
+    try {
+      const { data } = await API.put("/api/settings/security", settings);
+
+      if (data?.success && data?.settings) {
+        const updatedSettings = {
+          twoFactorEnabled: data.settings.twoFactorEnabled !== false,
+
+          sessionTimeoutEnabled: data.settings.sessionTimeoutEnabled !== false,
+        };
+
+        set({
+          securitySettings: updatedSettings,
+        });
+
+        /*
+          If session timeout was turned OFF,
+          immediately stop the existing timer.
+        */
+        if (updatedSettings.sessionTimeoutEnabled === false) {
+          console.log("🔓 Session timeout disabled. Clearing timer...");
+
+          get().clearInactivityTimer();
+        }
+
+        /*
+          If session timeout was turned ON,
+          start a fresh timer.
+        */
+        if (updatedSettings.sessionTimeoutEnabled === true) {
+          console.log("🔒 Session timeout enabled. Starting timer...");
+
+          get().startInactivityTimer();
+        }
+      }
+
+      toast.success(data?.message || "Security settings updated successfully");
+
+      return data;
+    } catch (err) {
+      const message =
+        err.response?.data?.message || "Failed to update security settings";
+
+      set({
+        error: message,
+      });
+
+      toast.error(message);
+
+      throw err;
+    } finally {
+      set({
+        isLoading: false,
+      });
+    }
+  },
+
+  /* =====================================================
        PUSH NOTIFICATIONS
-    ===================================================== */
+  ===================================================== */
 
   registerPushNotifications: async () => {
     try {
       console.log("====================================");
-
       console.log("🔥 REGISTERING WEB FCM FROM AUTH STORE");
-
       console.log("====================================");
 
       const token = await registerWebFCM();
@@ -171,6 +273,7 @@ export const useAuthStore = create((set, get) => ({
 
     return {
       success,
+
       ...(success
         ? {}
         : {
@@ -181,19 +284,88 @@ export const useAuthStore = create((set, get) => ({
 
   /* =====================================================
        INACTIVITY TIMER
-    ===================================================== */
+  ===================================================== */
 
   startInactivityTimer: (onLogoutCallback) => {
+    /*
+      Always clear the previous timer first.
+    */
     clearTimeout(get().inactivityTimer);
 
-    const inactivityMinutes = 10;
+    /*
+      Check the current security setting.
+    */
+    const { securitySettings } = get();
+
+    /*
+      If session timeout protection is disabled,
+      do not start an inactivity timer.
+    */
+    if (securitySettings?.sessionTimeoutEnabled === false) {
+      console.log("🔓 Session timeout protection is disabled.");
+
+      set({
+        inactivityTimer: null,
+        countdown: 0,
+        warningActive: false,
+      });
+
+      return;
+    }
+
+    console.log("🔒 Session timeout protection is enabled.");
+
+    /*
+      =====================================================
+      TEST MODE
+      =====================================================
+
+      10 seconds = logout timeout
+      5 seconds  = warning
+
+      AFTER TESTING, CHANGE TO:
+
+      const inactivityMinutes = 10;
+      const warningSeconds = 30;
+      let remaining = inactivityMinutes * 60;
+    */
+
+    const inactivitySeconds = 10 * 60;
     const warningSeconds = 30;
 
-    let remaining = inactivityMinutes * 60;
+    let remaining = inactivitySeconds;
+
+    console.log(`⏱️ Inactivity timer started: ${remaining} seconds`);
 
     const tick = () => {
+      /*
+        Check the setting again while the timer is running.
+      */
+      const currentSettings = get().securitySettings;
+
+      if (currentSettings?.sessionTimeoutEnabled === false) {
+        console.log("🔓 Session timeout disabled while timer was running.");
+
+        clearTimeout(get().inactivityTimer);
+
+        set({
+          inactivityTimer: null,
+          countdown: 0,
+          warningActive: false,
+        });
+
+        return;
+      }
+
+      /*
+        Show warning.
+      */
       if (remaining === warningSeconds) {
-        toast("You will be logged out in 30 seconds due to inactivity", {
+        set({
+          warningActive: true,
+        });
+
+        toast("You will be logged out in 5 seconds due to inactivity", {
           style: {
             background: "#FBBF24",
             color: "#000",
@@ -201,7 +373,17 @@ export const useAuthStore = create((set, get) => ({
         });
       }
 
+      /*
+        Logout when countdown reaches zero.
+      */
       if (remaining <= 0) {
+        console.log("⏰ SESSION TIMEOUT REACHED");
+
+        set({
+          warningActive: false,
+          countdown: 0,
+        });
+
         get().logout();
 
         if (onLogoutCallback) {
@@ -215,6 +397,8 @@ export const useAuthStore = create((set, get) => ({
         countdown: remaining,
       });
 
+      console.log(`⏱️ Session timeout countdown: ${remaining}s`);
+
       remaining -= 1;
 
       const timer = setTimeout(tick, 1000);
@@ -227,24 +411,59 @@ export const useAuthStore = create((set, get) => ({
     tick();
   },
 
+  /* =====================================================
+       RESET INACTIVITY TIMER
+  ===================================================== */
+
   resetInactivityTimer: () => {
+    const { securitySettings } = get();
+
+    /*
+      Do nothing when session timeout is disabled.
+    */
+    if (securitySettings?.sessionTimeoutEnabled === false) {
+      clearTimeout(get().inactivityTimer);
+
+      set({
+        inactivityTimer: null,
+        countdown: 0,
+        warningActive: false,
+      });
+
+      return;
+    }
+
+    console.log("🔄 User activity detected. Resetting session timeout.");
+
     clearTimeout(get().inactivityTimer);
+
+    set({
+      countdown: 0,
+      warningActive: false,
+    });
 
     get().startInactivityTimer();
   },
 
+  /* =====================================================
+       CLEAR INACTIVITY TIMER
+  ===================================================== */
+
   clearInactivityTimer: () => {
+    console.log("🧹 Clearing inactivity timer...");
+
     clearTimeout(get().inactivityTimer);
 
     set({
       inactivityTimer: null,
       countdown: 0,
+      warningActive: false,
     });
   },
 
   /* =====================================================
        CHECK AUTH
-    ===================================================== */
+  ===================================================== */
 
   checkAuth: async () => {
     try {
@@ -275,8 +494,63 @@ export const useAuthStore = create((set, get) => ({
         localStorage.setItem("user", JSON.stringify(userData));
 
         /* ===============================================
+             LOAD SECURITY SETTINGS
+        =============================================== */
+
+        try {
+          console.log("🔐 Loading security settings...");
+
+          const securityResponse = await API.get("/api/settings/security");
+
+          if (
+            securityResponse.data?.success &&
+            securityResponse.data?.settings
+          ) {
+            const settings = securityResponse.data.settings;
+
+            set({
+              securitySettings: {
+                twoFactorEnabled: settings.twoFactorEnabled !== false,
+
+                sessionTimeoutEnabled: settings.sessionTimeoutEnabled !== false,
+              },
+            });
+
+            console.log("✅ Security settings loaded:", settings);
+
+            /*
+              Start inactivity timer after the actual
+              security settings have been loaded.
+            */
+            console.log("🔐 Starting inactivity timer after auth check...");
+
+            get().startInactivityTimer();
+          }
+        } catch (securityError) {
+          console.error(
+            "❌ Failed to load security settings:",
+            securityError?.response?.data || securityError?.message,
+          );
+
+          /*
+            Secure defaults remain active.
+          */
+          set({
+            securitySettings: {
+              twoFactorEnabled: true,
+              sessionTimeoutEnabled: true,
+            },
+          });
+
+          /*
+            Start timer using secure defaults.
+          */
+          get().startInactivityTimer();
+        }
+
+        /* ===============================================
              RE-REGISTER WEB FCM TOKEN
-          =============================================== */
+        =============================================== */
 
         setTimeout(async () => {
           try {
@@ -294,7 +568,13 @@ export const useAuthStore = create((set, get) => ({
       } else {
         set({
           user: null,
+
           isAuthenticated: false,
+
+          securitySettings: {
+            twoFactorEnabled: true,
+            sessionTimeoutEnabled: true,
+          },
         });
 
         localStorage.removeItem("user");
@@ -304,7 +584,13 @@ export const useAuthStore = create((set, get) => ({
 
       set({
         user: null,
+
         isAuthenticated: false,
+
+        securitySettings: {
+          twoFactorEnabled: true,
+          sessionTimeoutEnabled: true,
+        },
       });
     } finally {
       set({
@@ -315,7 +601,7 @@ export const useAuthStore = create((set, get) => ({
 
   /* =====================================================
        SIGNUP
-    ===================================================== */
+  ===================================================== */
 
   signup: async (formData) => {
     set({
@@ -354,7 +640,7 @@ export const useAuthStore = create((set, get) => ({
 
   /* =====================================================
        LOGIN
-    ===================================================== */
+  ===================================================== */
 
   login: async (email, password) => {
     set({
@@ -367,6 +653,17 @@ export const useAuthStore = create((set, get) => ({
         email,
         password,
       });
+
+      /*
+        Backend decides whether OTP is required.
+
+        If Security > Two-Factor Authentication
+        is enabled:
+          password → OTP → dashboard
+
+        If disabled:
+          password → dashboard
+      */
 
       if (data.requiresOTP) {
         set({
@@ -381,16 +678,18 @@ export const useAuthStore = create((set, get) => ({
 
         return {
           success: true,
+
           requiresOTP: true,
         };
       }
 
       /* ===============================================
-           SAVE AUTH
-        =============================================== */
+           DIRECT LOGIN WHEN 2FA IS DISABLED
+      =============================================== */
 
       const userData = {
         ...data.user,
+
         token: data.token,
       };
 
@@ -404,6 +703,8 @@ export const useAuthStore = create((set, get) => ({
         tempEmail: null,
 
         otpType: null,
+
+        otpCode: null,
       });
 
       localStorage.setItem("user", JSON.stringify(userData));
@@ -412,7 +713,7 @@ export const useAuthStore = create((set, get) => ({
 
       /* ===============================================
            REGISTER WEB FCM
-        =============================================== */
+      =============================================== */
 
       setTimeout(async () => {
         try {
@@ -427,6 +728,23 @@ export const useAuthStore = create((set, get) => ({
           console.error("❌ Web FCM registration after login failed:", error);
         }
       }, 500);
+
+      /*
+        Load latest security settings and start
+        the inactivity timer.
+      */
+      try {
+        await get().getSecuritySettings();
+
+        console.log("🔐 Starting inactivity timer after login...");
+
+        get().startInactivityTimer();
+      } catch (error) {
+        console.error(
+          "❌ Failed to refresh security settings after login:",
+          error,
+        );
+      }
 
       return {
         success: true,
@@ -446,7 +764,7 @@ export const useAuthStore = create((set, get) => ({
 
   /* =====================================================
        VERIFY OTP
-    ===================================================== */
+  ===================================================== */
 
   verifyOTP: async (code) => {
     set({
@@ -473,11 +791,12 @@ export const useAuthStore = create((set, get) => ({
 
       /* ===============================================
            LOGIN OTP
-        =============================================== */
+      =============================================== */
 
       if (otpType === "login") {
         const userData = {
           ...data.user,
+
           token: data.token,
         };
 
@@ -491,6 +810,8 @@ export const useAuthStore = create((set, get) => ({
           tempEmail: null,
 
           otpType: null,
+
+          otpCode: null,
         });
 
         localStorage.setItem("user", JSON.stringify(userData));
@@ -499,7 +820,7 @@ export const useAuthStore = create((set, get) => ({
 
         /* =============================================
              REGISTER WEB FCM
-          ============================================= */
+        ============================================= */
 
         setTimeout(async () => {
           try {
@@ -518,15 +839,33 @@ export const useAuthStore = create((set, get) => ({
           }
         }, 500);
 
+        /*
+          Refresh security settings and start
+          inactivity timer after OTP login.
+        */
+        try {
+          await get().getSecuritySettings();
+
+          console.log("🔐 Starting inactivity timer after OTP login...");
+
+          get().startInactivityTimer();
+        } catch (error) {
+          console.error(
+            "❌ Failed to refresh security settings after OTP login:",
+            error,
+          );
+        }
+
         return {
           success: true,
+
           verified: true,
         };
       }
 
       /* ===============================================
            SIGNUP OTP
-        =============================================== */
+      =============================================== */
 
       if (otpType === "signup") {
         set({
@@ -541,6 +880,7 @@ export const useAuthStore = create((set, get) => ({
 
         return {
           success: true,
+
           verified: true,
         };
       }
@@ -559,7 +899,7 @@ export const useAuthStore = create((set, get) => ({
 
   /* =====================================================
        RESEND OTP
-    ===================================================== */
+  ===================================================== */
 
   resendOTP: async () => {
     set({
@@ -621,7 +961,7 @@ export const useAuthStore = create((set, get) => ({
 
   /* =====================================================
        FORGOT PASSWORD
-    ===================================================== */
+  ===================================================== */
 
   forgotPassword: async (email) => {
     set({
@@ -664,7 +1004,7 @@ export const useAuthStore = create((set, get) => ({
 
   /* =====================================================
        VERIFY FORGOT PASSWORD OTP
-    ===================================================== */
+  ===================================================== */
 
   verifyForgotPasswordOTP: async (code) => {
     set({
@@ -686,6 +1026,7 @@ export const useAuthStore = create((set, get) => ({
 
       set({
         otpRequired: false,
+
         otpCode: code,
       });
 
@@ -713,7 +1054,7 @@ export const useAuthStore = create((set, get) => ({
 
   /* =====================================================
        RESET PASSWORD
-    ===================================================== */
+  ===================================================== */
 
   resetPassword: async (newPassword) => {
     const { tempEmail, otpCode } = get();
@@ -730,9 +1071,7 @@ export const useAuthStore = create((set, get) => ({
 
       await API.post("/api/auth/reset-password", {
         email: tempEmail,
-
         newPassword,
-
         code: otpCode,
       });
 
@@ -770,7 +1109,7 @@ export const useAuthStore = create((set, get) => ({
 
   /* =====================================================
        CHANGE PASSWORD
-    ===================================================== */
+  ===================================================== */
 
   changePassword: async (oldPassword, newPassword) => {
     set({
@@ -807,14 +1146,14 @@ export const useAuthStore = create((set, get) => ({
 
   /* =====================================================
        LOGOUT
-    ===================================================== */
+  ===================================================== */
 
   logout: async (callback) => {
     try {
-      /* ===============================================
-           IMPORTANT:
-           Remove FCM token BEFORE clearing local JWT.
-        =============================================== */
+      /*
+        IMPORTANT:
+        Remove FCM token BEFORE clearing local JWT.
+      */
 
       const pushRemoved = await removeWebPushToken();
 
@@ -825,8 +1164,14 @@ export const useAuthStore = create((set, get) => ({
       }
 
       /* ===============================================
+           CLEAR INACTIVITY TIMER
+      =============================================== */
+
+      clearTimeout(get().inactivityTimer);
+
+      /* ===============================================
            BACKEND LOGOUT
-        =============================================== */
+      =============================================== */
 
       try {
         await API.post("/api/auth/logout");
@@ -839,7 +1184,7 @@ export const useAuthStore = create((set, get) => ({
 
       /* ===============================================
            CLEAR LOCAL AUTH
-        =============================================== */
+      =============================================== */
 
       set({
         user: null,
@@ -850,6 +1195,8 @@ export const useAuthStore = create((set, get) => ({
 
         warningActive: false,
 
+        inactivityTimer: null,
+
         tempEmail: null,
 
         otpRequired: false,
@@ -859,6 +1206,12 @@ export const useAuthStore = create((set, get) => ({
         otpCode: null,
 
         error: null,
+
+        securitySettings: {
+          twoFactorEnabled: true,
+
+          sessionTimeoutEnabled: true,
+        },
       });
 
       localStorage.removeItem("user");
@@ -877,9 +1230,11 @@ export const useAuthStore = create((set, get) => ({
     } catch (error) {
       console.error("LOGOUT ERROR:", error);
 
-      /* ===============================================
-           ALWAYS CLEAR LOCAL AUTH
-        =============================================== */
+      /*
+        ALWAYS CLEAR LOCAL AUTH
+      */
+
+      clearTimeout(get().inactivityTimer);
 
       set({
         user: null,
@@ -890,6 +1245,8 @@ export const useAuthStore = create((set, get) => ({
 
         warningActive: false,
 
+        inactivityTimer: null,
+
         tempEmail: null,
 
         otpRequired: false,
@@ -899,6 +1256,12 @@ export const useAuthStore = create((set, get) => ({
         otpCode: null,
 
         error: null,
+
+        securitySettings: {
+          twoFactorEnabled: true,
+
+          sessionTimeoutEnabled: true,
+        },
       });
 
       localStorage.removeItem("user");

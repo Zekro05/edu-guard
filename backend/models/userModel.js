@@ -5,10 +5,12 @@ const userSchema = new mongoose.Schema(
     firstName: { type: String },
     middleName: { type: String },
     lastName: { type: String },
+
     name: {
       type: String,
       required: true,
     },
+
     email: {
       type: String,
       required: true,
@@ -25,6 +27,10 @@ const userSchema = new mongoose.Schema(
       enum: ["admin", "student", "teacher"],
       default: "student",
     },
+
+    /* =========================================================
+       PUSH NOTIFICATIONS
+    ========================================================= */
 
     pushTokens: [
       {
@@ -52,6 +58,10 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
+    /* =========================================================
+       PROFILE
+    ========================================================= */
+
     profilePhoto: {
       type: String,
       default: "",
@@ -71,6 +81,10 @@ const userSchema = new mongoose.Schema(
       },
     },
 
+    /* =========================================================
+       LOGIN INFORMATION
+    ========================================================= */
+
     lastLogin: {
       type: Date,
       default: Date.now,
@@ -81,42 +95,60 @@ const userSchema = new mongoose.Schema(
       default: false,
     },
 
+    /* =========================================================
+       NOTIFICATION SETTINGS
+    ========================================================= */
+
     notificationSettings: {
+      /* -------------------------------------------------------
+         MOBILE
+      ------------------------------------------------------- */
+
       mute: {
         type: Boolean,
         default: false,
       },
+
       incidentUpdates: {
         type: Boolean,
         default: true,
       },
+
       guidanceMessages: {
         type: Boolean,
         default: true,
       },
+
       systemAnnouncements: {
         type: Boolean,
         default: true,
       },
+
       quietHours: {
         type: Boolean,
         default: false,
       },
+
       sound: {
         type: Boolean,
         default: true,
       },
+
       vibration: {
         type: Boolean,
         default: true,
       },
 
-      emailAlerts: {
+      highRiskAlerts: {
         type: Boolean,
         default: true,
       },
 
-      highRiskAlerts: {
+      /* -------------------------------------------------------
+         WEB / EMAIL
+      ------------------------------------------------------- */
+
+      emailAlerts: {
         type: Boolean,
         default: true,
       },
@@ -146,22 +178,78 @@ const userSchema = new mongoose.Schema(
       },
     },
 
-    // SIGNUP EMAIL VERIFICATION
+    /* =========================================================
+       SECURITY SETTINGS
+    ========================================================= */
+
+    securitySettings: {
+      /*
+        Two-factor authentication.
+
+        When true:
+        - Login requires the configured OTP verification flow.
+
+        When false:
+        - Login can proceed without the additional OTP step.
+      */
+
+      twoFactorEnabled: {
+        type: Boolean,
+        default: true,
+      },
+
+      /*
+        Session timeout protection.
+
+        When true:
+        - Inactive administrator sessions are protected
+          according to the application's session timeout logic.
+
+        When false:
+        - Session timeout protection is disabled.
+      */
+
+      sessionTimeoutEnabled: {
+        type: Boolean,
+        default: true,
+      },
+    },
+
+    /* =========================================================
+       SIGNUP EMAIL VERIFICATION
+    ========================================================= */
+
     verificationToken: String,
+
     verificationTokenExpiresAt: Date,
 
-    // LOGIN OTP
+    /* =========================================================
+       LOGIN OTP
+    ========================================================= */
+
     loginOTP: String,
+
     loginOTPExpiresAt: Date,
+
+    /* =========================================================
+       FORGOT PASSWORD OTP
+    ========================================================= */
 
     forgotPasswordOTP: String,
 
-    // PASSWORD RESET
+    /* =========================================================
+       PASSWORD RESET
+    ========================================================= */
+
     resetPasswordToken: String,
+
     resetPasswordExpiresAt: Date,
   },
-  { timestamps: true },
+  {
+    timestamps: true,
+  },
 );
 
 export const User = mongoose.model("User", userSchema);
+
 export default User;

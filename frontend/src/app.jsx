@@ -3,7 +3,6 @@ import {
   Route,
   Routes,
   useLocation,
-  useNavigate,
 } from "react-router-dom";
 
 import { lazy, Suspense, useEffect } from "react";
@@ -27,26 +26,46 @@ const EmailVerificationPage = lazy(
   () => import("./pages/EmailVerificationPage.jsx"),
 );
 
-const ForgotPasswordPage = lazy(() => import("./pages/ForgotPassword.jsx"));
+const ForgotPasswordPage = lazy(
+  () => import("./pages/ForgotPassword.jsx"),
+);
 
-const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage.jsx"));
+const ResetPasswordPage = lazy(
+  () => import("./pages/ResetPasswordPage.jsx"),
+);
 
-const NewPasswordPage = lazy(() => import("./pages/NewPasswordPage.jsx"));
+const NewPasswordPage = lazy(
+  () => import("./pages/NewPasswordPage.jsx"),
+);
 
 // Protected pages
-const DashboardPage = lazy(() => import("./pages/DashboardPage.jsx"));
+const DashboardPage = lazy(
+  () => import("./pages/DashboardPage.jsx"),
+);
 
-const StudentPage = lazy(() => import("./pages/StudentPage.jsx"));
+const StudentPage = lazy(
+  () => import("./pages/StudentPage.jsx"),
+);
 
-const ReportPage = lazy(() => import("./pages/ReportPage.jsx"));
+const ReportPage = lazy(
+  () => import("./pages/ReportPage.jsx"),
+);
 
-const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
+const SettingsPage = lazy(
+  () => import("./pages/SettingsPage.jsx"),
+);
 
-const GuidancePage = lazy(() => import("./pages/GuidancePage.jsx"));
+const GuidancePage = lazy(
+  () => import("./pages/GuidancePage.jsx"),
+);
 
-const InterventionPage = lazy(() => import("./pages/InterventionPage.jsx"));
+const InterventionPage = lazy(
+  () => import("./pages/InterventionPage.jsx"),
+);
 
-const CaseManagement = lazy(() => import("./pages/CaseManagement.jsx"));
+const CaseManagement = lazy(
+  () => import("./pages/CaseManagement.jsx"),
+);
 
 /* =========================================================
    GLOBAL NOTIFICATIONS
@@ -60,7 +79,9 @@ const GlobalNotifications = lazy(
    EDU-GUARD LOADING SCREEN
 ========================================================= */
 
-const PageLoader = ({ message = "Preparing your workspace..." }) => {
+const PageLoader = ({
+  message = "Preparing your workspace...",
+}) => {
   return (
     <div className="fixed inset-0 z-[9999] overflow-hidden bg-[#F7F9F8]">
       {/* =================================================
@@ -110,7 +131,6 @@ const PageLoader = ({ message = "Preparing your workspace..." }) => {
 
             {/* Logo card */}
             <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-[26px] bg-white border border-emerald-100 shadow-[0_12px_40px_rgba(16,185,129,0.12)] flex items-center justify-center">
-              {/* Replace this with your actual logo if desired */}
               <img
                 src="/school-logo.webp"
                 alt="GuidEd"
@@ -131,7 +151,10 @@ const PageLoader = ({ message = "Preparing your workspace..." }) => {
 
           <div className="mb-2">
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-800">
-              Guid<span className="text-emerald-600">Ed</span>
+              Guid
+              <span className="text-emerald-600">
+                Ed
+              </span>
             </h1>
 
             <p className="mt-1 text-xs sm:text-sm font-medium tracking-wide text-gray-500">
@@ -164,7 +187,9 @@ const PageLoader = ({ message = "Preparing your workspace..." }) => {
               STATUS MESSAGE
           ================================================= */}
 
-          <p className="mt-4 text-sm text-gray-500">{message}</p>
+          <p className="mt-4 text-sm text-gray-500">
+            {message}
+          </p>
 
           {/* =================================================
               SCHOOL BRANDING
@@ -188,10 +213,16 @@ const PageLoader = ({ message = "Preparing your workspace..." }) => {
 ========================================================= */
 
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, user, isCheckingAuth } = useAuthStore();
+  const {
+    isAuthenticated,
+    user,
+    isCheckingAuth,
+  } = useAuthStore();
 
   if (isCheckingAuth) {
-    return <PageLoader message="Checking your account..." />;
+    return (
+      <PageLoader message="Checking your account..." />
+    );
   }
 
   if (!isAuthenticated) {
@@ -209,13 +240,21 @@ const ProtectedRoute = ({ children }) => {
    REDIRECT AUTHENTICATED USERS
 ========================================================= */
 
-const RedirectAuthenticatedUser = ({ children }) => {
-  const { isAuthenticated, user, isCheckingAuth } = useAuthStore();
+const RedirectAuthenticatedUser = ({
+  children,
+}) => {
+  const {
+    isAuthenticated,
+    user,
+    isCheckingAuth,
+  } = useAuthStore();
 
   const location = useLocation();
 
   if (isCheckingAuth) {
-    return <PageLoader message="Checking your account..." />;
+    return (
+      <PageLoader message="Checking your account..." />
+    );
   }
 
   /*
@@ -229,8 +268,16 @@ const RedirectAuthenticatedUser = ({ children }) => {
    * Redirect authenticated and verified users
    * away from login/auth pages.
    */
-  if (isAuthenticated && user?.isVerified) {
-    return <Navigate to="/dashboard" replace />;
+  if (
+    isAuthenticated &&
+    user?.isVerified
+  ) {
+    return (
+      <Navigate
+        to="/dashboard"
+        replace
+      />
+    );
   }
 
   return children;
@@ -245,11 +292,8 @@ function App() {
     checkAuth,
     isCheckingAuth,
     isAuthenticated,
-    startInactivityTimer,
     resetInactivityTimer,
   } = useAuthStore();
-
-  const navigate = useNavigate();
 
   /* =======================================================
      CHECK AUTHENTICATION ON APP LOAD
@@ -260,49 +304,83 @@ function App() {
   }, [checkAuth]);
 
   /* =======================================================
-     AUTHENTICATED INACTIVITY AUTO-LOGOUT
+     USER ACTIVITY / INACTIVITY RESET
   ======================================================= */
 
   useEffect(() => {
+    /*
+      Only listen for activity while authenticated.
+    */
     if (!isAuthenticated) {
       return;
     }
 
     const activityEvents = [
       "mousemove",
+      "mousedown",
       "keydown",
       "click",
       "scroll",
       "touchstart",
     ];
 
+    let activityTimeout = null;
+
     const handleActivity = () => {
-      resetInactivityTimer();
+      /*
+        Prevent resetting the timer hundreds of times
+        per second when the mouse is moving.
+      */
+      if (activityTimeout) {
+        return;
+      }
+
+      activityTimeout = setTimeout(() => {
+        activityTimeout = null;
+
+        console.log(
+          "👤 User activity detected. Resetting inactivity timer...",
+        );
+
+        resetInactivityTimer();
+      }, 250);
     };
 
     activityEvents.forEach((event) => {
-      window.addEventListener(event, handleActivity);
-    });
-
-    startInactivityTimer(() => {
-      navigate("/login", {
-        replace: true,
-      });
+      window.addEventListener(
+        event,
+        handleActivity,
+        {
+          passive: true,
+        },
+      );
     });
 
     return () => {
       activityEvents.forEach((event) => {
-        window.removeEventListener(event, handleActivity);
+        window.removeEventListener(
+          event,
+          handleActivity,
+        );
       });
+
+      if (activityTimeout) {
+        clearTimeout(activityTimeout);
+      }
     };
-  }, [isAuthenticated, navigate, resetInactivityTimer, startInactivityTimer]);
+  }, [
+    isAuthenticated,
+    resetInactivityTimer,
+  ]);
 
   /* =======================================================
      SHOW LOADING UNTIL AUTH IS CONFIRMED
   ======================================================= */
 
   if (isCheckingAuth) {
-    return <PageLoader message="Checking your account..." />;
+    return (
+      <PageLoader message="Checking your account..." />
+    );
   }
 
   /* =======================================================
@@ -331,7 +409,11 @@ function App() {
           ROUTES
       ================================================= */}
 
-      <Suspense fallback={<PageLoader message="Loading your page..." />}>
+      <Suspense
+        fallback={
+          <PageLoader message="Loading your page..." />
+        }
+      >
         <Routes>
           {/* DASHBOARD */}
           <Route
@@ -454,16 +536,27 @@ function App() {
           />
 
           {/* EMAIL VERIFICATION */}
-          <Route path="/verify-email" element={<EmailVerificationPage />} />
+          <Route
+            path="/verify-email"
+            element={
+              <EmailVerificationPage />
+            }
+          />
 
           {/* DEFAULT ROUTE */}
           <Route
             path="*"
             element={
               isAuthenticated ? (
-                <Navigate to="/dashboard" replace />
+                <Navigate
+                  to="/dashboard"
+                  replace
+                />
               ) : (
-                <Navigate to="/login" replace />
+                <Navigate
+                  to="/login"
+                  replace
+                />
               )
             }
           />

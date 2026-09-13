@@ -359,20 +359,74 @@ export const login = async (req, res) => {
     }
 
     // GENERATE OTP
-    const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
+    // =========================================================
+    // TWO-FACTOR AUTHENTICATION
+    // =========================================================
 
-    user.loginOTP = loginOTP;
-    user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000;
+    const twoFactorEnabled = user.securitySettings?.twoFactorEnabled !== false;
+
+    // ---------------------------------------------------------
+    // 2FA ENABLED
+    // ---------------------------------------------------------
+
+    if (twoFactorEnabled) {
+      const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
+
+      user.loginOTP = loginOTP;
+      user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000;
+
+      await user.save();
+
+      await sendVerificationEmail(email, loginOTP);
+
+      return res.status(200).json({
+        success: true,
+        requiresOTP: true,
+        message: "OTP sent to your email",
+      });
+    }
+
+    // ---------------------------------------------------------
+    // 2FA DISABLED
+    // ---------------------------------------------------------
+
+    user.loginOTP = undefined;
+    user.loginOTPExpiresAt = undefined;
+    user.lastLogin = new Date();
 
     await user.save();
 
-    // send OTP
-    await sendVerificationEmail(email, loginOTP);
+    const token = jwt.sign(
+      {
+        id: user._id,
+        role: user.role,
+        name: user.name,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      },
+    );
+
+    await createHistoryLog({
+      userId: user._id,
+      role: mapRoleForHistory(user.role),
+      action: "Login",
+      category: "Auth",
+      details: "Admin logged in successfully without 2FA",
+      ipAddress: req.ip,
+    });
 
     return res.status(200).json({
       success: true,
-      requiresOTP: true,
-      message: "OTP sent to your email",
+      requiresOTP: false,
+
+      user: {
+        ...user._doc,
+        password: undefined,
+      },
+
+      token,
     });
   } catch (err) {
     console.error("Login Error:", err);
@@ -605,8 +659,7 @@ export const resendSignupOTP = async (req, res) => {
     ).toString();
 
     user.verificationToken = verificationToken;
-    user.verificationTokenExpiresAt =
-      Date.now() + 24 * 60 * 60 * 1000;
+    user.verificationTokenExpiresAt = Date.now() + 24 * 60 * 60 * 1000;
 
     await user.save();
 
@@ -649,9 +702,7 @@ export const resendLoginOTP = async (req, res) => {
       });
     }
 
-    const loginOTP = Math.floor(
-      100000 + Math.random() * 900000,
-    ).toString();
+    const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
 
     user.loginOTP = loginOTP;
     user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000;
@@ -737,11 +788,7 @@ export const logout = async (req, res) => {
 
 export const savePushToken = async (req, res) => {
   try {
-    const {
-      token,
-      platform,
-      provider = "fcm",
-    } = req.body;
+    const { token, platform, provider = "fcm" } = req.body;
 
     if (!token) {
       return res.status(400).json({
@@ -904,19 +951,31 @@ export const forgotPassword = async (req, res) => {
 
     const user = await User.findOne({ email });
 
+    // =========================================================
+    // PASSWORD RECOVERY SECURITY SETTING
+    // =========================================================
+
+    const passwordRecoveryEnabled =
+      user.securitySettings?.passwordRecoveryEnabled !== false;
+
+    if (!passwordRecoveryEnabled) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Password recovery is disabled for this account. Please contact an administrator.",
+      });
+    }
+
     if (!user) {
       return res.status(404).json({
         message: "User not found",
       });
     }
 
-    const otp = Math.floor(
-      100000 + Math.random() * 900000,
-    ).toString();
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     user.resetPasswordToken = otp;
-    user.resetPasswordExpiresAt =
-      Date.now() + 10 * 60 * 1000;
+    user.resetPasswordExpiresAt = Date.now() + 10 * 60 * 1000;
 
     await user.save();
 
@@ -1000,29 +1059,20 @@ export const resendForgotPasswordOTP = async (req, res) => {
       });
     }
 
-    const otp = Math.floor(
-      100000 + Math.random() * 900000,
-    ).toString();
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     user.resetPasswordToken = otp;
-    user.resetPasswordExpiresAt =
-      Date.now() + 10 * 60 * 1000;
+    user.resetPasswordExpiresAt = Date.now() + 10 * 60 * 1000;
 
     await user.save();
 
-    await sendPasswordResetEmail(
-      normalizedEmail,
-      otp,
-    );
+    await sendPasswordResetEmail(normalizedEmail, otp);
 
     res.status(200).json({
       message: "Password reset OTP resent successfully",
     });
   } catch (err) {
-    console.error(
-      "Resend Forgot Password OTP Error:",
-      err,
-    );
+    console.error("Resend Forgot Password OTP Error:", err);
 
     res.status(500).json({
       message: "Failed to resend OTP",
@@ -1055,22 +1105,15 @@ export const resetPassword = async (req, res) => {
       });
     }
 
-    const isSameAsOld = await bcrypt.compare(
-      newPassword,
-      user.password,
-    );
+    const isSameAsOld = await bcrypt.compare(newPassword, user.password);
 
     if (isSameAsOld) {
       return res.status(400).json({
-        message:
-          "New password cannot be the same as the old password",
+        message: "New password cannot be the same as the old password",
       });
     }
 
-    user.password = await bcrypt.hash(
-      newPassword,
-      10,
-    );
+    user.password = await bcrypt.hash(newPassword, 10);
 
     user.resetPasswordToken = undefined;
     user.resetPasswordExpiresAt = undefined;
@@ -1119,10 +1162,7 @@ export const changePassword = async (req, res) => {
       });
     }
 
-    const isMatch = await bcrypt.compare(
-      oldPassword,
-      user.password,
-    );
+    const isMatch = await bcrypt.compare(oldPassword, user.password);
 
     if (!isMatch) {
       return res.status(400).json({
@@ -1130,22 +1170,15 @@ export const changePassword = async (req, res) => {
       });
     }
 
-    const isSame = await bcrypt.compare(
-      newPassword,
-      user.password,
-    );
+    const isSame = await bcrypt.compare(newPassword, user.password);
 
     if (isSame) {
       return res.status(400).json({
-        message:
-          "New password cannot be the same as old password",
+        message: "New password cannot be the same as old password",
       });
     }
 
-    user.password = await bcrypt.hash(
-      newPassword,
-      10,
-    );
+    user.password = await bcrypt.hash(newPassword, 10);
 
     await user.save();
 
@@ -1174,18 +1207,14 @@ export const getChatUsers = async (req, res) => {
 
     const users = await User.find({
       _id: { $ne: userId },
-    }).select(
-      "firstName lastName name email profilePhoto role",
-    );
+    }).select("firstName lastName name email profilePhoto role");
 
     console.log("====================================");
     console.log("🔥 GET CHAT USERS");
     console.log("User requesting:", userId);
 
     users.forEach((u) => {
-      console.log(
-        `${u._id} | ${u.name} | ${u.profilePhoto}`,
-      );
+      console.log(`${u._id} | ${u.name} | ${u.profilePhoto}`);
     });
 
     console.log("====================================");
@@ -1240,9 +1269,7 @@ export const searchUsers = async (req, res) => {
         },
       ],
     })
-      .select(
-        "firstName lastName name email profilePhoto role",
-      )
+      .select("firstName lastName name email profilePhoto role")
       .limit(10);
 
     res.status(200).json(users);

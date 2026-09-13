@@ -41,6 +41,16 @@ const DEFAULT_NOTIFICATION_SETTINGS = {
 };
 
 /* =========================================================
+   DEFAULT SECURITY SETTINGS
+========================================================= */
+
+const DEFAULT_SECURITY_SETTINGS = {
+  twoFactorEnabled: true,
+
+  sessionTimeoutEnabled: true,
+};
+
+/* =========================================================
    HELPER
    Convert notification settings into a normal object
 ========================================================= */
@@ -49,10 +59,15 @@ const getNotificationSettingsObject = (user) => {
   let existingSettings = {};
 
   if (user?.notificationSettings) {
-    if (typeof user.notificationSettings.toObject === "function") {
-      existingSettings = user.notificationSettings.toObject();
+    if (
+      typeof user.notificationSettings.toObject ===
+      "function"
+    ) {
+      existingSettings =
+        user.notificationSettings.toObject();
     } else {
-      existingSettings = user.notificationSettings;
+      existingSettings =
+        user.notificationSettings;
     }
   }
 
@@ -63,10 +78,40 @@ const getNotificationSettingsObject = (user) => {
 };
 
 /* =========================================================
+   HELPER
+   Convert security settings into a normal object
+========================================================= */
+
+const getSecuritySettingsObject = (user) => {
+  let existingSettings = {};
+
+  if (user?.securitySettings) {
+    if (
+      typeof user.securitySettings.toObject ===
+      "function"
+    ) {
+      existingSettings =
+        user.securitySettings.toObject();
+    } else {
+      existingSettings =
+        user.securitySettings;
+    }
+  }
+
+  return {
+    ...DEFAULT_SECURITY_SETTINGS,
+    ...existingSettings,
+  };
+};
+
+/* =========================================================
    GET NOTIFICATION SETTINGS
 ========================================================= */
 
-export const getNotificationSettings = async (req, res) => {
+export const getNotificationSettings = async (
+  req,
+  res
+) => {
   try {
     console.log("========================================");
     console.log("🔔 GET NOTIFICATION SETTINGS");
@@ -87,14 +132,14 @@ export const getNotificationSettings = async (req, res) => {
     }
 
     /*
-      Merge the saved settings with defaults.
+      Merge saved settings with defaults.
 
       This makes sure older users who do not yet have
-      the mobile notification fields still receive the
-      correct default values.
+      newer notification fields still receive defaults.
     */
 
-    const settings = getNotificationSettingsObject(user);
+    const settings =
+      getNotificationSettingsObject(user);
 
     /*
       Make sure email fields are always strings.
@@ -110,8 +155,12 @@ export const getNotificationSettings = async (req, res) => {
         ? settings.guidanceEmail
         : "";
 
-    console.log("✅ NOTIFICATION SETTINGS LOADED");
+    console.log(
+      "✅ NOTIFICATION SETTINGS LOADED"
+    );
+
     console.log(settings);
+
     console.log("========================================");
 
     return res.status(200).json({
@@ -120,13 +169,19 @@ export const getNotificationSettings = async (req, res) => {
     });
   } catch (error) {
     console.error("========================================");
-    console.error("❌ GET NOTIFICATION SETTINGS ERROR");
+
+    console.error(
+      "❌ GET NOTIFICATION SETTINGS ERROR"
+    );
+
     console.error(error);
+
     console.error("========================================");
 
     return res.status(500).json({
       success: false,
-      message: "Failed to load notification settings",
+      message:
+        "Failed to load notification settings",
     });
   }
 };
@@ -135,10 +190,15 @@ export const getNotificationSettings = async (req, res) => {
    UPDATE NOTIFICATION SETTINGS
 ========================================================= */
 
-export const updateNotificationSettings = async (req, res) => {
+export const updateNotificationSettings = async (
+  req,
+  res
+) => {
   try {
     console.log("========================================");
-    console.log("💾 UPDATE NOTIFICATION SETTINGS");
+    console.log(
+      "💾 UPDATE NOTIFICATION SETTINGS"
+    );
     console.log("User ID:", req.userId);
     console.log("Request Body:", req.body);
     console.log("========================================");
@@ -169,7 +229,8 @@ export const updateNotificationSettings = async (req, res) => {
       the other settings remain unchanged.
     */
 
-    const settings = getNotificationSettingsObject(user);
+    const settings =
+      getNotificationSettingsObject(user);
 
     /* =======================================================
        BOOLEAN SETTINGS
@@ -209,8 +270,12 @@ export const updateNotificationSettings = async (req, res) => {
     */
 
     for (const field of booleanFields) {
-      if (typeof req.body[field] === "boolean") {
-        settings[field] = req.body[field];
+      if (
+        typeof req.body[field] ===
+        "boolean"
+      ) {
+        settings[field] =
+          req.body[field];
 
         console.log(
           `🔄 ${field}:`,
@@ -223,9 +288,14 @@ export const updateNotificationSettings = async (req, res) => {
        EMAIL SETTINGS
     ======================================================= */
 
-    if (typeof req.body.adminEmail === "string") {
+    if (
+      typeof req.body.adminEmail ===
+      "string"
+    ) {
       settings.adminEmail =
-        req.body.adminEmail.trim().toLowerCase();
+        req.body.adminEmail
+          .trim()
+          .toLowerCase();
 
       console.log(
         "🔄 adminEmail:",
@@ -233,9 +303,14 @@ export const updateNotificationSettings = async (req, res) => {
       );
     }
 
-    if (typeof req.body.guidanceEmail === "string") {
+    if (
+      typeof req.body.guidanceEmail ===
+      "string"
+    ) {
       settings.guidanceEmail =
-        req.body.guidanceEmail.trim().toLowerCase();
+        req.body.guidanceEmail
+          .trim()
+          .toLowerCase();
 
       console.log(
         "🔄 guidanceEmail:",
@@ -244,10 +319,11 @@ export const updateNotificationSettings = async (req, res) => {
     }
 
     /* =======================================================
-       SAVE SETTINGS
+       SAVE NOTIFICATION SETTINGS
     ======================================================= */
 
-    user.notificationSettings = settings;
+    user.notificationSettings =
+      settings;
 
     await user.save();
 
@@ -260,25 +336,342 @@ export const updateNotificationSettings = async (req, res) => {
       getNotificationSettingsObject(user);
 
     console.log("========================================");
-    console.log("✅ NOTIFICATION SETTINGS SAVED");
-    console.log("User ID:", req.userId);
-    console.log("Saved Settings:", savedSettings);
+
+    console.log(
+      "✅ NOTIFICATION SETTINGS SAVED"
+    );
+
+    console.log(
+      "User ID:",
+      req.userId
+    );
+
+    console.log(
+      "Saved Settings:",
+      savedSettings
+    );
+
     console.log("========================================");
 
     return res.status(200).json({
       success: true,
-      message: "Notification settings updated successfully",
+
+      message:
+        "Notification settings updated successfully",
+
       settings: savedSettings,
     });
   } catch (error) {
     console.error("========================================");
-    console.error("❌ UPDATE NOTIFICATION SETTINGS ERROR");
+
+    console.error(
+      "❌ UPDATE NOTIFICATION SETTINGS ERROR"
+    );
+
     console.error(error);
+
     console.error("========================================");
 
     return res.status(500).json({
       success: false,
-      message: "Failed to update notification settings",
+
+      message:
+        "Failed to update notification settings",
     });
   }
 };
+
+/* =========================================================
+   GET SECURITY SETTINGS
+========================================================= */
+
+export const getSecuritySettings = async (
+  req,
+  res
+) => {
+  try {
+    console.log("========================================");
+    console.log("🛡️ GET SECURITY SETTINGS");
+    console.log("User ID:", req.userId);
+    console.log("========================================");
+
+    const user = await User.findById(
+      req.userId
+    ).select("securitySettings");
+
+    if (!user) {
+      console.log("❌ USER NOT FOUND");
+
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    /*
+      Read the actual stored values.
+
+      IMPORTANT:
+
+      false must remain false.
+
+      We only use true as the fallback when the
+      field does not exist yet.
+    */
+
+    const securitySettings =
+      user.securitySettings || {};
+
+    const settings = {
+      twoFactorEnabled:
+        securitySettings.twoFactorEnabled !==
+        false,
+
+      sessionTimeoutEnabled:
+        securitySettings.sessionTimeoutEnabled !==
+        false,
+    };
+
+    console.log(
+      "📦 DATABASE SECURITY SETTINGS:"
+    );
+
+    console.log(
+      securitySettings
+    );
+
+    console.log(
+      "📤 RETURNING SETTINGS:"
+    );
+
+    console.log(
+      settings
+    );
+
+    console.log("========================================");
+
+    return res.status(200).json({
+      success: true,
+      settings,
+    });
+  } catch (error) {
+    console.error("========================================");
+
+    console.error(
+      "❌ GET SECURITY SETTINGS ERROR"
+    );
+
+    console.error(error);
+
+    console.error("========================================");
+
+    return res.status(500).json({
+      success: false,
+      message:
+        "Failed to load security settings",
+    });
+  }
+};
+
+/* =========================================================
+   UPDATE SECURITY SETTINGS
+========================================================= */
+
+export const updateSecuritySettings = async (
+  req,
+  res
+) => {
+  try {
+    console.log("========================================");
+
+    console.log(
+      "🛡️ UPDATE SECURITY SETTINGS"
+    );
+
+    console.log(
+      "User ID:",
+      req.userId
+    );
+
+    console.log(
+      "Request Body:",
+      req.body
+    );
+
+    console.log("========================================");
+
+    const user = await User.findById(
+      req.userId
+    );
+
+    if (!user) {
+      console.log("❌ USER NOT FOUND");
+
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    /* =======================================================
+       TWO-FACTOR AUTHENTICATION
+    ======================================================= */
+
+    if (
+      typeof req.body.twoFactorEnabled ===
+      "boolean"
+    ) {
+      console.log(
+        "🔐 Updating twoFactorEnabled:",
+        req.body.twoFactorEnabled
+      );
+
+      /*
+        IMPORTANT:
+
+        Update the nested Mongoose field directly.
+
+        This guarantees that Mongoose tracks the
+        change correctly, including false.
+      */
+
+      user.set(
+        "securitySettings.twoFactorEnabled",
+        req.body.twoFactorEnabled
+      );
+    }
+
+    /* =======================================================
+       SESSION TIMEOUT PROTECTION
+    ======================================================= */
+
+    if (
+      typeof req.body.sessionTimeoutEnabled ===
+      "boolean"
+    ) {
+      console.log(
+        "⏱️ Updating sessionTimeoutEnabled:",
+        req.body.sessionTimeoutEnabled
+      );
+
+      /*
+        Update the nested Mongoose field directly.
+      */
+
+      user.set(
+        "securitySettings.sessionTimeoutEnabled",
+        req.body.sessionTimeoutEnabled
+      );
+    }
+
+    console.log(
+      "📦 SECURITY SETTINGS BEFORE SAVE:"
+    );
+
+    console.log(
+      user.securitySettings
+    );
+
+    /* =======================================================
+       SAVE USER
+    ======================================================= */
+
+    await user.save();
+
+    console.log(
+      "✅ USER SAVED SUCCESSFULLY"
+    );
+
+    /* =======================================================
+       READ DIRECTLY FROM DATABASE AGAIN
+    ======================================================= */
+
+    const freshUser =
+      await User.findById(req.userId)
+        .select("securitySettings")
+        .lean();
+
+    if (!freshUser) {
+      console.log(
+        "❌ USER NOT FOUND AFTER SAVE"
+      );
+
+      return res.status(404).json({
+        success: false,
+        message:
+          "User not found after update",
+      });
+    }
+
+    const savedSecuritySettings =
+      freshUser.securitySettings || {};
+
+    /*
+      IMPORTANT:
+
+      false = OFF
+      true = ON
+      undefined = ON by default
+
+      This prevents false from accidentally becoming
+      true when returning the response.
+    */
+
+    const savedSettings = {
+      twoFactorEnabled:
+        savedSecuritySettings.twoFactorEnabled !==
+        false,
+
+      sessionTimeoutEnabled:
+        savedSecuritySettings.sessionTimeoutEnabled !==
+        false,
+    };
+
+    console.log("========================================");
+
+    console.log(
+      "💾 ACTUALLY SAVED IN DATABASE:"
+    );
+
+    console.log(
+      savedSecuritySettings
+    );
+
+    console.log(
+      "📤 RETURNING TO FRONTEND:"
+    );
+
+    console.log(
+      savedSettings
+    );
+
+    console.log("========================================");
+
+    return res.status(200).json({
+      success: true,
+
+      message:
+        "Security settings updated successfully",
+
+      settings: savedSettings,
+    });
+  } catch (error) {
+    console.error("========================================");
+
+    console.error(
+      "❌ UPDATE SECURITY SETTINGS ERROR"
+    );
+
+    console.error(error);
+
+    console.error("========================================");
+
+    return res.status(500).json({
+      success: false,
+
+      message:
+        "Failed to update security settings",
+    });
+  }
+};
+
