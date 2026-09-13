@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { io } from "socket.io-client";
 import { motion, AnimatePresence } from "framer-motion";
+import { API } from "../lib/api.js";
 
 import {
   LayoutDashboard,
@@ -13,15 +14,17 @@ import {
   Send,
   Search,
   Bell,
-  Sparkles,
-  BriefcaseBusiness,
-  HandHelping,
-  MessageCircle,
+  MessageSquare,
+  FileText,
+  AlertTriangle,
   CheckCheck,
   LogOut,
   ArrowLeft,
   Menu,
   X,
+  BriefcaseBusiness,
+  HandHelping,
+  MessageCircle,
 } from "lucide-react";
 
 /* =========================================================
@@ -206,17 +209,24 @@ const GuidancePage = () => {
   const [conversationMeta, setConversationMeta] = useState({});
 
   /* =======================================================
-     UNREAD
+     CHAT UNREAD
+     
+     IMPORTANT:
+     This is separate from system notifications.
   ======================================================= */
 
   const [unreadMap, setUnreadMap] = useState({});
 
   /* =======================================================
-     NOTIFICATIONS
+     SYSTEM NOTIFICATIONS
+     
+     SAME SYSTEM AS DASHBOARD
   ======================================================= */
 
   const [notifications, setNotifications] = useState([]);
+  const [notifCount, setNotifCount] = useState(0);
   const [openNotif, setOpenNotif] = useState(false);
+  const [notificationLoading, setNotificationLoading] = useState(false);
 
   /* =======================================================
      TOAST
@@ -436,6 +446,348 @@ const GuidancePage = () => {
   };
 
   /* =======================================================
+     FETCH SYSTEM NOTIFICATIONS
+     
+     SAME LOGIC AS DASHBOARD
+  ======================================================= */
+
+  const fetchNotifications = useCallback(async () => {
+    const userId = useAuthStore.getState().user?._id;
+
+    if (!userId) return;
+
+    setNotificationLoading(true);
+
+    try {
+      const response = await API.get(
+        `/api/notifications/${userId}/unread`
+      );
+
+      const incoming =
+        response.data?.notifications ||
+        response.data ||
+        [];
+
+      const unread = incoming.filter(
+        (notification) => !notification.isRead
+      );
+
+      unread.sort(
+        (a, b) =>
+          new Date(b.createdAt || 0) -
+          new Date(a.createdAt || 0)
+      );
+
+      setNotifications(unread);
+      setNotifCount(unread.length);
+    } catch (error) {
+      console.error(
+        "Failed to fetch notifications:",
+        error
+      );
+    } finally {
+      setNotificationLoading(false);
+    }
+  }, []);
+
+  /* =======================================================
+     INITIAL SYSTEM NOTIFICATIONS
+  ======================================================= */
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications, user?._id]);
+
+  /* =======================================================
+     REALTIME SYSTEM NOTIFICATIONS
+     
+     SAME GLOBAL EVENT USED BY DASHBOARD
+  ======================================================= */
+
+  useEffect(() => {
+    const handleGlobalNotification = (event) => {
+      const data = event?.detail;
+
+      if (!data) return;
+
+      const notificationId =
+        data._id ||
+        data.id ||
+        data.notificationId ||
+        `${data.type || "general"}-${Date.now()}`;
+
+      const newNotification = {
+        _id: notificationId,
+        id: notificationId,
+
+        title:
+          data.title ||
+          "New Notification",
+
+        message:
+          data.message ||
+          data.body ||
+          data.text ||
+          "You have a new notification.",
+
+        type:
+          data.type ||
+          data.notificationType ||
+          "general",
+
+        priority:
+          data.priority ||
+          "low",
+
+        isRead: false,
+
+        relatedId:
+          data.relatedId ||
+          data.data?.relatedId ||
+          null,
+
+        relatedType:
+          data.relatedType ||
+          data.data?.relatedType ||
+          null,
+
+        createdAt:
+          data.createdAt ||
+          new Date().toISOString(),
+
+        data:
+          data.data ||
+          {},
+      };
+
+      let wasAdded = false;
+
+      setNotifications((prev) => {
+        const alreadyExists = prev.some(
+          (item) =>
+            String(
+              item._id || item.id
+            ) ===
+            String(notificationId)
+        );
+
+        if (alreadyExists) {
+          return prev;
+        }
+
+        wasAdded = true;
+
+        return [
+          newNotification,
+          ...prev,
+        ];
+      });
+
+      if (wasAdded) {
+        setNotifCount(
+          (prev) => prev + 1
+        );
+      }
+    };
+
+    window.addEventListener(
+      "eduguard:new-notification",
+      handleGlobalNotification
+    );
+
+    return () => {
+      window.removeEventListener(
+        "eduguard:new-notification",
+        handleGlobalNotification
+      );
+    };
+  }, []);
+
+  /* =======================================================
+     GLOBAL MESSAGE EVENT
+     
+     Kept separate from system notification state.
+  ======================================================= */
+
+  useEffect(() => {
+    const handleGlobalMessage = (event) => {
+      console.log(
+        "📩 Guidance received global message event:",
+        event?.detail
+      );
+    };
+
+    window.addEventListener(
+      "eduguard:new-message",
+      handleGlobalMessage
+    );
+
+    return () => {
+      window.removeEventListener(
+        "eduguard:new-message",
+        handleGlobalMessage
+      );
+    };
+  }, []);
+
+  /* =======================================================
+     MARK INDIVIDUAL NOTIFICATION AS READ
+     
+     SAME LOGIC AS DASHBOARD
+  ======================================================= */
+
+  const markAsRead = async (notification) => {
+    const notificationId =
+      notification._id ||
+      notification.id;
+
+    if (!notificationId) return;
+
+    try {
+      await API.put(
+        `/api/notifications/read/${notificationId}`
+      );
+
+      setNotifications((prev) =>
+        prev.filter(
+          (item) =>
+            String(
+              item._id || item.id
+            ) !==
+            String(notificationId)
+        )
+      );
+
+      setNotifCount((prev) =>
+        Math.max(0, prev - 1)
+      );
+    } catch (error) {
+      console.error(
+        "Failed to mark notification as read:",
+        error
+      );
+    }
+  };
+
+  /* =======================================================
+     MARK ALL NOTIFICATIONS AS READ
+     
+     SAME LOGIC AS DASHBOARD
+  ======================================================= */
+
+  const markAllAsRead = async () => {
+    const userId =
+      useAuthStore.getState().user?._id;
+
+    if (
+      !userId ||
+      notifications.length === 0
+    ) {
+      return;
+    }
+
+    try {
+      await API.put(
+        `/api/notifications/${userId}/read-all`
+      );
+
+      setNotifications([]);
+      setNotifCount(0);
+    } catch (error) {
+      console.error(
+        "Failed to mark all notifications as read:",
+        error
+      );
+    }
+  };
+
+  /* =======================================================
+     NOTIFICATION ICON
+     
+     SAME AS DASHBOARD
+  ======================================================= */
+
+  const getNotificationIcon = (
+    notification
+  ) => {
+    if (
+      notification.type === "message" ||
+      notification.relatedType === "Message"
+    ) {
+      return (
+        <MessageSquare
+          size={15}
+          className="text-blue-600"
+        />
+      );
+    }
+
+    if (
+      notification.type === "report" ||
+      notification.relatedType === "Report"
+    ) {
+      return (
+        <FileText
+          size={15}
+          className="text-green-700"
+        />
+      );
+    }
+
+    if (
+      notification.type === "incident" ||
+      notification.relatedType === "Incident"
+    ) {
+      return (
+        <AlertTriangle
+          size={15}
+          className="text-red-600"
+        />
+      );
+    }
+
+    return (
+      <Bell
+        size={15}
+        className="text-green-700"
+      />
+    );
+  };
+
+  /* =======================================================
+     NOTIFICATION BACKGROUND
+     
+     SAME AS DASHBOARD
+  ======================================================= */
+
+  const getNotificationBackground = (
+    notification
+  ) => {
+    if (
+      notification.type === "message" ||
+      notification.relatedType === "Message"
+    ) {
+      return "bg-blue-50";
+    }
+
+    if (
+      notification.type === "report" ||
+      notification.relatedType === "Report"
+    ) {
+      return "bg-green-100";
+    }
+
+    if (
+      notification.type === "incident" ||
+      notification.relatedType === "Incident"
+    ) {
+      return "bg-red-50";
+    }
+
+    return "bg-green-100";
+  };
+
+  /* =======================================================
      FETCH USERS + EXISTING CONVERSATIONS
   ======================================================= */
 
@@ -451,7 +803,9 @@ const GuidancePage = () => {
         );
 
         if (!res.ok) {
-          throw new Error("Failed to fetch users");
+          throw new Error(
+            "Failed to fetch users"
+          );
         }
 
         const data = await res.json();
@@ -459,91 +813,117 @@ const GuidancePage = () => {
         if (cancelled) return;
 
         const otherUsers = data.filter(
-          (u) => String(u._id) !== String(user._id)
+          (u) =>
+            String(u._id) !==
+            String(user._id)
         );
 
         setUsers(otherUsers);
         usersRef.current = otherUsers;
 
-        const conversationChecks = await Promise.all(
-          otherUsers.map(async (u) => {
-            try {
-              const chatId = [String(user._id), String(u._id)]
-                .sort()
-                .join("-");
+        const conversationChecks =
+          await Promise.all(
+            otherUsers.map(async (u) => {
+              try {
+                const chatId = [
+                  String(user._id),
+                  String(u._id),
+                ]
+                  .sort()
+                  .join("-");
 
-              const response = await fetch(
-                `https://edu-guard-backend.onrender.com/api/messages/${chatId}`
-              );
+                const response =
+                  await fetch(
+                    `https://edu-guard-backend.onrender.com/api/messages/${chatId}`
+                  );
 
-              if (!response.ok) {
+                if (!response.ok) {
+                  return {
+                    user: u,
+                    hasConversation: false,
+                    lastMessage: null,
+                  };
+                }
+
+                const chatData =
+                  await response.json();
+
+                const chatMessages =
+                  Array.isArray(
+                    chatData.messages
+                  )
+                    ? chatData.messages
+                    : [];
+
+                const lastMessage =
+                  chatMessages.length > 0
+                    ? chatMessages[
+                        chatMessages.length - 1
+                      ]
+                    : null;
+
+                return {
+                  user: u,
+                  hasConversation:
+                    chatMessages.length > 0,
+                  lastMessage,
+                };
+              } catch (error) {
+                console.error(
+                  `Failed to check conversation with ${getDisplayName(
+                    u
+                  )}:`,
+                  error
+                );
+
                 return {
                   user: u,
                   hasConversation: false,
                   lastMessage: null,
                 };
               }
-
-              const chatData = await response.json();
-
-              const chatMessages = Array.isArray(
-                chatData.messages
-              )
-                ? chatData.messages
-                : [];
-
-              const lastMessage =
-                chatMessages.length > 0
-                  ? chatMessages[chatMessages.length - 1]
-                  : null;
-
-              return {
-                user: u,
-                hasConversation: chatMessages.length > 0,
-                lastMessage,
-              };
-            } catch (error) {
-              console.error(
-                `Failed to check conversation with ${getDisplayName(
-                  u
-                )}:`,
-                error
-              );
-
-              return {
-                user: u,
-                hasConversation: false,
-                lastMessage: null,
-              };
-            }
-          })
-        );
+            })
+          );
 
         if (cancelled) return;
 
-        const existingConversations = conversationChecks
-          .filter((item) => item.hasConversation)
-          .map((item) => item.user);
+        const existingConversations =
+          conversationChecks
+            .filter(
+              (item) =>
+                item.hasConversation
+            )
+            .map(
+              (item) => item.user
+            );
 
         const meta = {};
 
-        conversationChecks.forEach((item) => {
-          if (!item.lastMessage) return;
+        conversationChecks.forEach(
+          (item) => {
+            if (!item.lastMessage)
+              return;
 
-          const message = item.lastMessage;
+            const message =
+              item.lastMessage;
 
-          meta[item.user._id] = {
-            lastMessage: message.text || "",
-            lastMessageAt:
-              message.createdAt ||
-              message.updatedAt ||
-              null,
-          };
-        });
+            meta[item.user._id] = {
+              lastMessage:
+                message.text || "",
+              lastMessageAt:
+                message.createdAt ||
+                message.updatedAt ||
+                null,
+            };
+          }
+        );
 
         setConversationMeta(meta);
-        setConversationUsers(existingConversations);
-        conversationUsersRef.current = existingConversations;
+        setConversationUsers(
+          existingConversations
+        );
+        conversationUsersRef.current =
+          existingConversations;
       } catch (error) {
         console.error(
           "Failed to load users and conversations:",
@@ -566,22 +946,36 @@ const GuidancePage = () => {
   useEffect(() => {
     if (!user?._id) return;
 
-    const userId = String(user._id);
+    const userId = String(
+      user._id
+    );
 
     console.log(
       "🔌 Registering Guidance socket:",
       userId
     );
 
-    socket.emit("register", userId);
+    socket.emit(
+      "register",
+      userId
+    );
 
-    const handleOnlineUsers = (online) => {
-      console.log("🟢 Online users:", online);
+    const handleOnlineUsers = (
+      online
+    ) => {
+      console.log(
+        "🟢 Online users:",
+        online
+      );
 
-      setOnlineUsers(online || []);
+      setOnlineUsers(
+        online || []
+      );
     };
 
-    const handleReceiveMessage = (msg) => {
+    const handleReceiveMessage = (
+      msg
+    ) => {
       if (!msg) return;
 
       console.log(
@@ -589,21 +983,33 @@ const GuidancePage = () => {
         msg
       );
 
-      const senderId = String(msg.sender);
-      const receiverId = String(msg.receiver);
-
-      const currentUserId = String(
-        currentUserRef.current?._id || ""
+      const senderId = String(
+        msg.sender
       );
 
+      const receiverId = String(
+        msg.receiver
+      );
+
+      const currentUserId =
+        String(
+          currentUserRef.current?._id ||
+            ""
+        );
+
       if (
-        senderId !== currentUserId &&
-        receiverId !== currentUserId
+        senderId !==
+          currentUserId &&
+        receiverId !==
+          currentUserId
       ) {
         return;
       }
 
-      if (senderId === currentUserId) {
+      if (
+        senderId ===
+        currentUserId
+      ) {
         console.log(
           "⏭️ Ignoring own receive_message event. ACK handles it."
         );
@@ -611,36 +1017,51 @@ const GuidancePage = () => {
         return;
       }
 
-      const otherUserId = senderId;
+      const otherUserId =
+        senderId;
 
       let chatUser = null;
 
-      const existingUser = usersRef.current.find(
-        (u) => String(u._id) === otherUserId
-      );
+      const existingUser =
+        usersRef.current.find(
+          (u) =>
+            String(u._id) ===
+            otherUserId
+        );
 
       if (existingUser) {
         chatUser = existingUser;
       } else {
         const existingConversation =
           conversationUsersRef.current.find(
-            (u) => String(u._id) === otherUserId
+            (u) =>
+              String(u._id) ===
+              otherUserId
           );
 
-        if (existingConversation) {
-          chatUser = existingConversation;
+        if (
+          existingConversation
+        ) {
+          chatUser =
+            existingConversation;
         }
       }
 
       if (!chatUser) {
-        chatUser = createUserFromMessage(msg);
+        chatUser =
+          createUserFromMessage(
+            msg
+          );
       }
 
       if (
         chatUser &&
         !usersRef.current.some(
           (u) =>
-            String(u._id) === String(chatUser._id)
+            String(u._id) ===
+            String(
+              chatUser._id
+            )
         )
       ) {
         setUsers((prev) => {
@@ -648,13 +1069,18 @@ const GuidancePage = () => {
             prev.some(
               (u) =>
                 String(u._id) ===
-                String(chatUser._id)
+                String(
+                  chatUser._id
+                )
             )
           ) {
             return prev;
           }
 
-          return [...prev, chatUser];
+          return [
+            ...prev,
+            chatUser,
+          ];
         });
 
         usersRef.current = [
@@ -664,39 +1090,54 @@ const GuidancePage = () => {
       }
 
       if (chatUser) {
-        setConversationUsers((prev) => {
-          const exists = prev.some(
-            (u) =>
-              String(u._id) ===
-              String(chatUser._id)
-          );
+        setConversationUsers(
+          (prev) => {
+            const exists =
+              prev.some(
+                (u) =>
+                  String(u._id) ===
+                  String(
+                    chatUser._id
+                  )
+              );
 
-          if (exists) return prev;
+            if (exists) return prev;
 
-          const next = [...prev, chatUser];
+            const next = [
+              ...prev,
+              chatUser,
+            ];
 
-          conversationUsersRef.current = next;
+            conversationUsersRef.current =
+              next;
 
-          return next;
-        });
+            return next;
+          }
+        );
       }
 
-      setConversationMeta((prev) => ({
-        ...prev,
+      setConversationMeta(
+        (prev) => ({
+          ...prev,
 
-        [otherUserId]: {
-          lastMessage: msg.text || "",
-          lastMessageAt:
-            msg.createdAt ||
-            new Date().toISOString(),
-        },
-      }));
+          [otherUserId]: {
+            lastMessage:
+              msg.text || "",
+            lastMessageAt:
+              msg.createdAt ||
+              new Date().toISOString(),
+          },
+        })
+      );
 
-      const currentChat = activeChatRef.current;
+      const currentChat =
+        activeChatRef.current;
 
       const isCurrentChat =
         currentChat &&
-        String(currentChat._id) === otherUserId;
+        String(
+          currentChat._id
+        ) === otherUserId;
 
       if (isCurrentChat) {
         setMessages((prev) => {
@@ -705,8 +1146,12 @@ const GuidancePage = () => {
             prev.some(
               (message) =>
                 message._id &&
-                String(message._id) ===
-                  String(msg._id)
+                String(
+                  message._id
+                ) ===
+                  String(
+                    msg._id
+                  )
             )
           ) {
             return prev;
@@ -724,17 +1169,35 @@ const GuidancePage = () => {
             return prev;
           }
 
-          return [...prev, msg];
+          return [
+            ...prev,
+            msg,
+          ];
         });
 
         return;
       }
 
+      /* ================================================
+         CHAT UNREAD COUNT
+         
+         This remains separate from system notifications.
+      ================================================= */
+
       setUnreadMap((prev) => ({
         ...prev,
 
-        [senderId]: (prev[senderId] || 0) + 1,
+        [senderId]:
+          (prev[senderId] || 0) +
+          1,
       }));
+
+      /* ================================================
+         MESSAGE TOAST
+         
+         This remains because it is a direct realtime
+         chat alert, not the system notification drawer.
+      ================================================= */
 
       const notif = {
         id:
@@ -742,11 +1205,14 @@ const GuidancePage = () => {
           msg.clientMessageId ||
           `${senderId}-${Date.now()}`,
 
-        text: msg.text || "",
+        text:
+          msg.text || "",
 
         name:
           msg.senderName ||
-          getDisplayName(chatUser) ||
+          getDisplayName(
+            chatUser
+          ) ||
           "User",
 
         photo:
@@ -762,27 +1228,21 @@ const GuidancePage = () => {
       };
 
       console.log(
-        "🔔 Creating notification:",
+        "🔔 Creating message toast:",
         notif
       );
 
-      setNotifications((prev) => {
-        const exists = prev.some(
-          (n) => n.id === notif.id
-        );
-
-        if (exists) return prev;
-
-        return [notif, ...prev.slice(0, 15)];
-      });
-
-      setToastNotif(notif);
+      setToastNotif(
+        notif
+      );
 
       setTimeout(() => {
-        setToastNotif((current) =>
-          current?.id === notif.id
-            ? null
-            : current
+        setToastNotif(
+          (current) =>
+            current?.id ===
+            notif.id
+              ? null
+              : current
         );
       }, 4000);
     };
@@ -814,37 +1274,47 @@ const GuidancePage = () => {
      SORT CONVERSATIONS
   ======================================================= */
 
-  const sortedConversationUsers = useMemo(() => {
-    return [...conversationUsers].sort((a, b) => {
-      const dateA = conversationMeta[a._id]
-        ?.lastMessageAt
-        ? new Date(
-            conversationMeta[a._id]
-              .lastMessageAt
-          ).getTime()
-        : 0;
+  const sortedConversationUsers =
+    useMemo(() => {
+      return [
+        ...conversationUsers,
+      ].sort((a, b) => {
+        const dateA =
+          conversationMeta[
+            a._id
+          ]?.lastMessageAt
+            ? new Date(
+                conversationMeta[
+                  a._id
+                ].lastMessageAt
+              ).getTime()
+            : 0;
 
-      const dateB = conversationMeta[b._id]
-        ?.lastMessageAt
-        ? new Date(
-            conversationMeta[b._id]
-              .lastMessageAt
-          ).getTime()
-        : 0;
+        const dateB =
+          conversationMeta[
+            b._id
+          ]?.lastMessageAt
+            ? new Date(
+                conversationMeta[
+                  b._id
+                ].lastMessageAt
+              ).getTime()
+            : 0;
 
-      return dateB - dateA;
-    });
-  }, [
-    conversationUsers,
-    conversationMeta,
-  ]);
+        return dateB - dateA;
+      });
+    }, [
+      conversationUsers,
+      conversationMeta,
+    ]);
 
   /* =======================================================
      OPEN CHAT
   ======================================================= */
 
   const openChat = async (u) => {
-    if (!u?._id || !user?._id) return;
+    if (!u?._id || !user?._id)
+      return;
 
     setMobileChatOpen(true);
 
@@ -881,13 +1351,15 @@ const GuidancePage = () => {
         );
       }
 
-      const data = await res.json();
+      const data =
+        await res.json();
 
-      const chatMessages = Array.isArray(
-        data.messages
-      )
-        ? data.messages
-        : [];
+      const chatMessages =
+        Array.isArray(
+          data.messages
+        )
+          ? data.messages
+          : [];
 
       if (
         String(
@@ -897,45 +1369,66 @@ const GuidancePage = () => {
         return;
       }
 
-      setMessages(chatMessages);
+      setMessages(
+        chatMessages
+      );
 
-      if (chatMessages.length > 0) {
+      if (
+        chatMessages.length >
+        0
+      ) {
         const lastMessage =
           chatMessages[
-            chatMessages.length - 1
+            chatMessages.length -
+              1
           ];
 
-        setConversationMeta((prev) => ({
-          ...prev,
+        setConversationMeta(
+          (prev) => ({
+            ...prev,
 
-          [u._id]: {
-            lastMessage:
-              lastMessage.text || "",
+            [u._id]: {
+              lastMessage:
+                lastMessage.text ||
+                "",
 
-            lastMessageAt:
-              lastMessage.createdAt ||
-              lastMessage.updatedAt ||
-              null,
-          },
-        }));
+              lastMessageAt:
+                lastMessage.createdAt ||
+                lastMessage.updatedAt ||
+                null,
+            },
+          })
+        );
 
-        setConversationUsers((prev) => {
-          const alreadyExists =
-            prev.some(
-              (existingUser) =>
-                String(existingUser._id) ===
-                String(u._id)
-            );
+        setConversationUsers(
+          (prev) => {
+            const alreadyExists =
+              prev.some(
+                (existingUser) =>
+                  String(
+                    existingUser._id
+                  ) ===
+                  String(
+                    u._id
+                  )
+              );
 
-          if (alreadyExists) return prev;
+            if (
+              alreadyExists
+            )
+              return prev;
 
-          const next = [...prev, u];
+            const next = [
+              ...prev,
+              u,
+            ];
 
-          conversationUsersRef.current =
-            next;
+            conversationUsersRef.current =
+              next;
 
-          return next;
-        });
+            return next;
+          }
+        );
       }
     } catch (error) {
       console.error(
@@ -957,21 +1450,23 @@ const GuidancePage = () => {
      BACK TO CONVERSATIONS
   ======================================================= */
 
-  const backToConversations = () => {
-    setActiveChat(null);
-    activeChatRef.current = null;
-    setMessages([]);
-    setInput("");
-    setMobileChatOpen(false);
-  };
+  const backToConversations =
+    () => {
+      setActiveChat(null);
+      activeChatRef.current = null;
+      setMessages([]);
+      setInput("");
+      setMobileChatOpen(false);
+    };
 
   /* =======================================================
      CLOSE MOBILE CHAT
   ======================================================= */
 
-  const closeMobileChat = () => {
-    backToConversations();
-  };
+  const closeMobileChat =
+    () => {
+      backToConversations();
+    };
 
   /* =======================================================
      SEND MESSAGE
@@ -986,7 +1481,8 @@ const GuidancePage = () => {
       return;
     }
 
-    const text = input.trim();
+    const text =
+      input.trim();
 
     const clientMessageId =
       `client-${Date.now()}-${Math.random()
@@ -1001,9 +1497,13 @@ const GuidancePage = () => {
 
       clientMessageId,
 
-      sender: String(user._id),
+      sender: String(
+        user._id
+      ),
 
-      receiver: String(activeChat._id),
+      receiver: String(
+        activeChat._id
+      ),
 
       text,
 
@@ -1036,42 +1536,53 @@ const GuidancePage = () => {
       ];
     });
 
-    setConversationMeta((prev) => ({
-      ...prev,
-
-      [activeChat._id]: {
-        lastMessage: text,
-
-        lastMessageAt: createdAt,
-      },
-    }));
-
-    setConversationUsers((prev) => {
-      const exists = prev.some(
-        (u) =>
-          String(u._id) ===
-          String(activeChat._id)
-      );
-
-      if (exists) return prev;
-
-      const next = [
+    setConversationMeta(
+      (prev) => ({
         ...prev,
-        activeChat,
-      ];
 
-      conversationUsersRef.current =
-        next;
+        [activeChat._id]: {
+          lastMessage: text,
 
-      return next;
-    });
+          lastMessageAt:
+            createdAt,
+        },
+      })
+    );
+
+    setConversationUsers(
+      (prev) => {
+        const exists =
+          prev.some(
+            (u) =>
+              String(u._id) ===
+              String(
+                activeChat._id
+              )
+          );
+
+        if (exists)
+          return prev;
+
+        const next = [
+          ...prev,
+          activeChat,
+        ];
+
+        conversationUsersRef.current =
+          next;
+
+        return next;
+      }
+    );
 
     setInput("");
 
     socket.emit(
       "send_message",
       {
-        sender: String(user._id),
+        sender: String(
+          user._id
+        ),
 
         receiver: String(
           activeChat._id
@@ -1093,12 +1604,13 @@ const GuidancePage = () => {
             saved.message
           );
 
-          setMessages((prev) =>
-            prev.filter(
-              (message) =>
-                message.clientMessageId !==
-                clientMessageId
-            )
+          setMessages(
+            (prev) =>
+              prev.filter(
+                (message) =>
+                  message.clientMessageId !==
+                  clientMessageId
+              )
           );
 
           return;
@@ -1111,53 +1623,64 @@ const GuidancePage = () => {
           return;
         }
 
-        setMessages((prev) => {
-          const optimisticIndex =
-            prev.findIndex(
-              (message) =>
-                message.clientMessageId ===
-                clientMessageId
-            );
+        setMessages(
+          (prev) => {
+            const optimisticIndex =
+              prev.findIndex(
+                (message) =>
+                  message.clientMessageId ===
+                  clientMessageId
+              );
 
-          if (optimisticIndex === -1) {
-            const alreadyExists =
-              (savedMessage._id &&
-                prev.some(
-                  (message) =>
-                    message._id &&
-                    String(
-                      message._id
-                    ) ===
+            if (
+              optimisticIndex ===
+              -1
+            ) {
+              const alreadyExists =
+                (savedMessage._id &&
+                  prev.some(
+                    (message) =>
+                      message._id &&
                       String(
-                        savedMessage._id
-                      )
-                )) ||
-              (savedMessage.clientMessageId &&
-                prev.some(
-                  (message) =>
-                    message.clientMessageId ===
-                    savedMessage.clientMessageId
-                ));
+                        message._id
+                      ) ===
+                        String(
+                          savedMessage._id
+                        )
+                  )) ||
+                (savedMessage.clientMessageId &&
+                  prev.some(
+                    (message) =>
+                      message.clientMessageId ===
+                      savedMessage.clientMessageId
+                  ));
 
-            if (alreadyExists) {
+              if (
+                alreadyExists
+              ) {
+                return prev;
+              }
+
               return prev;
             }
 
-            return prev;
+            const next = [
+              ...prev,
+            ];
+
+            next[
+              optimisticIndex
+            ] = {
+              ...savedMessage,
+
+              clientMessageId,
+
+              pending: false,
+            };
+
+            return next;
           }
-
-          const next = [...prev];
-
-          next[optimisticIndex] = {
-            ...savedMessage,
-
-            clientMessageId,
-
-            pending: false,
-          };
-
-          return next;
-        });
+        );
       }
     );
   };
@@ -1166,7 +1689,9 @@ const GuidancePage = () => {
      ENTER TO SEND
   ======================================================= */
 
-  const handleInputKeyDown = (e) => {
+  const handleInputKeyDown = (
+    e
+  ) => {
     if (
       e.key === "Enter" &&
       !e.shiftKey
@@ -1181,62 +1706,72 @@ const GuidancePage = () => {
      FILTER USERS
   ======================================================= */
 
-  const filteredUsers = useMemo(() => {
-    const searchTerm =
-      search.trim().toLowerCase();
+  const filteredUsers =
+    useMemo(() => {
+      const searchTerm =
+        search
+          .trim()
+          .toLowerCase();
 
-    if (!searchTerm) {
-      return sortedConversationUsers;
-    }
+      if (!searchTerm) {
+        return sortedConversationUsers;
+      }
 
-    return users
-      .filter((u) => {
-        const isStudent =
-          u.role?.toLowerCase() ===
-          "student";
+      return users
+        .filter((u) => {
+          const isStudent =
+            u.role?.toLowerCase() ===
+            "student";
 
-        const name =
-          getDisplayName(u);
+          const name =
+            getDisplayName(u);
 
-        return (
-          isStudent &&
-          name
-            .toLowerCase()
-            .includes(searchTerm)
-        );
-      })
-      .sort((a, b) => {
-        const dateA =
-          conversationMeta[a._id]
-            ?.lastMessageAt
-            ? new Date(
-                conversationMeta[
-                  a._id
-                ].lastMessageAt
-              ).getTime()
-            : 0;
+          return (
+            isStudent &&
+            name
+              .toLowerCase()
+              .includes(
+                searchTerm
+              )
+          );
+        })
+        .sort((a, b) => {
+          const dateA =
+            conversationMeta[
+              a._id
+            ]?.lastMessageAt
+              ? new Date(
+                  conversationMeta[
+                    a._id
+                  ].lastMessageAt
+                ).getTime()
+              : 0;
 
-        const dateB =
-          conversationMeta[b._id]
-            ?.lastMessageAt
-            ? new Date(
-                conversationMeta[
-                  b._id
-                ].lastMessageAt
-              ).getTime()
-            : 0;
+          const dateB =
+            conversationMeta[
+              b._id
+            ]?.lastMessageAt
+              ? new Date(
+                  conversationMeta[
+                    b._id
+                  ].lastMessageAt
+                ).getTime()
+              : 0;
 
-        return dateB - dateA;
-      });
-  }, [
-    users,
-    sortedConversationUsers,
-    conversationMeta,
-    search,
-  ]);
+          return dateB - dateA;
+        });
+    }, [
+      users,
+      sortedConversationUsers,
+      conversationMeta,
+      search,
+    ]);
 
   /* =======================================================
-     UNREAD TOTAL
+     CHAT UNREAD TOTAL
+     
+     This is intentionally NOT used for the system
+     notification badge anymore.
   ======================================================= */
 
   const unreadTotal = useMemo(() => {
@@ -1251,38 +1786,147 @@ const GuidancePage = () => {
 
   /* =======================================================
      NOTIFICATION CLICK
+     
+     SYSTEM NOTIFICATIONS:
+     - Message -> open corresponding chat
+     - Report -> Reports
+     - Incident -> Cases
+     - Other -> remain handled as read
   ======================================================= */
 
-  const handleNotificationClick = (n) => {
-    const target =
-      usersRef.current.find(
-        (u) =>
-          String(u._id) ===
-          String(n.senderId)
-      ) ||
-      conversationUsersRef.current.find(
-        (u) =>
-          String(u._id) ===
-          String(n.senderId)
-      ) ||
-      createUserFromMessage({
-        sender: n.senderId,
-        senderName: n.name,
-        senderProfilePhoto: n.photo,
-      });
+  const handleNotificationClick =
+    async (notification) => {
+      const type =
+        notification.type;
 
-    if (target) {
-      openChat(target);
+      const relatedType =
+        notification.relatedType;
+
+      await markAsRead(
+        notification
+      );
 
       setOpenNotif(false);
-      setToastNotif(null);
 
-      setUnreadMap((prev) => ({
-        ...prev,
-        [n.senderId]: 0,
-      }));
-    }
-  };
+      /* ================================================
+         MESSAGE NOTIFICATION
+      ================================================= */
+
+      if (
+        type === "message" ||
+        relatedType === "Message"
+      ) {
+        const senderId =
+          notification.data
+            ?.senderId ||
+          notification.data
+            ?.sender ||
+          notification.relatedId;
+
+        const senderName =
+          notification.data
+            ?.senderName ||
+          notification.data
+            ?.sender?.name ||
+          notification.title ||
+          "Student";
+
+        const senderPhoto =
+          notification.data
+            ?.senderProfilePhoto ||
+          notification.data
+            ?.sender?.profilePhoto ||
+          null;
+
+        if (senderId) {
+          const target =
+            usersRef.current.find(
+              (u) =>
+                String(
+                  u._id
+                ) ===
+                String(
+                  senderId
+                )
+            ) ||
+            conversationUsersRef.current.find(
+              (u) =>
+                String(
+                  u._id
+                ) ===
+                String(
+                  senderId
+                )
+            ) ||
+            createUserFromMessage({
+              sender:
+                senderId,
+              senderName,
+              senderProfilePhoto:
+                senderPhoto,
+            });
+
+          if (target) {
+            await openChat(
+              target
+            );
+
+            setUnreadMap(
+              (prev) => ({
+                ...prev,
+
+                [senderId]: 0,
+              })
+            );
+          } else {
+            /*
+             * If the backend notification does not contain
+             * enough information to identify the sender,
+             * fall back to the Guidance page itself.
+             */
+            navigate(
+              "/guidance"
+            );
+          }
+        } else {
+          navigate(
+            "/guidance"
+          );
+        }
+
+        return;
+      }
+
+      /* ================================================
+         REPORT NOTIFICATION
+      ================================================= */
+
+      if (
+        type === "report" ||
+        relatedType === "Report"
+      ) {
+        navigate(
+          "/reports"
+        );
+
+        return;
+      }
+
+      /* ================================================
+         INCIDENT NOTIFICATION
+      ================================================= */
+
+      if (
+        type === "incident" ||
+        relatedType === "Incident"
+      ) {
+        navigate(
+          "/cases"
+        );
+
+        return;
+      }
+    };
 
   /* =======================================================
      RENDER
@@ -1335,52 +1979,78 @@ const GuidancePage = () => {
 
           <div className="space-y-1">
             <Nav
-              icon={<LayoutDashboard size={18} />}
+              icon={
+                <LayoutDashboard
+                  size={18}
+                />
+              }
               label="Dashboard"
               onClick={() =>
-                navigate("/dashboard")
+                navigate(
+                  "/dashboard"
+                )
               }
             />
 
             <Nav
-              icon={<Users size={18} />}
+              icon={
+                <Users size={18} />
+              }
               label="Students"
               onClick={() =>
-                navigate("/students")
+                navigate(
+                  "/students"
+                )
               }
             />
 
             <Nav
-              icon={<ShieldX size={18} />}
+              icon={
+                <ShieldX size={18} />
+              }
               label="Guidance"
               active
             />
 
             <Nav
               icon={
-                <ChartNoAxesCombined size={18} />
+                <ChartNoAxesCombined
+                  size={18}
+                />
               }
               label="Reports"
               onClick={() =>
-                navigate("/reports")
+                navigate(
+                  "/reports"
+                )
               }
             />
 
             <Nav
               icon={
-                <BriefcaseBusiness size={18} />
+                <BriefcaseBusiness
+                  size={18}
+                />
               }
               label="Cases"
               onClick={() =>
-                navigate("/cases")
+                navigate(
+                  "/cases"
+                )
               }
             />
 
             <Nav
-              icon={<HandHelping size={18} />}
+              icon={
+                <HandHelping
+                  size={18}
+                />
+              }
               label="Interventions"
               onClick={() =>
-                navigate("/interventions")
+                navigate(
+                  "/interventions"
+                )
               }
             />
           </div>
@@ -1390,10 +2060,14 @@ const GuidancePage = () => {
           </p>
 
           <Nav
-            icon={<Settings size={18} />}
+            icon={
+              <Settings size={18} />
+            }
             label="Settings"
             onClick={() =>
-              navigate("/settings")
+              navigate(
+                "/settings"
+              )
             }
           />
         </div>
@@ -1470,12 +2144,22 @@ const GuidancePage = () => {
         {mobileSidebarOpen && (
           <>
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
+              initial={{
+                opacity: 0,
+              }}
+              animate={{
+                opacity: 1,
+              }}
+              exit={{
+                opacity: 0,
+              }}
+              transition={{
+                duration: 0.2,
+              }}
               onClick={() =>
-                setMobileSidebarOpen(false)
+                setMobileSidebarOpen(
+                  false
+                )
               }
               className="
                 fixed
@@ -1488,9 +2172,15 @@ const GuidancePage = () => {
             />
 
             <motion.aside
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
+              initial={{
+                x: "-100%",
+              }}
+              animate={{
+                x: 0,
+              }}
+              exit={{
+                x: "-100%",
+              }}
               transition={{
                 type: "spring",
                 stiffness: 320,
@@ -1543,7 +2233,9 @@ const GuidancePage = () => {
 
                     <button
                       onClick={() =>
-                        setMobileSidebarOpen(false)
+                        setMobileSidebarOpen(
+                          false
+                        )
                       }
                       className="
                         w-9
@@ -1582,7 +2274,9 @@ const GuidancePage = () => {
                 <div className="space-y-1">
                   <Nav
                     icon={
-                      <LayoutDashboard size={18} />
+                      <LayoutDashboard
+                        size={18}
+                      />
                     }
                     label="Dashboard"
                     onClick={() =>
@@ -1593,7 +2287,9 @@ const GuidancePage = () => {
                   />
 
                   <Nav
-                    icon={<Users size={18} />}
+                    icon={
+                      <Users size={18} />
+                    }
                     label="Students"
                     onClick={() =>
                       handleNavigation(
@@ -1603,14 +2299,18 @@ const GuidancePage = () => {
                   />
 
                   <Nav
-                    icon={<ShieldX size={18} />}
+                    icon={
+                      <ShieldX size={18} />
+                    }
                     label="Guidance"
                     active
                   />
 
                   <Nav
                     icon={
-                      <ChartNoAxesCombined size={18} />
+                      <ChartNoAxesCombined
+                        size={18}
+                      />
                     }
                     label="Reports"
                     onClick={() =>
@@ -1622,7 +2322,9 @@ const GuidancePage = () => {
 
                   <Nav
                     icon={
-                      <BriefcaseBusiness size={18} />
+                      <BriefcaseBusiness
+                        size={18}
+                      />
                     }
                     label="Cases"
                     onClick={() =>
@@ -1634,7 +2336,9 @@ const GuidancePage = () => {
 
                   <Nav
                     icon={
-                      <HandHelping size={18} />
+                      <HandHelping
+                        size={18}
+                      />
                     }
                     label="Interventions"
                     onClick={() =>
@@ -1650,7 +2354,9 @@ const GuidancePage = () => {
                 </p>
 
                 <Nav
-                  icon={<Settings size={18} />}
+                  icon={
+                    <Settings size={18} />
+                  }
                   label="Settings"
                   onClick={() =>
                     handleNavigation(
@@ -1677,7 +2383,9 @@ const GuidancePage = () => {
                       ) : (
                         <span className="text-green-700 font-bold">
                           {adminName
-                            .charAt(0)
+                            .charAt(
+                              0
+                            )
                             .toUpperCase()}
                         </span>
                       )}
@@ -1699,7 +2407,9 @@ const GuidancePage = () => {
 
                 <button
                   onClick={() => {
-                    setMobileSidebarOpen(false);
+                    setMobileSidebarOpen(
+                      false
+                    );
                     logout();
                   }}
                   className="
@@ -1754,13 +2464,18 @@ const GuidancePage = () => {
             lg:py-5
           "
         >
-          {/* MOBILE BRAND + HAMBURGER + NOTIFICATION */}
+
+          {/* =================================================
+             MOBILE BRAND + HAMBURGER + NOTIFICATION
+          ================================================= */}
 
           <div className="flex lg:hidden items-center justify-between mb-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <button
                 onClick={() =>
-                  setMobileSidebarOpen(true)
+                  setMobileSidebarOpen(
+                    true
+                  )
                 }
                 className="
                   w-10
@@ -1806,158 +2521,43 @@ const GuidancePage = () => {
               </div>
             </div>
 
-            <div className="relative flex-shrink-0">
-              <button
-                onClick={() =>
-                  setOpenNotif(!openNotif)
-                }
-                className="
-                  relative
-                  w-10
-                  h-10
-                  rounded-xl
-                  bg-white
-                  border
-                  border-gray-200
-                  text-gray-600
-                  flex
-                  items-center
-                  justify-center
-                  shadow-sm
-                "
-              >
-                <Bell size={17} />
+            {/* MOBILE NOTIFICATION BUTTON */}
 
-                {unreadTotal > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 border-2 border-white text-white text-[10px] font-bold flex items-center justify-center">
-                    {unreadTotal > 9
-                      ? "9+"
-                      : unreadTotal}
-                  </span>
-                )}
-              </button>
+            <button
+              onClick={() =>
+                setOpenNotif(
+                  (prev) => !prev
+                )
+              }
+              className="
+                relative
+                w-10
+                h-10
+                rounded-xl
+                bg-white
+                border
+                border-gray-200
+                text-gray-600
+                flex
+                items-center
+                justify-center
+                flex-shrink-0
+                hover:bg-gray-50
+                hover:text-gray-900
+                transition
+                shadow-sm
+              "
+            >
+              <Bell size={17} />
 
-              <AnimatePresence>
-                {openNotif && (
-                  <motion.div
-                    initial={{
-                      opacity: 0,
-                      y: 8,
-                      scale: 0.97,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      y: 0,
-                      scale: 1,
-                    }}
-                    exit={{
-                      opacity: 0,
-                      y: 8,
-                      scale: 0.97,
-                    }}
-                    transition={{
-                      duration: 0.18,
-                    }}
-                    className="
-                      absolute
-                      right-0
-                      top-12
-                      w-[calc(100vw-2rem)]
-                      max-w-96
-                      bg-white
-                      border border-gray-100
-                      rounded-2xl
-                      overflow-hidden
-                      shadow-xl
-                      z-[100]
-                    "
-                  >
-                    <div className="px-4 py-4 border-b border-gray-100 flex items-center justify-between">
-                      <div>
-                        <h3 className="font-bold text-gray-900">
-                          Notifications
-                        </h3>
-
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          Recent messages
-                        </p>
-                      </div>
-
-                      <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
-                        <Sparkles size={15} />
-                      </div>
-                    </div>
-
-                    <div className="max-h-[60vh] overflow-y-auto">
-                      {notifications.length ===
-                      0 ? (
-                        <div className="p-8 text-center">
-                          <div className="w-12 h-12 rounded-xl bg-gray-50 mx-auto flex items-center justify-center mb-3">
-                            <Bell
-                              size={18}
-                              className="text-gray-400"
-                            />
-                          </div>
-
-                          <p className="text-sm font-medium text-gray-700">
-                            No notifications
-                          </p>
-
-                          <p className="text-xs text-gray-400 mt-1">
-                            You're all caught up.
-                          </p>
-                        </div>
-                      ) : (
-                        notifications.map((n) => (
-                          <motion.button
-                            key={n.id}
-                            whileHover={{
-                              x: 3,
-                            }}
-                            onClick={() =>
-                              handleNotificationClick(n)
-                            }
-                            className="
-                              w-full
-                              text-left
-                              px-4
-                              py-4
-                              border-b border-gray-100
-                              hover:bg-green-50/40
-                            "
-                          >
-                            <div className="flex gap-3">
-                              <Avatar
-                                name={n.name}
-                                photo={n.photo}
-                              />
-
-                              <div className="flex-1 min-w-0">
-                                <div className="flex justify-between gap-2">
-                                  <span className="text-xs font-bold text-green-700 truncate">
-                                    {n.name}
-                                  </span>
-
-                                  <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                                    {formatTime(
-                                      n.time
-                                    )}
-                                  </span>
-                                </div>
-
-                                <p className="text-sm text-gray-700 mt-1 line-clamp-2 break-words">
-                                  {n.text}
-                                </p>
-                              </div>
-                            </div>
-                          </motion.button>
-                        ))
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+              {notifCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1.5 rounded-full bg-red-500 border-2 border-white text-white text-[10px] font-bold flex items-center justify-center">
+                  {notifCount > 9
+                    ? "9+"
+                    : notifCount}
+                </span>
+              )}
+            </button>
           </div>
 
           {/* BREADCRUMB */}
@@ -2028,163 +2628,48 @@ const GuidancePage = () => {
               </div>
             </div>
 
-            {/* DESKTOP NOTIFICATION */}
+            {/* DESKTOP NOTIFICATION BUTTON */}
 
-            <div className="relative flex-shrink-0 hidden lg:block">
-              <button
-                onClick={() =>
-                  setOpenNotif(!openNotif)
-                }
-                className="
-                  relative
-                  w-11 h-11
-                  rounded-xl
-                  bg-white
-                  border border-gray-200
-                  text-gray-600
-                  flex items-center justify-center
-                  hover:bg-gray-50
-                  transition
-                "
-              >
-                <Bell size={18} />
+            <button
+              onClick={() =>
+                setOpenNotif(
+                  (prev) => !prev
+                )
+              }
+              className="
+                relative
+                w-11
+                h-11
+                rounded-xl
+                bg-white
+                border border-gray-200
+                text-gray-600
+                flex
+                items-center
+                justify-center
+                hover:bg-gray-50
+                hover:text-gray-900
+                transition
+                flex-shrink-0
+                hidden
+                lg:flex
+              "
+            >
+              <Bell size={18} />
 
-                {unreadTotal > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 border-2 border-white text-white text-[10px] font-bold flex items-center justify-center">
-                    {unreadTotal > 9
-                      ? "9+"
-                      : unreadTotal}
-                  </span>
-                )}
-              </button>
-
-              <AnimatePresence>
-                {openNotif && (
-                  <motion.div
-                    initial={{
-                      opacity: 0,
-                      y: 8,
-                      scale: 0.97,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      y: 0,
-                      scale: 1,
-                    }}
-                    exit={{
-                      opacity: 0,
-                      y: 8,
-                      scale: 0.97,
-                    }}
-                    className="
-                      absolute
-                      right-0
-                      top-14
-                      w-96
-                      max-w-[calc(100vw-2rem)]
-                      bg-white
-                      border border-gray-100
-                      rounded-2xl
-                      overflow-hidden
-                      shadow-xl
-                      z-[100]
-                    "
-                  >
-                    <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                      <div>
-                        <h3 className="font-bold text-gray-900">
-                          Notifications
-                        </h3>
-
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          Recent messages
-                        </p>
-                      </div>
-
-                      <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
-                        <Sparkles size={15} />
-                      </div>
-                    </div>
-
-                    <div className="max-h-[400px] overflow-y-auto">
-                      {notifications.length ===
-                      0 ? (
-                        <div className="p-10 text-center">
-                          <div className="w-12 h-12 rounded-xl bg-gray-50 mx-auto flex items-center justify-center mb-3">
-                            <Bell
-                              size={18}
-                              className="text-gray-400"
-                            />
-                          </div>
-
-                          <p className="text-sm font-medium text-gray-700">
-                            No notifications
-                          </p>
-
-                          <p className="text-xs text-gray-400 mt-1">
-                            You're all caught up.
-                          </p>
-                        </div>
-                      ) : (
-                        notifications.map((n) => (
-                          <motion.button
-                            key={n.id}
-                            whileHover={{
-                              x: 3,
-                            }}
-                            onClick={() =>
-                              handleNotificationClick(n)
-                            }
-                            className="
-                              w-full
-                              text-left
-                              px-5
-                              py-4
-                              border-b border-gray-100
-                              hover:bg-green-50/40
-                            "
-                          >
-                            <div className="flex gap-3">
-                              <Avatar
-                                name={n.name}
-                                photo={n.photo}
-                              />
-
-                              <div className="flex-1 min-w-0">
-                                <div className="flex justify-between gap-3">
-                                  <span className="text-xs font-bold text-green-700 truncate">
-                                    {n.name}
-                                  </span>
-
-                                  <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                                    {formatTime(
-                                      n.time
-                                    )}
-                                  </span>
-                                </div>
-
-                                <p className="text-sm text-gray-700 mt-1 line-clamp-2">
-                                  {n.text}
-                                </p>
-                              </div>
-                            </div>
-                          </motion.button>
-                        ))
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+              {notifCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1.5 rounded-full bg-red-500 border-2 border-white text-white text-[10px] font-bold flex items-center justify-center">
+                  {notifCount > 9
+                    ? "9+"
+                    : notifCount}
+                </span>
+              )}
+            </button>
           </div>
         </header>
 
         {/* =================================================
            CHAT LAYOUT
-           
-           IMPORTANT:
-           lg:flex makes the conversation list and chat
-           appear SIDE-BY-SIDE on desktop.
         ================================================= */}
 
         <div
@@ -2193,7 +2678,6 @@ const GuidancePage = () => {
             flex-1
             min-h-0
             overflow-hidden
-
             lg:flex
             lg:flex-row
           "
@@ -2389,7 +2873,9 @@ const GuidancePage = () => {
                       <div className="flex items-center gap-2.5 sm:gap-3">
                         <Avatar
                           name={displayName}
-                          photo={u.profilePhoto}
+                          photo={
+                            u.profilePhoto
+                          }
                           online={onlineUsers.includes(
                             u._id
                           )}
@@ -2511,15 +2997,10 @@ const GuidancePage = () => {
               {activeChat ? (
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
-
-                    {/* =====================================
-                       BACK BUTTON
-                       
-                       Visible on BOTH mobile and desktop.
-                    ====================================== */}
-
                     <button
-                      onClick={backToConversations}
+                      onClick={
+                        backToConversations
+                      }
                       className="
                         w-9
                         h-9
@@ -2540,7 +3021,9 @@ const GuidancePage = () => {
                       aria-label="Back to conversations"
                       title="Back to conversations"
                     >
-                      <ArrowLeft size={18} />
+                      <ArrowLeft
+                        size={18}
+                      />
                     </button>
 
                     <Avatar
@@ -2885,7 +3368,301 @@ const GuidancePage = () => {
       </main>
 
       {/* ===================================================
-         TOAST
+         DASHBOARD-STYLE NOTIFICATION DRAWER
+         
+         This is intentionally outside the header so it
+         behaves exactly like the Dashboard drawer.
+      =================================================== */}
+
+      <AnimatePresence>
+        {openNotif && (
+          <>
+            {/* BACKDROP */}
+
+            <motion.div
+              initial={{
+                opacity: 0,
+              }}
+              animate={{
+                opacity: 1,
+              }}
+              exit={{
+                opacity: 0,
+              }}
+              onClick={() =>
+                setOpenNotif(false)
+              }
+              className="
+                fixed
+                inset-0
+                bg-black/10
+                backdrop-blur-[2px]
+                z-40
+              "
+            />
+
+            {/* DRAWER */}
+
+            <motion.div
+              initial={{
+                x: "100%",
+              }}
+              animate={{
+                x: 0,
+              }}
+              exit={{
+                x: "100%",
+              }}
+              transition={{
+                type: "spring",
+                damping: 28,
+              }}
+              className="
+                fixed
+                right-0
+                top-0
+                h-full
+                w-full
+                sm:w-[390px]
+                bg-white
+                border-l
+                border-gray-100
+                shadow-2xl
+                z-50
+                flex
+                flex-col
+              "
+            >
+              {/* DRAWER HEADER */}
+
+              <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-100">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                      <Bell
+                        size={17}
+                        className="text-green-600"
+                      />
+                      Notifications
+                    </h3>
+
+                    <p className="text-xs text-gray-400 mt-1">
+                      Unread system activity
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {notifications.length >
+                      0 && (
+                      <button
+                        onClick={
+                          markAllAsRead
+                        }
+                        className="
+                          flex
+                          items-center
+                          gap-1.5
+                          px-2.5
+                          py-2
+                          rounded-lg
+                          text-[10px]
+                          sm:text-xs
+                          font-semibold
+                          text-green-700
+                          bg-green-50
+                          hover:bg-green-100
+                          transition
+                        "
+                      >
+                        <CheckCheck
+                          size={14}
+                        />
+
+                        <span>
+                          Read all
+                        </span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() =>
+                        setOpenNotif(
+                          false
+                        )
+                      }
+                      className="
+                        w-9
+                        h-9
+                        rounded-xl
+                        bg-gray-50
+                        border
+                        border-gray-200
+                        text-gray-500
+                        flex
+                        items-center
+                        justify-center
+                        hover:bg-gray-100
+                        hover:text-gray-900
+                        transition
+                      "
+                      aria-label="Close notifications"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* NOTIFICATION LIST */}
+
+              <div className="flex-1 overflow-y-auto p-3 sm:p-5">
+                {notificationLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4].map(
+                      (item) => (
+                        <div
+                          key={item}
+                          className="
+                            p-3
+                            sm:p-4
+                            rounded-2xl
+                            bg-gray-50
+                            border
+                            border-gray-100
+                            animate-pulse
+                          "
+                        >
+                          <div className="flex gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-gray-200 flex-shrink-0" />
+
+                            <div className="flex-1 space-y-2">
+                              <div className="h-3 bg-gray-200 rounded w-2/3" />
+
+                              <div className="h-3 bg-gray-200 rounded w-full" />
+
+                              <div className="h-2 bg-gray-200 rounded w-1/3 mt-3" />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : notifications.length ===
+                  0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center px-5">
+                    <div className="w-14 h-14 rounded-2xl bg-green-50 flex items-center justify-center mb-4">
+                      <Bell
+                        size={22}
+                        className="text-green-600"
+                      />
+                    </div>
+
+                    <p className="text-sm font-semibold text-gray-800">
+                      No notifications
+                    </p>
+
+                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                      You're all caught up.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {notifications.map(
+                      (notification) => (
+                        <motion.button
+                          layout
+                          key={
+                            notification._id ||
+                            notification.id
+                          }
+                          onClick={() =>
+                            handleNotificationClick(
+                              notification
+                            )
+                          }
+                          className="
+                            w-full
+                            text-left
+                            p-3
+                            sm:p-4
+                            rounded-2xl
+                            bg-gray-50
+                            border
+                            border-gray-100
+                            hover:bg-white
+                            hover:border-green-100
+                            hover:shadow-sm
+                            transition
+                          "
+                        >
+                          <div className="flex gap-3">
+                            <div
+                              className={`
+                                w-9
+                                h-9
+                                rounded-xl
+                                flex
+                                items-center
+                                justify-center
+                                flex-shrink-0
+                                ${getNotificationBackground(
+                                  notification
+                                )}
+                              `}
+                            >
+                              {getNotificationIcon(
+                                notification
+                              )}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="font-semibold text-sm text-gray-900 break-words">
+                                  {
+                                    notification.title
+                                  }
+                                </p>
+
+                                <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 mt-1.5" />
+                              </div>
+
+                              <p className="text-xs text-gray-500 mt-1 leading-relaxed break-words">
+                                {
+                                  notification.message
+                                }
+                              </p>
+
+                              <div className="flex items-center justify-between gap-2 mt-3">
+                                <p className="text-[9px] sm:text-[10px] text-gray-400 truncate">
+                                  {notification.createdAt
+                                    ? new Date(
+                                        notification.createdAt
+                                      ).toLocaleString()
+                                    : "Just now"}
+                                </p>
+
+                                <span className="text-[10px] font-semibold text-green-700 flex-shrink-0">
+                                  View
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.button>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ===================================================
+         MESSAGE TOAST
+         
+         This is NOT the notification drawer.
+         It remains for immediate incoming chat messages.
       =================================================== */}
 
       <AnimatePresence>
@@ -2895,14 +3672,18 @@ const GuidancePage = () => {
               const target =
                 usersRef.current.find(
                   (u) =>
-                    String(u._id) ===
+                    String(
+                      u._id
+                    ) ===
                     String(
                       toastNotif.senderId
                     )
                 ) ||
                 conversationUsersRef.current.find(
                   (u) =>
-                    String(u._id) ===
+                    String(
+                      u._id
+                    ) ===
                     String(
                       toastNotif.senderId
                     )
@@ -2917,15 +3698,20 @@ const GuidancePage = () => {
                 });
 
               if (target) {
-                openChat(target);
+                openChat(
+                  target
+                );
 
-                setToastNotif(null);
+                setToastNotif(
+                  null
+                );
 
                 setUnreadMap(
                   (prev) => ({
                     ...prev,
 
-                    [toastNotif.senderId]: 0,
+                    [toastNotif.senderId]:
+                      0,
                   })
                 );
               }
@@ -2969,8 +3755,12 @@ const GuidancePage = () => {
           >
             <div className="p-3.5 sm:p-5 flex gap-3 sm:gap-4">
               <Avatar
-                name={toastNotif.name}
-                photo={toastNotif.photo}
+                name={
+                  toastNotif.name
+                }
+                photo={
+                  toastNotif.photo
+                }
               />
 
               <div className="flex-1 min-w-0">
@@ -2983,12 +3773,16 @@ const GuidancePage = () => {
                 </div>
 
                 <p className="text-sm text-gray-700 mt-1 line-clamp-2 break-words">
-                  {toastNotif.text}
+                  {
+                    toastNotif.text
+                  }
                 </p>
 
                 <div className="flex justify-between gap-2 mt-3">
                   <span className="text-xs text-green-700 font-semibold truncate">
-                    {toastNotif.name}
+                    {
+                      toastNotif.name
+                    }
                   </span>
 
                   <span className="text-xs text-gray-400 whitespace-nowrap">

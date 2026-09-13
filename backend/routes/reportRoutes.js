@@ -984,7 +984,6 @@ router.get(
     }
   },
 );
-
 /* =========================================================
    ACCEPT REPORT
 ========================================================= */
@@ -1170,6 +1169,11 @@ router.put(
 
       await report.save();
 
+      console.log(
+        "✅ Report status updated:",
+        report.status,
+      );
+
       /* =====================================================
          CREATE INCIDENT
       ===================================================== */
@@ -1223,29 +1227,97 @@ router.put(
       );
 
       /* =====================================================
-         FIND STUDENT
+         FIND REPORTED STUDENT
       ===================================================== */
 
-      const student =
-        await Student.findById(
-          studentId,
-        );
+      let student = null;
+      let studentUser = null;
+
+      if (studentId) {
+        student =
+          await Student.findById(
+            studentId,
+          );
+
+        if (student) {
+          console.log("");
+          console.log(
+            "👨‍🎓 REPORTED STUDENT FOUND",
+          );
+
+          console.log(
+            "Student MongoDB ID:",
+            student._id.toString(),
+          );
+
+          console.log(
+            "Student ID:",
+            student.studentId,
+          );
+
+          /* =================================================
+             FIND USER ACCOUNT OF REPORTED STUDENT
+          ================================================= */
+
+          studentUser =
+            await User.findOne({
+              studentId:
+                student.studentId,
+            }).select(
+              "_id studentId email name firstName lastName pushTokens notificationSettings",
+            );
+
+          if (studentUser) {
+            console.log(
+              "✅ Student User account found:",
+              studentUser.email ||
+                studentUser._id.toString(),
+            );
+
+            console.log(
+              "Student User ID:",
+              studentUser._id.toString(),
+            );
+
+            console.log(
+              "Student push tokens:",
+              studentUser.pushTokens?.length ||
+                0,
+            );
+          } else {
+            console.log(
+              "⚠️ Student User account not found:",
+              student.studentId,
+            );
+          }
+        } else {
+          console.log(
+            "⚠️ Student record not found:",
+            studentId,
+          );
+        }
+      }
 
       /* =====================================================
          STUDENT NOTIFICATION
          REPORTED STUDENT
       ===================================================== */
 
-      if (student) {
-        const studentUser =
-          await User.findOne({
-            studentId:
-              student.studentId,
-          }).select(
-            "_id studentId email name firstName lastName pushTokens notificationSettings",
+      if (studentUser) {
+        try {
+          console.log("");
+          console.log("========================================");
+          console.log(
+            "📢 REPORTED STUDENT ACCEPT NOTIFICATION",
+          );
+          console.log("========================================");
+
+          console.log(
+            "Student:",
+            studentUser.email ||
+              studentUser._id.toString(),
           );
 
-        if (studentUser) {
           const studentNotificationData =
             {
               type:
@@ -1258,7 +1330,8 @@ router.put(
                 incident._id.toString(),
 
               studentId:
-                student._id.toString(),
+                student?._id?.toString() ||
+                "",
 
               status:
                 "under_review",
@@ -1270,6 +1343,10 @@ router.put(
                 decision.action ||
                 null,
             };
+
+          /* =================================================
+             DATABASE + SOCKET.IO
+          ================================================= */
 
           const studentNotification =
             await createRealtimeNotification({
@@ -1284,7 +1361,7 @@ router.put(
                 `was approved and is now under review.`,
 
               type:
-                "success",
+                "warning",
 
               priority:
                 "high",
@@ -1301,6 +1378,12 @@ router.put(
               logPrefix:
                 "STUDENT ACCEPT NOTIFICATION",
             });
+
+          console.log(
+            "Student notification ID:",
+            studentNotification?._id?.toString() ||
+              "Database notification failed",
+          );
 
           /* =================================================
              NATIVE FCM
@@ -1328,16 +1411,41 @@ router.put(
             logPrefix:
               "STUDENT ACCEPT FCM",
           });
-        } else {
+
           console.log(
-            "⚠️ Student User account not found:",
-            student.studentId,
+            "✅ REPORTED STUDENT ACCEPT NOTIFICATION COMPLETED",
           );
+
+          console.log("========================================");
+        } catch (
+          studentNotificationError
+        ) {
+          console.error("");
+          console.error(
+            "❌ REPORTED STUDENT ACCEPT NOTIFICATION ERROR:",
+          );
+
+          console.error(
+            "Message:",
+            studentNotificationError?.message ||
+              studentNotificationError,
+          );
+
+          console.error(
+            "Error:",
+            studentNotificationError,
+          );
+
+          console.error("========================================");
         }
       } else {
+        console.log("");
         console.log(
-          "⚠️ Student record not found:",
-          studentId,
+          "⚠️ REPORTED STUDENT NOTIFICATION SKIPPED",
+        );
+
+        console.log(
+          "Reason: Student User account not found.",
         );
       }
 
@@ -1350,7 +1458,9 @@ router.put(
         try {
           console.log("");
           console.log("========================================");
-          console.log("📢 REPORTER ACCEPT NOTIFICATION");
+          console.log(
+            "📢 REPORTER ACCEPT NOTIFICATION",
+          );
           console.log("========================================");
 
           console.log(
@@ -1398,6 +1508,10 @@ router.put(
                   decision.action ||
                   null,
               };
+
+            /* =================================================
+               DATABASE + SOCKET.IO
+            ================================================= */
 
             const reporterNotification =
               await createRealtimeNotification({
@@ -1468,9 +1582,14 @@ router.put(
           console.error(
             "❌ REPORTER ACCEPT NOTIFICATION ERROR:",
           );
+
           console.error(
             reporterError?.message ||
               reporterError,
+          );
+
+          console.error(
+            reporterError,
           );
         }
       } else {
@@ -1524,9 +1643,10 @@ router.put(
               null,
           };
 
-        /*
-         * Database + Socket
-         */
+        /* =================================================
+           DATABASE + SOCKET.IO
+        ================================================= */
+
         const adminNotification =
           await createRealtimeNotification({
             userId:
@@ -1561,9 +1681,10 @@ router.put(
               "ADMIN INCIDENT NOTIFICATION",
           });
 
-        /*
-         * Native/Web FCM
-         */
+        /* =================================================
+           NATIVE / WEB FCM
+        ================================================= */
+
         await sendFCMToUser({
           user:
             admin,
@@ -1588,9 +1709,10 @@ router.put(
             "ADMIN INCIDENT FCM",
         });
 
-        /*
-         * Email
-         */
+        /* =================================================
+           ADMIN EMAIL
+        ================================================= */
+
         await sendAdminNotificationEmail({
           admin,
 
@@ -1698,6 +1820,8 @@ router.put(
     }
   },
 );
+
+
 
 /* =========================================================
    REJECT REPORT

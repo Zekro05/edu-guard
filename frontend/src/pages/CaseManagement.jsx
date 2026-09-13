@@ -44,18 +44,10 @@ import CasePrintableReport from "../components/reports/CasePrintableReport";
 
 const socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000");
 
-/* =========================================================
-   DEFAULTS
-========================================================= */
-
 const DEFAULT_AVATAR =
   "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png";
 
 const MIN_TEXT_LENGTH = 10;
-
-/* =========================================================
-   NAV
-========================================================= */
 
 const Nav = ({ icon, label, onClick, active }) => (
   <button
@@ -94,10 +86,6 @@ const Nav = ({ icon, label, onClick, active }) => (
     )}
   </button>
 );
-
-/* =========================================================
-   STATUS BADGE
-========================================================= */
 
 const StatusBadge = memo(({ status }) => {
   const config = {
@@ -159,10 +147,6 @@ const StatusBadge = memo(({ status }) => {
   );
 });
 
-/* =========================================================
-   RISK BADGE
-========================================================= */
-
 const RiskBadge = memo(({ risk }) => {
   const config = {
     HIGH: {
@@ -205,10 +189,6 @@ const RiskBadge = memo(({ risk }) => {
   );
 });
 
-/* =========================================================
-   INFO BLOCK
-========================================================= */
-
 const InfoBlock = memo(({ icon, label, value }) => (
   <div
     className="
@@ -245,10 +225,6 @@ const InfoBlock = memo(({ icon, label, value }) => (
     </p>
   </div>
 ));
-
-/* =========================================================
-   STAT CARD
-========================================================= */
 
 const StatCard = memo(
   ({
@@ -304,10 +280,6 @@ const StatCard = memo(
     </motion.div>
   ),
 );
-
-/* =========================================================
-   OFFENSE MAP
-========================================================= */
 
 const offenseMap = {
   MINOR: [
@@ -464,10 +436,6 @@ const classifyCase = (c = {}) => {
   };
 };
 
-/* =========================================================
-   CASE FLOW
-========================================================= */
-
 const flow = [
   "received",
   "saved-student-statement",
@@ -483,10 +451,6 @@ const statusUI = {
   "refer-for-intervention": "from-red-400 to-pink-400",
   "intervention-ready": "from-green-400 to-emerald-400",
 };
-
-/* =========================================================
-   NORMALIZER
-========================================================= */
 
 const normalizeCase = (c) => {
   let evidence = [];
@@ -519,6 +483,8 @@ const normalizeCase = (c) => {
   return {
     ...c,
 
+    reportId: c.reportId?._id || c.reportId || null,
+
     offense:
       c.offense ||
       c.reportId?.offense ||
@@ -533,6 +499,14 @@ const normalizeCase = (c) => {
     description:
       c.description || c.reportId?.description || c.report?.description || "",
 
+    date: c.date || c.reportId?.date || c.report?.date || null,
+
+    time: c.time || c.reportId?.time || c.report?.time || null,
+
+    studentStatement: c.studentStatement || c.statement || "",
+
+    level: c.level || "",
+
     student: c.studentId
       ? {
           name: `${c.studentId.firstName || ""} ${
@@ -542,6 +516,7 @@ const normalizeCase = (c) => {
           grade: c.studentId.grade,
           section: c.studentId.section,
           studentId: c.studentId.studentId,
+          _id: c.studentId._id,
         }
       : c.student || {},
 
@@ -565,10 +540,6 @@ const normalizeCase = (c) => {
   };
 };
 
-/* =========================================================
-   EVIDENCE
-========================================================= */
-
 const normalizeEvidenceUrl = (url) => {
   if (!url) return null;
 
@@ -580,10 +551,6 @@ const normalizeEvidenceUrl = (url) => {
 
   return url;
 };
-
-/* =========================================================
-   CASE CARD
-========================================================= */
 
 const CaseCard = memo(({ caseData, onClick }) => {
   const ai = classifyCase(caseData);
@@ -633,7 +600,6 @@ const CaseCard = memo(({ caseData, onClick }) => {
       />
 
       <div className="relative">
-        {/* STUDENT */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="relative flex-shrink-0">
@@ -682,7 +648,6 @@ const CaseCard = memo(({ caseData, onClick }) => {
           />
         </div>
 
-        {/* OFFENSE */}
         <div className="mt-5">
           <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400">
             Offense
@@ -693,13 +658,11 @@ const CaseCard = memo(({ caseData, onClick }) => {
           </h3>
         </div>
 
-        {/* BADGES */}
         <div className="flex flex-wrap gap-2 mt-4">
           <StatusBadge status={status} />
           <RiskBadge risk={ai.risk} />
         </div>
 
-        {/* PROGRESS */}
         <div className="mt-5">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
@@ -731,7 +694,6 @@ const CaseCard = memo(({ caseData, onClick }) => {
           </div>
         </div>
 
-        {/* FOOTER */}
         <div className="flex items-center justify-between mt-5 pt-4 border-t border-gray-100">
           <div className="flex items-center gap-1.5 text-gray-400 min-w-0">
             <MapPin size={11} className="flex-shrink-0" />
@@ -755,10 +717,6 @@ const CaseCard = memo(({ caseData, onClick }) => {
     </motion.button>
   );
 });
-
-/* =========================================================
-   MAIN
-========================================================= */
 
 export default function CaseManagement() {
   const navigate = useNavigate();
@@ -796,9 +754,13 @@ export default function CaseManagement() {
   const [additionalParticipants, setAdditionalParticipants] = useState("");
   const [approvalDetails, setApprovalDetails] = useState("");
 
-  /* =====================================================
-     STATUS HELPERS
-  ===================================================== */
+  // =====================================================
+  // GEMINI AI STATE
+  // =====================================================
+
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
 
   const getStatus = (c) => c?.status || "received";
 
@@ -807,10 +769,6 @@ export default function CaseManagement() {
   const canEscalate = (c) => getStatus(c) === "reviewing";
 
   const canIntervene = (c) => getStatus(c) === "refer-for-intervention";
-
-  /* =====================================================
-     ACTION LABELS
-  ===================================================== */
 
   const actionLabels = {
     received: "Case Created",
@@ -830,10 +788,6 @@ export default function CaseManagement() {
     "intervention-ready": "text-green-700 bg-green-50 border-green-200",
     completed: "text-purple-700 bg-purple-50 border-purple-200",
   };
-
-  /* =====================================================
-     LATEST LOG
-  ===================================================== */
 
   const getLatestLog = (logs = []) =>
     [...logs].sort((a, b) => new Date(b.time) - new Date(a.time))[0];
@@ -855,9 +809,326 @@ export default function CaseManagement() {
   const loggedInUser =
     JSON.parse(localStorage.getItem("user"))?.name || adminName || "Admin";
 
-  /* =====================================================
-     CLOSE
-  ===================================================== */
+  // =====================================================
+  // GEMINI AI ANALYSIS
+  // =====================================================
+
+  const runGeminiAnalysis = async (caseData) => {
+    if (!caseData?._id) return;
+
+    try {
+      setAiLoading(true);
+      setAiError("");
+      setAiAnalysis(null);
+
+      const studentId =
+        caseData.studentId?._id ||
+        caseData.studentId ||
+        caseData.student?._id ||
+        caseData.student?._id;
+
+      // =================================================
+      // CURRENT INCIDENT
+      // THIS IS THE PRIMARY AI CONTEXT
+      // =================================================
+
+      const currentIncident = {
+        incidentId: caseData._id,
+
+        reportId: caseData.reportId?._id || caseData.reportId || null,
+
+        title: caseData.title || caseData.offense || "Unknown offense",
+
+        offense: caseData.offense || caseData.title || "Unknown offense",
+
+        category: caseData.category || "Uncategorized",
+
+        level:
+          caseData.level || classifyCase(caseData)?.severity || "Unclassified",
+
+        status: caseData.status || "received",
+
+        studentStatement: caseData.studentStatement || caseData.statement || "",
+
+        description: caseData.description || "",
+
+        location: caseData.location || "",
+
+        date: caseData.date || caseData.createdAt || null,
+
+        time: caseData.time || null,
+
+        evidence: Array.isArray(caseData.evidence) ? caseData.evidence : [],
+
+        reporter: caseData.reporter || "Anonymous",
+
+        createdAt: caseData.createdAt || null,
+      };
+
+      // =================================================
+      // PREVIOUS INCIDENTS
+      // SECONDARY CONTEXT ONLY
+      // =================================================
+
+      const previousIncidents = cases
+        .filter((incident) => {
+          if (String(incident._id) === String(caseData._id)) {
+            return false;
+          }
+
+          const incidentStudentId =
+            incident.studentId?._id ||
+            incident.studentId ||
+            incident.student?._id ||
+            incident.student?.studentId ||
+            "";
+
+          return String(incidentStudentId) === String(studentId || "");
+        })
+        .map((incident) => ({
+          incidentId: incident._id,
+
+          title: incident.title || incident.offense || "Unknown offense",
+
+          offense: incident.offense || incident.title || "Unknown offense",
+
+          category: incident.category || "Uncategorized",
+
+          level: incident.level || "Unclassified",
+
+          status: incident.status || "received",
+
+          studentStatement:
+            incident.studentStatement || incident.statement || "",
+
+          description: incident.description || "",
+
+          location: incident.location || "",
+
+          createdAt: incident.createdAt || null,
+        }));
+
+      const timeline = [
+        {
+          type: "current-incident",
+          ...currentIncident,
+        },
+
+        ...previousIncidents.map((incident) => ({
+          type: "previous-incident",
+          ...incident,
+        })),
+      ];
+
+      const incidents = [currentIncident, ...previousIncidents];
+
+      // =================================================
+      // REPORT CONTEXT
+      // =================================================
+
+      const reports = [
+        {
+          reportId: caseData.reportId?._id || caseData.reportId || null,
+
+          offense: caseData.offense || "",
+
+          category: caseData.category || "",
+
+          description: caseData.description || "",
+
+          location: caseData.location || "",
+
+          date: caseData.date || caseData.createdAt || null,
+
+          time: caseData.time || null,
+
+          status: caseData.status || "",
+
+          isCurrentIncident: true,
+        },
+
+        ...previousIncidents.map((incident) => ({
+          reportId: incident.reportId || null,
+
+          offense: incident.offense || "",
+
+          category: incident.category || "",
+
+          description: incident.description || "",
+
+          location: incident.location || "",
+
+          date: incident.createdAt || null,
+
+          status: incident.status || "",
+
+          isCurrentIncident: false,
+        })),
+      ];
+
+      // =================================================
+      // LOCAL RISK CLASSIFICATION
+      // =================================================
+
+      const localClassification = classifyCase(caseData);
+
+      const riskLevel =
+        localClassification?.risk === "HIGH"
+          ? "High"
+          : localClassification?.risk === "MEDIUM"
+            ? "Medium"
+            : "Low";
+
+      // =================================================
+      // GEMINI REQUEST
+      // =================================================
+
+      const response = await API.post(
+        "/api/gemini/student-analysis",
+        {
+          currentIncident,
+
+          previousIncidents,
+
+          grade: caseData.student?.grade || "N/A",
+
+          riskLevel,
+
+          timeline,
+
+          incidents,
+
+          reports,
+
+          recommendationInstructions: `
+The currentIncident object represents the incident
+currently being reviewed by the guidance administrator.
+
+IMPORTANT:
+
+The CURRENT INCIDENT is the PRIMARY CONTEXT.
+
+The AI analysis must focus primarily on the facts
+and circumstances of the current incident.
+
+Evaluate the current incident's:
+
+- offense
+- title
+- category
+- severity or level
+- status
+- incident description
+- student statement
+- location
+- date and time
+- evidence
+
+Previous incidents are SECONDARY CONTEXT ONLY.
+
+Previous incidents may be used to understand
+behavioral history or recurring patterns, but they
+must NOT automatically determine the analysis of
+the current incident.
+
+Do NOT recommend a harsher response merely because
+the student has previous incidents.
+
+Do NOT allow an old incident to override the facts
+of the current incident.
+
+The analysis should answer:
+
+"What does the available evidence indicate about
+THIS CURRENT INCIDENT?"
+
+Provide:
+
+1. A clear summary of the current incident.
+2. An assessment of the behavioral pattern, if enough
+   information is available.
+3. An assessment of the student's current risk level.
+4. A prediction or possible behavioral concern when
+   supported by the available information.
+5. A guidance recommendation based primarily on the
+   current incident.
+6. Supporting research references when available.
+
+Do NOT provide a fixed intervention conclusion such as
+Warning, Call a Parent, Community Service, or Suspension.
+
+This page is CASE MANAGEMENT only.
+
+The actual intervention decision will be handled
+separately by the Intervention Management module.
+
+Do not invent facts that are not present in the
+provided incident information.
+          `,
+        },
+        {
+          timeout: 90000,
+        },
+      );
+
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || "Gemini analysis failed.");
+      }
+
+      const analysis = response.data;
+
+      const firstIntervention = Array.isArray(analysis.interventions)
+        ? analysis.interventions[0]
+        : null;
+
+      setAiAnalysis({
+        ...analysis,
+
+        recommendation:
+          firstIntervention?.recommendation ||
+          analysis.recommendation ||
+          "No specific recommendation was generated.",
+
+        basis:
+          firstIntervention?.basis ||
+          analysis.notes ||
+          "Analysis generated from the current incident and available supporting records.",
+
+        references: Array.isArray(firstIntervention?.references)
+          ? firstIntervention.references
+          : Array.isArray(analysis.researchReferences)
+            ? analysis.researchReferences
+            : [],
+
+        referenceIds: Array.isArray(firstIntervention?.referenceIds)
+          ? firstIntervention.referenceIds
+          : [],
+
+        summary: analysis.summary || "",
+
+        pattern: analysis.pattern || "",
+
+        prediction: analysis.prediction || "",
+
+        risk: analysis.risk || riskLevel,
+
+        notes: analysis.notes || "",
+      });
+    } catch (error) {
+      console.error(
+        "Gemini case analysis failed:",
+        error?.response?.data || error,
+      );
+
+      setAiError(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Unable to generate AI analysis.",
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const close = () => {
     setSelected(null);
@@ -868,11 +1139,16 @@ export default function CaseManagement() {
     setAdditionalParticipants("");
     setApprovalDetails("");
     setPreviewImage(null);
+
+    // Reset Gemini state
+    setAiAnalysis(null);
+    setAiError("");
+    setAiLoading(false);
   };
 
-  /* =====================================================
-     ESCAPE
-  ===================================================== */
+  // =====================================================
+  // ESCAPE KEY
+  // =====================================================
 
   useEffect(() => {
     const esc = (e) => {
@@ -890,9 +1166,9 @@ export default function CaseManagement() {
     return () => window.removeEventListener("keydown", esc);
   }, [previewImage]);
 
-  /* =====================================================
-     FETCH CASES
-  ===================================================== */
+  // =====================================================
+  // FETCH CASES
+  // =====================================================
 
   useEffect(() => {
     const fetchCases = async () => {
@@ -908,6 +1184,7 @@ export default function CaseManagement() {
         setCases(data.map(normalizeCase));
       } catch (err) {
         console.error("Failed to fetch cases:", err);
+
         setCases([]);
       } finally {
         setLoading(false);
@@ -917,9 +1194,9 @@ export default function CaseManagement() {
     fetchCases();
   }, []);
 
-  /* =====================================================
-     SOCKET
-  ===================================================== */
+  // =====================================================
+  // SOCKET EVENTS
+  // =====================================================
 
   useEffect(() => {
     const handleUpdated = (updatedCase) => {
@@ -936,40 +1213,72 @@ export default function CaseManagement() {
 
     const handleLogAdded = ({ caseId, log }) => {
       setCases((prev) =>
-        prev.map((c) =>
-          c._id === caseId
-            ? {
-                ...c,
-                logs: [...(c.logs || []), log],
-              }
-            : c,
-        ),
+        prev.map((c) => {
+          if (c._id !== caseId) return c;
+
+          const existingLogs = c.logs || [];
+
+          const alreadyExists = existingLogs.some(
+            (existing) =>
+              existing._id === log._id ||
+              (existing.stage === log.stage &&
+                existing.time === log.time &&
+                existing.note === log.note),
+          );
+
+          if (alreadyExists) {
+            return c;
+          }
+
+          return {
+            ...c,
+            logs: [...existingLogs, log],
+          };
+        }),
       );
 
-      setSelected((prev) =>
-        prev && prev._id === caseId
-          ? {
-              ...prev,
-              logs: [...(prev.logs || []), log],
-            }
-          : prev,
-      );
+      setSelected((prev) => {
+        if (!prev || prev._id !== caseId) return prev;
+
+        const existingLogs = prev.logs || [];
+
+        const alreadyExists = existingLogs.some(
+          (existing) =>
+            existing._id === log._id ||
+            (existing.stage === log.stage &&
+              existing.time === log.time &&
+              existing.note === log.note),
+        );
+
+        if (alreadyExists) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          logs: [...existingLogs, log],
+        };
+      });
     };
 
     socket.on("caseUpdated", handleUpdated);
+
     socket.on("caseCreated", handleCreated);
+
     socket.on("caseLogAdded", handleLogAdded);
 
     return () => {
       socket.off("caseUpdated", handleUpdated);
+
       socket.off("caseCreated", handleCreated);
+
       socket.off("caseLogAdded", handleLogAdded);
     };
   }, []);
 
-  /* =====================================================
-     AI
-  ===================================================== */
+  // =====================================================
+  // LOCAL POLICY AI
+  // =====================================================
 
   const ai = useMemo(() => {
     if (!selected) return null;
@@ -977,9 +1286,9 @@ export default function CaseManagement() {
     return classifyCase(selected);
   }, [selected]);
 
-  /* =====================================================
-     FILTER / SORT
-  ===================================================== */
+  // =====================================================
+  // FILTER CASES
+  // =====================================================
 
   const visibleCases = useMemo(() => {
     const keyword = search.toLowerCase().trim();
@@ -1002,6 +1311,7 @@ export default function CaseManagement() {
       const result = classifyCase(c);
 
       if (result.risk === "HIGH") return 3;
+
       if (result.risk === "MEDIUM") return 2;
 
       return 1;
@@ -1026,9 +1336,9 @@ export default function CaseManagement() {
     });
   }, [cases, search, sortMode]);
 
-  /* =====================================================
-     STATS
-  ===================================================== */
+  // =====================================================
+  // STATS
+  // =====================================================
 
   const totalCases = cases.length;
 
@@ -1047,9 +1357,9 @@ export default function CaseManagement() {
     (c) => getStatus(c) === "intervention-ready",
   ).length;
 
-  /* =====================================================
-     UPDATE STATUS
-  ===================================================== */
+  // =====================================================
+  // UPDATE STATUS
+  // =====================================================
 
   const updateStatus = async (status) => {
     const trimmedNote = note.trim();
@@ -1096,6 +1406,9 @@ export default function CaseManagement() {
       setInvolvedPersons("");
       setAdditionalParticipants("");
       setApprovalDetails("");
+
+      // Re-analyze the updated current incident
+      runGeminiAnalysis(updated);
     } catch (err) {
       console.error("Status update failed:", err);
 
@@ -1103,9 +1416,9 @@ export default function CaseManagement() {
     }
   };
 
-  /* =====================================================
-     REQUEST STUDENT STATEMENT
-  ===================================================== */
+  // =====================================================
+  // REQUEST STUDENT STATEMENT
+  // =====================================================
 
   const requestStudentStatement = async () => {
     try {
@@ -1134,9 +1447,9 @@ export default function CaseManagement() {
     }
   };
 
-  /* =====================================================
-     SAVE STATEMENT
-  ===================================================== */
+  // =====================================================
+  // SAVE STATEMENT
+  // =====================================================
 
   const saveStudentStatement = async () => {
     const trimmedStatement = studentInput.trim();
@@ -1172,6 +1485,10 @@ export default function CaseManagement() {
       );
 
       setStudentInput("");
+
+      // Re-run Gemini because the current incident
+      // now contains the student's statement.
+      runGeminiAnalysis(updated);
     } catch (err) {
       console.error("Save statement failed:", err);
 
@@ -1179,9 +1496,9 @@ export default function CaseManagement() {
     }
   };
 
-  /* =====================================================
-     FLOW
-  ===================================================== */
+  // =====================================================
+  // FLOW
+  // =====================================================
 
   const flowWithMeta = flow.map((step) => {
     const logs = selected?.logs || [];
@@ -1201,15 +1518,15 @@ export default function CaseManagement() {
     };
   });
 
-  /* =====================================================
-     LOGOUT
-  ===================================================== */
+  // =====================================================
+  // LOGOUT
+  // =====================================================
 
   const logout = () => navigate("/login");
 
-  /* =====================================================
-     RENDER
-  ===================================================== */
+  // =====================================================
+  // RENDER
+  // =====================================================
 
   return (
     <div
@@ -1228,8 +1545,6 @@ export default function CaseManagement() {
 
       <aside className="hidden lg:flex w-[270px] bg-white border-r border-gray-100 flex-col justify-between px-5 py-6">
         <div>
-          {/* BRAND */}
-
           <div className="px-3 mb-8">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 flex items-center justify-center">
@@ -1242,7 +1557,8 @@ export default function CaseManagement() {
 
               <div>
                 <h1 className="text-xl font-extrabold tracking-tight text-gray-900">
-                  Guid<span className="text-green-600">Ed</span>
+                  Guid
+                  <span className="text-green-600">Ed</span>
                 </h1>
 
                 <p className="text-[9px] uppercase tracking-widest text-gray-400 font-semibold">
@@ -1257,8 +1573,6 @@ export default function CaseManagement() {
               General Trias Campus
             </p>
           </div>
-
-          {/* NAV LABEL */}
 
           <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">
             Main Menu
@@ -1298,8 +1612,6 @@ export default function CaseManagement() {
             />
           </div>
 
-          {/* SYSTEM */}
-
           <p className="px-3 mt-8 mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">
             System
           </p>
@@ -1310,8 +1622,6 @@ export default function CaseManagement() {
             onClick={() => navigate("/settings")}
           />
         </div>
-
-        {/* SIDEBAR FOOTER */}
 
         <div className="space-y-3">
           <div className="p-3 rounded-2xl bg-gray-50 border border-gray-100">
@@ -1350,22 +1660,22 @@ export default function CaseManagement() {
           <button
             onClick={logout}
             className="
-        w-full
-        flex
-        items-center
-        justify-center
-        gap-2
-        py-2.5
-        rounded-xl
-        text-sm
-        font-semibold
-        text-gray-600
-        border border-gray-200
-        hover:bg-red-50
-        hover:text-red-600
-        hover:border-red-100
-        transition
-      "
+              w-full
+              flex
+              items-center
+              justify-center
+              gap-2
+              py-2.5
+              rounded-xl
+              text-sm
+              font-semibold
+              text-gray-600
+              border border-gray-200
+              hover:bg-red-50
+              hover:text-red-600
+              hover:border-red-100
+              transition
+            "
           >
             <LogOut size={16} />
             Sign out
@@ -1540,14 +1850,16 @@ export default function CaseManagement() {
                         notifications.map((n) => (
                           <motion.div
                             key={n.id}
-                            whileHover={{ x: 2 }}
+                            whileHover={{
+                              x: 2,
+                            }}
                             className="
-                              p-4
-                              border-b
-                              border-gray-100
-                              hover:bg-gray-50
-                              transition
-                            "
+                                p-4
+                                border-b
+                                border-gray-100
+                                hover:bg-gray-50
+                                transition
+                              "
                           >
                             <p className="font-semibold text-xs text-gray-900">
                               {n.title}
@@ -1655,18 +1967,18 @@ export default function CaseManagement() {
                   key={value}
                   onClick={() => setSortMode(value)}
                   className={`
-                    whitespace-nowrap
-                    px-3 py-2
-                    rounded-lg
-                    text-[11px]
-                    font-semibold
-                    transition-all
-                    ${
-                      sortMode === value
-                        ? "bg-green-600 text-white shadow-sm"
-                        : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-                    }
-                  `}
+                      whitespace-nowrap
+                      px-3 py-2
+                      rounded-lg
+                      text-[11px]
+                      font-semibold
+                      transition-all
+                      ${
+                        sortMode === value
+                          ? "bg-green-600 text-white shadow-sm"
+                          : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                      }
+                    `}
                 >
                   {label}
                 </button>
@@ -1732,26 +2044,26 @@ export default function CaseManagement() {
               <button
                 onClick={() => setShowCasePrintableReport(true)}
                 className="
-      flex
-      items-center
-      justify-center
-      gap-2
-      px-4
-      h-10
-      rounded-xl
-      bg-white
-      border
-      border-gray-200
-      text-gray-700
-      text-xs
-      font-bold
-      hover:border-green-200
-      hover:bg-green-50
-      hover:text-green-700
-      transition
-      shadow-sm
-      whitespace-nowrap
-    "
+                  flex
+                  items-center
+                  justify-center
+                  gap-2
+                  px-4
+                  h-10
+                  rounded-xl
+                  bg-white
+                  border
+                  border-gray-200
+                  text-gray-700
+                  text-xs
+                  font-bold
+                  hover:border-green-200
+                  hover:bg-green-50
+                  hover:text-green-700
+                  transition
+                  shadow-sm
+                  whitespace-nowrap
+                "
               >
                 <Printer size={16} />
                 Printable Report
@@ -1773,12 +2085,12 @@ export default function CaseManagement() {
                 <div
                   key={item}
                   className="
-                    h-[260px]
-                    rounded-2xl
-                    bg-white
-                    border border-gray-100
-                    animate-pulse
-                  "
+                      h-[260px]
+                      rounded-2xl
+                      bg-white
+                      border border-gray-100
+                      animate-pulse
+                    "
                 />
               ))}
             </div>
@@ -1818,7 +2130,13 @@ export default function CaseManagement() {
                 <CaseCard
                   key={c._id}
                   caseData={c}
-                  onClick={() => setSelected(c)}
+                  onClick={() => {
+                    setSelected(c);
+
+                    // Generate Gemini analysis
+                    // using this exact current incident.
+                    runGeminiAnalysis(c);
+                  }}
                 />
               ))}
             </div>
@@ -1833,9 +2151,15 @@ export default function CaseManagement() {
       <AnimatePresence>
         {selected && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: 1,
+            }}
+            exit={{
+              opacity: 0,
+            }}
             className="
               fixed inset-0
               z-[500]
@@ -2061,17 +2385,17 @@ export default function CaseManagement() {
                           <div className="flex items-center">
                             <div
                               className={`
-                                relative z-10
-                                w-9 h-9
-                                rounded-xl
-                                flex items-center justify-center
-                                border-2
-                                ${
-                                  step.done
-                                    ? "bg-green-600 border-green-600 text-white"
-                                    : "bg-white border-gray-200 text-gray-300"
-                                }
-                              `}
+                                  relative z-10
+                                  w-9 h-9
+                                  rounded-xl
+                                  flex items-center justify-center
+                                  border-2
+                                  ${
+                                    step.done
+                                      ? "bg-green-600 border-green-600 text-white"
+                                      : "bg-white border-gray-200 text-gray-300"
+                                  }
+                                `}
                             >
                               {step.done ? (
                                 <CheckCircle size={15} />
@@ -2083,10 +2407,12 @@ export default function CaseManagement() {
                             {i !== flowWithMeta.length - 1 && (
                               <div
                                 className={`
-                                  h-1
-                                  flex-1
-                                  ${step.done ? "bg-green-400" : "bg-gray-200"}
-                                `}
+                                    h-1
+                                    flex-1
+                                    ${
+                                      step.done ? "bg-green-400" : "bg-gray-200"
+                                    }
+                                  `}
                               />
                             )}
                           </div>
@@ -2094,10 +2420,14 @@ export default function CaseManagement() {
                           <div className="pr-3 mt-3">
                             <p
                               className={`
-                                text-[10px]
-                                font-bold
-                                ${step.done ? "text-gray-800" : "text-gray-400"}
-                              `}
+                                  text-[10px]
+                                  font-bold
+                                  ${
+                                    step.done
+                                      ? "text-gray-800"
+                                      : "text-gray-400"
+                                  }
+                                `}
                             >
                               {step.label}
                             </p>
@@ -2212,7 +2542,9 @@ export default function CaseManagement() {
                   </div>
                 </div>
 
-                {/* AI */}
+                {/* =================================================
+                    GEMINI AI CASE ANALYSIS
+                ================================================= */}
 
                 <div
                   className="
@@ -2231,6 +2563,8 @@ export default function CaseManagement() {
                   <div className="absolute -right-10 -top-10 w-36 h-36 bg-green-300/10 blur-3xl rounded-full" />
 
                   <div className="relative">
+                    {/* HEADER */}
+
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <div
@@ -2247,23 +2581,340 @@ export default function CaseManagement() {
 
                         <div>
                           <p className="text-sm font-bold text-gray-800">
-                            AI Case Analysis
+                            GuidED AI Case Analysis
                           </p>
 
                           <p className="text-[9px] text-gray-400">
-                            Automated policy-based classification
+                            Current incident-focused analysis
                           </p>
                         </div>
                       </div>
 
-                      <RiskBadge risk={ai?.risk || "LOW"} />
+                      <RiskBadge risk={aiAnalysis?.risk || ai?.risk || "LOW"} />
                     </div>
 
-                    <div className="mt-4 bg-white rounded-xl p-4 border border-green-100">
-                      <p className="text-sm leading-relaxed text-gray-700">
-                        {ai?.insight}
-                      </p>
+                    {/* CURRENT INCIDENT */}
+
+                    <div className="mt-4 rounded-xl bg-white border border-green-100 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div
+                          className="
+                            w-7 h-7
+                            rounded-lg
+                            bg-green-50
+                            text-green-700
+                            flex items-center justify-center
+                          "
+                        >
+                          <FileText size={13} />
+                        </div>
+
+                        <div>
+                          <p className="text-[9px] uppercase tracking-wider font-bold text-green-700">
+                            Current Incident
+                          </p>
+
+                          <p className="text-xs font-bold text-gray-800">
+                            {selected.offense}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div>
+                          <p className="text-[8px] uppercase tracking-wider font-bold text-gray-400">
+                            Category
+                          </p>
+
+                          <p className="text-[10px] font-semibold text-gray-700 mt-1">
+                            {selected.category || "N/A"}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-[8px] uppercase tracking-wider font-bold text-gray-400">
+                            Severity
+                          </p>
+
+                          <p className="text-[10px] font-semibold text-gray-700 mt-1">
+                            {selected.level || ai?.severity || "N/A"}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-[8px] uppercase tracking-wider font-bold text-gray-400">
+                            Status
+                          </p>
+
+                          <p className="text-[10px] font-semibold text-gray-700 mt-1">
+                            {getStatus(selected)}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-[8px] uppercase tracking-wider font-bold text-gray-400">
+                            Student
+                          </p>
+
+                          <p className="text-[10px] font-semibold text-gray-700 mt-1 truncate">
+                            {selected.student?.name || "Unknown"}
+                          </p>
+                        </div>
+                      </div>
                     </div>
+
+                    {/* LOADING */}
+
+                    {aiLoading && (
+                      <div className="mt-4 rounded-xl bg-white border border-green-100 p-5 flex items-center gap-3">
+                        <div
+                          className="
+                            w-9 h-9
+                            rounded-xl
+                            bg-green-50
+                            text-green-700
+                            flex items-center justify-center
+                          "
+                        >
+                          <Brain size={17} className="animate-pulse" />
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">
+                            GuidED AI is analyzing this case...
+                          </p>
+
+                          <p className="text-[9px] text-gray-400 mt-1">
+                            The current incident is being evaluated first, with
+                            previous records used only as supporting context.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ERROR */}
+
+                    {!aiLoading && aiError && (
+                      <div className="mt-4 rounded-xl bg-red-50 border border-red-100 p-4">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle
+                            size={16}
+                            className="text-red-600 mt-0.5 flex-shrink-0"
+                          />
+
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-red-700">
+                              AI analysis unavailable
+                            </p>
+
+                            <p className="text-[10px] text-red-600 mt-1">
+                              {aiError}
+                            </p>
+
+                            <button
+                              onClick={() => runGeminiAnalysis(selected)}
+                              className="
+                                  mt-3
+                                  px-3
+                                  py-2
+                                  rounded-lg
+                                  bg-white
+                                  border border-red-200
+                                  text-[10px]
+                                  font-bold
+                                  text-red-700
+                                  hover:bg-red-100
+                                  transition
+                                "
+                            >
+                              Try Again
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* RESULT */}
+
+                    {!aiLoading && !aiError && aiAnalysis && (
+                      <div className="mt-4 space-y-4">
+                        {/* AI SUMMARY */}
+
+                        {aiAnalysis.summary && (
+                          <div className="bg-white rounded-xl p-4 border border-green-100">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Sparkles size={14} className="text-green-600" />
+
+                              <p className="text-[9px] uppercase tracking-wider font-bold text-green-700">
+                                AI Summary
+                              </p>
+                            </div>
+
+                            <p className="text-sm leading-relaxed text-gray-700">
+                              {aiAnalysis.summary}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* RECOMMENDATION */}
+
+                        <div className="bg-white rounded-xl p-4 border border-green-100">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Brain size={14} className="text-green-600" />
+
+                            <p className="text-[9px] uppercase tracking-wider font-bold text-green-700">
+                              AI Guidance Recommendation
+                            </p>
+                          </div>
+
+                          <p className="text-sm leading-relaxed text-gray-700">
+                            {aiAnalysis.recommendation}
+                          </p>
+                        </div>
+
+                        {/* EVIDENCE BASIS */}
+
+                        {aiAnalysis.basis && (
+                          <div className="bg-white rounded-xl p-4 border border-gray-100">
+                            <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400 mb-2">
+                              Evidence Basis
+                            </p>
+
+                            <p className="text-[11px] leading-relaxed text-gray-600">
+                              {aiAnalysis.basis}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* PATTERN + PREDICTION */}
+
+                        {(aiAnalysis.pattern || aiAnalysis.prediction) && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {aiAnalysis.pattern && (
+                              <div className="bg-white rounded-xl p-4 border border-gray-100">
+                                <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400 mb-2">
+                                  Behavioral Pattern
+                                </p>
+
+                                <p className="text-[10px] leading-relaxed text-gray-600">
+                                  {aiAnalysis.pattern}
+                                </p>
+                              </div>
+                            )}
+
+                            {aiAnalysis.prediction && (
+                              <div className="bg-white rounded-xl p-4 border border-gray-100">
+                                <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400 mb-2">
+                                  Behavioral Prediction
+                                </p>
+
+                                <p className="text-[10px] leading-relaxed text-gray-600">
+                                  {aiAnalysis.prediction}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* RESEARCH REFERENCES */}
+
+                        {Array.isArray(aiAnalysis.references) &&
+                          aiAnalysis.references.length > 0 && (
+                            <div className="bg-white rounded-xl p-4 border border-green-100">
+                              <div className="flex items-center gap-2 mb-3">
+                                <FileText
+                                  size={14}
+                                  className="text-green-600"
+                                />
+
+                                <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400">
+                                  Research Support
+                                </p>
+                              </div>
+
+                              <div className="space-y-3">
+                                {aiAnalysis.references
+                                  .slice(0, 5)
+                                  .map((reference, index) => (
+                                    <div
+                                      key={
+                                        reference.referenceId ||
+                                        reference.id ||
+                                        index
+                                      }
+                                      className="rounded-xl bg-gray-50 border border-gray-100 p-3"
+                                    >
+                                      <p className="text-[10px] font-bold text-gray-700">
+                                        {reference.referenceId ||
+                                          `Reference ${index + 1}`}
+                                      </p>
+
+                                      {reference.citation && (
+                                        <p className="text-[10px] leading-relaxed text-gray-500 mt-1">
+                                          {reference.citation}
+                                        </p>
+                                      )}
+
+                                      {reference.doi && (
+                                        <p className="text-[9px] text-green-700 font-semibold mt-1">
+                                          DOI: {reference.doi}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+
+                        {/* AI NOTES */}
+
+                        {aiAnalysis.notes && (
+                          <div className="rounded-xl bg-green-50 border border-green-100 p-4">
+                            <p className="text-[9px] uppercase tracking-wider font-bold text-green-700 mb-2">
+                              AI Notes
+                            </p>
+
+                            <p className="text-[10px] leading-relaxed text-green-800">
+                              {aiAnalysis.notes}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* NO RESULT */}
+
+                    {!aiLoading && !aiError && !aiAnalysis && (
+                      <div className="mt-4 rounded-xl bg-white border border-green-100 p-5 text-center">
+                        <Brain size={22} className="mx-auto text-green-500" />
+
+                        <p className="text-xs font-bold text-gray-700 mt-2">
+                          AI analysis has not been generated yet.
+                        </p>
+
+                        <button
+                          onClick={() => runGeminiAnalysis(selected)}
+                          className="
+                              mt-3
+                              inline-flex
+                              items-center
+                              gap-2
+                              px-4
+                              py-2
+                              rounded-xl
+                              bg-green-600
+                              text-white
+                              text-[10px]
+                              font-bold
+                              hover:bg-green-700
+                              transition
+                            "
+                        >
+                          <Sparkles size={13} />
+                          Analyze Current Incident
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2383,14 +3034,14 @@ export default function CaseManagement() {
                                     src={url}
                                     alt="Evidence"
                                     className="
-                                      w-full
-                                      h-24
-                                      object-cover
-                                      rounded-xl
-                                      border border-gray-200
-                                      hover:scale-[1.03]
-                                      transition
-                                    "
+                                        w-full
+                                        h-24
+                                        object-cover
+                                        rounded-xl
+                                        border border-gray-200
+                                        hover:scale-[1.03]
+                                        transition
+                                      "
                                   />
                                 </button>
                               ) : (
@@ -2399,18 +3050,18 @@ export default function CaseManagement() {
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="
-                                    flex
-                                    items-center
-                                    justify-center
-                                    h-24
-                                    rounded-xl
-                                    border border-gray-200
-                                    bg-gray-50
-                                    text-[10px]
-                                    font-semibold
-                                    text-gray-500
-                                    hover:bg-gray-100
-                                  "
+                                      flex
+                                      items-center
+                                      justify-center
+                                      h-24
+                                      rounded-xl
+                                      border border-gray-200
+                                      bg-gray-50
+                                      text-[10px]
+                                      font-semibold
+                                      text-gray-500
+                                      hover:bg-gray-100
+                                    "
                                 >
                                   Open File
                                 </a>
@@ -2439,9 +3090,15 @@ export default function CaseManagement() {
                 <AnimatePresence>
                   {previewImage && (
                     <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
+                      initial={{
+                        opacity: 0,
+                      }}
+                      animate={{
+                        opacity: 1,
+                      }}
+                      exit={{
+                        opacity: 0,
+                      }}
                       className="
                         fixed inset-0
                         z-[9999]
@@ -2486,71 +3143,6 @@ export default function CaseManagement() {
                   )}
                 </AnimatePresence>
 
-                {/* REQUEST STATEMENT */}
-
-                {(getStatus(selected) === "reviewing" ||
-                  getStatus(selected) === "received") && (
-                  <div
-                    className="
-                      mt-5
-                      rounded-2xl
-                      bg-purple-50
-                      border border-purple-100
-                      p-5
-                    "
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="
-                          w-9 h-9
-                          rounded-xl
-                          bg-purple-100
-                          text-purple-700
-                          flex items-center justify-center
-                        "
-                      >
-                        <MessageSquare size={15} />
-                      </div>
-
-                      <div>
-                        <p className="text-sm font-bold text-purple-900">
-                          Student Statement
-                        </p>
-
-                        <p className="text-[9px] text-purple-600 mt-0.5">
-                          Request the student's explanation before proceeding.
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={requestStudentStatement}
-                      className="
-                        mt-4
-                        px-5
-                        py-2.5
-                        rounded-xl
-                        bg-purple-600
-                        hover:bg-purple-700
-                        text-white
-                        text-xs
-                        font-bold
-                        shadow-sm
-                        transition
-                      "
-                    >
-                      <MessageSquare size={13} className="inline mr-2" />
-                      Request Student Statement
-                    </button>
-
-                    {requestSent && (
-                      <p className="text-[10px] text-amber-700 mt-3 font-medium">
-                        Waiting for student response...
-                      </p>
-                    )}
-                  </div>
-                )}
-
                 {/* MANUAL STATEMENT */}
 
                 {selected.statementStatus !== "manual_entry" &&
@@ -2594,25 +3186,25 @@ export default function CaseManagement() {
                         onChange={(e) => setStudentInput(e.target.value)}
                         minLength={MIN_TEXT_LENGTH}
                         className={`
-                        w-full
-                        min-h-[110px]
-                        p-4
-                        rounded-xl
-                        bg-gray-50
-                        border
-                        outline-none
-                        resize-none
-                        text-sm
-                        text-gray-700
-                        focus:ring-2
-                        focus:ring-green-500/10
-                        ${
-                          studentInput.length > 0 &&
-                          studentInput.trim().length < MIN_TEXT_LENGTH
-                            ? "border-red-300 focus:border-red-400"
-                            : "border-gray-200 focus:border-green-300"
-                        }
-                      `}
+                          w-full
+                          min-h-[110px]
+                          p-4
+                          rounded-xl
+                          bg-gray-50
+                          border
+                          outline-none
+                          resize-none
+                          text-sm
+                          text-gray-700
+                          focus:ring-2
+                          focus:ring-green-500/10
+                          ${
+                            studentInput.length > 0 &&
+                            studentInput.trim().length < MIN_TEXT_LENGTH
+                              ? "border-red-300 focus:border-red-400"
+                              : "border-gray-200 focus:border-green-300"
+                          }
+                        `}
                         placeholder="Write student statement..."
                       />
 
@@ -2626,7 +3218,9 @@ export default function CaseManagement() {
                           }`}
                         >
                           {studentInput.trim().length < MIN_TEXT_LENGTH
-                            ? `${MIN_TEXT_LENGTH - studentInput.trim().length} more characters required`
+                            ? `${
+                                MIN_TEXT_LENGTH - studentInput.trim().length
+                              } more characters required`
                             : "Minimum length reached"}
                         </p>
 
@@ -2700,12 +3294,12 @@ export default function CaseManagement() {
                             <div className="flex flex-col items-center">
                               <div
                                 className="
-                                  w-8 h-8
-                                  rounded-xl
-                                  bg-green-50
-                                  text-green-600
-                                  flex items-center justify-center
-                                "
+                                    w-8 h-8
+                                    rounded-xl
+                                    bg-green-50
+                                    text-green-600
+                                    flex items-center justify-center
+                                  "
                               >
                                 <CircleCheck size={14} />
                               </div>
@@ -2940,24 +3534,24 @@ export default function CaseManagement() {
                     onChange={(e) => setNote(e.target.value)}
                     minLength={MIN_TEXT_LENGTH}
                     className={`
-                    mt-2
-                    w-full
-                    min-h-[100px]
-                    p-4
-                    rounded-xl
-                    bg-white
-                    border
-                    outline-none
-                    resize-none
-                    text-sm
-                    focus:ring-2
-                    focus:ring-green-500/10
-                    ${
-                      note.length > 0 && note.trim().length < MIN_TEXT_LENGTH
-                        ? "border-red-300 focus:border-red-400"
-                        : "border-gray-200 focus:border-green-300"
-                    }
-                  `}
+                      mt-2
+                      w-full
+                      min-h-[100px]
+                      p-4
+                      rounded-xl
+                      bg-white
+                      border
+                      outline-none
+                      resize-none
+                      text-sm
+                      focus:ring-2
+                      focus:ring-green-500/10
+                      ${
+                        note.length > 0 && note.trim().length < MIN_TEXT_LENGTH
+                          ? "border-red-300 focus:border-red-400"
+                          : "border-gray-200 focus:border-green-300"
+                      }
+                    `}
                     placeholder="Add a note explaining this case action..."
                   />
 
@@ -2971,7 +3565,9 @@ export default function CaseManagement() {
                       }`}
                     >
                       {note.trim().length < MIN_TEXT_LENGTH
-                        ? `${MIN_TEXT_LENGTH - note.trim().length} more characters required`
+                        ? `${
+                            MIN_TEXT_LENGTH - note.trim().length
+                          } more characters required`
                         : "Minimum length reached"}
                     </p>
 
@@ -3052,6 +3648,7 @@ export default function CaseManagement() {
           </motion.div>
         )}
       </AnimatePresence>
+
       {showCasePrintableReport && (
         <CasePrintableReport
           onClose={() => setShowCasePrintableReport(false)}

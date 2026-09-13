@@ -153,10 +153,6 @@ const initialize = async () => {
       user?.role,
     );
 
-    console.log(
-      "User ID:",
-      user?._id,
-    );
 
     if (!user?._id) {
       console.log(
@@ -387,10 +383,6 @@ const initialize = async () => {
     ================================================= */
 
     const handleConnect = () => {
-      console.log(
-        "🟢 GLOBAL SOCKET CONNECTED:",
-        socket.id,
-      );
 
       /*
        * Register user.
@@ -400,11 +392,6 @@ const initialize = async () => {
        */
       socket.emit(
         "register",
-        currentUserId,
-      );
-
-      console.log(
-        "📡 GLOBAL USER REGISTERED:",
         currentUserId,
       );
 
@@ -420,10 +407,6 @@ const initialize = async () => {
         currentUserId,
       );
 
-      console.log(
-        "📡 GLOBAL JOINED USER ROOM:",
-        currentUserId,
-      );
     };
 
     /* =================================================

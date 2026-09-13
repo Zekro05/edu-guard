@@ -149,11 +149,7 @@ export const registerWebFCM = async () => {
       "===================================="
     );
 
-    console.log(
-      "🌐 WEB FCM TOKEN:"
-    );
-
-    console.log(token);
+    
 
     console.log(
       "===================================="

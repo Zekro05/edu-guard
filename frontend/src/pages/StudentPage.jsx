@@ -105,17 +105,6 @@ const StudentPage = () => {
 
       const res = await API.get("/api/students");
 
-      console.log("📸 STUDENTS FROM API:", res.data);
-
-      res.data.forEach((student) => {
-        console.log(
-          student.firstName,
-          student.studentId,
-          "PROFILE PHOTO:",
-          student.profilePhoto,
-        );
-      });
-
       setStudents(res.data || []);
     } catch (error) {
       console.error("Failed to fetch students:", error);

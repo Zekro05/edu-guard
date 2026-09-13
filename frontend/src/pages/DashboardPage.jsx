@@ -688,7 +688,7 @@ const DashboardPage = () => {
     }
 
     try {
-      await API.put(`/api/notifications/${userId}/read-all`);
+      await API.put("/api/notifications/read-all");;
 
       setNotifications([]);
       setNotifCount(0);

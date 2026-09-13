@@ -1,10 +1,15 @@
 import express from "express";
+
 import { ai } from "../config/geminiAi.js";
 
 import {
   findRelevantResearchReferences,
   formatReferencesForGemini,
 } from "../services/researchReferenceService.js";
+
+import Report from "../models/reportModel.js";
+import Incident from "../models/incidentModel.js";
+import Student from "../models/studentModel.js";
 
 const router = express.Router();
 
@@ -13,7 +18,6 @@ const router = express.Router();
 ========================================================= */
 
 const GEMINI_MODEL = "models/gemini-3-flash-preview";
-
 const MAX_RETRIES = 4;
 
 const sleep = (ms) =>
@@ -280,13 +284,6 @@ const getFallbackConclusion = (
         "",
     ).toLowerCase();
 
-  /*
-   * This is only a safety fallback.
-   *
-   * The AI should normally provide the
-   * conclusion itself.
-   */
-
   if (level === "high") {
     return "Suspension";
   }
@@ -296,6 +293,535 @@ const getFallbackConclusion = (
   }
 
   return "Warning";
+};
+
+/* =========================================================
+   SCHOOL-WIDE AI HELPERS
+========================================================= */
+
+const normalizeValue = (
+  value,
+  fallback = "Unknown",
+) => {
+  if (
+    value === null ||
+    value === undefined ||
+    String(value).trim() === ""
+  ) {
+    return fallback;
+  }
+
+  return String(value).trim();
+};
+
+const countBy = (
+  items,
+  getter,
+) => {
+  const counts = {};
+
+  for (const item of items) {
+    const value =
+      normalizeValue(
+        getter(item),
+      );
+
+    counts[value] =
+      (counts[value] || 0) + 1;
+  }
+
+  return Object.entries(counts)
+    .sort(
+      (a, b) =>
+        b[1] - a[1],
+    )
+    .map(
+      ([name, count]) => ({
+        name,
+        count,
+      }),
+    );
+};
+
+const getStudentId = (
+  item,
+) => {
+  const value =
+    item?.studentId?._id ||
+    item?.studentId ||
+    item?.student?._id ||
+    null;
+
+  return value
+    ? String(value)
+    : null;
+};
+
+const getDateValue = (
+  item,
+) => {
+  return (
+    item?.date ||
+    item?.incidentDate ||
+    item?.createdAt ||
+    item?.updatedAt ||
+    null
+  );
+};
+
+const getMonthKey = (
+  dateValue,
+) => {
+  if (!dateValue) {
+    return "Unknown";
+  }
+
+  const date =
+    new Date(dateValue);
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return "Unknown";
+  }
+
+  return date
+    .toISOString()
+    .slice(0, 7);
+};
+
+const getDateRange = (
+  items,
+) => {
+  const dates = items
+    .map(getDateValue)
+    .filter(Boolean)
+    .map(
+      (value) =>
+        new Date(value),
+    )
+    .filter(
+      (date) =>
+        !Number.isNaN(
+          date.getTime(),
+        ),
+    )
+    .sort(
+      (a, b) => a - b,
+    );
+
+  if (!dates.length) {
+    return {
+      earliest: null,
+      latest: null,
+    };
+  }
+
+  return {
+    earliest:
+      dates[0].toISOString(),
+
+    latest:
+      dates[
+        dates.length - 1
+      ].toISOString(),
+  };
+};
+
+/* =========================================================
+   BUILD SCHOOL-WIDE STATISTICS
+========================================================= */
+
+const buildSchoolWideStatistics = ({
+  reports,
+  incidents,
+  students,
+}) => {
+  const allStudentIds =
+    new Set();
+
+  reports.forEach(
+    (report) => {
+      const studentId =
+        getStudentId(report);
+
+      if (studentId) {
+        allStudentIds.add(
+          studentId,
+        );
+      }
+    },
+  );
+
+  incidents.forEach(
+    (incident) => {
+      const studentId =
+        getStudentId(
+          incident,
+        );
+
+      if (studentId) {
+        allStudentIds.add(
+          studentId,
+        );
+      }
+    },
+  );
+
+  /* =====================================================
+     SEVERITY
+  ===================================================== */
+
+  const severityDistribution =
+    countBy(
+      incidents,
+      (incident) =>
+        incident?.level ||
+        incident?.riskLevel ||
+        "Unknown",
+    );
+
+  /* =====================================================
+     CATEGORIES
+  ===================================================== */
+
+  const categoryDistribution =
+    countBy(
+      incidents,
+      (incident) =>
+        incident?.category ||
+        incident?.title ||
+        "Unknown",
+    );
+
+  /* =====================================================
+     OFFENSES
+  ===================================================== */
+
+  const offenseDistribution =
+    countBy(
+      reports,
+      (report) =>
+        report?.offense ||
+        report?.category ||
+        "Unknown",
+    );
+
+  /* =====================================================
+     LOCATIONS
+  ===================================================== */
+
+  const locationDistribution =
+    countBy(
+      [
+        ...reports,
+        ...incidents,
+      ],
+      (item) =>
+        item?.location ||
+        "Unknown",
+    );
+
+  /* =====================================================
+     INCIDENT STATUS
+  ===================================================== */
+
+  const incidentStatusDistribution =
+    countBy(
+      incidents,
+      (incident) =>
+        incident?.status ||
+        "Unknown",
+    );
+
+  /* =====================================================
+     REPORT STATUS
+  ===================================================== */
+
+  const reportStatusDistribution =
+    countBy(
+      reports,
+      (report) =>
+        report?.status ||
+        "Unknown",
+    );
+
+  /* =====================================================
+     REPORTER TYPES
+  ===================================================== */
+
+  const reporterDistribution =
+    countBy(
+      reports,
+      (report) =>
+        report?.reporterType ||
+        "Unknown",
+    );
+
+  /* =====================================================
+     MONTHLY TREND
+  ===================================================== */
+
+  const monthlyMap = {};
+
+  reports.forEach(
+    (report) => {
+      const month =
+        getMonthKey(
+          getDateValue(
+            report,
+          ),
+        );
+
+      if (!monthlyMap[month]) {
+        monthlyMap[month] = {
+          month,
+          reports: 0,
+          incidents: 0,
+        };
+      }
+
+      monthlyMap[month]
+        .reports += 1;
+    },
+  );
+
+  incidents.forEach(
+    (incident) => {
+      const month =
+        getMonthKey(
+          getDateValue(
+            incident,
+          ),
+        );
+
+      if (!monthlyMap[month]) {
+        monthlyMap[month] = {
+          month,
+          reports: 0,
+          incidents: 0,
+        };
+      }
+
+      monthlyMap[month]
+        .incidents += 1;
+    },
+  );
+
+  const monthlyTrend =
+    Object.values(
+      monthlyMap,
+    ).sort(
+      (a, b) =>
+        a.month.localeCompare(
+          b.month,
+        ),
+    );
+
+  /* =====================================================
+     STUDENT BEHAVIOR SUMMARY
+
+     We intentionally use IDs/counts only.
+     No student names are sent to Gemini.
+  ===================================================== */
+
+  const studentBehaviorMap =
+    {};
+
+  incidents.forEach(
+    (incident) => {
+      const studentId =
+        getStudentId(
+          incident,
+        );
+
+      if (!studentId) {
+        return;
+      }
+
+      if (
+        !studentBehaviorMap[
+          studentId
+        ]
+      ) {
+        studentBehaviorMap[
+          studentId
+        ] = {
+          studentId,
+          incidentCount: 0,
+          highCount: 0,
+          mediumCount: 0,
+          lowCount: 0,
+          categories: {},
+        };
+      }
+
+      const student =
+        studentBehaviorMap[
+          studentId
+        ];
+
+      student.incidentCount += 1;
+
+      const level =
+        String(
+          incident?.level ||
+            incident?.riskLevel ||
+            "",
+        ).toLowerCase();
+
+      if (
+        level === "high"
+      ) {
+        student.highCount += 1;
+      }
+
+      if (
+        level === "medium"
+      ) {
+        student.mediumCount += 1;
+      }
+
+      if (
+        level === "low"
+      ) {
+        student.lowCount += 1;
+      }
+
+      const category =
+        normalizeValue(
+          incident?.category ||
+            incident?.title,
+        );
+
+      student.categories[
+        category
+      ] =
+        (student.categories[
+          category
+        ] || 0) + 1;
+    },
+  );
+
+  const recurringStudents =
+    Object.values(
+      studentBehaviorMap,
+    )
+      .sort(
+        (a, b) =>
+          b.incidentCount -
+          a.incidentCount,
+      )
+      .slice(0, 20);
+
+  /* =====================================================
+     RISK COUNTS
+  ===================================================== */
+
+  const highIncidents =
+    incidents.filter(
+      (incident) => {
+        const level =
+          String(
+            incident?.level ||
+              incident?.riskLevel ||
+              "",
+          ).toLowerCase();
+
+        return level === "high";
+      },
+    ).length;
+
+  const mediumIncidents =
+    incidents.filter(
+      (incident) => {
+        const level =
+          String(
+            incident?.level ||
+              incident?.riskLevel ||
+              "",
+          ).toLowerCase();
+
+        return level ===
+          "medium";
+      },
+    ).length;
+
+  const lowIncidents =
+    incidents.filter(
+      (incident) => {
+        const level =
+          String(
+            incident?.level ||
+              incident?.riskLevel ||
+              "",
+          ).toLowerCase();
+
+        return level === "low";
+      },
+    ).length;
+
+  return {
+    totalStudents:
+      students.length,
+
+    studentsInvolved:
+      allStudentIds.size,
+
+    totalReports:
+      reports.length,
+
+    totalIncidents:
+      incidents.length,
+
+    highIncidents,
+
+    mediumIncidents,
+
+    lowIncidents,
+
+    severityDistribution,
+
+    categoryDistribution:
+      categoryDistribution.slice(
+        0,
+        15,
+      ),
+
+    offenseDistribution:
+      offenseDistribution.slice(
+        0,
+        15,
+      ),
+
+    locationDistribution:
+      locationDistribution.slice(
+        0,
+        15,
+      ),
+
+    incidentStatusDistribution,
+
+    reportStatusDistribution,
+
+    reporterDistribution,
+
+    monthlyTrend,
+
+    recurringStudents,
+
+    reportDateRange:
+      getDateRange(
+        reports,
+      ),
+
+    incidentDateRange:
+      getDateRange(
+        incidents,
+      ),
+  };
 };
 
 /* =========================================================
@@ -426,29 +952,13 @@ router.post(
       const {
         grade,
         riskLevel,
-
-        /*
-         * IMPORTANT:
-         * currentIncident is the case currently
-         * being reviewed by the guidance administrator.
-         */
         currentIncident = null,
-
-        /*
-         * Previous incidents are supporting context
-         * only. They must never override the current case.
-         */
         previousIncidents = [],
-
-        /*
-         * Existing fields are still accepted so older
-         * frontend versions do not immediately break.
-         */
         timeline = [],
         incidents = [],
         reports = [],
-
-        requiredConclusionOptions = CONCLUSION_OPTIONS,
+        requiredConclusionOptions =
+          CONCLUSION_OPTIONS,
       } = req.body;
 
       /* =====================================================
@@ -469,17 +979,12 @@ router.post(
           ? previousIncidents
           : [];
 
-      /*
-       * Backward compatibility:
-       *
-       * If the frontend has not yet sent previousIncidents,
-       * derive them from incidents while excluding the
-       * current incident.
-       */
       if (
         supportingIncidents.length ===
           0 &&
-        Array.isArray(incidents)
+        Array.isArray(
+          incidents,
+        )
       ) {
         supportingIncidents =
           incidents.filter(
@@ -665,11 +1170,13 @@ ${
         supportingIncidents.length
           ? supportingIncidents
               .map(
-                (incident, index) =>
-                  `
+                (
+                  incident,
+                  index,
+                ) => `
 Previous Incident ${
-                    index + 1
-                  }
+                  index + 1
+                }
 
 Incident ID:
 ${
@@ -731,11 +1238,13 @@ ${
         reports.length
           ? reports
               .map(
-                (report, index) =>
-                  `
+                (
+                  report,
+                  index,
+                ) => `
 Report ${
-                    index + 1
-                  }
+                  index + 1
+                }
 
 Report ID:
 ${
@@ -885,13 +1394,15 @@ The conclusion MUST be exactly ONE of these options:
 
 ${finalConclusionOptions
   .map(
-    (option) => `- ${option}`,
+    (option) =>
+      `- ${option}`,
   )
   .join("\n")}
 
 Do not create another conclusion option.
 
 Do not use:
+
 - Expulsion
 - Probation
 - Counseling
@@ -952,44 +1463,70 @@ ANALYSIS RULES
 
 - Base behavioral observations ONLY on recorded school
   information.
+
 - Do not invent facts.
+
 - Do not diagnose mental health conditions.
+
 - Do not speculate about medical conditions.
+
 - Do not claim to know psychological states.
+
 - Do not make assumptions about personality.
+
 - Risk must be based only on the recorded school information.
+
 - Prediction must be cautious and must not present an uncertain
   outcome as fact.
+
 - The CURRENT INCIDENT is the primary basis for intervention.
+
 - Previous incidents are secondary context.
+
 - Previous incidents must never automatically escalate the
   intervention.
+
 - Do not recommend suspension simply because a previous incident
   was severe.
+
 - Consider the actual severity, circumstances, evidence,
   student statement, and current status of the CURRENT INCIDENT.
+
 - Keep recommendations educational and proportionate.
+
 - Do not invent school policies that were not provided.
+
 - Do not state that a particular intervention is legally required.
+
 - Provide exactly 3 intervention recommendations.
+
 - Each recommendation must have:
   - recommendation
   - conclusion
   - basis
   - referenceIds
   - references
+
 - conclusion must be exactly one of:
   ${finalConclusionOptions.join(
     ", ",
   )}
+
 - Each reference in "references" must correspond exactly to a
   supplied research reference.
+
 - The citation should use the supplied author names and year.
+
 - The DOI must exactly match the supplied DOI.
+
 - Do not create fake citations.
+
 - If evidence is insufficient, explicitly state so.
+
 - Do not use markdown.
+
 - Do not wrap JSON in code fences.
+
 - Do not add explanations outside the JSON.
 
 =========================================================
@@ -1127,11 +1664,9 @@ Return ONLY valid JSON.
         rawInterventions
           .slice(0, 3)
           .map(
-            (intervention) => {
-              /* =============================================
-                 VALIDATE REFERENCE IDS
-              ============================================= */
-
+            (
+              intervention,
+            ) => {
               const validIds =
                 Array.isArray(
                   intervention?.referenceIds,
@@ -1143,10 +1678,6 @@ Return ONLY valid JSON.
                         ),
                     )
                   : [];
-
-              /* =============================================
-                 REBUILD REFERENCES FROM DATABASE
-              ============================================= */
 
               const validReferences =
                 validIds.map(
@@ -1160,9 +1691,10 @@ Return ONLY valid JSON.
                       referenceId:
                         reference.referenceId,
 
-                      citation: `${reference.authors.join(
-                        ", ",
-                      )} (${reference.year})`,
+                      citation:
+                        `${reference.authors.join(
+                          ", ",
+                        )} (${reference.year})`,
 
                       doi:
                         reference.doi ||
@@ -1171,19 +1703,10 @@ Return ONLY valid JSON.
                   },
                 );
 
-              /* =============================================
-                 VALIDATE CONCLUSION
-              ============================================= */
-
               let conclusion =
                 normalizeConclusion(
                   intervention?.conclusion,
                 );
-
-              /*
-               * If Gemini failed to provide a valid conclusion,
-               * try to detect one from the recommendation text.
-               */
 
               if (!conclusion) {
                 const recommendationText =
@@ -1226,12 +1749,6 @@ Return ONLY valid JSON.
                 }
               }
 
-              /*
-               * Final safety fallback.
-               *
-               * This is only used when Gemini does not return
-               * a valid conclusion.
-               */
               if (!conclusion) {
                 conclusion =
                   getFallbackConclusion(
@@ -1239,27 +1756,21 @@ Return ONLY valid JSON.
                   );
               }
 
-              /* =============================================
-                 RECOMMENDATION
-              ============================================= */
-
               const recommendation =
                 String(
                   intervention?.recommendation ||
                     "No recommendation generated.",
                 ).trim();
 
-              /*
-               * Make sure the recommendation itself ends with
-               * the required conclusion.
-               */
+              const escapedConclusion =
+                conclusion.replace(
+                  /[.*+?^${}()|[\]\\]/g,
+                  "\\$&",
+                );
 
               const conclusionRegex =
                 new RegExp(
-                  `Conclusion\\s*:\\s*${conclusion.replace(
-                    /[.*+?^${}()|[\]\\]/g,
-                    "\\$&",
-                  )}\\.?$`,
+                  `Conclusion\\s*:\\s*${escapedConclusion}\\.?$`,
                   "i",
                 );
 
@@ -1329,9 +1840,6 @@ Return ONLY valid JSON.
       return res.json({
         success: true,
 
-        /*
-         * Useful for frontend transparency.
-         */
         analysisBasis:
           "current-incident",
 
@@ -1471,6 +1979,1041 @@ Return ONLY valid JSON.
 );
 
 /* =========================================================
+   SCHOOL-WIDE AI ANALYSIS
+   WHOLE EDUGUARD SYSTEM
+========================================================= */
+
+router.post(
+  "/school-analysis",
+  async (req, res) => {
+    try {
+      console.log(
+        "🏫 Starting school-wide EduGuard AI analysis...",
+      );
+
+      /* =====================================================
+         LOAD WHOLE SYSTEM DATA
+      ===================================================== */
+
+      const [
+        reports,
+        incidents,
+        students,
+      ] = await Promise.all([
+        Report.find({}).lean(),
+
+        Incident.find({}).lean(),
+
+        Student.find({}).lean(),
+      ]);
+
+      console.log(
+        `📊 School data loaded: ${reports.length} reports, ${incidents.length} incidents, ${students.length} students.`,
+      );
+
+      /* =====================================================
+         BUILD SCHOOL-WIDE STATISTICS
+      ===================================================== */
+
+      const schoolStats =
+        buildSchoolWideStatistics({
+          reports,
+          incidents,
+          students,
+        });
+
+      /* =====================================================
+         RECENT DATA FOR QUALITATIVE ANALYSIS
+
+         Statistics are calculated from ALL records.
+
+         Detailed samples are limited to prevent the Gemini
+         prompt from becoming unnecessarily large.
+      ===================================================== */
+
+      const recentReports =
+        [...reports]
+          .sort(
+            (a, b) =>
+              new Date(
+                getDateValue(b) || 0,
+              ) -
+              new Date(
+                getDateValue(a) || 0,
+              ),
+          )
+          .slice(0, 200);
+
+      const recentIncidents =
+        [...incidents]
+          .sort(
+            (a, b) =>
+              new Date(
+                getDateValue(b) || 0,
+              ) -
+              new Date(
+                getDateValue(a) || 0,
+              ),
+          )
+          .slice(0, 200);
+
+      /* =====================================================
+         RESEARCH REFERENCES
+      ===================================================== */
+
+      console.log(
+        "📚 Finding research references for school-wide analysis...",
+      );
+
+      const researchReferences =
+        await findRelevantResearchReferences(
+          {
+            grade: "All Grades",
+
+            riskLevel:
+              schoolStats.highIncidents >
+              0
+                ? "High"
+                : schoolStats.mediumIncidents >
+                    0
+                  ? "Medium"
+                  : "Low",
+
+            timeline:
+              schoolStats.monthlyTrend,
+
+            incidents:
+              recentIncidents,
+
+            reports:
+              recentReports,
+
+            currentIncident:
+              null,
+
+            previousIncidents:
+              recentIncidents,
+
+            limit: 5,
+          },
+        );
+
+      console.log(
+        `📚 Selected ${researchReferences.length} school-wide research references.`,
+      );
+
+      const researchContext =
+        formatReferencesForGemini(
+          researchReferences,
+        );
+
+      /* =====================================================
+         FORMAT REPORT SAMPLES
+      ===================================================== */
+
+      const reportText =
+        recentReports.length
+          ? recentReports
+              .map(
+                (
+                  report,
+                  index,
+                ) => `
+Report Sample ${
+                  index + 1
+                }
+
+Report ID:
+${
+  report?.reportId ||
+  "N/A"
+}
+
+Offense:
+${
+  report?.offense ||
+  "N/A"
+}
+
+Category:
+${
+  report?.category ||
+  "N/A"
+}
+
+Location:
+${
+  report?.location ||
+  "N/A"
+}
+
+Reporter Type:
+${
+  report?.reporterType ||
+  "N/A"
+}
+
+Date:
+${
+  report?.date ||
+  "N/A"
+}
+
+Time:
+${
+  report?.time ||
+  "N/A"
+}
+
+Status:
+${
+  report?.status ||
+  "N/A"
+}
+
+Description:
+${
+  report?.description ||
+  "N/A"
+}
+`,
+              )
+              .join("\n")
+          : "No reports recorded.";
+
+      /* =====================================================
+         FORMAT INCIDENT SAMPLES
+      ===================================================== */
+
+      const incidentText =
+        recentIncidents.length
+          ? recentIncidents
+              .map(
+                (
+                  incident,
+                  index,
+                ) => `
+Incident Sample ${
+                  index + 1
+                }
+
+Incident ID:
+${
+  incident?.incidentId ||
+  incident?._id ||
+  "N/A"
+}
+
+Title:
+${
+  incident?.title ||
+  "N/A"
+}
+
+Category:
+${
+  incident?.category ||
+  "N/A"
+}
+
+Severity / Level:
+${
+  incident?.level ||
+  incident?.riskLevel ||
+  "N/A"
+}
+
+Status:
+${
+  incident?.status ||
+  "N/A"
+}
+
+Location:
+${
+  incident?.location ||
+  "N/A"
+}
+
+Date:
+${
+  incident?.date ||
+  "N/A"
+}
+
+Action:
+${
+  incident?.action ||
+  "N/A"
+}
+
+Created At:
+${
+  incident?.createdAt ||
+  "N/A"
+}
+`,
+              )
+              .join("\n")
+          : "No incidents recorded.";
+
+      /* =====================================================
+         SCHOOL-WIDE GEMINI PROMPT
+      ===================================================== */
+
+      const prompt = `
+You are EduGuard AI, an educational guidance and school
+behavioral analytics assistant.
+
+Your task is to analyze the OVERALL SCHOOL-WIDE BEHAVIORAL
+DATA recorded in the EduGuard system.
+
+This is NOT an analysis of one student.
+
+This is NOT an analysis of one incident.
+
+This is NOT a current-incident intervention assessment.
+
+The purpose of this analysis is to identify meaningful
+school-wide behavioral trends that can help authorized
+guidance personnel understand the overall discipline
+environment of the school.
+
+This is NOT a medical, psychological, psychiatric, or
+clinical diagnosis.
+
+=========================================================
+MOST IMPORTANT RULE: SCHOOL-WIDE ANALYSIS
+=========================================================
+
+Analyze the ENTIRE SCHOOL DATASET.
+
+The supplied statistics were calculated from ALL available
+reports, incidents, and students in the EduGuard database.
+
+You MUST base the analysis primarily on the aggregate
+school-wide statistics.
+
+The recent reports and recent incidents are provided only
+as qualitative examples to help interpret the statistics.
+
+There is NO CURRENT INCIDENT in this analysis.
+
+There is NO PRIMARY STUDENT.
+
+There is NO STUDENT WHO SHOULD BE SINGLED OUT.
+
+Do NOT behave as if you are reviewing an individual
+disciplinary case.
+
+Do NOT recommend suspension, warning, calling a parent,
+or another disciplinary action for a particular student.
+
+Instead, provide recommendations appropriate for
+SCHOOL-WIDE GUIDANCE AND PREVENTION.
+
+=========================================================
+SCHOOL-WIDE DATA
+=========================================================
+
+Total Students:
+${schoolStats.totalStudents}
+
+Students Involved in Recorded Reports/Incidents:
+${schoolStats.studentsInvolved}
+
+Total Reports:
+${schoolStats.totalReports}
+
+Total Incidents:
+${schoolStats.totalIncidents}
+
+High-Level Incidents:
+${schoolStats.highIncidents}
+
+Medium-Level Incidents:
+${schoolStats.mediumIncidents}
+
+Low-Level Incidents:
+${schoolStats.lowIncidents}
+
+=========================================================
+SEVERITY DISTRIBUTION
+=========================================================
+
+${JSON.stringify(
+  schoolStats.severityDistribution,
+  null,
+  2,
+)}
+
+=========================================================
+TOP INCIDENT CATEGORIES
+=========================================================
+
+${JSON.stringify(
+  schoolStats.categoryDistribution,
+  null,
+  2,
+)}
+
+=========================================================
+TOP REPORTED OFFENSES
+=========================================================
+
+${JSON.stringify(
+  schoolStats.offenseDistribution,
+  null,
+  2,
+)}
+
+=========================================================
+LOCATION DISTRIBUTION
+=========================================================
+
+${JSON.stringify(
+  schoolStats.locationDistribution,
+  null,
+  2,
+)}
+
+=========================================================
+INCIDENT STATUS DISTRIBUTION
+=========================================================
+
+${JSON.stringify(
+  schoolStats.incidentStatusDistribution,
+  null,
+  2,
+)}
+
+=========================================================
+REPORT STATUS DISTRIBUTION
+=========================================================
+
+${JSON.stringify(
+  schoolStats.reportStatusDistribution,
+  null,
+  2,
+)}
+
+=========================================================
+REPORTER TYPE DISTRIBUTION
+=========================================================
+
+${JSON.stringify(
+  schoolStats.reporterDistribution,
+  null,
+  2,
+)}
+
+=========================================================
+MONTHLY BEHAVIORAL TREND
+=========================================================
+
+${JSON.stringify(
+  schoolStats.monthlyTrend,
+  null,
+  2,
+)}
+
+=========================================================
+REPEATED RECORDED INCIDENT PATTERNS
+=========================================================
+
+The following information contains ONLY anonymous student
+identifiers and incident counts.
+
+Use this information only to identify whether repeated
+behavioral incidents exist at a school-wide level.
+
+DO NOT diagnose these students.
+
+DO NOT identify students by name.
+
+DO NOT assume that repeated incidents indicate a
+psychological condition.
+
+DO NOT recommend disciplinary action for these students.
+
+${JSON.stringify(
+  schoolStats.recurringStudents,
+  null,
+  2,
+)}
+
+=========================================================
+DATE RANGE
+=========================================================
+
+Reports:
+${JSON.stringify(
+  schoolStats.reportDateRange,
+  null,
+  2,
+)}
+
+Incidents:
+${JSON.stringify(
+  schoolStats.incidentDateRange,
+  null,
+  2,
+)}
+
+=========================================================
+RECENT REPORT SAMPLES
+=========================================================
+
+${reportText}
+
+=========================================================
+RECENT INCIDENT SAMPLES
+=========================================================
+
+${incidentText}
+
+=========================================================
+RESEARCH REFERENCE DATABASE
+=========================================================
+
+${researchContext}
+
+=========================================================
+SCHOOL-WIDE ANALYSIS RULES
+=========================================================
+
+1. Analyze the school as a whole.
+
+2. Use ALL aggregate statistics supplied above.
+
+3. Do not focus on a single student.
+
+4. Do not focus on a single incident.
+
+5. Do not treat the most recent incident as the most
+   important incident.
+
+6. Identify recurring behavioral categories.
+
+7. Identify changes or trends over time.
+
+8. Identify severity distribution.
+
+9. Identify locations where incidents appear concentrated.
+
+10. Identify whether repeated incidents appear to be a
+    meaningful school-wide pattern.
+
+11. Identify possible areas where guidance programs,
+    prevention, monitoring, communication, or student
+    support could be improved.
+
+12. Distinguish clearly between recorded facts and
+    cautious interpretation.
+
+13. Do not invent facts.
+
+14. Do not diagnose mental health conditions.
+
+15. Do not speculate about medical conditions.
+
+16. Do not claim to know students' psychological states.
+
+17. Do not assume that an incident automatically means
+    intentional misconduct.
+
+18. Do not claim that a pattern proves causation.
+
+19. Use cautious language such as:
+    "may", "can", "appears", "suggests", and "consider".
+
+20. Do not invent school policies.
+
+21. Do not state that an intervention is legally required.
+
+22. Recommendations must be SCHOOL-WIDE.
+
+23. Recommendations may include:
+    - awareness programs
+    - preventive education
+    - guidance campaigns
+    - monitoring improvements
+    - teacher coordination
+    - parent communication strategies
+    - reporting process improvements
+    - location-based supervision
+    - student support programs
+    - conflict prevention
+    - positive behavior initiatives
+
+24. Do NOT recommend a disciplinary action against
+    a particular student.
+
+25. Do NOT identify individual students in the final answer.
+
+=========================================================
+RESEARCH RULES
+=========================================================
+
+You MUST use the supplied research references as the
+evidence base for recommendations.
+
+1. Use ONLY the supplied research references.
+
+2. Never invent a study.
+
+3. Never invent an author.
+
+4. Never invent a journal.
+
+5. Never invent a DOI.
+
+6. Never invent research findings.
+
+7. Never cite a reference that was not supplied.
+
+8. Recommendations should include supplied reference IDs
+   when adequate research support exists.
+
+9. If a recommendation cannot be adequately supported,
+   say:
+
+   "Insufficient evidence in the current reference database."
+
+10. Research evidence should support educational guidance,
+    not diagnosis.
+
+11. Do not claim that a research finding proves that a
+    particular intervention will work in this school.
+
+=========================================================
+REQUIRED OUTPUT
+=========================================================
+
+Return ONLY valid JSON.
+
+Do not use markdown.
+
+Do not wrap the JSON in code fences.
+
+Do not add explanations outside the JSON.
+
+The JSON must contain:
+
+{
+  "summary": "",
+  "pattern": "",
+  "risk": "",
+  "prediction": "",
+  "interventions": [
+    {
+      "recommendation": "",
+      "basis": "",
+      "referenceIds": [],
+      "references": [
+        {
+          "referenceId": "",
+          "citation": "",
+          "doi": ""
+        }
+      ]
+    }
+  ],
+  "notes": ""
+}
+
+=========================================================
+FIELD REQUIREMENTS
+=========================================================
+
+summary:
+Provide a concise overview of the overall behavioral
+environment of the school.
+
+pattern:
+Describe the most important recurring behavioral trends,
+categories, locations, or time-based patterns.
+
+risk:
+Return exactly one of:
+
+Low
+Medium
+High
+
+The school-wide risk must be based on the overall
+distribution of recorded incidents.
+
+prediction:
+Provide a cautious school-wide prediction about possible
+behavioral trends if the observed pattern continues.
+
+Do NOT predict the behavior of an individual student.
+
+interventions:
+Provide exactly 3 SCHOOL-WIDE recommendations.
+
+Each recommendation must contain:
+
+- recommendation
+- basis
+- referenceIds
+- references
+
+These recommendations must NOT be individual disciplinary
+actions.
+
+notes:
+Mention important limitations, data gaps, or cautions about
+interpreting the school-wide results.
+
+=========================================================
+IMPORTANT
+=========================================================
+
+This analysis is intended to SUPPORT guidance personnel.
+
+It must NOT replace professional judgment.
+
+It must NOT be treated as a diagnosis.
+
+It must NOT be treated as proof of future student behavior.
+
+Return ONLY the JSON object.
+`;
+
+      console.log(
+        "🤖 Generating school-wide research-backed AI analysis...",
+      );
+
+      const response =
+        await generateWithRetry(
+          prompt,
+          {
+            config: {
+              responseMimeType:
+                "application/json",
+            },
+          },
+        );
+
+      let text =
+        getGeminiText(
+          response,
+        );
+
+      if (!text) {
+        return res.status(500).json({
+          success: false,
+          error:
+            "Gemini returned an empty response.",
+          code:
+            "GEMINI_EMPTY_RESPONSE",
+        });
+      }
+
+      text =
+        cleanJsonText(text);
+
+      let analysis;
+
+      try {
+        analysis =
+          JSON.parse(text);
+      } catch (parseError) {
+        console.error(
+          "❌ School-wide AI JSON Parse Error:",
+          parseError,
+        );
+
+        console.error(
+          "Gemini returned:",
+          text,
+        );
+
+        return res.status(500).json({
+          success: false,
+          error:
+            "Gemini returned invalid JSON.",
+          code:
+            "GEMINI_INVALID_JSON",
+        });
+      }
+
+      /* =====================================================
+         VALIDATE RISK
+      ===================================================== */
+
+      const validRiskLevels = [
+        "Low",
+        "Medium",
+        "High",
+      ];
+
+      const validatedRisk =
+        validRiskLevels.includes(
+          analysis?.risk,
+        )
+          ? analysis.risk
+          : "Low";
+
+      /* =====================================================
+         VALIDATE RESEARCH REFERENCES
+      ===================================================== */
+
+      const referenceMap =
+        new Map(
+          researchReferences.map(
+            (reference) => [
+              reference.referenceId,
+              reference,
+            ],
+          ),
+        );
+
+      /* =====================================================
+         VALIDATE SCHOOL-WIDE RECOMMENDATIONS
+      ===================================================== */
+
+      const rawInterventions =
+        Array.isArray(
+          analysis?.interventions,
+        )
+          ? analysis.interventions
+          : [];
+
+      const validatedInterventions =
+        rawInterventions
+          .slice(0, 3)
+          .map(
+            (intervention) => {
+              const validIds =
+                Array.isArray(
+                  intervention?.referenceIds,
+                )
+                  ? intervention.referenceIds.filter(
+                      (id) =>
+                        referenceMap.has(
+                          id,
+                        ),
+                    )
+                  : [];
+
+              const validReferences =
+                validIds.map(
+                  (id) => {
+                    const reference =
+                      referenceMap.get(
+                        id,
+                      );
+
+                    return {
+                      referenceId:
+                        reference.referenceId,
+
+                      citation:
+                        `${reference.authors.join(
+                          ", ",
+                        )} (${reference.year})`,
+
+                      doi:
+                        reference.doi ||
+                        "",
+                    };
+                  },
+                );
+
+              return {
+                recommendation:
+                  String(
+                    intervention?.recommendation ||
+                      "No school-wide recommendation generated.",
+                  ).trim(),
+
+                basis:
+                  String(
+                    intervention?.basis ||
+                      "The recommendation is based on the aggregate school-wide behavioral data and available research references.",
+                  ).trim(),
+
+                referenceIds:
+                  validIds,
+
+                references:
+                  validReferences,
+              };
+            },
+          );
+
+      /* =====================================================
+         GUARANTEE EXACTLY 3 RECOMMENDATIONS
+      ===================================================== */
+
+      while (
+        validatedInterventions.length <
+        3
+      ) {
+        validatedInterventions.push({
+          recommendation:
+            "Insufficient evidence in the current reference database to generate an additional evidence-supported school-wide recommendation.",
+
+          basis:
+            "The available research references did not provide enough evidence for an additional recommendation.",
+
+          referenceIds: [],
+
+          references: [],
+        });
+      }
+
+      /* =====================================================
+         RETURN SCHOOL-WIDE RESULT
+      ===================================================== */
+
+      return res.json({
+        success: true,
+
+        analysisBasis:
+          "school-wide",
+
+        scope:
+          "entire-system",
+
+        summary:
+          analysis?.summary ||
+          "No school-wide summary was generated.",
+
+        pattern:
+          analysis?.pattern ||
+          "No clear school-wide behavioral pattern was identified.",
+
+        risk:
+          validatedRisk,
+
+        prediction:
+          analysis?.prediction ||
+          "No school-wide prediction is available.",
+
+        interventions:
+          validatedInterventions,
+
+        notes:
+          analysis?.notes ||
+          "No additional school-wide notes were generated.",
+
+        schoolStats,
+
+        researchReferences:
+          researchReferences.map(
+            (reference) => ({
+              referenceId:
+                reference.referenceId,
+
+              type:
+                reference.type,
+
+              category:
+                reference.category,
+
+              title:
+                reference.title,
+
+              authors:
+                reference.authors,
+
+              year:
+                reference.year,
+
+              journal:
+                reference.journal,
+
+              doi:
+                reference.doi,
+
+              sourceUrl:
+                reference.sourceUrl,
+
+              findings:
+                reference.findings,
+
+              evidenceLevel:
+                reference.evidenceLevel,
+            }),
+          ),
+      });
+    } catch (err) {
+      console.error(
+        "❌ School-wide AI analysis error:",
+        err,
+      );
+
+      if (
+        err?.code ===
+        "GEMINI_CONTENT_BLOCKED"
+      ) {
+        return res.status(422).json({
+          success: false,
+          error:
+            "AI analysis could not be generated because Gemini blocked the submitted content.",
+          code:
+            "GEMINI_CONTENT_BLOCKED",
+          reason:
+            err?.blockReason ||
+            "PROHIBITED_CONTENT",
+        });
+      }
+
+      if (
+        err?.code ===
+        "GEMINI_EMPTY_RESPONSE"
+      ) {
+        return res.status(500).json({
+          success: false,
+          error:
+            "Gemini returned no generated content.",
+          code:
+            "GEMINI_EMPTY_RESPONSE",
+        });
+      }
+
+      const status =
+        getErrorStatus(err);
+
+      if (
+        Number(status) === 429
+      ) {
+        return res.status(429).json({
+          success: false,
+          error:
+            "Gemini AI request limit has been reached. Please try again shortly.",
+          code:
+            "GEMINI_RATE_LIMIT",
+        });
+      }
+
+      if (
+        Number(status) === 503
+      ) {
+        return res.status(503).json({
+          success: false,
+          error:
+            "Gemini AI is temporarily experiencing high demand. Please try again in a few moments.",
+          code:
+            "GEMINI_UNAVAILABLE",
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        error:
+          err?.message ||
+          "Failed to generate school-wide AI analysis.",
+      });
+    }
+  },
+);
+
+/* =========================================================
    ANALYZE INCIDENT
 ========================================================= */
 
@@ -1526,18 +3069,31 @@ Return ONLY a valid JSON object.
 Requirements:
 
 - category must be a short incident category.
+
 - confidence must be a percentage.
+
 - riskLevel must be exactly Low, Medium, or High.
+
 - pattern must contain 1-2 concise sentences.
+
 - prediction must contain exactly 1 cautious sentence.
+
 - remarks must contain 2-3 concise professional sentences.
+
 - recommendation must provide practical school guidance.
+
 - Do not diagnose mental health conditions.
+
 - Do not speculate about medical conditions.
+
 - Do not make claims about psychological states.
+
 - Do not invent facts.
+
 - Do not include personal information.
+
 - Do not use markdown.
+
 - Do not wrap the JSON in code fences.
 `;
 

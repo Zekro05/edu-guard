@@ -379,66 +379,82 @@ const IncidentReport = () => {
   ========================================================= */
 
   const handleSubmit = async () => {
-    try {
-      const { date, time } = getDateTime();
+  try {
+    const { date, time } = getDateTime();
 
-      if (
-        !form.studentId ||
-        !form.offense ||
-        !form.location ||
-        !form.description.trim()
-      ) {
-        toast.error("Please complete all required fields.");
-        return;
-      }
-
-      setSubmitting(true);
-
-      const formData = new FormData();
-
-      formData.append("studentId", form.studentId);
-      formData.append("studentName", form.studentName);
-      formData.append("offense", form.offense);
-      formData.append("location", form.location);
-      formData.append("description", form.description);
-      formData.append("date", date);
-      formData.append("time", time);
-      formData.append("reporter", "Teacher");
-
-      files.forEach((file) => {
-        formData.append("evidence", file);
-      });
-
-      await API.post("/api/reports", formData);
-
-      toast.success("Incident report submitted successfully.");
-
-      setFiles([]);
-      setSearch("");
-
-      setForm({
-        student: "",
-        studentId: "",
-        studentName: "",
-        offense: "",
-        location: "",
-        description: "",
-      });
-
-      if (fileRef.current) {
-        fileRef.current.value = "";
-      }
-    } catch (error) {
-      console.error("Report submission error:", error);
-
-      toast.error(
-        error?.response?.data?.message ||
-          "Failed to submit incident report.",
-      );
-    } finally {
-      setSubmitting(false);
+    if (
+      !form.studentId ||
+      !form.offense ||
+      !form.location ||
+      !form.description.trim()
+    ) {
+      toast.error("Please complete all required fields.");
+      return;
     }
-  };
+
+    setSubmitting(true);
+
+    const formData = new FormData();
+
+    formData.append("studentId", form.studentId);
+    formData.append("studentName", form.studentName);
+    formData.append("offense", form.offense);
+    formData.append("location", form.location);
+    formData.append("description", form.description);
+    formData.append("date", date);
+    formData.append("time", time);
+
+    // This report is being created directly by the admin.
+    formData.append("reporter", "Admin");
+
+    files.forEach((file) => {
+      formData.append("evidence", file);
+    });
+
+    /*
+     * IMPORTANT:
+     * Use the direct incident endpoint.
+     *
+     * This automatically:
+     * - creates the report as accepted
+     * - creates the incident immediately
+     * - skips the mobile pending-report workflow
+     */
+    await API.post("/api/reports/direct", formData);
+
+    toast.success(
+      "Incident report created successfully.",
+    );
+
+    setFiles([]);
+    setSearch("");
+
+    setForm({
+      student: "",
+      studentId: "",
+      studentName: "",
+      offense: "",
+      location: "",
+      description: "",
+    });
+
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
+  } catch (error) {
+    console.error(
+      "Direct incident submission error:",
+      error,
+    );
+
+    toast.error(
+      error?.response?.data?.message ||
+        "Failed to create incident report.",
+    );
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   /* =========================================================
      RENDER
