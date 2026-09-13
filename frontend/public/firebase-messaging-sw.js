@@ -10,9 +10,9 @@ firebase.initializeApp({
   apiKey: "AIzaSyCJ4ALX8SgOv_0dJ077A3N2axP_kN7iOqI",
   authDomain: "eduguard-b7d1e.firebaseapp.com",
   projectId: "eduguard-b7d1e",
-  storageBucket: "eduguard-b7d1e.firebasestorage.app",
-  messagingSenderId: "190851241122",
-  appId: "G-8CPRH7K0CE",
+  storageBucket: "eduguard-b7d1e.appspot.com",
+  messagingSenderId: "1051795648424",
+  appId: "1:1051795648424:web:8c8f8f8f8f8f8f8f8f8f8f"
 });
 
 const messaging = firebase.messaging();
