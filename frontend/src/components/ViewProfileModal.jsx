@@ -1892,7 +1892,7 @@ const ViewProfileModal = ({ student, close }) => {
                                 >
                                   Research references
                                   retrieved from the
-                                  EduGuard database
+                                  GuidEd database
                                 </p>
                               </div>
                             </div>
@@ -2475,7 +2475,7 @@ const ViewProfileModal = ({ student, close }) => {
                             text-xs text-gray-500
                           "
                         >
-                          EduGuard account details
+                          GuidEd account details
                         </p>
                       </div>
                     </div>

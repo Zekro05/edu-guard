@@ -1136,7 +1136,7 @@ const ReportPage = () => {
                       </div>
 
                       <p className="text-xs text-gray-400 mt-2">
-                        Reports submitted through the EduGuard mobile app.
+                        Reports submitted through the GuidEd mobile app.
                       </p>
                     </div>
 

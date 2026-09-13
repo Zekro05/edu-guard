@@ -294,7 +294,7 @@ const notifyStudent = async ({
                 pushToken.token,
 
               title:
-                "EduGuard 🔔",
+                "GuidEd 🔔",
 
               body:
                 `${title}: ${message}`,
@@ -576,7 +576,7 @@ const notifyAdmins = async ({
                     pushToken.token,
 
                   title:
-                    "EduGuard Admin Alert 🔔",
+                    "GuidEd Admin Alert 🔔",
 
                   body:
                     `${title}: ${message}`,
@@ -672,7 +672,7 @@ const notifyAdmins = async ({
                         font-size: 22px;
                       "
                     >
-                      EduGuard Admin Alert
+                      GuidEd Admin Alert
                     </h1>
 
                     <p
@@ -816,7 +816,7 @@ const notifyAdmins = async ({
                       "
                     >
                       This is an automated notification from
-                      the EduGuard system. Please do not reply
+                      the GuidEd system. Please do not reply
                       directly to this email.
                     </p>
                   </div>
@@ -829,7 +829,7 @@ const notifyAdmins = async ({
             await sendNotificationEmail({
               to: admin.email,
               subject:
-                `EduGuard Admin Alert: ${title}`,
+                `GuidEd Admin Alert: ${title}`,
               html: emailHtml,
             });
 

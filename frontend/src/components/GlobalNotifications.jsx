@@ -247,7 +247,7 @@ const initialize = async () => {
       try {
         const browserNotification =
           new Notification(
-            title || "EduGuard",
+            title || "GuidEd",
             {
               body:
                 body ||
@@ -742,7 +742,7 @@ const initialize = async () => {
 
           title:
             data.title ||
-            "EduGuard",
+            "GuidEd",
 
           message:
             data.message ||
@@ -920,7 +920,7 @@ const initialize = async () => {
                   payload
                     ?.data
                     ?.title ||
-                  "EduGuard";
+                  "GuidEd";
 
                 const body =
                   payload

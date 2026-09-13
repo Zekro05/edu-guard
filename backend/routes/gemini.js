@@ -1303,7 +1303,7 @@ ${
       ===================================================== */
 
       const prompt = `
-You are EduGuard AI, an educational guidance assistant.
+You are GuidEd AI, an educational guidance assistant.
 
 Your task is to analyze a student's CURRENT SCHOOL INCIDENT
 and provide cautious, research-supported educational guidance
@@ -1988,7 +1988,7 @@ router.post(
   async (req, res) => {
     try {
       console.log(
-        "🏫 Starting school-wide EduGuard AI analysis...",
+        "🏫 Starting school-wide GuidEd AI analysis...",
       );
 
       /* =====================================================
@@ -2262,11 +2262,11 @@ ${
       ===================================================== */
 
       const prompt = `
-You are EduGuard AI, an educational guidance and school
+You are GuidEd AI, an educational guidance and school
 behavioral analytics assistant.
 
 Your task is to analyze the OVERALL SCHOOL-WIDE BEHAVIORAL
-DATA recorded in the EduGuard system.
+DATA recorded in the GuidEd system.
 
 This is NOT an analysis of one student.
 
@@ -3098,7 +3098,7 @@ Requirements:
 `;
 
       console.log(
-        "🤖 Starting EduGuard incident AI analysis...",
+        "🤖 Starting GuidEd incident AI analysis...",
       );
 
       const response =

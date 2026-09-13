@@ -324,7 +324,7 @@ const sendAdminNotificationEmail = async ({
                   font-size: 22px;
                 "
               >
-                EduGuard Admin Alert
+                GuidEd Admin Alert
               </h2>
 
               <p
@@ -450,7 +450,7 @@ const sendAdminNotificationEmail = async ({
                 "
               >
                 This notification was generated automatically
-                by the EduGuard system based on your admin
+                by the GuidEd system based on your admin
                 notification settings.
               </p>
             </div>
@@ -461,7 +461,7 @@ const sendAdminNotificationEmail = async ({
 
     await sendNotificationEmail({
       to: admin.email,
-      subject: `EduGuard Admin Alert: ${title}`,
+      subject: `GuidEd Admin Alert: ${title}`,
       html: emailHtml,
     });
 
@@ -580,7 +580,7 @@ const notifyAdmins = async ({
         await sendFCMToUser({
           user: admin,
 
-          title: `EduGuard 🔔 ${title}`,
+          title: `GuidEd 🔔 ${title}`,
 
           body: message,
 

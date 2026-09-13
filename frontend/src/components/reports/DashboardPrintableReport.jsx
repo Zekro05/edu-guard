@@ -3342,7 +3342,7 @@ const DashboardPrintableReport = ({
                       mt-3
                     "
                   >
-                    EduGuard Student Discipline
+                    GuidEd Student Discipline
                     and Monitoring System
                   </p>
                 </div>

@@ -680,7 +680,7 @@ const AIPredictions = () => {
           ],
 
           notes:
-            "School-wide AI analysis requires sufficient behavioral records. Research-supported recommendations will become more specific as the EduGuard database grows.",
+            "School-wide AI analysis requires sufficient behavioral records. Research-supported recommendations will become more specific as the GuidEd database grows.",
 
           researchReferences: [],
 
@@ -969,7 +969,7 @@ const AIPredictions = () => {
       };
 
       console.log(
-        "🧠 Sending SCHOOL-WIDE dataset to EduGuard AI..."
+        "🧠 Sending SCHOOL-WIDE dataset to GuidEd AI..."
       );
 
       console.log(
@@ -1179,7 +1179,7 @@ const AIPredictions = () => {
 
               <p className="text-sm text-gray-500 mt-0.5">
                 School-wide behavioral intelligence powered by
-                EduGuard AI
+                GuidEd AI
               </p>
             </div>
           </div>
@@ -1238,7 +1238,7 @@ const AIPredictions = () => {
             </p>
 
             <p className="text-xs text-gray-500 mt-0.5">
-              EduGuard AI is reviewing the overall reports,
+              GuidEd AI is reviewing the overall reports,
               incidents, severity distribution, recurring
               categories, locations, and behavioral trends
               across the system.
@@ -1290,7 +1290,7 @@ const AIPredictions = () => {
 
                 <p className="text-sm text-gray-500 mt-1 leading-relaxed">
                   These insights are generated from the overall
-                  behavioral data recorded across the EduGuard
+                  behavioral data recorded across the GuidEd
                   system. The analysis considers reports,
                   incidents, severity levels, recurring
                   categories, locations, statuses, student
@@ -1314,7 +1314,7 @@ const AIPredictions = () => {
               <InsightCard
                 icon={FileText}
                 title="School-wide Summary"
-                description="Overall behavioral overview across EduGuard"
+                description="Overall behavioral overview across G"
               >
                 <p className="text-sm text-gray-600 leading-7">
                   {ai.summary}

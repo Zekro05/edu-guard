@@ -308,7 +308,7 @@ export const listenForWebFCM = async (
           const title =
             notification.title ||
             data.title ||
-            "EduGuard";
+            "G";
 
           const body =
             notification.body ||
@@ -317,7 +317,8 @@ export const listenForWebFCM = async (
 
           console.log(
             "🔔 Notification title:",
-            title
+            title,
+            "GuidEd"
           );
 
           console.log(

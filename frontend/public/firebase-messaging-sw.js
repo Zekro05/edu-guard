@@ -24,7 +24,7 @@ messaging.onBackgroundMessage((payload) => {
   );
 
   const notificationTitle =
-    payload.notification?.title || "EduGuard";
+    payload.notification?.title || "GuidEd";
 
   const notificationOptions = {
     body:
