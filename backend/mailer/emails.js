@@ -14,7 +14,7 @@ export const sendEmail = async (to, subject, html) => {
     await emailApi.sendTransacEmail({
       sender: {
         email: process.env.EMAIL_FROM,
-        name: "GuidEd",
+        name: "GuidEd Student Guidance",
       },
       to: [{ email: to }],
       subject,
@@ -107,4 +107,149 @@ export const sendNotificationEmail = async ({
   html,
 }) => {
   await sendEmail(to, subject, html);
+};
+
+// -------------------- STUDENT ACCOUNT WELCOME EMAIL --------------------
+export const sendStudentWelcomeEmail = async ({
+  email,
+  firstName,
+  studentId,
+  password,
+}) => {
+  const subject = "Your GuidEd Student Account Has Been Created";
+
+  const html = `
+    <div style="
+      font-family: Arial, sans-serif;
+      background-color: #f7f9f8;
+      padding: 40px 20px;
+    ">
+
+      <div style="
+        max-width: 600px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 32px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      ">
+
+        <h2 style="
+          margin-top: 0;
+          color: #222;
+        ">
+          Welcome to GuidEd!
+        </h2>
+
+        <p style="font-size: 15px; color: #444;">
+          Hello <strong>${firstName || "Student"}</strong>,
+        </p>
+
+        <p style="font-size: 15px; color: #444; line-height: 1.6;">
+          Your student account for the
+          <strong>GuidEd Student Discipline Management System</strong>
+          has been created by
+          <strong>Our Lady of the Holy Rosary School - General Trias Campus</strong>.
+        </p>
+
+        <div style="
+          background: #f3f4f6;
+          border-radius: 10px;
+          padding: 20px;
+          margin: 24px 0;
+        ">
+
+          <h3 style="
+            margin-top: 0;
+            color: #222;
+          ">
+            Your Login Credentials
+          </h3>
+
+          <p style="margin: 8px 0;">
+            <strong>Student ID:</strong>
+            ${studentId}
+          </p>
+
+          <p style="margin: 8px 0;">
+            <strong>Email:</strong>
+            ${email}
+          </p>
+
+          <p style="margin: 8px 0;">
+            <strong>Temporary Password:</strong>
+            ${password}
+          </p>
+
+        </div>
+
+        <p style="
+          font-size: 14px;
+          color: #555;
+          line-height: 1.6;
+        ">
+          You can use these credentials to log in to your GuidEd
+          student account.
+        </p>
+
+        <p style="
+          font-size: 14px;
+          color: #555;
+          line-height: 1.6;
+        ">
+          For your security, please change your password after
+          your first login.
+        </p>
+
+        <div style="
+          margin: 28px 0;
+          text-align: center;
+        ">
+
+          <a
+            href="${process.env.GUIDED_URL}"
+            style="
+              display: inline-block;
+              background: #198754;
+              color: #ffffff;
+              text-decoration: none;
+              padding: 12px 24px;
+              border-radius: 8px;
+              font-weight: bold;
+            "
+          >
+            Login to GuidEd
+          </a>
+
+        </div>
+
+        <hr style="
+          border: none;
+          border-top: 1px solid #eeeeee;
+          margin: 28px 0;
+        ">
+
+        <p style="
+          font-size: 12px;
+          color: #888;
+          line-height: 1.5;
+        ">
+          This is an automated message from GuidEd.
+          Please do not reply to this email.
+        </p>
+
+        <p style="
+          font-size: 12px;
+          color: #888;
+        ">
+          GuidEd<br>
+          Student Guidance<br>
+          Our Lady of the Holy Rosary School - General Trias Campus
+        </p>
+
+      </div>
+    </div>
+  `;
+
+  await sendEmail(email, subject, html);
 };
