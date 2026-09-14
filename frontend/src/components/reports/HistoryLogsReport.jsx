@@ -291,6 +291,83 @@ const getLogDate = (log) => {
 };
 
 /* =========================================================
+   GET ACTOR NAME
+========================================================= */
+
+const getActorName = (log) => {
+  // Your HistoryLog backend populates:
+  // user: { name, email }
+  if (
+    log?.user &&
+    typeof log.user === "object"
+  ) {
+    const populatedName =
+      log.user?.name?.trim() ||
+      [
+        log.user?.firstName,
+        log.user?.middleName,
+        log.user?.lastName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim() ||
+      log.user?.fullName?.trim();
+
+    if (populatedName) {
+      return populatedName;
+    }
+
+    if (log.user?.email) {
+      return log.user.email;
+    }
+  }
+
+  // Other possible name fields
+  const directName =
+    log?.userName ||
+    log?.actorName ||
+    log?.adminName ||
+    log?.teacherName ||
+    log?.performedByName ||
+    log?.createdByName;
+
+  if (
+    directName &&
+    typeof directName !== "object"
+  ) {
+    return String(directName).trim();
+  }
+
+  // Possible actor object
+  if (
+    log?.actor &&
+    typeof log.actor === "object"
+  ) {
+    const actorName =
+      log.actor?.name?.trim() ||
+      [
+        log.actor?.firstName,
+        log.actor?.middleName,
+        log.actor?.lastName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim() ||
+      log.actor?.fullName?.trim();
+
+    if (actorName) {
+      return actorName;
+    }
+
+    if (log.actor?.email) {
+      return log.actor.email;
+    }
+  }
+
+  return "Unknown User";
+};
+
+/* =========================================================
    LOAD IMAGE
 ========================================================= */
 
@@ -345,14 +422,9 @@ const HistoryLogsReport = ({
      GENERATED INFORMATION
   ======================================================= */
 
-  /*
-   * Capture the generated time only once.
-   *
-   * This is important because we don't want the
-   * "Generated On" value to keep changing while
-   * the user is viewing the report.
-   */
-  const [generatedAt] = useState(() => new Date());
+  const [generatedAt] = useState(
+    () => new Date()
+  );
 
   const generatedBy =
     user?.name?.trim() ||
@@ -375,11 +447,11 @@ const HistoryLogsReport = ({
      REPORT FILTER STATE
   ======================================================= */
 
-  const [period, setPeriod] = useState("monthly");
+  const [period, setPeriod] =
+    useState("monthly");
 
-  const [selectedDate, setSelectedDate] = useState(
-    getTodayInputValue()
-  );
+  const [selectedDate, setSelectedDate] =
+    useState(getTodayInputValue());
 
   const [customStartDate, setCustomStartDate] =
     useState(getMonthStartInputValue());
@@ -399,7 +471,10 @@ const HistoryLogsReport = ({
       return "";
     }
 
-    if (!customStartDate || !customEndDate) {
+    if (
+      !customStartDate ||
+      !customEndDate
+    ) {
       return "Please select both a start date and an end date.";
     }
 
@@ -471,7 +546,10 @@ const HistoryLogsReport = ({
         log?.userRole ||
         log?.actorRole ||
         log?.user?.role ||
+        log?.actor?.role ||
         "Unknown",
+
+      actorName: getActorName(log),
 
       category:
         log?.category ||
@@ -715,7 +793,11 @@ const HistoryLogsReport = ({
          TOP GREEN BAR
       =================================================== */
 
-      doc.setFillColor(22, 163, 74);
+      doc.setFillColor(
+        22,
+        163,
+        74
+      );
 
       doc.rect(
         0,
@@ -1012,6 +1094,9 @@ const HistoryLogsReport = ({
               log.date
             ),
             getSafeText(
+              log.actorName
+            ),
+            getSafeText(
               log.role
             ),
             getSafeText(
@@ -1034,6 +1119,7 @@ const HistoryLogsReport = ({
             "#",
             "Date",
             "Time",
+            "Performed By",
             "Role",
             "Category",
             "Action",
@@ -1102,18 +1188,22 @@ const HistoryLogsReport = ({
           },
 
           3: {
-            cellWidth: 25,
+            cellWidth: 38,
           },
 
           4: {
-            cellWidth: 28,
+            cellWidth: 25,
           },
 
           5: {
-            cellWidth: 45,
+            cellWidth: 28,
           },
 
           6: {
+            cellWidth: 45,
+          },
+
+          7: {
             cellWidth: "auto",
           },
         },
@@ -1971,6 +2061,10 @@ const HistoryLogsReport = ({
                       </th>
 
                       <th className="px-3 py-3 text-left font-bold">
+                        Performed By
+                      </th>
+
+                      <th className="px-3 py-3 text-left font-bold">
                         Role
                       </th>
 
@@ -2035,6 +2129,31 @@ const HistoryLogsReport = ({
                             )}
                           </td>
 
+                          {/* =================================
+                              PERFORMED BY
+                          ================================= */}
+
+                          <td className="px-3 py-3 min-w-[180px]">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-gray-800">
+                                {getSafeText(
+                                  log.actorName,
+                                  "Unknown User"
+                                )}
+                              </span>
+
+                              {log?.user?.email && (
+                                <span className="text-[10px] text-gray-400 mt-0.5">
+                                  {log.user.email}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* =================================
+                              ROLE
+                          ================================= */}
+
                           <td className="px-3 py-3 whitespace-nowrap">
                             <RoleBadge
                               role={
@@ -2042,6 +2161,10 @@ const HistoryLogsReport = ({
                               }
                             />
                           </td>
+
+                          {/* =================================
+                              CATEGORY
+                          ================================= */}
 
                           <td className="px-3 py-3 whitespace-nowrap">
                             <span
@@ -2064,6 +2187,10 @@ const HistoryLogsReport = ({
                             </span>
                           </td>
 
+                          {/* =================================
+                              ACTION
+                          ================================= */}
+
                           <td className="px-3 py-3 min-w-[180px]">
                             <p className="font-bold text-gray-800">
                               {getSafeText(
@@ -2071,6 +2198,10 @@ const HistoryLogsReport = ({
                               )}
                             </p>
                           </td>
+
+                          {/* =================================
+                              DETAILS
+                          ================================= */}
 
                           <td className="px-3 py-3 min-w-[320px]">
                             <p className="text-gray-500 leading-relaxed whitespace-pre-wrap">
@@ -2087,7 +2218,7 @@ const HistoryLogsReport = ({
                       0 && (
                       <tr>
                         <td
-                          colSpan="7"
+                          colSpan="8"
                           className="px-6 py-14 text-center"
                         >
                           <div className="flex flex-col items-center">
@@ -2319,3 +2450,4 @@ const RoleBadge = ({
 };
 
 export default HistoryLogsReport;
+

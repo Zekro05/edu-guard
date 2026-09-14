@@ -351,6 +351,14 @@ export const login = async (req, res) => {
       });
     }
 
+    if (user.role === "teacher") {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Teacher accounts cannot login here. Please use the mobile app.",
+      });
+    }
+
     // role check optional
     if (accountType && user.role !== accountType.toLowerCase()) {
       return res.status(403).json({

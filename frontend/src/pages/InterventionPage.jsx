@@ -1529,7 +1529,7 @@ const InterventionPage = () => {
       <main className="flex-1 overflow-y-auto">
         {/* HEADER */}
 
-        <header className="sticky top-0 z-30 bg-white/85 backdrop-blur-xl border-b border-gray-100">
+        <header className="sticky top-0 z-30 bg-[#F7F9F8]/90 backdrop-blur-xl border-b border-gray-100">
           <div className="px-8 py-6 flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 text-xs text-gray-400 mb-2">

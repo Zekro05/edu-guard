@@ -297,26 +297,28 @@ const HistoryLogs = () => {
                 {loading ? "Loading..." : "Refresh"}
               </button>
 
+              {/* PRINTABLE REPORT */}
+
               <button
                 onClick={() => setShowReport(true)}
                 className="
-                flex
-                items-center
-                justify-center
-                gap-2
-                px-4
-                py-2.5
-                rounded-xl
-                bg-gray-900
-                hover:bg-gray-800
-                text-white
-                text-xs
-                font-semibold
-                shadow-sm
-                hover:shadow-md
-                transition-all
-                duration-200
-              "
+                  flex
+                  items-center
+                  justify-center
+                  gap-2
+                  px-4
+                  py-2.5
+                  rounded-xl
+                  bg-gray-900
+                  hover:bg-gray-800
+                  text-white
+                  text-xs
+                  font-semibold
+                  shadow-sm
+                  hover:shadow-md
+                  transition-all
+                  duration-200
+                "
               >
                 <Printer size={14} />
                 Printable Report
@@ -335,17 +337,31 @@ const HistoryLogs = () => {
 
             <thead>
               <tr className="bg-gray-50/70 border-b border-gray-100">
+                {/* DATE */}
+
                 <th className="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400 whitespace-nowrap">
                   Date & Time
                 </th>
+
+                {/* PERFORMED BY */}
+
+                <th className="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400 whitespace-nowrap">
+                  Performed By
+                </th>
+
+                {/* ROLE */}
 
                 <th className="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">
                   Role
                 </th>
 
+                {/* ACTION */}
+
                 <th className="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">
                   Action
                 </th>
+
+                {/* DETAILS */}
 
                 <th className="px-6 py-3.5 text-left text-[10px] font-bold uppercase tracking-wider text-gray-400">
                   Details
@@ -366,7 +382,7 @@ const HistoryLogs = () => {
 
               {!loading && currentLogs.length === 0 && (
                 <tr>
-                  <td colSpan="4">
+                  <td colSpan="5">
                     <div className="py-14 flex flex-col items-center justify-center text-center">
                       <div
                         className="
@@ -424,7 +440,9 @@ const HistoryLogs = () => {
                 {currentLogs.length}
               </span>{" "}
               of{" "}
-              <span className="font-semibold text-gray-600">{logs.length}</span>{" "}
+              <span className="font-semibold text-gray-600">
+                {logs.length}
+              </span>{" "}
               records
             </p>
 
@@ -500,6 +518,7 @@ const HistoryLogs = () => {
           </div>
         )}
       </section>
+
       {showReport && (
         <HistoryLogsReport
           logs={logs}
@@ -565,6 +584,32 @@ const LogSummary = ({ icon, label, value, description }) => (
 ========================================================= */
 
 const LogRow = ({ log }) => {
+  /*
+   * The backend populates:
+   *
+   * user: {
+   *   name: "Zekro Admin",
+   *   email: "fraxashborn05@gmail.com",
+   *   ...
+   * }
+   *
+   * So we can safely get the name from log.user.name.
+   */
+
+  const performedBy =
+    log?.user?.name ||
+    log?.user?.fullName ||
+    [
+      log?.user?.firstName,
+      log?.user?.middleName,
+      log?.user?.lastName,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
+    log?.user?.email ||
+    "Unknown User";
+
   return (
     <tr className="group hover:bg-gray-50/70 transition-colors">
       {/* DATE */}
@@ -604,6 +649,22 @@ const LogRow = ({ log }) => {
         </div>
       </td>
 
+      {/* PERFORMED BY */}
+
+      <td className="px-6 py-4 min-w-[190px]">
+        <div className="flex flex-col">
+          <p className="text-xs font-bold text-gray-800">
+            {performedBy}
+          </p>
+
+          {log?.user?.email && (
+            <p className="text-[10px] text-gray-400 mt-0.5">
+              {log.user.email}
+            </p>
+          )}
+        </div>
+      </td>
+
       {/* ROLE */}
 
       <td className="px-6 py-4 whitespace-nowrap">
@@ -628,7 +689,10 @@ const LogRow = ({ log }) => {
 
       <td className="px-6 py-4 min-w-[280px]">
         <div className="flex items-start gap-2">
-          <FileText size={14} className="text-gray-300 mt-0.5 flex-shrink-0" />
+          <FileText
+            size={14}
+            className="text-gray-300 mt-0.5 flex-shrink-0"
+          />
 
           <p className="text-xs text-gray-500 leading-relaxed">
             {log.details || "—"}
@@ -698,6 +762,8 @@ const LoadingRows = () => (
   <>
     {Array.from({ length: 5 }).map((_, index) => (
       <tr key={index} className="animate-pulse">
+        {/* DATE */}
+
         <td className="px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gray-100" />
@@ -709,14 +775,29 @@ const LoadingRows = () => (
           </div>
         </td>
 
+        {/* PERFORMED BY */}
+
+        <td className="px-6 py-5">
+          <div>
+            <div className="h-3 w-28 bg-gray-100 rounded mb-2" />
+            <div className="h-2 w-36 bg-gray-100 rounded" />
+          </div>
+        </td>
+
+        {/* ROLE */}
+
         <td className="px-6 py-5">
           <div className="h-6 w-20 bg-gray-100 rounded-lg" />
         </td>
+
+        {/* ACTION */}
 
         <td className="px-6 py-5">
           <div className="h-3 w-28 bg-gray-100 rounded mb-2" />
           <div className="h-4 w-16 bg-gray-100 rounded" />
         </td>
+
+        {/* DETAILS */}
 
         <td className="px-6 py-5">
           <div className="h-3 w-64 bg-gray-100 rounded" />
@@ -725,3 +806,4 @@ const LoadingRows = () => (
     ))}
   </>
 );
+

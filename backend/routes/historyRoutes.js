@@ -10,16 +10,23 @@ router.get("/", verifyToken, async (req, res) => {
     const { category, role } = req.query;
 
     const filter = {};
+
     if (category) filter.category = category;
     if (role) filter.role = role;
 
     const logs = await HistoryLog.find(filter)
-      .populate("user", "name email")
+      .populate(
+        "user",
+        "name firstName middleName lastName email role"
+      )
       .sort({ createdAt: -1 });
 
     res.status(200).json(logs);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch logs" });
+    console.error("Failed to fetch history logs:", error);
+    res.status(500).json({
+      message: "Failed to fetch logs",
+    });
   }
 });
 
