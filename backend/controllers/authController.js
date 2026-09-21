@@ -327,65 +327,94 @@ export const verifyEmail = async (req, res) => {
 };
 
 // LOGIN
+// LOGIN
 export const login = async (req, res) => {
   try {
     const { email, password, accountType } = req.body;
 
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
+    // ================= VALIDATION =================
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required",
+      });
     }
 
+    const normalizedEmail = email.trim().toLowerCase();
+
+    console.log("====================================");
+    console.log("🔐 LOGIN ATTEMPT");
+    console.log("Email:", normalizedEmail);
+    console.log("Account Type:", accountType || "Not provided");
+    console.log("====================================");
+
+    // ================= FIND USER =================
+    const user = await User.findOne({
+      email: normalizedEmail,
+    });
+
+    if (!user) {
+      console.log("❌ LOGIN FAILED: User not found");
+
+      return res.status(400).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    // ================= CHECK PASSWORD =================
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
+      console.log("❌ LOGIN FAILED: Incorrect password");
 
-    // 🚫 STUDENTS ARE NOT ALLOWED TO USE THIS LOGIN
-    if (user.role === "student") {
-      return res.status(403).json({
+      return res.status(400).json({
         success: false,
-        message: "Student accounts cannot login here.",
+        message: "Invalid credentials",
       });
     }
 
-    if (user.role === "teacher") {
+    // ================= ACCOUNT TYPE CHECK =================
+    if (
+      accountType &&
+      user.role !== String(accountType).trim().toLowerCase()
+    ) {
+      console.log(
+        `❌ ACCOUNT TYPE MISMATCH: account selected = ${accountType}, actual role = ${user.role}`,
+      );
+
       return res.status(403).json({
         success: false,
-        message:
-          "Teacher accounts cannot login here. Please use the mobile app.",
-      });
-    }
-
-    // role check optional
-    if (accountType && user.role !== accountType.toLowerCase()) {
-      return res.status(403).json({
         message: `Account is registered as ${user.role}`,
       });
     }
 
-    // GENERATE OTP
     // =========================================================
     // TWO-FACTOR AUTHENTICATION
     // =========================================================
 
-    const twoFactorEnabled = user.securitySettings?.twoFactorEnabled !== false;
+    const twoFactorEnabled =
+      user.securitySettings?.twoFactorEnabled !== false;
 
-    // ---------------------------------------------------------
+    // =========================================================
     // 2FA ENABLED
-    // ---------------------------------------------------------
+    // =========================================================
 
     if (twoFactorEnabled) {
-      const loginOTP = Math.floor(100000 + Math.random() * 900000).toString();
+      const loginOTP = Math.floor(
+        100000 + Math.random() * 900000,
+      ).toString();
 
       user.loginOTP = loginOTP;
       user.loginOTPExpiresAt = Date.now() + 15 * 60 * 1000;
 
       await user.save();
 
-      await sendVerificationEmail(email, loginOTP);
+      await sendVerificationEmail(normalizedEmail, loginOTP);
+
+      console.log("✅ LOGIN OTP SENT");
+      console.log("User:", user.email);
+      console.log("Role:", user.role);
 
       return res.status(200).json({
         success: true,
@@ -394,9 +423,9 @@ export const login = async (req, res) => {
       });
     }
 
-    // ---------------------------------------------------------
+    // =========================================================
     // 2FA DISABLED
-    // ---------------------------------------------------------
+    // =========================================================
 
     user.loginOTP = undefined;
     user.loginOTPExpiresAt = undefined;
@@ -421,9 +450,13 @@ export const login = async (req, res) => {
       role: mapRoleForHistory(user.role),
       action: "Login",
       category: "Auth",
-      details: "Admin logged in successfully without 2FA",
+      details: `${user.role} logged in successfully without 2FA`,
       ipAddress: req.ip,
     });
+
+    console.log("✅ LOGIN SUCCESS");
+    console.log("User:", user.email);
+    console.log("Role:", user.role);
 
     return res.status(200).json({
       success: true,
@@ -437,8 +470,15 @@ export const login = async (req, res) => {
       token,
     });
   } catch (err) {
-    console.error("Login Error:", err);
-    return res.status(500).json({ message: "Server error" });
+    console.error("====================================");
+    console.error("❌ LOGIN ERROR:");
+    console.error(err);
+    console.error("====================================");
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 };
 
@@ -623,7 +663,7 @@ export const verifyLoginOTP = async (req, res) => {
       role: mapRoleForHistory(user.role),
       action: "Login",
       category: "Auth",
-      details: "Admin logged in successfully",
+      details: `${user.role} logged in successfully`,
       ipAddress: req.ip,
     });
 

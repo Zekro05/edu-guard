@@ -29,19 +29,25 @@ import {
 import RiskBadge from "./RiskBadge";
 import { API } from "../lib/api";
 
-const ViewProfileModal = ({ student, close }) => {
+const ViewProfileModal = ({
+  student,
+  close,
+  darkMode = false,
+}) => {
   const [tab, setTab] = useState("history");
 
   const [timeline, setTimeline] = useState([]);
   const [incidents, setIncidents] = useState([]);
   const [reports, setReports] = useState([]);
 
-  const [selectedIncident, setSelectedIncident] = useState(null);
+  const [selectedIncident, setSelectedIncident] =
+    useState(null);
 
   const [ai, setAi] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityLoading, setActivityLoading] =
+    useState(true);
 
   const analysisRequestRef = useRef(false);
   const analyzedStudentRef = useRef(null);
@@ -91,16 +97,23 @@ const ViewProfileModal = ({ student, close }) => {
       try {
         setActivityLoading(true);
 
-        const [incidentRes, reportRes] = await Promise.all([
-          API.get(`/api/incidents/student/${student._id}`),
-          API.get("/api/reports"),
-        ]);
+        const [incidentRes, reportRes] =
+          await Promise.all([
+            API.get(
+              `/api/incidents/student/${student._id}`,
+            ),
+            API.get("/api/reports"),
+          ]);
 
-        const incidentData = Array.isArray(incidentRes.data)
+        const incidentData = Array.isArray(
+          incidentRes.data,
+        )
           ? incidentRes.data
           : incidentRes.data?.incidents || [];
 
-        const reportData = Array.isArray(reportRes.data)
+        const reportData = Array.isArray(
+          reportRes.data,
+        )
           ? reportRes.data
           : reportRes.data?.reports || [];
 
@@ -143,7 +156,8 @@ const ViewProfileModal = ({ student, close }) => {
         const formatted = incidentData
           .filter(Boolean)
           .map((incident, index) => {
-            const report = findReportForIncident(incident);
+            const report =
+              findReportForIncident(incident);
 
             return {
               id:
@@ -252,7 +266,8 @@ const ViewProfileModal = ({ student, close }) => {
 
       return (
         studentId &&
-        studentId.toString() === student._id.toString()
+        studentId.toString() ===
+          student._id.toString()
       );
     });
   };
@@ -462,20 +477,6 @@ const ViewProfileModal = ({ student, close }) => {
         Array.isArray(parsed?.interventions)
           ? parsed.interventions.map(
               (item, index) => {
-                /*
-                 * New backend format:
-                 *
-                 * {
-                 *   recommendation,
-                 *   basis,
-                 *   referenceIds,
-                 *   references
-                 * }
-                 *
-                 * We also support strings so older
-                 * backend responses don't break the UI.
-                 */
-
                 if (typeof item === "string") {
                   return {
                     recommendation: item,
@@ -489,7 +490,9 @@ const ViewProfileModal = ({ student, close }) => {
                 return {
                   recommendation:
                     item?.recommendation ||
-                    `Recommended intervention ${index + 1}`,
+                    `Recommended intervention ${
+                      index + 1
+                    }`,
 
                   basis:
                     item?.basis ||
@@ -895,8 +898,90 @@ const ViewProfileModal = ({ student, close }) => {
   };
 
   /* =========================================================
-     MAIN RENDER
+     THEME CLASSES
   ========================================================= */
+
+  const theme = {
+    overlay: darkMode
+      ? "bg-black/65"
+      : "bg-black/40",
+
+    modal: darkMode
+      ? "bg-[#0B1712]/95 border-emerald-900/40 shadow-[0_25px_90px_rgba(0,0,0,0.55)]"
+      : "bg-white/75 border-white/40 shadow-2xl",
+
+    header: darkMode
+      ? "border-emerald-900/30"
+      : "border-white/30",
+
+    headerGlowOne: darkMode
+      ? "bg-green-500/10"
+      : "bg-green-200/30",
+
+    headerGlowTwo: darkMode
+      ? "bg-emerald-500/10"
+      : "bg-emerald-100/30",
+
+    title: darkMode
+      ? "text-white"
+      : "text-gray-900",
+
+    muted: darkMode
+      ? "text-slate-400"
+      : "text-gray-500",
+
+    closeButton: darkMode
+      ? "bg-white/5 hover:bg-white/10 border-emerald-900/40 text-slate-400 hover:text-white"
+      : "bg-white/60 hover:bg-white border-white/40 text-gray-700",
+
+    tabs: darkMode
+      ? "border-emerald-900/30 bg-[#0D1C15]/80"
+      : "border-white/30 bg-white/25",
+
+    content: darkMode
+      ? "bg-gradient-to-br from-[#102119]/60 to-[#08110D]/40"
+      : "bg-gradient-to-br from-white/20 to-white/5",
+
+    card: darkMode
+      ? "bg-[#101F17]/80 border-emerald-900/30"
+      : "bg-white/50 border-white/30",
+
+    cardStrong: darkMode
+      ? "bg-[#0E1C15]/90 border-emerald-900/40"
+      : "bg-white/60 border-white/30",
+
+    cardHover: darkMode
+      ? "hover:bg-[#14261C]"
+      : "hover:bg-white/75",
+
+    text: darkMode
+      ? "text-slate-100"
+      : "text-gray-900",
+
+    bodyText: darkMode
+      ? "text-slate-300"
+      : "text-gray-700",
+
+    iconBox: darkMode
+      ? "bg-emerald-950/70 border border-emerald-900/50 text-emerald-300"
+      : "bg-green-100 text-green-700",
+
+    pill: darkMode
+      ? "bg-white/5 border-emerald-900/40 text-slate-300"
+      : "bg-white/50 border-white/40 text-gray-600",
+
+    secondaryPill: darkMode
+      ? "bg-white/5 text-slate-400 border-emerald-900/30"
+      : "bg-gray-100 text-gray-600",
+
+    subtleBorder: darkMode
+      ? "border-emerald-900/30"
+      : "border-white/30",
+
+    footer: darkMode
+      ? "border-emerald-900/30 bg-[#0B1712]/85"
+      : "border-white/30 bg-white/20",
+  };
 
   return (
     <>
@@ -904,11 +989,13 @@ const ViewProfileModal = ({ student, close }) => {
         <motion.div
           key="student-profile-modal"
           onClick={close}
-          className="
-            fixed inset-0 z-50 bg-black/40
-            backdrop-blur-md flex items-center
+          className={`
+            fixed inset-0 z-50
+            ${theme.overlay}
+            backdrop-blur-md
+            flex items-center
             justify-center p-4 sm:p-6
-          "
+          `}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -935,36 +1022,40 @@ const ViewProfileModal = ({ student, close }) => {
             transition={{
               duration: 0.25,
             }}
-            className="
+            className={`
               w-full max-w-6xl max-h-[92vh]
-              bg-white/75 backdrop-blur-2xl
-              border border-white/40
-              rounded-[2rem] shadow-2xl
-              overflow-hidden flex flex-col
-            "
+              ${theme.modal}
+              backdrop-blur-2xl
+              border
+              rounded-[2rem]
+              overflow-hidden
+              flex flex-col
+            `}
           >
             {/* HEADER */}
 
             <div
-              className="
+              className={`
                 relative flex-shrink-0 overflow-hidden
-                border-b border-white/30
-              "
+                border-b ${theme.header}
+              `}
             >
               <div
-                className="
+                className={`
                   absolute -top-32 -left-20
-                  w-80 h-80 bg-green-200/30
+                  w-80 h-80
+                  ${theme.headerGlowOne}
                   rounded-full blur-3xl
-                "
+                `}
               />
 
               <div
-                className="
+                className={`
                   absolute -top-20 right-0
-                  w-72 h-72 bg-emerald-100/30
+                  w-72 h-72
+                  ${theme.headerGlowTwo}
                   rounded-full blur-3xl
-                "
+                `}
               />
 
               <div
@@ -981,15 +1072,20 @@ const ViewProfileModal = ({ student, close }) => {
                   "
                 >
                   <div
-                    className="
+                    className={`
                       w-16 h-16 sm:w-20 sm:h-20
-                      rounded-3xl bg-white/70
+                      rounded-3xl
+                      ${
+                        darkMode
+                          ? "bg-[#14261C] border-emerald-900/40"
+                          : "bg-white/70 border-white/50"
+                      }
                       backdrop-blur-xl
-                      border border-white/50
+                      border
                       shadow-lg overflow-hidden
                       flex items-center justify-center
                       flex-shrink-0
-                    "
+                    `}
                   >
                     {student.profilePhoto ? (
                       <img
@@ -1005,7 +1101,11 @@ const ViewProfileModal = ({ student, close }) => {
                     ) : (
                       <User
                         size={30}
-                        className="text-gray-400"
+                        className={
+                          darkMode
+                            ? "text-emerald-300"
+                            : "text-gray-400"
+                        }
                       />
                     )}
                   </div>
@@ -1018,11 +1118,12 @@ const ViewProfileModal = ({ student, close }) => {
                       "
                     >
                       <h2
-                        className="
+                        className={`
                           text-2xl sm:text-3xl
                           font-black tracking-tight
-                          text-gray-900 truncate
-                        "
+                          truncate
+                          ${theme.title}
+                        `}
                       >
                         {student.firstName}{" "}
                         {student.middleName
@@ -1039,9 +1140,10 @@ const ViewProfileModal = ({ student, close }) => {
                     </div>
 
                     <p
-                      className="
-                        text-sm text-gray-500 mt-1
-                      "
+                      className={`
+                        text-sm mt-1
+                        ${theme.muted}
+                      `}
                     >
                       Student behavioral profile
                     </p>
@@ -1052,6 +1154,7 @@ const ViewProfileModal = ({ student, close }) => {
                       "
                     >
                       <InfoPill
+                        darkMode={darkMode}
                         icon={
                           <GraduationCap
                             size={13}
@@ -1064,6 +1167,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <InfoPill
+                        darkMode={darkMode}
                         icon={
                           <Hash size={13} />
                         }
@@ -1074,6 +1178,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <InfoPill
+                        darkMode={darkMode}
                         icon={
                           <Activity
                             size={13}
@@ -1092,15 +1197,16 @@ const ViewProfileModal = ({ student, close }) => {
                 <button
                   type="button"
                   onClick={close}
-                  className="
+                  className={`
                     w-10 h-10 sm:w-11 sm:h-11
-                    rounded-2xl bg-white/60
-                    hover:bg-white
-                    border border-white/40
-                    backdrop-blur flex
-                    items-center justify-center
+                    rounded-2xl
+                    ${theme.closeButton}
+                    backdrop-blur
+                    border
+                    flex items-center
+                    justify-center
                     transition flex-shrink-0
-                  "
+                  `}
                 >
                   <X size={18} />
                 </button>
@@ -1110,14 +1216,16 @@ const ViewProfileModal = ({ student, close }) => {
             {/* TABS */}
 
             <div
-              className="
+              className={`
                 flex gap-2 px-6 sm:px-8 py-4
-                border-b border-white/30
-                bg-white/25 backdrop-blur
+                border-b
+                ${theme.tabs}
+                backdrop-blur
                 flex-shrink-0 overflow-x-auto
-              "
+              `}
             >
               <TabButton
+                darkMode={darkMode}
                 active={tab === "history"}
                 icon={<Activity size={16} />}
                 label="Activity Timeline"
@@ -1127,6 +1235,7 @@ const ViewProfileModal = ({ student, close }) => {
               />
 
               <TabButton
+                darkMode={darkMode}
                 active={tab === "analysis"}
                 icon={<Brain size={16} />}
                 label="AI Analysis"
@@ -1136,6 +1245,7 @@ const ViewProfileModal = ({ student, close }) => {
               />
 
               <TabButton
+                darkMode={darkMode}
                 active={tab === "profile"}
                 icon={<User size={16} />}
                 label="Profile"
@@ -1148,12 +1258,11 @@ const ViewProfileModal = ({ student, close }) => {
             {/* CONTENT */}
 
             <div
-              className="
+              className={`
                 flex-1 min-h-0 overflow-y-auto
                 p-6 sm:p-8
-                bg-gradient-to-br
-                from-white/20 to-white/5
-              "
+                ${theme.content}
+              `}
             >
               {/* =================================================
                   HISTORY
@@ -1168,6 +1277,7 @@ const ViewProfileModal = ({ student, close }) => {
                     "
                   >
                     <ProfileInfo
+                      darkMode={darkMode}
                       icon={<Mail size={17} />}
                       label="Email"
                       value={
@@ -1177,6 +1287,7 @@ const ViewProfileModal = ({ student, close }) => {
                     />
 
                     <ProfileInfo
+                      darkMode={darkMode}
                       icon={<Phone size={17} />}
                       label="Phone"
                       value={
@@ -1186,6 +1297,7 @@ const ViewProfileModal = ({ student, close }) => {
                     />
 
                     <ProfileInfo
+                      darkMode={darkMode}
                       icon={<User size={17} />}
                       label="Gender"
                       value={
@@ -1203,18 +1315,19 @@ const ViewProfileModal = ({ student, close }) => {
                   >
                     <div>
                       <h3
-                        className="
+                        className={`
                           text-lg font-bold
-                          text-gray-900
-                        "
+                          ${theme.text}
+                        `}
                       >
                         Incident History
                       </h3>
 
                       <p
-                        className="
-                          text-xs text-gray-500 mt-1
-                        "
+                        className={`
+                          text-xs mt-1
+                          ${theme.muted}
+                        `}
                       >
                         Click an incident to view its
                         complete report
@@ -1222,13 +1335,11 @@ const ViewProfileModal = ({ student, close }) => {
                     </div>
 
                     <div
-                      className="
+                      className={`
                         px-3 py-1.5 rounded-xl
-                        bg-white/60
-                        border border-white/40
-                        text-xs font-semibold
-                        text-gray-600
-                      "
+                        border text-xs font-semibold
+                        ${theme.pill}
+                      `}
                     >
                       {timeline.length} records
                     </div>
@@ -1236,22 +1347,26 @@ const ViewProfileModal = ({ student, close }) => {
 
                   {timeline.length === 0 && (
                     <div
-                      className="
-                        bg-white/50
+                      className={`
+                        ${theme.card}
                         backdrop-blur-xl
-                        border border-white/30
+                        border
                         rounded-3xl p-12
                         text-center
-                      "
+                      `}
                     >
                       <div
-                        className="
+                        className={`
                           w-14 h-14 mx-auto
                           rounded-2xl
-                          bg-green-100 text-green-700
                           flex items-center
                           justify-center
-                        "
+                          ${
+                            darkMode
+                              ? "bg-emerald-950/70 text-emerald-300"
+                              : "bg-green-100 text-green-700"
+                          }
+                        `}
                       >
                         <ClipboardList
                           size={24}
@@ -1259,18 +1374,19 @@ const ViewProfileModal = ({ student, close }) => {
                       </div>
 
                       <p
-                        className="
-                          font-semibold
-                          text-gray-800 mt-4
-                        "
+                        className={`
+                          font-semibold mt-4
+                          ${theme.text}
+                        `}
                       >
                         No incident history
                       </p>
 
                       <p
-                        className="
-                          text-sm text-gray-500 mt-1
-                        "
+                        className={`
+                          text-sm mt-1
+                          ${theme.muted}
+                        `}
                       >
                         This student currently has
                         no recorded incidents.
@@ -1303,19 +1419,19 @@ const ViewProfileModal = ({ student, close }) => {
                           delay:
                             idx * 0.025,
                         }}
-                        className="
+                        className={`
                           w-full text-left
-                          bg-white/50
+                          ${theme.card}
                           backdrop-blur-2xl
-                          border border-white/40
+                          border
                           rounded-3xl
                           p-5 sm:p-6
                           shadow-sm
-                          hover:bg-white/75
+                          ${theme.cardHover}
                           hover:shadow-lg
                           hover:-translate-y-0.5
                           transition-all group
-                        "
+                        `}
                       >
                         <div
                           className="
@@ -1329,15 +1445,18 @@ const ViewProfileModal = ({ student, close }) => {
                             "
                           >
                             <div
-                              className="
+                              className={`
                                 w-11 h-11
                                 rounded-2xl
-                                bg-green-100
-                                text-green-700
                                 flex items-center
                                 justify-center
                                 flex-shrink-0
-                              "
+                                ${
+                                  darkMode
+                                    ? "bg-emerald-950/70 text-emerald-300"
+                                    : "bg-green-100 text-green-700"
+                                }
+                              `}
                             >
                               <ShieldAlert
                                 size={19}
@@ -1352,16 +1471,19 @@ const ViewProfileModal = ({ student, close }) => {
                                 "
                               >
                                 <span
-                                  className="
+                                  className={`
                                     text-[10px]
                                     uppercase
                                     tracking-wider
                                     font-bold
                                     px-2.5 py-1
                                     rounded-lg
-                                    bg-green-100
-                                    text-green-700
-                                  "
+                                    ${
+                                      darkMode
+                                        ? "bg-emerald-950/70 text-emerald-300"
+                                        : "bg-green-100 text-green-700"
+                                    }
+                                  `}
                                 >
                                   Incident
                                 </span>
@@ -1369,16 +1491,15 @@ const ViewProfileModal = ({ student, close }) => {
                                 {item.data
                                   ?.category && (
                                   <span
-                                    className="
+                                    className={`
                                       text-[10px]
                                       uppercase
                                       tracking-wider
                                       font-semibold
                                       px-2.5 py-1
                                       rounded-lg
-                                      bg-gray-100
-                                      text-gray-600
-                                    "
+                                      ${theme.secondaryPill}
+                                    `}
                                   >
                                     {
                                       item.data
@@ -1389,10 +1510,10 @@ const ViewProfileModal = ({ student, close }) => {
                               </div>
 
                               <h3
-                                className="
-                                  font-bold
-                                  text-gray-900 mt-2
-                                "
+                                className={`
+                                  font-bold mt-2
+                                  ${theme.text}
+                                `}
                               >
                                 {
                                   item.data
@@ -1401,12 +1522,12 @@ const ViewProfileModal = ({ student, close }) => {
                               </h3>
 
                               <p
-                                className="
-                                  text-sm
-                                  text-gray-500 mt-1
+                                className={`
+                                  text-sm mt-1
                                   line-clamp-2
                                   leading-relaxed
-                                "
+                                  ${theme.muted}
+                                `}
                               >
                                 {
                                   item.data
@@ -1415,14 +1536,18 @@ const ViewProfileModal = ({ student, close }) => {
                               </p>
 
                               <div
-                                className="
+                                className={`
                                   flex items-center
                                   gap-1 text-xs
-                                  text-green-600
                                   font-semibold mt-3
                                   group-hover:gap-2
                                   transition-all
-                                "
+                                  ${
+                                    darkMode
+                                      ? "text-emerald-300"
+                                      : "text-green-600"
+                                  }
+                                `}
                               >
                                 View incident details
                                 <ChevronRight
@@ -1439,10 +1564,15 @@ const ViewProfileModal = ({ student, close }) => {
                             "
                           >
                             <p
-                              className="
-                                text-xs text-gray-400
+                              className={`
+                                text-xs
                                 whitespace-nowrap
-                              "
+                                ${
+                                  darkMode
+                                    ? "text-slate-500"
+                                    : "text-gray-400"
+                                }
+                              `}
                             >
                               {formatDate(
                                 item.date,
@@ -1469,13 +1599,22 @@ const ViewProfileModal = ({ student, close }) => {
                         >
                           <Clock
                             size={13}
-                            className="text-gray-400"
+                            className={
+                              darkMode
+                                ? "text-slate-500"
+                                : "text-gray-400"
+                            }
                           />
 
                           <span
-                            className="
-                              text-xs text-gray-400
-                            "
+                            className={`
+                              text-xs
+                              ${
+                                darkMode
+                                  ? "text-slate-500"
+                                  : "text-gray-400"
+                              }
+                            `}
                           >
                             {formatDate(
                               item.date,
@@ -1510,7 +1649,6 @@ const ViewProfileModal = ({ student, close }) => {
                       to-emerald-500
                       text-white rounded-3xl
                       p-6 shadow-lg
-                      shadow-green-200
                     "
                   >
                     <div
@@ -1562,13 +1700,13 @@ const ViewProfileModal = ({ student, close }) => {
 
                   {loading && (
                     <div
-                      className="
-                        bg-white/50
+                      className={`
+                        ${theme.card}
                         backdrop-blur-xl
-                        border border-white/30
+                        border
                         rounded-3xl p-10
                         text-center
-                      "
+                      `}
                     >
                       <div
                         className="
@@ -1582,7 +1720,7 @@ const ViewProfileModal = ({ student, close }) => {
 
                       <p
                         className="
-                          text-green-700
+                          text-green-500
                           font-semibold
                         "
                       >
@@ -1591,9 +1729,10 @@ const ViewProfileModal = ({ student, close }) => {
                       </p>
 
                       <p
-                        className="
-                          text-xs text-gray-500 mt-2
-                        "
+                        className={`
+                          text-xs mt-2
+                          ${theme.muted}
+                        `}
                       >
                         Reviewing behavioral patterns,
                         incident history, and relevant
@@ -1605,22 +1744,26 @@ const ViewProfileModal = ({ student, close }) => {
                   {ai && !loading && (
                     <>
                       <GlassCard
+                        darkMode={darkMode}
                         title="Behavior Summary"
                         text={ai.summary}
                       />
 
                       <GlassCard
+                        darkMode={darkMode}
                         title="Pattern Analysis"
                         text={ai.pattern}
                       />
 
                       <GlassCard
+                        darkMode={darkMode}
                         title="Risk Assessment"
                         text={ai.risk}
                         highlight="yellow"
                       />
 
                       <GlassCard
+                        darkMode={darkMode}
                         title="Prediction"
                         text={ai.prediction}
                         highlight="red"
@@ -1631,12 +1774,12 @@ const ViewProfileModal = ({ student, close }) => {
                       ================================================= */}
 
                       <div
-                        className="
-                          bg-white/50
+                        className={`
+                          ${theme.card}
                           backdrop-blur-2xl
-                          border border-white/30
+                          border
                           rounded-3xl p-6
-                        "
+                        `}
                       >
                         <div
                           className="
@@ -1644,32 +1787,35 @@ const ViewProfileModal = ({ student, close }) => {
                           "
                         >
                           <div
-                            className="
+                            className={`
                               w-9 h-9 rounded-xl
-                              bg-green-100
-                              text-green-700
                               flex items-center
                               justify-center
-                            "
+                              ${
+                                darkMode
+                                  ? "bg-emerald-950/70 text-emerald-300"
+                                  : "bg-green-100 text-green-700"
+                              }
+                            `}
                           >
                             <Activity size={17} />
                           </div>
 
                           <div>
                             <h3
-                              className="
+                              className={`
                                 font-bold
-                                text-gray-900
-                              "
+                                ${theme.text}
+                              `}
                             >
                               Intervention Plan
                             </h3>
 
                             <p
-                              className="
+                              className={`
                                 text-xs
-                                text-gray-500
-                              "
+                                ${theme.muted}
+                              `}
                             >
                               Recommended next steps
                               supported by the research
@@ -1704,13 +1850,16 @@ const ViewProfileModal = ({ student, close }) => {
                               return (
                                 <div
                                   key={`intervention-${idx}`}
-                                  className="
-                                    bg-white/60
+                                  className={`
+                                    ${
+                                      darkMode
+                                        ? "bg-[#0E1C15]/80 border-emerald-900/30"
+                                        : "bg-white/60 border-white/30"
+                                    }
                                     border
-                                    border-white/30
                                     rounded-2xl
                                     p-4
-                                  "
+                                  `}
                                 >
                                   <div
                                     className="
@@ -1719,60 +1868,74 @@ const ViewProfileModal = ({ student, close }) => {
                                     "
                                   >
                                     <div
-                                      className="
+                                      className={`
                                         w-8 h-8
                                         rounded-xl
-                                        bg-green-100
-                                        text-green-700
                                         flex items-center
                                         justify-center
                                         font-bold text-sm
                                         flex-shrink-0
-                                      "
+                                        ${
+                                          darkMode
+                                            ? "bg-emerald-950/70 text-emerald-300"
+                                            : "bg-green-100 text-green-700"
+                                        }
+                                      `}
                                     >
                                       {idx + 1}
                                     </div>
 
                                     <div className="min-w-0 flex-1">
                                       <p
-                                        className="
+                                        className={`
                                           text-sm
                                           font-semibold
-                                          text-gray-800
-                                        "
+                                          ${theme.text}
+                                        `}
                                       >
                                         {intervention?.recommendation ||
                                           "No recommendation provided."}
                                       </p>
 
                                       <div
-                                        className="
+                                        className={`
                                           mt-3 p-3
                                           rounded-xl
-                                          bg-green-50/70
+                                          ${
+                                            darkMode
+                                              ? "bg-emerald-950/40 border-emerald-900/40"
+                                              : "bg-green-50/70 border-green-100"
+                                          }
                                           border
-                                          border-green-100
-                                        "
+                                        `}
                                       >
                                         <p
-                                          className="
+                                          className={`
                                             text-[10px]
                                             uppercase
                                             tracking-wider
                                             font-bold
-                                            text-green-700
-                                          "
+                                            ${
+                                              darkMode
+                                                ? "text-emerald-300"
+                                                : "text-green-700"
+                                            }
+                                          `}
                                         >
                                           Evidence basis
                                         </p>
 
                                         <p
-                                          className="
+                                          className={`
                                             text-xs
-                                            text-gray-600
                                             mt-1
                                             leading-relaxed
-                                          "
+                                            ${
+                                              darkMode
+                                                ? "text-slate-300"
+                                                : "text-gray-600"
+                                            }
+                                          `}
                                         >
                                           {intervention?.basis ||
                                             "No evidence basis was returned."}
@@ -1783,13 +1946,17 @@ const ViewProfileModal = ({ student, close }) => {
                                         0 && (
                                         <div className="mt-3 space-y-2">
                                           <p
-                                            className="
+                                            className={`
                                               text-[10px]
                                               uppercase
                                               tracking-wider
                                               font-bold
-                                              text-gray-500
-                                            "
+                                              ${
+                                                darkMode
+                                                  ? "text-slate-400"
+                                                  : "text-gray-500"
+                                              }
+                                            `}
                                           >
                                             Supporting research
                                           </p>
@@ -1807,6 +1974,9 @@ const ViewProfileModal = ({ student, close }) => {
                                                 reference={
                                                   reference
                                                 }
+                                                darkMode={
+                                                  darkMode
+                                                }
                                               />
                                             ),
                                           )}
@@ -1815,12 +1985,16 @@ const ViewProfileModal = ({ student, close }) => {
 
                                       {!references.length && (
                                         <div
-                                          className="
+                                          className={`
                                             mt-3
                                             text-[11px]
-                                            text-gray-400
                                             italic
-                                          "
+                                            ${
+                                              darkMode
+                                                ? "text-slate-500"
+                                                : "text-gray-400"
+                                            }
+                                          `}
                                         >
                                           No matching research
                                           reference was returned
@@ -1846,12 +2020,12 @@ const ViewProfileModal = ({ student, close }) => {
                         ai.researchReferences.length >
                           0 && (
                           <div
-                            className="
-                              bg-white/50
+                            className={`
+                              ${theme.card}
                               backdrop-blur-2xl
-                              border border-white/30
+                              border
                               rounded-3xl p-6
-                            "
+                            `}
                           >
                             <div
                               className="
@@ -1860,14 +2034,17 @@ const ViewProfileModal = ({ student, close }) => {
                               "
                             >
                               <div
-                                className="
+                                className={`
                                   w-9 h-9
                                   rounded-xl
-                                  bg-green-100
-                                  text-green-700
                                   flex items-center
                                   justify-center
-                                "
+                                  ${
+                                    darkMode
+                                      ? "bg-emerald-950/70 text-emerald-300"
+                                      : "bg-green-100 text-green-700"
+                                  }
+                                `}
                               >
                                 <BookOpen
                                   size={17}
@@ -1876,19 +2053,19 @@ const ViewProfileModal = ({ student, close }) => {
 
                               <div>
                                 <h3
-                                  className="
+                                  className={`
                                     font-bold
-                                    text-gray-900
-                                  "
+                                    ${theme.text}
+                                  `}
                                 >
                                   Research Evidence Used
                                 </h3>
 
                                 <p
-                                  className="
+                                  className={`
                                     text-xs
-                                    text-gray-500
-                                  "
+                                    ${theme.muted}
+                                  `}
                                 >
                                   Research references
                                   retrieved from the
@@ -1912,6 +2089,9 @@ const ViewProfileModal = ({ student, close }) => {
                                       reference
                                     }
                                     expanded
+                                    darkMode={
+                                      darkMode
+                                    }
                                   />
                                 ),
                               )}
@@ -1920,6 +2100,7 @@ const ViewProfileModal = ({ student, close }) => {
                         )}
 
                       <GlassCard
+                        darkMode={darkMode}
                         title="Counselor Notes"
                         text={ai.notes}
                       />
@@ -1938,6 +2119,7 @@ const ViewProfileModal = ({ student, close }) => {
                             text-white text-xs
                             font-semibold transition
                             disabled:opacity-50
+                            shadow-green-950/30
                           "
                         >
                           Regenerate Analysis
@@ -1955,12 +2137,12 @@ const ViewProfileModal = ({ student, close }) => {
               {tab === "profile" && (
                 <div className="space-y-5">
                   <div
-                    className="
-                      bg-white/50
+                    className={`
+                      ${theme.card}
                       backdrop-blur-2xl
-                      border border-white/30
+                      border
                       rounded-3xl p-6
-                    "
+                    `}
                   >
                     <div
                       className="
@@ -1968,30 +2150,35 @@ const ViewProfileModal = ({ student, close }) => {
                       "
                     >
                       <div
-                        className="
+                        className={`
                           w-11 h-11 rounded-2xl
-                          bg-green-100
-                          text-green-700
                           flex items-center
                           justify-center
-                        "
+                          ${
+                            darkMode
+                              ? "bg-emerald-950/70 text-emerald-300"
+                              : "bg-green-100 text-green-700"
+                          }
+                        `}
                       >
                         <User size={21} />
                       </div>
 
                       <div>
                         <h3
-                          className="
-                            font-bold text-gray-900
-                          "
+                          className={`
+                            font-bold
+                            ${theme.text}
+                          `}
                         >
                           Student Information
                         </h3>
 
                         <p
-                          className="
-                            text-xs text-gray-500 mt-1
-                          "
+                          className={`
+                            text-xs mt-1
+                            ${theme.muted}
+                          `}
                         >
                           Complete profile information
                         </p>
@@ -2005,14 +2192,17 @@ const ViewProfileModal = ({ student, close }) => {
                       "
                     >
                       <div
-                        className="
+                        className={`
                           w-24 h-24 rounded-3xl
-                          bg-white/70
-                          border border-white/50
                           shadow-lg overflow-hidden
                           flex items-center
                           justify-center
-                        "
+                          ${
+                            darkMode
+                              ? "bg-[#14261C] border border-emerald-900/40"
+                              : "bg-white/70 border border-white/50"
+                          }
+                        `}
                       >
                         {student.profilePhoto ? (
                           <img
@@ -2028,16 +2218,20 @@ const ViewProfileModal = ({ student, close }) => {
                         ) : (
                           <User
                             size={38}
-                            className="text-gray-400"
+                            className={
+                              darkMode
+                                ? "text-emerald-300"
+                                : "text-gray-400"
+                            }
                           />
                         )}
                       </div>
 
                       <h3
-                        className="
-                          text-xl font-black
-                          text-gray-900 mt-4
-                        "
+                        className={`
+                          text-xl font-black mt-4
+                          ${theme.text}
+                        `}
                       >
                         {getFullName() ||
                           "Unnamed Student"}
@@ -2059,6 +2253,7 @@ const ViewProfileModal = ({ student, close }) => {
                       "
                     >
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={<Hash size={17} />}
                         label="Student ID"
                         value={
@@ -2068,6 +2263,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={
                           <GraduationCap
                             size={17}
@@ -2081,6 +2277,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={
                           <BookOpen size={17} />
                         }
@@ -2093,6 +2290,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={
                           <BadgeCheck
                             size={17}
@@ -2106,6 +2304,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={<Mail size={17} />}
                         label="Email"
                         value={
@@ -2115,6 +2314,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={<Phone size={17} />}
                         label="Phone"
                         value={
@@ -2125,6 +2325,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={
                           <VenusAndMars
                             size={17}
@@ -2138,6 +2339,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={
                           <CalendarDays
                             size={17}
@@ -2168,12 +2370,12 @@ const ViewProfileModal = ({ student, close }) => {
                     "
                   >
                     <div
-                      className="
-                        bg-white/50
+                      className={`
+                        ${theme.card}
                         backdrop-blur-2xl
-                        border border-white/30
+                        border
                         rounded-3xl p-6
-                      "
+                      `}
                     >
                       <div
                         className="
@@ -2182,30 +2384,35 @@ const ViewProfileModal = ({ student, close }) => {
                         "
                       >
                         <div
-                          className="
+                          className={`
                             w-9 h-9 rounded-xl
-                            bg-green-100
-                            text-green-700
                             flex items-center
                             justify-center
-                          "
+                            ${
+                              darkMode
+                                ? "bg-emerald-950/70 text-emerald-300"
+                                : "bg-green-100 text-green-700"
+                            }
+                          `}
                         >
                           <MapPin size={17} />
                         </div>
 
                         <div>
                           <h3
-                            className="
-                              font-bold text-gray-900
-                            "
+                            className={`
+                              font-bold
+                              ${theme.text}
+                            `}
                           >
                             Address
                           </h3>
 
                           <p
-                            className="
-                              text-xs text-gray-500
-                            "
+                            className={`
+                              text-xs
+                              ${theme.muted}
+                            `}
                           >
                             Registered address
                           </p>
@@ -2213,10 +2420,11 @@ const ViewProfileModal = ({ student, close }) => {
                       </div>
 
                       <p
-                        className="
-                          text-sm text-gray-700
+                        className={`
+                          text-sm
                           leading-relaxed
-                        "
+                          ${theme.bodyText}
+                        `}
                       >
                         {student.address ||
                           student.homeAddress ||
@@ -2226,12 +2434,12 @@ const ViewProfileModal = ({ student, close }) => {
                     </div>
 
                     <div
-                      className="
-                        bg-white/50
+                      className={`
+                        ${theme.card}
                         backdrop-blur-2xl
-                        border border-white/30
+                        border
                         rounded-3xl p-6
-                      "
+                      `}
                     >
                       <div
                         className="
@@ -2240,30 +2448,35 @@ const ViewProfileModal = ({ student, close }) => {
                         "
                       >
                         <div
-                          className="
+                          className={`
                             w-9 h-9 rounded-xl
-                            bg-green-100
-                            text-green-700
                             flex items-center
                             justify-center
-                          "
+                            ${
+                              darkMode
+                                ? "bg-emerald-950/70 text-emerald-300"
+                                : "bg-green-100 text-green-700"
+                            }
+                          `}
                         >
                           <Users size={17} />
                         </div>
 
                         <div>
                           <h3
-                            className="
-                              font-bold text-gray-900
-                            "
+                            className={`
+                              font-bold
+                              ${theme.text}
+                            `}
                           >
                             Parent / Guardian
                           </h3>
 
                           <p
-                            className="
-                              text-xs text-gray-500
-                            "
+                            className={`
+                              text-xs
+                              ${theme.muted}
+                            `}
                           >
                             Emergency / guardian
                             information
@@ -2273,6 +2486,7 @@ const ViewProfileModal = ({ student, close }) => {
 
                       <div className="space-y-3">
                         <ProfileInfo
+                          darkMode={darkMode}
                           icon={
                             <UserRound
                               size={16}
@@ -2288,6 +2502,7 @@ const ViewProfileModal = ({ student, close }) => {
                         />
 
                         <ProfileInfo
+                          darkMode={darkMode}
                           icon={
                             <Phone size={16} />
                           }
@@ -2306,12 +2521,12 @@ const ViewProfileModal = ({ student, close }) => {
                   {/* ACADEMIC */}
 
                   <div
-                    className="
-                      bg-white/50
+                    className={`
+                      ${theme.card}
                       backdrop-blur-2xl
-                      border border-white/30
+                      border
                       rounded-3xl p-6
-                    "
+                    `}
                   >
                     <div
                       className="
@@ -2320,13 +2535,16 @@ const ViewProfileModal = ({ student, close }) => {
                       "
                     >
                       <div
-                        className="
+                        className={`
                           w-9 h-9 rounded-xl
-                          bg-green-100
-                          text-green-700
                           flex items-center
                           justify-center
-                        "
+                          ${
+                            darkMode
+                              ? "bg-emerald-950/70 text-emerald-300"
+                              : "bg-green-100 text-green-700"
+                          }
+                        `}
                       >
                         <GraduationCap
                           size={17}
@@ -2335,17 +2553,19 @@ const ViewProfileModal = ({ student, close }) => {
 
                       <div>
                         <h3
-                          className="
-                            font-bold text-gray-900
-                          "
+                          className={`
+                            font-bold
+                            ${theme.text}
+                          `}
                         >
                           Academic Information
                         </h3>
 
                         <p
-                          className="
-                            text-xs text-gray-500
-                          "
+                          className={`
+                            text-xs
+                            ${theme.muted}
+                          `}
                         >
                           Student academic details
                         </p>
@@ -2360,6 +2580,7 @@ const ViewProfileModal = ({ student, close }) => {
                       "
                     >
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={
                           <GraduationCap
                             size={17}
@@ -2373,6 +2594,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={
                           <BookOpen size={17} />
                         }
@@ -2385,6 +2607,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={<Hash size={17} />}
                         label="Student ID"
                         value={
@@ -2394,6 +2617,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={
                           <ShieldAlert
                             size={17}
@@ -2407,6 +2631,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={
                           <Activity
                             size={17}
@@ -2419,6 +2644,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={
                           <FileText
                             size={17}
@@ -2436,12 +2662,12 @@ const ViewProfileModal = ({ student, close }) => {
                   {/* ACCOUNT */}
 
                   <div
-                    className="
-                      bg-white/50
+                    className={`
+                      ${theme.card}
                       backdrop-blur-2xl
-                      border border-white/30
+                      border
                       rounded-3xl p-6
-                    "
+                    `}
                   >
                     <div
                       className="
@@ -2450,30 +2676,35 @@ const ViewProfileModal = ({ student, close }) => {
                       "
                     >
                       <div
-                        className="
+                        className={`
                           w-9 h-9 rounded-xl
-                          bg-green-100
-                          text-green-700
                           flex items-center
                           justify-center
-                        "
+                          ${
+                            darkMode
+                              ? "bg-emerald-950/70 text-emerald-300"
+                              : "bg-green-100 text-green-700"
+                          }
+                        `}
                       >
                         <User size={17} />
                       </div>
 
                       <div>
                         <h3
-                          className="
-                            font-bold text-gray-900
-                          "
+                          className={`
+                            font-bold
+                            ${theme.text}
+                          `}
                         >
                           Account Information
                         </h3>
 
                         <p
-                          className="
-                            text-xs text-gray-500
-                          "
+                          className={`
+                            text-xs
+                            ${theme.muted}
+                          `}
                         >
                           GuidEd account details
                         </p>
@@ -2487,6 +2718,7 @@ const ViewProfileModal = ({ student, close }) => {
                       "
                     >
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={<Mail size={17} />}
                         label="Account Email"
                         value={
@@ -2496,6 +2728,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={
                           <BadgeCheck
                             size={17}
@@ -2509,6 +2742,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={
                           <CalendarDays
                             size={17}
@@ -2525,6 +2759,7 @@ const ViewProfileModal = ({ student, close }) => {
                       />
 
                       <ProfileInfo
+                        darkMode={darkMode}
                         icon={
                           <CalendarDays
                             size={17}
@@ -2556,12 +2791,17 @@ const ViewProfileModal = ({ student, close }) => {
         {selectedIncident && (
           <motion.div
             key="incident-detail-modal"
-            className="
+            className={`
               fixed inset-0 z-[70]
-              bg-black/45 backdrop-blur-md
+              ${
+                darkMode
+                  ? "bg-black/70"
+                  : "bg-black/45"
+              }
+              backdrop-blur-md
               flex items-center justify-center
               p-4 sm:p-6
-            "
+            `}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -2588,33 +2828,46 @@ const ViewProfileModal = ({ student, close }) => {
                 opacity: 0,
                 scale: 0.95,
               }}
-              className="
+              className={`
                 w-full max-w-2xl
                 max-h-[90vh]
-                bg-white/80
+                ${
+                  darkMode
+                    ? "bg-[#0B1712]/95 border-emerald-900/40"
+                    : "bg-white/80 border-white/50"
+                }
                 backdrop-blur-2xl
-                border border-white/50
+                border
                 rounded-[2rem]
                 shadow-2xl
                 overflow-hidden
                 flex flex-col
-              "
+              `}
             >
               <div
-                className="
+                className={`
                   relative overflow-hidden
                   px-6 sm:px-7 py-6
-                  border-b border-white/30
+                  border-b
+                  ${
+                    darkMode
+                      ? "border-emerald-900/30"
+                      : "border-white/30"
+                  }
                   flex-shrink-0
-                "
+                `}
               >
                 <div
-                  className="
+                  className={`
                     absolute -top-20 -right-20
                     w-48 h-48
-                    bg-green-200/30
+                    ${
+                      darkMode
+                        ? "bg-green-500/10"
+                        : "bg-green-200/30"
+                    }
                     rounded-full blur-3xl
-                  "
+                  `}
                 />
 
                 <div
@@ -2629,34 +2882,42 @@ const ViewProfileModal = ({ student, close }) => {
                     "
                   >
                     <div
-                      className="
+                      className={`
                         w-12 h-12 rounded-2xl
-                        bg-green-100
-                        text-green-700
                         flex items-center
                         justify-center
                         flex-shrink-0
-                      "
+                        ${
+                          darkMode
+                            ? "bg-emerald-950/70 text-emerald-300"
+                            : "bg-green-100 text-green-700"
+                        }
+                      `}
                     >
                       <ShieldAlert size={21} />
                     </div>
 
                     <div>
                       <p
-                        className="
+                        className={`
                           text-[10px]
                           uppercase tracking-wider
-                          font-bold text-green-600
-                        "
+                          font-bold
+                          ${
+                            darkMode
+                              ? "text-emerald-300"
+                              : "text-green-600"
+                          }
+                        `}
                       >
                         Incident Record
                       </p>
 
                       <h3
-                        className="
-                          text-xl font-bold
-                          text-gray-900 mt-1
-                        "
+                        className={`
+                          text-xl font-bold mt-1
+                          ${theme.title}
+                        `}
                       >
                         {
                           selectedIncident
@@ -2673,15 +2934,19 @@ const ViewProfileModal = ({ student, close }) => {
                         null,
                       )
                     }
-                    className="
+                    className={`
                       w-10 h-10 rounded-xl
-                      bg-white/60 hover:bg-white
-                      border border-white/40
+                      ${
+                        darkMode
+                          ? "bg-white/5 hover:bg-white/10 border-emerald-900/40 text-slate-400 hover:text-white"
+                          : "bg-white/60 hover:bg-white border-white/40 text-gray-700"
+                      }
+                      border
                       flex items-center
                       justify-center
                       transition
                       flex-shrink-0
-                    "
+                    `}
                   >
                     <X size={18} />
                   </button>
@@ -2701,6 +2966,7 @@ const ViewProfileModal = ({ student, close }) => {
                   "
                 >
                   <DetailBox
+                    darkMode={darkMode}
                     icon={
                       <CalendarDays
                         size={14}
@@ -2713,6 +2979,7 @@ const ViewProfileModal = ({ student, close }) => {
                   />
 
                   <DetailBox
+                    darkMode={darkMode}
                     icon={<Tag size={14} />}
                     label="Category"
                     value={
@@ -2723,6 +2990,7 @@ const ViewProfileModal = ({ student, close }) => {
                   />
 
                   <DetailBox
+                    darkMode={darkMode}
                     icon={
                       <ShieldAlert
                         size={14}
@@ -2738,14 +3006,16 @@ const ViewProfileModal = ({ student, close }) => {
                 </div>
 
                 <DetailSection
+                  darkMode={darkMode}
                   icon={<FileText size={17} />}
                   title="Report Description"
                 >
                   <p
-                    className="
-                      text-sm text-gray-700
+                    className={`
+                      text-sm
                       leading-relaxed
-                    "
+                      ${theme.bodyText}
+                    `}
                   >
                     {selectedIncident.data
                       ?.description ||
@@ -2754,6 +3024,7 @@ const ViewProfileModal = ({ student, close }) => {
                 </DetailSection>
 
                 <DetailSection
+                  darkMode={darkMode}
                   icon={
                     <ClipboardList
                       size={17}
@@ -2762,10 +3033,11 @@ const ViewProfileModal = ({ student, close }) => {
                   title="Disciplinary / Guidance Action"
                 >
                   <p
-                    className="
-                      text-sm text-gray-700
+                    className={`
+                      text-sm
                       leading-relaxed
-                    "
+                      ${theme.bodyText}
+                    `}
                   >
                     {selectedIncident.data
                       ?.action ||
@@ -2776,19 +3048,23 @@ const ViewProfileModal = ({ student, close }) => {
                 {selectedIncident.data
                   ?.status && (
                   <DetailSection
+                    darkMode={darkMode}
                     icon={
                       <Activity size={17} />
                     }
                     title="Current Status"
                   >
                     <span
-                      className="
+                      className={`
                         inline-flex px-3 py-1.5
                         rounded-xl
-                        bg-green-100
-                        text-green-700
                         text-xs font-bold
-                      "
+                        ${
+                          darkMode
+                            ? "bg-emerald-950/70 text-emerald-300 border border-emerald-900/40"
+                            : "bg-green-100 text-green-700"
+                        }
+                      `}
                     >
                       {
                         selectedIncident
@@ -2801,16 +3077,18 @@ const ViewProfileModal = ({ student, close }) => {
                 {selectedIncident.data
                   ?.details && (
                   <DetailSection
+                    darkMode={darkMode}
                     icon={
                       <FileText size={17} />
                     }
                     title="Additional Details"
                   >
                     <p
-                      className="
-                        text-sm text-gray-700
+                      className={`
+                        text-sm
                         leading-relaxed
-                      "
+                        ${theme.bodyText}
+                      `}
                     >
                       {
                         selectedIncident.data
@@ -2823,10 +3101,14 @@ const ViewProfileModal = ({ student, close }) => {
                 {selectedIncident.data
                   ?.reportId && (
                   <div
-                    className="
+                    className={`
                       pt-2 text-[10px]
-                      text-gray-400
-                    "
+                      ${
+                        darkMode
+                          ? "text-slate-500"
+                          : "text-gray-400"
+                      }
+                    `}
                   >
                     Report Reference:{" "}
                     {
@@ -2838,13 +3120,17 @@ const ViewProfileModal = ({ student, close }) => {
               </div>
 
               <div
-                className="
+                className={`
                   px-6 sm:px-7 py-5
-                  border-t border-white/30
-                  bg-white/20
+                  border-t
+                  ${
+                    darkMode
+                      ? "border-emerald-900/30 bg-[#0B1712]/85"
+                      : "border-white/30 bg-white/20"
+                  }
                   flex justify-end
                   flex-shrink-0
-                "
+                `}
               >
                 <button
                   type="button"
@@ -2859,7 +3145,7 @@ const ViewProfileModal = ({ student, close }) => {
                     hover:bg-green-700
                     text-white text-sm
                     font-semibold shadow-md
-                    shadow-green-200
+                    shadow-green-950/30
                     transition
                   "
                 >
@@ -2881,6 +3167,7 @@ const ViewProfileModal = ({ student, close }) => {
 const ResearchReference = ({
   reference,
   expanded = false,
+  darkMode = false,
 }) => {
   if (!reference) return null;
 
@@ -2908,12 +3195,16 @@ const ResearchReference = ({
 
   return (
     <div
-      className="
-        bg-white/60
-        border border-white/30
+      className={`
+        ${
+          darkMode
+            ? "bg-[#0E1C15]/80 border-emerald-900/30"
+            : "bg-white/60 border-white/30"
+        }
+        border
         rounded-2xl
         p-4
-      "
+      `}
     >
       <div
         className="
@@ -2921,37 +3212,48 @@ const ResearchReference = ({
         "
       >
         <div
-          className="
+          className={`
             w-8 h-8 rounded-xl
-            bg-green-100
-            text-green-700
             flex items-center
             justify-center
             flex-shrink-0
-          "
+            ${
+              darkMode
+                ? "bg-emerald-950/70 text-emerald-300"
+                : "bg-green-100 text-green-700"
+            }
+          `}
         >
           <BookOpen size={15} />
         </div>
 
         <div className="min-w-0 flex-1">
           <p
-            className="
+            className={`
               text-xs font-bold
-              text-gray-800
               leading-relaxed
-            "
+              ${
+                darkMode
+                  ? "text-slate-100"
+                  : "text-gray-800"
+              }
+            `}
           >
             {citation}
           </p>
 
           {authors && (
             <p
-              className="
+              className={`
                 text-[11px]
-                text-gray-500
                 mt-1
                 leading-relaxed
-              "
+                ${
+                  darkMode
+                    ? "text-slate-400"
+                    : "text-gray-500"
+                }
+              `}
             >
               {authors}
               {reference.year
@@ -2965,12 +3267,16 @@ const ResearchReference = ({
             reference.issue ||
             reference.pages) && (
             <p
-              className="
+              className={`
                 text-[11px]
-                text-gray-500
                 mt-1
                 leading-relaxed
-              "
+                ${
+                  darkMode
+                    ? "text-slate-400"
+                    : "text-gray-500"
+                }
+              `}
             >
               {reference.journal || ""}
               {reference.volume
@@ -2988,33 +3294,45 @@ const ResearchReference = ({
           {expanded &&
             reference.findings && (
               <div
-                className="
+                className={`
                   mt-3
                   p-3
                   rounded-xl
-                  bg-gray-50/80
-                  border border-gray-100
-                "
+                  border
+                  ${
+                    darkMode
+                      ? "bg-[#14261C] border-emerald-900/40"
+                      : "bg-gray-50/80 border-gray-100"
+                  }
+                `}
               >
                 <p
-                  className="
+                  className={`
                     text-[10px]
                     uppercase
                     tracking-wider
                     font-bold
-                    text-gray-500
-                  "
+                    ${
+                      darkMode
+                        ? "text-slate-400"
+                        : "text-gray-500"
+                    }
+                  `}
                 >
                   Research finding
                 </p>
 
                 <p
-                  className="
+                  className={`
                     text-xs
-                    text-gray-600
                     mt-1
                     leading-relaxed
-                  "
+                    ${
+                      darkMode
+                        ? "text-slate-300"
+                        : "text-gray-600"
+                    }
+                  `}
                 >
                   {reference.findings}
                 </p>
@@ -3030,16 +3348,18 @@ const ResearchReference = ({
           >
             {reference.referenceId && (
               <span
-                className="
+                className={`
                   px-2 py-1
                   rounded-lg
-                  bg-green-50
-                  text-green-700
                   text-[9px]
                   font-bold
                   border
-                  border-green-100
-                "
+                  ${
+                    darkMode
+                      ? "bg-emerald-950/60 text-emerald-300 border-emerald-900/40"
+                      : "bg-green-50 text-green-700 border-green-100"
+                  }
+                `}
               >
                 {reference.referenceId}
               </span>
@@ -3047,14 +3367,17 @@ const ResearchReference = ({
 
             {reference.evidenceLevel && (
               <span
-                className="
+                className={`
                   px-2 py-1
                   rounded-lg
-                  bg-gray-100
-                  text-gray-600
                   text-[9px]
                   font-semibold
-                "
+                  ${
+                    darkMode
+                      ? "bg-white/5 text-slate-400"
+                      : "bg-gray-100 text-gray-600"
+                  }
+                `}
               >
                 {reference.evidenceLevel}
               </span>
@@ -3062,10 +3385,14 @@ const ResearchReference = ({
 
             {doi && (
               <span
-                className="
+                className={`
                   text-[9px]
-                  text-gray-400
-                "
+                  ${
+                    darkMode
+                      ? "text-slate-500"
+                      : "text-gray-400"
+                  }
+                `}
               >
                 DOI: {doi}
               </span>
@@ -3079,15 +3406,18 @@ const ResearchReference = ({
                 onClick={(e) =>
                   e.stopPropagation()
                 }
-                className="
+                className={`
                   inline-flex
                   items-center
                   gap-1
                   text-[10px]
                   font-semibold
-                  text-green-600
-                  hover:text-green-700
-                "
+                  ${
+                    darkMode
+                      ? "text-emerald-300 hover:text-emerald-200"
+                      : "text-green-600 hover:text-green-700"
+                  }
+                `}
               >
                 View source
                 <ExternalLink
@@ -3111,6 +3441,7 @@ const TabButton = ({
   icon,
   label,
   onClick,
+  darkMode = false,
 }) => (
   <button
     type="button"
@@ -3122,8 +3453,10 @@ const TabButton = ({
       transition whitespace-nowrap
       ${
         active
-          ? "bg-green-600 text-white shadow-lg shadow-green-200"
-          : "bg-white/40 text-gray-600 hover:bg-white/70 border border-white/30"
+          ? "bg-green-600 text-white shadow-lg shadow-green-950/30"
+          : darkMode
+            ? "bg-white/5 text-slate-300 hover:bg-white/10 border border-emerald-900/30"
+            : "bg-white/40 text-gray-600 hover:bg-white/70 border border-white/30"
       }
     `}
   >
@@ -3139,16 +3472,21 @@ const TabButton = ({
 const InfoPill = ({
   icon,
   label,
+  darkMode = false,
 }) => (
   <div
-    className="
+    className={`
       flex items-center gap-1.5
       px-3 py-1.5 rounded-xl
-      bg-white/50 backdrop-blur
-      border border-white/40
+      backdrop-blur
+      border
       text-xs font-medium
-      text-gray-600
-    "
+      ${
+        darkMode
+          ? "bg-white/5 border-emerald-900/40 text-slate-300"
+          : "bg-white/50 border-white/40 text-gray-600"
+      }
+    `}
   >
     {icon}
     <span>{label}</span>
@@ -3163,20 +3501,29 @@ const ProfileInfo = ({
   icon,
   label,
   value,
+  darkMode = false,
 }) => (
   <div
-    className="
-      bg-white/45
+    className={`
       backdrop-blur-xl
-      border border-white/30
+      border
       rounded-2xl p-4
-    "
+      ${
+        darkMode
+          ? "bg-[#0E1C15]/80 border-emerald-900/30"
+          : "bg-white/45 border-white/30"
+      }
+    `}
   >
     <div
-      className="
+      className={`
         flex items-center gap-2
-        text-gray-400
-      "
+        ${
+          darkMode
+            ? "text-slate-500"
+            : "text-gray-400"
+        }
+      `}
     >
       {icon}
 
@@ -3193,11 +3540,15 @@ const ProfileInfo = ({
     </div>
 
     <p
-      className="
+      className={`
         text-sm font-semibold
-        text-gray-800 mt-2
-        break-words
-      "
+        mt-2 break-words
+        ${
+          darkMode
+            ? "text-slate-100"
+            : "text-gray-800"
+        }
+      `}
     >
       {value}
     </p>
@@ -3212,19 +3563,28 @@ const DetailBox = ({
   icon,
   label,
   value,
+  darkMode = false,
 }) => (
   <div
-    className="
-      bg-white/50
-      border border-white/40
+    className={`
+      border
       rounded-2xl p-4
-    "
+      ${
+        darkMode
+          ? "bg-[#0E1C15]/80 border-emerald-900/30"
+          : "bg-white/50 border-white/40"
+      }
+    `}
   >
     <div
-      className="
+      className={`
         flex items-center gap-1.5
-        text-gray-400
-      "
+        ${
+          darkMode
+            ? "text-slate-500"
+            : "text-gray-400"
+        }
+      `}
     >
       {icon}
 
@@ -3241,11 +3601,15 @@ const DetailBox = ({
     </div>
 
     <p
-      className="
+      className={`
         text-sm font-semibold
-        text-gray-800 mt-2
-        truncate
-      "
+        mt-2 truncate
+        ${
+          darkMode
+            ? "text-slate-100"
+            : "text-gray-800"
+        }
+      `}
     >
       {value}
     </p>
@@ -3260,14 +3624,19 @@ const DetailSection = ({
   icon,
   title,
   children,
+  darkMode = false,
 }) => (
   <div
-    className="
-      bg-white/55
+    className={`
       backdrop-blur-xl
-      border border-white/40
+      border
       rounded-2xl p-5
-    "
+      ${
+        darkMode
+          ? "bg-[#101F17]/80 border-emerald-900/30"
+          : "bg-white/55 border-white/40"
+      }
+    `}
   >
     <div
       className="
@@ -3276,22 +3645,29 @@ const DetailSection = ({
       "
     >
       <div
-        className="
+        className={`
           w-8 h-8 rounded-xl
-          bg-green-100
-          text-green-700
           flex items-center
           justify-center
-        "
+          ${
+            darkMode
+              ? "bg-emerald-950/70 text-emerald-300"
+              : "bg-green-100 text-green-700"
+          }
+        `}
       >
         {icon}
       </div>
 
       <p
-        className="
+        className={`
           text-sm font-bold
-          text-gray-900
-        "
+          ${
+            darkMode
+              ? "text-slate-100"
+              : "text-gray-900"
+          }
+        `}
       >
         {title}
       </p>
@@ -3309,36 +3685,56 @@ const GlassCard = ({
   title,
   text,
   highlight,
+  darkMode = false,
 }) => (
   <div
     className={`
-      bg-white/45
       backdrop-blur-2xl
       border rounded-3xl
       p-6 shadow-sm
       ${
+        darkMode
+          ? "bg-[#101F17]/80"
+          : "bg-white/45"
+      }
+      ${
         highlight === "yellow"
-          ? "border-yellow-200/60"
+          ? darkMode
+            ? "border-yellow-900/50"
+            : "border-yellow-200/60"
           : highlight === "red"
-            ? "border-red-200/60"
-            : "border-white/30"
+            ? darkMode
+              ? "border-red-900/50"
+              : "border-red-200/60"
+            : darkMode
+              ? "border-emerald-900/30"
+              : "border-white/30"
       }
     `}
   >
     <p
-      className="
+      className={`
         text-sm font-bold
-        text-gray-900
-      "
+        ${
+          darkMode
+            ? "text-slate-100"
+            : "text-gray-900"
+        }
+      `}
     >
       {title}
     </p>
 
     <p
-      className="
-        text-sm text-gray-600
+      className={`
+        text-sm
         mt-3 leading-relaxed
-      "
+        ${
+          darkMode
+            ? "text-slate-300"
+            : "text-gray-600"
+        }
+      `}
     >
       {text}
     </p>

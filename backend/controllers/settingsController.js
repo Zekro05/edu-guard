@@ -1,4 +1,6 @@
 import User from "../models/userModel.js";
+import Student from "../models/studentModel.js";
+import Teacher from "../models/teacherModel.js";
 
 /* =========================================================
    DEFAULT NOTIFICATION SETTINGS
@@ -671,6 +673,299 @@ export const updateSecuritySettings = async (
 
       message:
         "Failed to update security settings",
+    });
+  }
+};
+
+/* =========================================================
+   PROFILE
+   WEB STUDENT / TEACHER SUPPORT
+========================================================= */
+
+/*
+  GET PROFILE
+
+  Used by:
+  - Web Student Settings
+  - Web Teacher Settings
+  - Mobile Student Settings
+  - Mobile Teacher Settings
+
+  Profile information is read-only from the frontend.
+  Only the phone number has a separate update endpoint.
+*/
+
+export const getProfile = async (req, res) => {
+  try {
+    console.log("========================================");
+    console.log("👤 GET PROFILE");
+    console.log("User ID:", req.userId);
+    console.log("========================================");
+
+    const user = await User.findById(req.userId)
+      .select(
+        "_id firstName middleName lastName name email role studentId employeeId profilePhoto isVerified lastLogin"
+      )
+      .lean();
+
+    if (!user) {
+      console.log("❌ USER NOT FOUND");
+
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    let linkedProfile = null;
+    let phone = "";
+    let profilePhoto = user.profilePhoto || "";
+
+    /* =====================================================
+       STUDENT
+    ===================================================== */
+
+    if (user.role === "student") {
+      linkedProfile = await Student.findOne({
+        studentId: user.studentId,
+      })
+        .select(
+          "_id studentId firstName middleName lastName email phone grade section gender age profilePhoto"
+        )
+        .lean();
+
+      if (linkedProfile) {
+        phone = linkedProfile.phone || "";
+
+        if (linkedProfile.profilePhoto) {
+          profilePhoto = linkedProfile.profilePhoto;
+        }
+      }
+    }
+
+    /* =====================================================
+       TEACHER
+    ===================================================== */
+
+    if (user.role === "teacher") {
+      linkedProfile = await Teacher.findOne({
+        employeeId: user.employeeId,
+      })
+        .select(
+          "_id employeeId firstName middleName lastName email phone department gender profilePhoto"
+        )
+        .lean();
+
+      if (linkedProfile) {
+        phone = linkedProfile.phone || "";
+
+        if (linkedProfile.profilePhoto) {
+          profilePhoto = linkedProfile.profilePhoto;
+        }
+      }
+    }
+
+    /* =====================================================
+       PROFILE RESPONSE
+    ===================================================== */
+
+    const fullName =
+      user.name ||
+      [
+        user.firstName,
+        user.middleName,
+        user.lastName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+
+    console.log("✅ PROFILE LOADED");
+
+    return res.status(200).json({
+      success: true,
+
+      profile: {
+        id: user._id,
+
+        firstName: user.firstName || "",
+        middleName: user.middleName || "",
+        lastName: user.lastName || "",
+
+        name: fullName,
+
+        email: user.email || "",
+        role: user.role || "",
+
+        studentId: user.studentId || "",
+        employeeId: user.employeeId || "",
+
+        phone,
+
+        profilePhoto,
+
+        isVerified: user.isVerified || false,
+        lastLogin: user.lastLogin || null,
+
+        linkedProfile,
+      },
+    });
+  } catch (error) {
+    console.error("========================================");
+    console.error("❌ GET PROFILE ERROR");
+    console.error(error);
+    console.error("========================================");
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load profile",
+    });
+  }
+};
+
+
+/* =========================================================
+   UPDATE PROFILE PHONE
+   ONLY PHONE NUMBER IS EDITABLE
+========================================================= */
+
+export const updateProfilePhone = async (req, res) => {
+  try {
+    console.log("========================================");
+    console.log("📱 UPDATE PROFILE PHONE");
+    console.log("User ID:", req.userId);
+    console.log("========================================");
+
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      console.log("❌ USER NOT FOUND");
+
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const { phone } = req.body;
+
+    if (phone === undefined || phone === null) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number is required",
+      });
+    }
+
+    const normalizedPhone = String(phone).trim();
+
+    /* =====================================================
+       VALIDATION
+    ===================================================== */
+
+    if (normalizedPhone.length > 30) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number is too long",
+      });
+    }
+
+    if (
+      normalizedPhone &&
+      !/^[0-9+\-\s()]+$/.test(normalizedPhone)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid phone number format",
+      });
+    }
+
+    /* =====================================================
+       STUDENT
+    ===================================================== */
+
+    if (user.role === "student") {
+      const student = await Student.findOne({
+        studentId: user.studentId,
+      });
+
+      if (!student) {
+        console.log("❌ STUDENT PROFILE NOT FOUND");
+
+        return res.status(404).json({
+          success: false,
+          message: "Student profile not found",
+        });
+      }
+
+      student.phone = normalizedPhone;
+
+      await student.save();
+
+      console.log("✅ STUDENT PHONE UPDATED");
+
+      return res.status(200).json({
+        success: true,
+        message: "Phone number updated successfully",
+        phone: student.phone || "",
+      });
+    }
+
+    /* =====================================================
+       TEACHER
+    ===================================================== */
+
+    if (user.role === "teacher") {
+      const teacher = await Teacher.findOne({
+        employeeId: user.employeeId,
+      });
+
+      if (!teacher) {
+        console.log("❌ TEACHER PROFILE NOT FOUND");
+
+        return res.status(404).json({
+          success: false,
+          message: "Teacher profile not found",
+        });
+      }
+
+      teacher.phone = normalizedPhone;
+
+      await teacher.save();
+
+      console.log("✅ TEACHER PHONE UPDATED");
+
+      return res.status(200).json({
+        success: true,
+        message: "Phone number updated successfully",
+        phone: teacher.phone || "",
+      });
+    }
+
+    /* =====================================================
+       FALLBACK
+       For users that don't have a Student/Teacher profile
+    ===================================================== */
+
+    user.phone = normalizedPhone;
+
+    await user.save();
+
+    console.log("✅ USER PHONE UPDATED");
+
+    return res.status(200).json({
+      success: true,
+      message: "Phone number updated successfully",
+      phone: user.phone || "",
+    });
+  } catch (error) {
+    console.error("========================================");
+    console.error("❌ UPDATE PROFILE PHONE ERROR");
+    console.error(error);
+    console.error("========================================");
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update phone number",
     });
   }
 };

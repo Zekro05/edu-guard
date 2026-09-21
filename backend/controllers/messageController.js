@@ -465,6 +465,53 @@ export const getMessages = async (req, res) => {
   }
 };
 
+export const markMessagesAsSeen = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { userId } = req.body;
+
+    if (!chatId || !userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Chat ID and user ID are required.",
+      });
+    }
+
+    const result = await Message.updateMany(
+      {
+        chatId,
+        receiver: String(userId),
+        seen: false,
+      },
+      {
+        $set: {
+          seen: true,
+        },
+      }
+    );
+
+    console.log(
+      `👁️ Messages marked as seen in ${chatId}:`,
+      result.modifiedCount
+    );
+
+    return res.json({
+      success: true,
+      markedAsSeen: result.modifiedCount,
+    });
+  } catch (err) {
+    console.error(
+      "❌ MARK MESSAGES AS SEEN ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
 /* =========================================================
    GET CONVERSATIONS
 ========================================================= */

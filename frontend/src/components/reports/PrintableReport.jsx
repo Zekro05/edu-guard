@@ -357,7 +357,7 @@ const getReportDate = (report) => {
    COMPONENT
 ========================================================= */
 
-const PrintableReport = ({ onClose }) => {
+const PrintableReport = ({ onClose, darkMode = false }) => {
   const { user } = useAuthStore();
 
   /* =======================================================
@@ -1757,6 +1757,137 @@ const PrintableReport = ({ onClose }) => {
 
       <style>
         {`
+          /* =====================================================
+             DARK MODE - SCREEN ONLY
+             The report modal has its own theme root so it remains
+             correct even when rendered outside ReportPage.
+          ===================================================== */
+          @media screen {
+            .printable-report-dark {
+              background-color: #0f1714 !important;
+              color: #e5e7eb !important;
+              border-color: #263a30 !important;
+            }
+
+            .printable-report-dark .print-controls {
+              background-color: #17211f !important;
+              border-color: #263a30 !important;
+            }
+
+            .printable-report-dark .printable-document {
+              background-color: #0f1714 !important;
+              color: #e5e7eb !important;
+            }
+
+            .printable-report-dark .bg-white {
+              background-color: #111918 !important;
+            }
+
+            .printable-report-dark .bg-gray-50,
+            .printable-report-dark .bg-gray-50\/70 {
+              background-color: #17211f !important;
+            }
+
+            .printable-report-dark .bg-gray-100 {
+              background-color: #202b29 !important;
+            }
+
+            .printable-report-dark .bg-green-50 {
+              background-color: #123322 !important;
+            }
+
+            .printable-report-dark .bg-red-50 {
+              background-color: #351919 !important;
+            }
+
+            .printable-report-dark .text-gray-900,
+            .printable-report-dark .text-gray-800,
+            .printable-report-dark .text-gray-700 {
+              color: #e5e7eb !important;
+            }
+
+            .printable-report-dark .text-gray-600,
+            .printable-report-dark .text-gray-500,
+            .printable-report-dark .text-gray-400 {
+              color: #94a3b8 !important;
+            }
+
+            .printable-report-dark .border-gray-100,
+            .printable-report-dark .border-gray-200 {
+              border-color: #263a30 !important;
+            }
+
+            .printable-report-dark .border-green-100,
+            .printable-report-dark .border-green-200 {
+              border-color: #24543a !important;
+            }
+
+            .printable-report-dark .border-red-100 {
+              border-color: #5a2929 !important;
+            }
+
+            .printable-report-dark button.bg-white,
+            .printable-report-dark select.bg-white,
+            .printable-report-dark input.bg-white {
+              background-color: #111918 !important;
+              color: #dbe5df !important;
+              border-color: #31463b !important;
+            }
+
+            .printable-report-dark button.bg-white:hover {
+              background-color: #173224 !important;
+              border-color: #2f7048 !important;
+              color: #86efac !important;
+            }
+
+            .printable-report-dark select,
+            .printable-report-dark input[type="date"] {
+              color-scheme: dark !important;
+            }
+
+            .printable-report-dark select option {
+              background-color: #111918 !important;
+              color: #e5e7eb !important;
+            }
+
+            .printable-report-dark .printable-document .bg-gray-50\/70 {
+              background-color: #17211f !important;
+            }
+
+            .printable-report-dark .print-summary-card,
+            .printable-report-dark .printable-document > div.rounded-2xl {
+              background-color: #111918 !important;
+              border-color: #263a30 !important;
+            }
+
+            .printable-report-dark .printable-document table {
+              color: #dbe5df !important;
+            }
+
+            .printable-report-dark .printable-document thead tr {
+              background-color: #123322 !important;
+            }
+
+            .printable-report-dark .printable-document tbody tr:hover {
+              background-color: #17211f !important;
+            }
+
+            .printable-report-dark .printable-document td,
+            .printable-report-dark .printable-document th {
+              border-color: #263a30 !important;
+            }
+
+            .printable-report-dark .printable-document .text-green-700,
+            .printable-report-dark .printable-document .text-green-600 {
+              color: #86efac !important;
+            }
+
+            .printable-report-dark .printable-document .text-red-700,
+            .printable-report-dark .printable-document .text-red-600 {
+              color: #fca5a5 !important;
+            }
+          }
+
           @media print {
             body {
               background: white !important;
@@ -1843,8 +1974,9 @@ const PrintableReport = ({ onClose }) => {
         "
       >
         <div
-          className="
+          className={`
             printable-report
+            ${darkMode ? "printable-report-dark" : ""}
             bg-white
             w-full
             max-w-6xl
@@ -1854,7 +1986,7 @@ const PrintableReport = ({ onClose }) => {
             shadow-2xl
             flex
             flex-col
-          "
+          `}
         >
           {/* =================================================
               HEADER

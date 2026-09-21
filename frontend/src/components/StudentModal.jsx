@@ -21,6 +21,55 @@ import {
 } from "lucide-react";
 
 const StudentModal = ({ close, refresh, student, isEditing }) => {
+  /* =========================================================
+     DARK MODE
+  ========================================================= */
+
+  const [darkMode, setDarkMode] = useState(() => {
+    try {
+      return localStorage.getItem("guided-theme") === "dark";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    const handleStorage = (event) => {
+      if (event.key === "guided-theme") {
+        setDarkMode(event.newValue === "dark");
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  /*
+    This allows the modal to respond when the dashboard changes
+    the theme while the modal is open in the same tab/window.
+  */
+  useEffect(() => {
+    const checkTheme = () => {
+      try {
+        const savedTheme = localStorage.getItem("guided-theme");
+        setDarkMode(savedTheme === "dark");
+      } catch {
+        // Ignore localStorage errors
+      }
+    };
+
+    const interval = setInterval(checkTheme, 500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  /* =========================================================
+     FORM
+  ========================================================= */
+
   const [form, setForm] = useState({
     firstName: "",
     middleName: "",
@@ -41,7 +90,9 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
 
   const fileRef = useRef(null);
 
-  /* ================= LOAD STUDENT ================= */
+  /* =========================================================
+     LOAD STUDENT
+  ========================================================= */
 
   useEffect(() => {
     if (isEditing && student) {
@@ -81,7 +132,9 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
     }
   }, [isEditing, student]);
 
-  /* ================= INPUT ================= */
+  /* =========================================================
+     INPUT
+  ========================================================= */
 
   const handleChange = (e) => {
     setForm((prev) => ({
@@ -90,7 +143,9 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
     }));
   };
 
-  /* ================= PHOTO ================= */
+  /* =========================================================
+     PHOTO
+  ========================================================= */
 
   const handlePhotoChange = (e) => {
     const file = e.target.files?.[0];
@@ -105,7 +160,9 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
     setPhotoPreview(URL.createObjectURL(file));
   };
 
-  /* ================= SUBMIT ================= */
+  /* =========================================================
+     SUBMIT
+  ========================================================= */
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -157,7 +214,9 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
     }
   };
 
-  /* ================= DISPLAY ================= */
+  /* =========================================================
+     DISPLAY
+  ========================================================= */
 
   const fullName = `${form.firstName} ${form.middleName} ${form.lastName}`
     .replace(/\s+/g, " ")
@@ -166,13 +225,18 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
   return (
     <AnimatePresence>
       <motion.div
-        className="
+        className={`
           fixed inset-0 z-50
-          bg-slate-950/45
-          backdrop-blur-md
           flex items-center justify-center
           p-4 sm:p-6
-        "
+          backdrop-blur-md
+          transition-colors duration-300
+          ${
+            darkMode
+              ? "bg-black/70"
+              : "bg-slate-950/45"
+          }
+        `}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -198,85 +262,132 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
             duration: 0.22,
             ease: "easeOut",
           }}
-          className="
+          className={`
             relative
             w-full
             max-w-5xl
             max-h-[92vh]
             overflow-hidden
             rounded-[28px]
-            bg-white/90
             backdrop-blur-2xl
-            border border-white/70
-            shadow-[0_25px_80px_rgba(0,0,0,0.18)]
-          "
+            border
+            shadow-[0_25px_80px_rgba(0,0,0,0.25)]
+            transition-colors duration-300
+            ${
+              darkMode
+                ? "bg-[#0B1712] border-emerald-900/40 shadow-[0_25px_80px_rgba(0,0,0,0.55)]"
+                : "bg-white/95 border-white/70"
+            }
+          `}
         >
-          {/* ================= HEADER ================= */}
+          {/* =====================================================
+             HEADER
+          ===================================================== */}
 
           <div
-            className="
+            className={`
               relative
               px-6 sm:px-8
               py-6
-              border-b border-slate-200/70
+              border-b
               bg-gradient-to-r
-              from-green-50/90
-              via-white/80
-              to-white/60
-            "
+              transition-colors duration-300
+              ${
+                darkMode
+                  ? "border-emerald-900/30 from-[#0E291A]/90 via-[#0B1712]/95 to-[#0B1712]/80"
+                  : "border-slate-200/70 from-green-50/90 via-white/80 to-white/60"
+              }
+            `}
           >
             {/* Decorative glow */}
 
             <div
-              className="
+              className={`
                 absolute
                 -top-20
                 -right-20
                 w-48
                 h-48
                 rounded-full
-                bg-green-200/30
                 blur-3xl
                 pointer-events-none
-              "
+                ${
+                  darkMode
+                    ? "bg-emerald-500/10"
+                    : "bg-green-200/30"
+                }
+              `}
             />
 
             <div className="relative flex items-center justify-between">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 min-w-0">
                 <div
-                  className="
+                  className={`
                     w-12 h-12
                     rounded-2xl
-                    bg-green-100
-                    border border-green-200/70
+                    border
                     flex items-center justify-center
-                    text-green-700
+                    flex-shrink-0
                     shadow-sm
-                  "
+                    ${
+                      darkMode
+                        ? "bg-emerald-950/60 border-emerald-800/50 text-emerald-300"
+                        : "bg-green-100 border-green-200/70 text-green-700"
+                    }
+                  `}
                 >
-                  {isEditing ? <UserRound size={22} /> : <Plus size={22} />}
+                  {isEditing ? (
+                    <UserRound size={22} />
+                  ) : (
+                    <Plus size={22} />
+                  )}
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <p
-                    className="
+                    className={`
                       text-[10px]
                       uppercase
                       tracking-[0.16em]
                       font-semibold
-                      text-green-700/70
-                    "
+                      ${
+                        darkMode
+                          ? "text-emerald-400/80"
+                          : "text-green-700/70"
+                      }
+                    `}
                   >
                     Student Management
                   </p>
 
-                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                  <h2
+                    className={`
+                      text-xl sm:text-2xl
+                      font-bold
+                      tracking-tight
+                      ${
+                        darkMode
+                          ? "text-white"
+                          : "text-slate-900"
+                      }
+                    `}
+                  >
                     {isEditing
                       ? "Edit Student Profile"
                       : "Create Student Profile"}
                   </h2>
 
-                  <p className="text-sm text-slate-500 mt-0.5">
+                  <p
+                    className={`
+                      text-sm
+                      mt-0.5
+                      ${
+                        darkMode
+                          ? "text-slate-400"
+                          : "text-slate-500"
+                      }
+                    `}
+                  >
                     {isEditing
                       ? "Update the student's information and profile."
                       : "Add a new student to the school database."}
@@ -287,57 +398,82 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
               <button
                 type="button"
                 onClick={close}
-                className="
+                aria-label="Close student modal"
+                className={`
                   w-10 h-10
                   rounded-xl
                   flex items-center justify-center
-                  text-slate-500
-                  hover:text-slate-800
-                  hover:bg-white
-                  border border-transparent
-                  hover:border-slate-200
+                  border
                   transition
-                "
+                  flex-shrink-0
+                  ${
+                    darkMode
+                      ? "text-slate-400 border-transparent hover:text-white hover:bg-white/10 hover:border-emerald-900/40"
+                      : "text-slate-500 border-transparent hover:text-slate-800 hover:bg-white hover:border-slate-200"
+                  }
+                `}
               >
                 <X size={19} />
               </button>
             </div>
           </div>
 
-          {/* ================= BODY ================= */}
+          {/* =====================================================
+             BODY
+          ===================================================== */}
 
-          <div className="overflow-y-auto max-h-[calc(92vh-150px)]">
+          <div
+            className={`
+              overflow-y-auto
+              max-h-[calc(92vh-150px)]
+              transition-colors duration-300
+              ${
+                darkMode
+                  ? "bg-[#0B1712]"
+                  : "bg-transparent"
+              }
+            `}
+          >
             <div className="p-6 sm:p-8 space-y-8">
-              {/* ================= PROFILE PREVIEW ================= */}
+              {/* =================================================
+                 PROFILE PREVIEW
+              ================================================= */}
 
               <div
-                className="
+                className={`
                   flex flex-col sm:flex-row
                   items-center sm:items-center
                   gap-5
                   p-5
                   rounded-3xl
-                  bg-white/70
-                  border border-slate-200/70
+                  border
                   shadow-sm
-                "
+                  transition-colors duration-300
+                  ${
+                    darkMode
+                      ? "bg-[#101F17] border-emerald-900/30"
+                      : "bg-white/70 border-slate-200/70"
+                  }
+                `}
               >
                 {/* PHOTO */}
 
                 <div className="relative">
                   <div
-                    className="
+                    className={`
                       w-24 h-24
                       rounded-[26px]
                       overflow-hidden
                       bg-gradient-to-br
-                      from-green-50
-                      to-green-100
                       border
-                      border-green-200/70
                       flex items-center justify-center
                       shadow-sm
-                    "
+                      ${
+                        darkMode
+                          ? "from-emerald-950/70 to-[#163522] border-emerald-800/50"
+                          : "from-green-50 to-green-100 border-green-200/70"
+                      }
+                    `}
                   >
                     {photoPreview ? (
                       <img
@@ -346,7 +482,14 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <User size={34} className="text-green-600" />
+                      <User
+                        size={34}
+                        className={
+                          darkMode
+                            ? "text-emerald-400"
+                            : "text-green-600"
+                        }
+                      />
                     )}
                   </div>
 
@@ -374,15 +517,49 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                 {/* PROFILE TEXT */}
 
                 <div className="flex-1 text-center sm:text-left min-w-0">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">
+                  <p
+                    className={`
+                      text-[10px]
+                      uppercase
+                      tracking-wider
+                      font-semibold
+                      ${
+                        darkMode
+                          ? "text-slate-500"
+                          : "text-slate-400"
+                      }
+                    `}
+                  >
                     Profile Preview
                   </p>
 
-                  <h3 className="text-lg font-bold text-slate-900 truncate mt-1">
+                  <h3
+                    className={`
+                      text-lg
+                      font-bold
+                      truncate
+                      mt-1
+                      ${
+                        darkMode
+                          ? "text-white"
+                          : "text-slate-900"
+                      }
+                    `}
+                  >
                     {fullName || "Student Name"}
                   </h3>
 
-                  <p className="text-sm text-slate-500 mt-1">
+                  <p
+                    className={`
+                      text-sm
+                      mt-1
+                      ${
+                        darkMode
+                          ? "text-slate-400"
+                          : "text-slate-500"
+                      }
+                    `}
+                  >
                     {form.studentId || "Student ID"}{" "}
                     {form.grade && `• ${form.grade}`}
                   </p>
@@ -390,19 +567,25 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    className="
+                    className={`
                       mt-3
                       inline-flex
                       items-center
                       gap-2
                       text-xs
                       font-semibold
-                      text-green-700
-                      hover:text-green-800
-                    "
+                      transition
+                      ${
+                        darkMode
+                          ? "text-emerald-400 hover:text-emerald-300"
+                          : "text-green-700 hover:text-green-800"
+                      }
+                    `}
                   >
                     <Upload size={13} />
-                    {photoPreview ? "Change photo" : "Upload photo"}
+                    {photoPreview
+                      ? "Change photo"
+                      : "Upload photo"}
                   </button>
 
                   <input
@@ -416,19 +599,25 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
 
                 {/* RISK PREVIEW */}
 
-                <RiskPreview level={form.riskLevel} />
+                <RiskPreview
+                  level={form.riskLevel}
+                  darkMode={darkMode}
+                />
               </div>
 
-              {/* ================= FORM GRID ================= */}
+              {/* =================================================
+                 FORM GRID
+              ================================================= */}
 
               <div className="grid lg:grid-cols-2 gap-8">
-                {/* ================= LEFT ================= */}
+                {/* LEFT */}
 
                 <div className="space-y-6">
                   <Section
                     icon={<UserRound size={16} />}
                     title="Personal Information"
                     description="Basic identity details"
+                    darkMode={darkMode}
                   />
 
                   <div className="grid sm:grid-cols-2 gap-4">
@@ -438,6 +627,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                       required
                       form={form}
                       onChange={handleChange}
+                      darkMode={darkMode}
                     />
 
                     <Input
@@ -445,6 +635,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                       label="Middle Name"
                       form={form}
                       onChange={handleChange}
+                      darkMode={darkMode}
                     />
                   </div>
 
@@ -454,6 +645,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     required
                     form={form}
                     onChange={handleChange}
+                    darkMode={darkMode}
                   />
 
                   <Select
@@ -463,6 +655,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     options={["Male", "Female"]}
                     label="Gender"
                     placeholder="Select gender"
+                    darkMode={darkMode}
                   />
 
                   {/* ACADEMIC */}
@@ -471,6 +664,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     icon={<GraduationCap size={16} />}
                     title="Academic Information"
                     description="School and enrollment details"
+                    darkMode={darkMode}
                   />
 
                   <div className="grid sm:grid-cols-2 gap-4">
@@ -480,6 +674,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                       required
                       form={form}
                       onChange={handleChange}
+                      darkMode={darkMode}
                     />
 
                     <Select
@@ -500,11 +695,12 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                       ]}
                       label="Grade Level"
                       placeholder="Select grade level"
+                      darkMode={darkMode}
                     />
                   </div>
                 </div>
 
-                {/* ================= RIGHT ================= */}
+                {/* RIGHT */}
 
                 <div className="space-y-6">
                   {/* CONTACT */}
@@ -513,6 +709,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     icon={<Mail size={16} />}
                     title="Contact Information"
                     description="Student contact details"
+                    darkMode={darkMode}
                   />
 
                   <Input
@@ -522,6 +719,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     form={form}
                     onChange={handleChange}
                     icon={<Mail size={15} />}
+                    darkMode={darkMode}
                   />
 
                   <Input
@@ -531,6 +729,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     form={form}
                     onChange={handleChange}
                     icon={<Phone size={15} />}
+                    darkMode={darkMode}
                   />
 
                   {/* CLASSIFICATION */}
@@ -539,6 +738,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     icon={<ShieldCheck size={16} />}
                     title="Risk Classification"
                     description="Behavioral monitoring level"
+                    darkMode={darkMode}
                   />
 
                   <RiskSelector
@@ -549,17 +749,21 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                         riskLevel: value,
                       }))
                     }
+                    darkMode={darkMode}
                   />
                 </div>
               </div>
 
-              {/* ================= NOTES ================= */}
+              {/* =================================================
+                 NOTES
+              ================================================= */}
 
               <div className="space-y-4">
                 <Section
                   icon={<FileText size={16} />}
                   title="Guidance Notes"
                   description="Optional behavioral observations or remarks"
+                  darkMode={darkMode}
                 />
 
                 <div className="relative">
@@ -568,27 +772,38 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     value={form.notes}
                     onChange={handleChange}
                     placeholder="Add behavioral notes, guidance remarks, observations, or other relevant information..."
-                    className="
+                    className={`
                       w-full
                       min-h-[130px]
                       resize-none
                       px-4
                       py-3.5
                       rounded-2xl
-                      bg-white/80
-                      border border-slate-200
+                      border
                       text-sm
-                      text-slate-800
-                      placeholder:text-slate-400
                       outline-none
                       transition
-                      focus:border-green-400
-                      focus:ring-4
-                      focus:ring-green-100
-                    "
+                      ${
+                        darkMode
+                          ? "bg-[#101F17] border-emerald-900/30 text-slate-200 placeholder:text-slate-600 hover:border-emerald-800/50 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                          : "bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 hover:border-slate-300 focus:border-green-400 focus:ring-4 focus:ring-green-100"
+                      }
+                    `}
                   />
 
-                  <span className="absolute bottom-3 right-3 text-[10px] text-slate-400">
+                  <span
+                    className={`
+                      absolute
+                      bottom-3
+                      right-3
+                      text-[10px]
+                      ${
+                        darkMode
+                          ? "text-slate-600"
+                          : "text-slate-400"
+                      }
+                    `}
+                  >
                     Optional
                   </span>
                 </div>
@@ -596,23 +811,40 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
             </div>
           </div>
 
-          {/* ================= FOOTER ================= */}
+          {/* =====================================================
+             FOOTER
+          ===================================================== */}
 
           <div
-            className="
+            className={`
               px-6 sm:px-8
               py-4
-              border-t border-slate-200/70
-              bg-white/70
+              border-t
               backdrop-blur-xl
               flex
               flex-col-reverse sm:flex-row
               justify-between
               items-center
               gap-3
-            "
+              transition-colors duration-300
+              ${
+                darkMode
+                  ? "border-emerald-900/30 bg-[#0D1A14]/95"
+                  : "border-slate-200/70 bg-white/70"
+              }
+            `}
           >
-            <p className="text-xs text-slate-400 hidden sm:block">
+            <p
+              className={`
+                text-xs
+                hidden sm:block
+                ${
+                  darkMode
+                    ? "text-slate-500"
+                    : "text-slate-400"
+                }
+              `}
+            >
               {isEditing
                 ? "Changes will be saved to the student record."
                 : "Make sure the student information is accurate before saving."}
@@ -623,20 +855,22 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                 type="button"
                 onClick={close}
                 disabled={saving}
-                className="
+                className={`
                   flex-1 sm:flex-none
                   px-5
                   py-2.5
                   rounded-xl
-                  bg-white
-                  border border-slate-200
-                  text-slate-600
+                  border
                   text-sm
                   font-medium
-                  hover:bg-slate-50
                   transition
                   disabled:opacity-50
-                "
+                  ${
+                    darkMode
+                      ? "bg-[#14231B] border-emerald-900/40 text-slate-300 hover:bg-[#1A2D22] hover:text-white"
+                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }
+                `}
               >
                 Cancel
               </button>
@@ -658,7 +892,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                   text-sm
                   font-semibold
                   shadow-lg
-                  shadow-green-200/60
+                  shadow-green-900/20
                   transition
                   flex items-center justify-center gap-2
                   disabled:opacity-60
@@ -703,26 +937,58 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
    SECTION
 ========================================================= */
 
-const Section = ({ icon, title, description }) => (
+const Section = ({
+  icon,
+  title,
+  description,
+  darkMode,
+}) => (
   <div className="flex items-start gap-3">
     <div
-      className="
+      className={`
         w-9 h-9
         rounded-xl
-        bg-green-50
-        border border-green-100
-        text-green-700
+        border
         flex items-center justify-center
         flex-shrink-0
-      "
+        ${
+          darkMode
+            ? "bg-emerald-950/50 border-emerald-900/40 text-emerald-400"
+            : "bg-green-50 border-green-100 text-green-700"
+        }
+      `}
     >
       {icon}
     </div>
 
     <div>
-      <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+      <h3
+        className={`
+          text-sm
+          font-bold
+          ${
+            darkMode
+              ? "text-slate-100"
+              : "text-slate-900"
+          }
+        `}
+      >
+        {title}
+      </h3>
 
-      <p className="text-xs text-slate-400 mt-0.5">{description}</p>
+      <p
+        className={`
+          text-xs
+          mt-0.5
+          ${
+            darkMode
+              ? "text-slate-500"
+              : "text-slate-400"
+          }
+        `}
+      >
+        {description}
+      </p>
     </div>
   </div>
 );
@@ -739,17 +1005,46 @@ const Input = ({
   required = false,
   type = "text",
   icon,
+  darkMode,
 }) => (
   <div>
-    <label className="flex items-center gap-1 text-xs font-semibold text-slate-600 mb-1.5">
+    <label
+      className={`
+        flex
+        items-center
+        gap-1
+        text-xs
+        font-semibold
+        mb-1.5
+        ${
+          darkMode
+            ? "text-slate-300"
+            : "text-slate-600"
+        }
+      `}
+    >
       {label}
 
-      {required && <span className="text-red-400">*</span>}
+      {required && (
+        <span className="text-red-400">*</span>
+      )}
     </label>
 
     <div className="relative">
       {icon && (
-        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+        <div
+          className={`
+            absolute
+            left-3.5
+            top-1/2
+            -translate-y-1/2
+            ${
+              darkMode
+                ? "text-slate-500"
+                : "text-slate-400"
+            }
+          `}
+        >
           {icon}
         </div>
       )}
@@ -766,17 +1061,15 @@ const Input = ({
           py-3
           ${icon ? "pl-10" : ""}
           rounded-xl
-          bg-white/80
-          border border-slate-200
+          border
           text-sm
-          text-slate-800
-          placeholder:text-slate-400
           outline-none
           transition
-          hover:border-slate-300
-          focus:border-green-400
-          focus:ring-4
-          focus:ring-green-100
+          ${
+            darkMode
+              ? "bg-[#101F17] border-emerald-900/30 text-slate-200 placeholder:text-slate-600 hover:border-emerald-800/50 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+              : "bg-white/80 border-slate-200 text-slate-800 placeholder:text-slate-400 hover:border-slate-300 focus:border-green-400 focus:ring-4 focus:ring-green-100"
+          }
         `}
       />
     </div>
@@ -787,9 +1080,29 @@ const Input = ({
    SELECT
 ========================================================= */
 
-const Select = ({ name, value, onChange, options, label, placeholder }) => (
+const Select = ({
+  name,
+  value,
+  onChange,
+  options,
+  label,
+  placeholder,
+  darkMode,
+}) => (
   <div>
-    <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+    <label
+      className={`
+        block
+        text-xs
+        font-semibold
+        mb-1.5
+        ${
+          darkMode
+            ? "text-slate-300"
+            : "text-slate-600"
+        }
+      `}
+    >
       {label}
     </label>
 
@@ -797,22 +1110,21 @@ const Select = ({ name, value, onChange, options, label, placeholder }) => (
       name={name}
       value={value}
       onChange={onChange}
-      className="
+      className={`
         w-full
         px-4
         py-3
         rounded-xl
-        bg-white/80
-        border border-slate-200
+        border
         text-sm
-        text-slate-800
         outline-none
         transition
-        hover:border-slate-300
-        focus:border-green-400
-        focus:ring-4
-        focus:ring-green-100
-      "
+        ${
+          darkMode
+            ? "bg-[#101F17] border-emerald-900/30 text-slate-200 hover:border-emerald-800/50 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+            : "bg-white/80 border-slate-200 text-slate-800 hover:border-slate-300 focus:border-green-400 focus:ring-4 focus:ring-green-100"
+        }
+      `}
     >
       {placeholder && (
         <option value="" disabled>
@@ -833,30 +1145,41 @@ const Select = ({ name, value, onChange, options, label, placeholder }) => (
    RISK SELECTOR
 ========================================================= */
 
-const RiskSelector = ({ value, onChange }) => {
+const RiskSelector = ({
+  value,
+  onChange,
+  darkMode,
+}) => {
   const risks = [
     {
       value: "Low",
       label: "Low Risk",
       description: "No immediate concerns",
       icon: <Check size={16} />,
-      classes:
+      light:
         "border-green-300 bg-green-50 text-green-700 ring-2 ring-green-100",
+      dark:
+        "border-green-700/60 bg-green-950/40 text-green-300 ring-2 ring-green-900/30",
     },
     {
       value: "Medium",
       label: "Medium Risk",
       description: "Requires monitoring",
       icon: <AlertTriangle size={16} />,
-      classes:
+      light:
         "border-orange-300 bg-orange-50 text-orange-700 ring-2 ring-orange-100",
+      dark:
+        "border-orange-700/60 bg-orange-950/30 text-orange-300 ring-2 ring-orange-900/30",
     },
     {
       value: "High",
       label: "High Risk",
       description: "Needs attention",
       icon: <AlertCircle size={16} />,
-      classes: "border-red-300 bg-red-50 text-red-700 ring-2 ring-red-100",
+      light:
+        "border-red-300 bg-red-50 text-red-700 ring-2 ring-red-100",
+      dark:
+        "border-red-700/60 bg-red-950/30 text-red-300 ring-2 ring-red-900/30",
     },
   ];
 
@@ -882,8 +1205,12 @@ const RiskSelector = ({ value, onChange }) => {
               gap-3
               ${
                 active
-                  ? risk.classes
-                  : "border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300"
+                  ? darkMode
+                    ? risk.dark
+                    : risk.light
+                  : darkMode
+                    ? "border-emerald-900/30 bg-[#101F17] hover:bg-[#14261C] hover:border-emerald-800/50 text-slate-300"
+                    : "border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300"
               }
             `}
           >
@@ -894,19 +1221,37 @@ const RiskSelector = ({ value, onChange }) => {
                 flex
                 items-center
                 justify-center
-                ${active ? "bg-white/70" : "bg-slate-50 text-slate-400"}
+                ${
+                  active
+                    ? darkMode
+                      ? "bg-white/10"
+                      : "bg-white/70"
+                    : darkMode
+                      ? "bg-slate-800/70 text-slate-500"
+                      : "bg-slate-50 text-slate-400"
+                }
               `}
             >
               {risk.icon}
             </div>
 
             <div className="flex-1">
-              <p className="text-sm font-semibold">{risk.label}</p>
+              <p className="text-sm font-semibold">
+                {risk.label}
+              </p>
 
               <p
-                className={`text-[11px] mt-0.5 ${
-                  active ? "opacity-70" : "text-slate-400"
-                }`}
+                className={`
+                  text-[11px]
+                  mt-0.5
+                  ${
+                    active
+                      ? "opacity-70"
+                      : darkMode
+                        ? "text-slate-500"
+                        : "text-slate-400"
+                  }
+                `}
               >
                 {risk.description}
               </p>
@@ -928,29 +1273,56 @@ const RiskSelector = ({ value, onChange }) => {
    RISK PREVIEW
 ========================================================= */
 
-const RiskPreview = ({ level }) => {
+const RiskPreview = ({
+  level,
+  darkMode,
+}) => {
   const config = {
     Low: {
-      color: "text-green-700",
-      bg: "bg-green-50",
-      border: "border-green-200",
+      light: {
+        color: "text-green-700",
+        bg: "bg-green-50",
+        border: "border-green-200",
+      },
+      dark: {
+        color: "text-green-300",
+        bg: "bg-green-950/40",
+        border: "border-green-800/50",
+      },
       dot: "bg-green-500",
     },
+
     Medium: {
-      color: "text-orange-700",
-      bg: "bg-orange-50",
-      border: "border-orange-200",
+      light: {
+        color: "text-orange-700",
+        bg: "bg-orange-50",
+        border: "border-orange-200",
+      },
+      dark: {
+        color: "text-orange-300",
+        bg: "bg-orange-950/30",
+        border: "border-orange-800/50",
+      },
       dot: "bg-orange-500",
     },
+
     High: {
-      color: "text-red-700",
-      bg: "bg-red-50",
-      border: "border-red-200",
+      light: {
+        color: "text-red-700",
+        bg: "bg-red-50",
+        border: "border-red-200",
+      },
+      dark: {
+        color: "text-red-300",
+        bg: "bg-red-950/30",
+        border: "border-red-800/50",
+      },
       dot: "bg-red-500",
     },
   };
 
   const c = config[level] || config.Low;
+  const theme = darkMode ? c.dark : c.light;
 
   return (
     <div
@@ -958,8 +1330,9 @@ const RiskPreview = ({ level }) => {
         px-4
         py-3
         rounded-2xl
-        ${c.bg}
-        border ${c.border}
+        ${theme.bg}
+        border
+        ${theme.border}
         min-w-[130px]
       `}
     >
@@ -967,10 +1340,27 @@ const RiskPreview = ({ level }) => {
         Risk Level
       </p>
 
-      <div className={`flex items-center gap-2 mt-1 ${c.color}`}>
-        <span className={`w-2.5 h-2.5 rounded-full ${c.dot}`} />
+      <div
+        className={`
+          flex
+          items-center
+          gap-2
+          mt-1
+          ${theme.color}
+        `}
+      >
+        <span
+          className={`
+            w-2.5
+            h-2.5
+            rounded-full
+            ${c.dot}
+          `}
+        />
 
-        <span className="text-sm font-bold">{level}</span>
+        <span className="text-sm font-bold">
+          {level}
+        </span>
       </div>
     </div>
   );

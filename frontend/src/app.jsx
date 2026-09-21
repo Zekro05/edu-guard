@@ -1,3 +1,4 @@
+
 import {
   Navigate,
   Route,
@@ -18,9 +19,17 @@ import { useAuthStore } from "./store/authStore.js";
 ========================================================= */
 
 // Public pages
-const LoginPage = lazy(() => import("./pages/LoginPage.jsx"));
+const LandingPage = lazy(
+  () => import("./pages/LandingPage.jsx"),
+);
 
-const SignupPage = lazy(() => import("./pages/SignupPage.jsx"));
+const LoginPage = lazy(
+  () => import("./pages/LoginPage.jsx"),
+);
+
+const SignupPage = lazy(
+  () => import("./pages/SignupPage.jsx"),
+);
 
 const EmailVerificationPage = lazy(
   () => import("./pages/EmailVerificationPage.jsx"),
@@ -43,21 +52,61 @@ const DashboardPage = lazy(
   () => import("./pages/DashboardPage.jsx"),
 );
 
+const StudentDashboardPage = lazy (
+  () => import("./pages/StudentDashboardPage.jsx")
+)
+
+const TeacherDashboardPage = lazy (
+  () => import("./pages/TeacherDashboardPage.jsx")
+)
+
+const MyReportPage = lazy (
+  () => import("./pages/MyReportPage.jsx")
+)
+
+const StudentHistory = lazy (
+  () => import("./pages/StudentHistory.jsx")
+)
+
+const StudentReporting = lazy (
+  () => import("./pages/StudentReporting.jsx")
+)
+
 const StudentPage = lazy(
   () => import("./pages/StudentPage.jsx"),
+);
+
+const TeacherMyClassPage = lazy(
+  () => import("./pages/TeacherMyClassPage.jsx"),
 );
 
 const ReportPage = lazy(
   () => import("./pages/ReportPage.jsx"),
 );
 
+const TeacherReportPage = lazy(
+  () => import("./pages/TeacherReportPage.jsx"),
+);
+
+const TeacherReporting = lazy (
+  () => import("./pages/TeacherReporting.jsx")
+)
+
 const SettingsPage = lazy(
   () => import("./pages/SettingsPage.jsx"),
+);
+
+const TeacherStudentSettings = lazy (
+  () => import ("./pages/TeacherStudentSettings.jsx")
 );
 
 const GuidancePage = lazy(
   () => import("./pages/GuidancePage.jsx"),
 );
+
+const MessageAdminPage = lazy (
+  () => import("./pages/MessageAdminPage.jsx")
+)
 
 const InterventionPage = lazy(
   () => import("./pages/InterventionPage.jsx"),
@@ -127,9 +176,11 @@ const PageLoader = ({
 
           <div className="relative mb-7">
             {/* Soft glow */}
+
             <div className="absolute inset-0 rounded-[28px] bg-emerald-400/20 blur-xl scale-125" />
 
             {/* Logo card */}
+
             <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-[26px] bg-white border border-emerald-100 shadow-[0_12px_40px_rgba(16,185,129,0.12)] flex items-center justify-center">
               <img
                 src="/school-logo.webp"
@@ -212,7 +263,10 @@ const PageLoader = ({
    PROTECTED ROUTE
 ========================================================= */
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({
+  children,
+  allowedRoles = [],
+}) => {
   const {
     isAuthenticated,
     user,
@@ -225,12 +279,82 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
+  /* =======================================================
+     NOT LOGGED IN
+  ======================================================= */
+
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
   }
 
+  /* =======================================================
+     EMAIL NOT VERIFIED
+  ======================================================= */
+
   if (!user?.isVerified) {
-    return <Navigate to="/verify-email" replace />;
+    return (
+      <Navigate
+        to="/verify-email"
+        replace
+      />
+    );
+  }
+
+  /* =======================================================
+     GET USER ROLE
+  ======================================================= */
+
+  const userRole =
+    user?.role ||
+    user?.accountType ||
+    user?.user?.role;
+
+  /* =======================================================
+     ROLE PROTECTION
+  ======================================================= */
+
+  if (
+    allowedRoles.length > 0 &&
+    !allowedRoles.includes(userRole)
+  ) {
+    /*
+     * Student trying to access an admin page
+     */
+    if (userRole === "student") {
+      return (
+        <Navigate
+          to="/student-dashboard"
+          replace
+        />
+      );
+    }
+
+    /*
+     * Admin trying to access a student page
+     */
+    if (userRole === "admin") {
+      return (
+        <Navigate
+          to="/dashboard"
+          replace
+        />
+      );
+    }
+
+    /*
+     * Unknown role
+     */
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
   }
 
   return children;
@@ -260,6 +384,7 @@ const RedirectAuthenticatedUser = ({
   /*
    * Allow signup even if a user is already authenticated.
    */
+
   if (location.pathname === "/signup") {
     return children;
   }
@@ -268,17 +393,36 @@ const RedirectAuthenticatedUser = ({
    * Redirect authenticated and verified users
    * away from login/auth pages.
    */
-  if (
-    isAuthenticated &&
-    user?.isVerified
-  ) {
+
+  if (isAuthenticated && user?.isVerified) {
+  const userRole =
+    user?.role ||
+    user?.accountType ||
+    user?.user?.role;
+
+  if (userRole === "student") {
     return (
       <Navigate
-        to="/dashboard"
+        to="/student-dashboard"
+        replace
+      />
+    );
+  } else if (userRole === "teacher") {
+    return (
+      <Navigate
+        to="/teacher-dashboard"
         replace
       />
     );
   }
+
+  return (
+    <Navigate
+      to="/dashboard"
+      replace
+    />
+  );
+}
 
   return children;
 };
@@ -311,6 +455,7 @@ function App() {
     /*
       Only listen for activity while authenticated.
     */
+
     if (!isAuthenticated) {
       return;
     }
@@ -331,6 +476,7 @@ function App() {
         Prevent resetting the timer hundreds of times
         per second when the mouse is moving.
       */
+
       if (activityTimeout) {
         return;
       }
@@ -388,13 +534,7 @@ function App() {
   ======================================================= */
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-green-900 to-emerald-900 flex items-center justify-center relative overflow-hidden">
-      {/* =================================================
-          FLOATING BACKGROUND
-      ================================================= */}
-
-      <FloatingShape />
-
+    <div className="relative min-h-screen">
       {/* =================================================
           GLOBAL WEB FCM NOTIFICATIONS
       ================================================= */}
@@ -415,77 +555,200 @@ function App() {
         }
       >
         <Routes>
-          {/* DASHBOARD */}
+          {/* =================================================
+              LANDING PAGE
+          ================================================= */}
+
+          <Route
+            path="/"
+            element={<LandingPage />}
+          />
+
+          {/* =================================================
+              DASHBOARD
+          ================================================= */}
+
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["admin"]}>
                 <DashboardPage />
               </ProtectedRoute>
             }
           />
 
-          {/* STUDENTS */}
+          <Route
+  path="/student-dashboard"
+  element={
+    <ProtectedRoute allowedRoles={["student"]}>
+      <StudentDashboardPage />
+    </ProtectedRoute>
+  }
+/>
+
+          <Route
+            path="/teacher-dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <TeacherDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* =================================================
+              STUDENTS
+          ================================================= */}
+
           <Route
             path="/students"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["admin"]}>
                 <StudentPage />
               </ProtectedRoute>
             }
           />
 
-          {/* GUIDANCE */}
           <Route
-            path="/guidance"
+            path="/teacher-class"
             element={
-              <ProtectedRoute>
-                <GuidancePage />
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <TeacherMyClassPage />
               </ProtectedRoute>
             }
           />
 
-          {/* REPORTS */}
+          {/* =================================================
+              GUIDANCE
+          ================================================= */}
+
+          <Route
+            path="/guidance"
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <GuidancePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/message-admin"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <MessageAdminPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* =================================================
+              REPORTS
+          ================================================= */}
+
           <Route
             path="/reports"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["admin"]}>
                 <ReportPage />
               </ProtectedRoute>
             }
           />
 
-          {/* CASES */}
+          <Route
+            path="/my-reports"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <MyReportPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/teacher-my-reports"
+            element={
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <TeacherReportPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/my-history"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <StudentHistory />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/student-reporting"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <StudentReporting />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/teacher-reporting"
+            element={
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <TeacherReporting />
+              </ProtectedRoute>
+            }
+          />
+
+
+          {/* =================================================
+              CASES
+          ================================================= */}
+
           <Route
             path="/cases"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["admin"]}>
                 <CaseManagement />
               </ProtectedRoute>
             }
           />
 
-          {/* INTERVENTIONS */}
+          {/* =================================================
+              INTERVENTIONS
+          ================================================= */}
+
           <Route
             path="/interventions"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["admin"]}>
                 <InterventionPage />
               </ProtectedRoute>
             }
           />
 
-          {/* SETTINGS */}
+          {/* =================================================
+              SETTINGS
+          ================================================= */}
+
           <Route
             path="/settings"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute allowedRoles={["admin"]}>
                 <SettingsPage />
               </ProtectedRoute>
             }
           />
 
-          {/* SIGNUP */}
+          <Route
+            path="/my-settings"
+            element={
+              <ProtectedRoute allowedRoles={["teacher", "student"]}>
+                <TeacherStudentSettings />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* =================================================
+              SIGNUP
+          ================================================= */}
+
           <Route
             path="/signup"
             element={
@@ -495,7 +758,10 @@ function App() {
             }
           />
 
-          {/* LOGIN */}
+          {/* =================================================
+              LOGIN
+          ================================================= */}
+
           <Route
             path="/login"
             element={
@@ -505,7 +771,10 @@ function App() {
             }
           />
 
-          {/* FORGOT PASSWORD */}
+          {/* =================================================
+              FORGOT PASSWORD
+          ================================================= */}
+
           <Route
             path="/forgot-password"
             element={
@@ -515,7 +784,10 @@ function App() {
             }
           />
 
-          {/* RESET PASSWORD */}
+          {/* =================================================
+              RESET PASSWORD
+          ================================================= */}
+
           <Route
             path="/reset-password"
             element={
@@ -525,7 +797,10 @@ function App() {
             }
           />
 
-          {/* NEW PASSWORD */}
+          {/* =================================================
+              NEW PASSWORD
+          ================================================= */}
+
           <Route
             path="/reset-password/new"
             element={
@@ -535,7 +810,10 @@ function App() {
             }
           />
 
-          {/* EMAIL VERIFICATION */}
+          {/* =================================================
+              EMAIL VERIFICATION
+          ================================================= */}
+
           <Route
             path="/verify-email"
             element={
@@ -543,7 +821,10 @@ function App() {
             }
           />
 
-          {/* DEFAULT ROUTE */}
+          {/* =================================================
+              DEFAULT ROUTE
+          ================================================= */}
+
           <Route
             path="*"
             element={
@@ -554,7 +835,7 @@ function App() {
                 />
               ) : (
                 <Navigate
-                  to="/login"
+                  to="/"
                   replace
                 />
               )

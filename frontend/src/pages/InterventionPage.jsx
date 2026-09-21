@@ -33,10 +33,41 @@ import {
   LogOut,
   Printer,
   BookOpen,
+  ClipboardList,
+  ShieldCheck,
   Loader2,
+  Menu,
+  Moon,
+  Sun,
 } from "lucide-react";
 
 import { useAuthStore } from "../store/authStore";
+
+const ThemeToggle = ({ darkMode, setDarkMode }) => (
+  <button
+    type="button"
+    onClick={() => setDarkMode((current) => !current)}
+    className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-sm font-semibold transition ${
+      darkMode
+        ? "bg-[#101F17] border-emerald-950/50 text-slate-300 hover:bg-[#14261C]"
+        : "bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100"
+    }`}
+    aria-label="Toggle theme"
+    aria-pressed={darkMode}
+  >
+    <div className="flex items-center gap-3 min-w-0">
+      <span className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+        darkMode ? "bg-amber-950/40 text-amber-300" : "bg-white text-slate-500"
+      }`}>
+        {darkMode ? <Sun size={15} /> : <Moon size={15} />}
+      </span>
+      <span>{darkMode ? "Light mode" : "Dark mode"}</span>
+    </div>
+    <span className={`relative w-9 h-5 rounded-full flex-shrink-0 transition ${darkMode ? "bg-green-600" : "bg-gray-300"}`}>
+      <span className={`absolute top-0.5 w-4 h-4 rounded-full shadow-sm transition ${darkMode ? "left-[18px] bg-black" : "left-0.5 bg-white"}`} />
+    </span>
+  </button>
+);
 
 const InterventionPage = () => {
   const navigate = useNavigate();
@@ -81,6 +112,36 @@ const InterventionPage = () => {
 
   const [notifications, setNotifications] = useState([]);
   const [openNotif, setOpenNotif] = useState(false);
+
+  const [darkMode, setDarkMode] = useState(() => {
+    try {
+      const savedTheme = localStorage.getItem("guided-theme");
+      if (savedTheme === "dark") return true;
+      if (savedTheme === "light") return false;
+      return false;
+    } catch {
+      return false;
+    }
+  });
+
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [viewMode, setViewMode] = useState("cards");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("guided-theme", darkMode ? "dark" : "light");
+    } catch {}
+    document.documentElement.style.colorScheme = darkMode ? "dark" : "light";
+  }, [darkMode]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) setMobileMenuOpen(false);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const [auditLog, setAuditLog] = useState([]);
   const [openTimeline, setOpenTimeline] = useState(null);
@@ -1309,1061 +1370,657 @@ const InterventionPage = () => {
      RETURN
   ========================================================= */
 
+  const pageBg = darkMode ? "bg-[#07110D]" : "bg-[#F5F8F6]";
+  const textPrimary = darkMode ? "text-slate-100" : "text-slate-900";
+  const textMuted = darkMode ? "text-slate-500" : "text-gray-400";
+
   return (
-    <div className="h-screen w-screen flex bg-[#F4F7FB] text-gray-900 overflow-hidden">
-      {/* =================================================
-          SIDEBAR
-      ================================================= */}
+    <div
+      className={`case-intervention min-h-screen w-full flex ${pageBg} ${textPrimary} overflow-hidden transition-colors duration-300 ${darkMode ? "case-intervention-dark" : ""}`}
+    >
+      <style>{`
+        .case-intervention-dark [class*="bg-white"] { background-color: #0C1913 !important; }
+        .case-intervention-dark [class*="bg-gray-50"] { background-color: #101F17 !important; }
+        .case-intervention-dark [class*="bg-gray-100"] { background-color: #14231C !important; }
+        .case-intervention-dark [class*="bg-gray-200"] { background-color: #1A2C23 !important; }
+        .case-intervention-dark .bg-[#F8FAFC] { background-color: #101F17 !important; }
+        .case-intervention-dark .bg-white { background-color: #0C1913 !important; }
+        .case-intervention-dark .bg-gray-50 { background-color: #101F17 !important; }
+        .case-intervention-dark .bg-gray-100 { background-color: #14231C !important; }
+        .case-intervention-dark .bg-gray-200 { background-color: #1A2C23 !important; }
+        .case-intervention-dark .intervention-modal {
+          background-color: #0C1913 !important;
+          border-color: rgba(6,78,59,.65) !important;
+          color: #E2E8F0 !important;
+        }
+        .case-intervention-dark .intervention-modal [class*="bg-white"],
+        .case-intervention-dark .intervention-modal [class*="bg-[#F8FAFC]"],
+        .case-intervention-dark .intervention-modal [class*="bg-gray-50"],
+        .case-intervention-dark .intervention-modal [class*="bg-gray-100"] {
+          background-color: #101F17 !important;
+        }
+        /* AI recommendation surfaces inside the modal */
+        .case-intervention-dark .intervention-modal .bg-green-50\/80 { background-color: rgba(6,78,59,.28) !important; }
+        .case-intervention-dark .intervention-modal .bg-white\/80 { background-color: #101F17 !important; }
+        .case-intervention-dark .intervention-modal [class*="bg-green-50\/"] { background-color: rgba(6,78,59,.28) !important; }
+        .case-intervention-dark .intervention-modal [class*="bg-white\/"] { background-color: #101F17 !important; }
+        .case-intervention-dark .intervention-modal .text-green-900 { color: #D1FAE5 !important; }
+        .case-intervention-dark .intervention-modal .text-green-800 { color: #A7F3D0 !important; }
+        .case-intervention-dark .intervention-modal .text-green-700 { color: #6EE7B7 !important; }
+        .case-intervention-dark .intervention-modal .text-green-600 { color: #34D399 !important; }
+        .case-intervention-dark .intervention-modal .text-green-700\/60 { color: rgba(110,231,183,.65) !important; }
+        .case-intervention-dark .intervention-modal .text-green-700\/80 { color: rgba(167,243,208,.82) !important; }
+        .case-intervention-dark .intervention-modal .border-green-100 { border-color: rgba(6,78,59,.55) !important; }
 
-      <aside className="hidden lg:flex w-[270px] bg-white border-r border-gray-100 flex-col justify-between px-5 py-6">
-        <div>
-          {/* BRAND */}
+        .case-intervention-dark .intervention-modal input,
+        .case-intervention-dark .intervention-modal textarea,
+        .case-intervention-dark .intervention-modal select {
+          background-color: #0C1913 !important;
+          color: #E2E8F0 !important;
+          border-color: rgba(6,78,59,.65) !important;
+        }
+        .case-intervention-dark .intervention-modal ::placeholder {
+          color: #64748B !important;
+        }
+        .case-intervention-dark .intervention-modal .text-gray-900 { color: #F1F5F9 !important; }
+        .case-intervention-dark .intervention-modal .text-gray-800 { color: #E2E8F0 !important; }
+        .case-intervention-dark .intervention-modal .text-gray-700 { color: #CBD5E1 !important; }
+        .case-intervention-dark .intervention-modal .text-gray-600 { color: #94A3B8 !important; }
+        .case-intervention-dark .intervention-modal .text-gray-500,
+        .case-intervention-dark .intervention-modal .text-gray-400 { color: #64748B !important; }
 
+        .case-intervention-dark .bg-green-50 { background-color: rgba(6,78,59,.28) !important; }
+        .case-intervention-dark .bg-green-100 { background-color: rgba(6,78,59,.42) !important; }
+        .case-intervention-dark .bg-amber-50 { background-color: rgba(120,53,15,.28) !important; }
+        .case-intervention-dark .bg-blue-50 { background-color: rgba(30,64,175,.25) !important; }
+        .case-intervention-dark .bg-emerald-50 { background-color: rgba(6,78,59,.28) !important; }
+        .case-intervention-dark .bg-red-50 { background-color: rgba(127,29,29,.28) !important; }
+        .case-intervention-dark .bg-purple-50 { background-color: rgba(107,33,168,.24) !important; }
+        .case-intervention-dark .border-white { border-color: rgba(255,255,255,.10) !important; }
+        .case-intervention-dark .border-gray-100 { border-color: rgba(6,78,59,.55) !important; }
+        .case-intervention-dark .border-gray-200 { border-color: rgba(6,78,59,.65) !important; }
+        .case-intervention-dark .border-gray-300 { border-color: rgba(6,78,59,.8) !important; }
+        .case-intervention-dark .border-green-100 { border-color: rgba(6,78,59,.55) !important; }
+        .case-intervention-dark .border-green-200 { border-color: rgba(6,78,59,.7) !important; }
+        .case-intervention-dark .border-amber-200 { border-color: rgba(245,158,11,.3) !important; }
+        .case-intervention-dark .border-red-100, .case-intervention-dark .border-red-200 { border-color: rgba(239,68,68,.3) !important; }
+        .case-intervention-dark .text-gray-900 { color: #F1F5F9 !important; }
+        .case-intervention-dark .text-gray-800 { color: #E2E8F0 !important; }
+        .case-intervention-dark .text-gray-700 { color: #CBD5E1 !important; }
+        .case-intervention-dark .text-gray-600 { color: #94A3B8 !important; }
+        .case-intervention-dark .text-gray-500 { color: #64748B !important; }
+        .case-intervention-dark .text-gray-400 { color: #64748B !important; }
+        .case-intervention-dark .text-gray-300 { color: #475569 !important; }
+        .case-intervention-dark .text-green-800 { color: #A7F3D0 !important; }
+        .case-intervention-dark .text-green-700 { color: #6EE7B7 !important; }
+        .case-intervention-dark .text-green-600 { color: #34D399 !important; }
+        .case-intervention-dark .text-amber-700 { color: #FCD34D !important; }
+        .case-intervention-dark .text-amber-600 { color: #FBBF24 !important; }
+        .case-intervention-dark .text-blue-700 { color: #93C5FD !important; }
+        .case-intervention-dark .text-emerald-700 { color: #6EE7B7 !important; }
+        .case-intervention-dark input, .case-intervention-dark textarea, .case-intervention-dark select {
+          background-color: #0C1913 !important; color: #E2E8F0 !important; border-color: rgba(6,78,59,.65) !important; color-scheme: dark;
+        }
+        .case-intervention-dark input::placeholder, .case-intervention-dark textarea::placeholder { color: #64748B !important; }
+        .case-intervention-dark .hover\:bg-gray-50:hover { background-color: #14231C !important; }
+        .case-intervention-dark .hover\:bg-gray-100:hover { background-color: #192A21 !important; }
+        .case-intervention-dark .hover\:bg-green-50:hover { background-color: rgba(6,78,59,.38) !important; }
+        .case-intervention-dark .shadow-sm, .case-intervention-dark .shadow-md, .case-intervention-dark .shadow-xl { box-shadow: 0 14px 38px rgba(0,0,0,.22) !important; }
+        .case-intervention-dark .theme-toggle { background-color: #0C1913 !important; border-color: rgba(6,78,59,.60) !important; }
+        .case-intervention-dark .theme-toggle-switch { background-color: #16A34A !important; }
+        .case-intervention-dark .theme-toggle-switch { overflow: hidden !important; }
+        .case-intervention-dark .theme-toggle-knob { background-color: #000000 !important; }
+        .case-intervention-dark option { background: #0C1913; color: #E2E8F0; }
+      `}</style>
+
+      {/* DESKTOP SIDEBAR */}
+      <aside
+        className={`hidden lg:flex fixed left-0 top-0 bottom-0 z-40 w-[250px] xl:w-[270px] flex-col justify-between px-4 xl:px-5 py-6 overflow-y-auto border-r transition-colors duration-300 ${darkMode ? "bg-[#09150F] border-emerald-950/60" : "bg-white border-gray-100"}`}
+      >
+        <div className="flex-1 min-h-0 overflow-y-auto pr-0.5">
           <div className="px-3 mb-8">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 flex items-center justify-center">
-                <img
-                  src="/school-logo.webp"
-                  alt="School Logo"
-                  className="w-full h-full object-contain"
-                />
+              <div className="w-10 xl:w-11 h-10 xl:h-11 flex items-center justify-center flex-shrink-0">
+                <img src="/school-logo.webp" alt="School Logo" className="w-full h-full object-contain" />
               </div>
-
-              <div>
-                <h1 className="text-xl font-extrabold tracking-tight text-gray-900">
-                  Guid
-                  <span className="text-green-600">
-                    Ed
-                  </span>
-                </h1>
-
-                <p className="text-[9px] uppercase tracking-widest text-gray-400 font-semibold">
-                  Student Guidance
-                </p>
+              <div className="min-w-0">
+                <h1 className={`text-xl font-extrabold tracking-tight ${textPrimary}`}>Guid<span className="text-green-500">Ed</span></h1>
+                <p className={`text-[9px] uppercase tracking-widest font-semibold truncate ${textMuted}`}>Student Guidance</p>
               </div>
             </div>
-
-            <p className="text-[11px] leading-relaxed text-gray-400 mt-4">
-              Our Lady of the Holy Rosary School
-              <br />
-              General Trias Campus
-            </p>
+            <p className={`text-[11px] leading-relaxed mt-4 ${textMuted}`}>Our Lady of the Holy Rosary School<br />General Trias Campus</p>
           </div>
-
-          {/* NAV LABEL */}
-
-          <p className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-            Main Menu
-          </p>
-
+          <p className={`px-3 mb-2 text-[10px] font-bold uppercase tracking-widest ${textMuted}`}>Main Menu</p>
           <div className="space-y-1">
-            <Nav
-              icon={
-                <LayoutDashboard
-                  size={18}
-                />
-              }
-              label="Dashboard"
-              onClick={() =>
-                navigate(
-                  "/dashboard",
-                )
-              }
-            />
-
-            <Nav
-              icon={
-                <Users size={18} />
-              }
-              label="Students"
-              onClick={() =>
-                navigate(
-                  "/students",
-                )
-              }
-            />
-
-            <Nav
-              icon={
-                <ShieldX
-                  size={18}
-                />
-              }
-              label="Guidance"
-              onClick={() =>
-                navigate(
-                  "/guidance",
-                )
-              }
-            />
-
-            <Nav
-              icon={
-                <ChartNoAxesCombined
-                  size={18}
-                />
-              }
-              label="Reports"
-              onClick={() =>
-                navigate(
-                  "/reports",
-                )
-              }
-            />
-
-            <Nav
-              icon={
-                <BriefcaseBusiness
-                  size={18}
-                />
-              }
-              label="Cases"
-              onClick={() =>
-                navigate("/cases")
-              }
-            />
-
-            <Nav
-              icon={
-                <HandHelping
-                  size={18}
-                />
-              }
-              label="Interventions"
-              active
-            />
+            <Nav icon={<LayoutDashboard size={18} />} label="Dashboard" onClick={() => navigate("/dashboard")} darkMode={darkMode} />
+            <Nav icon={<Users size={18} />} label="Students" onClick={() => navigate("/students")} darkMode={darkMode} />
+            <Nav icon={<ShieldX size={18} />} label="Guidance" onClick={() => navigate("/guidance")} darkMode={darkMode} />
+            <Nav icon={<ChartNoAxesCombined size={18} />} label="Reports" onClick={() => navigate("/reports")} darkMode={darkMode} />
+            <Nav icon={<BriefcaseBusiness size={18} />} label="Cases" onClick={() => navigate("/cases")} darkMode={darkMode} />
+            <Nav icon={<HandHelping size={18} />} label="Interventions" active darkMode={darkMode} />
           </div>
-
-          {/* SYSTEM */}
-
-          <p className="px-3 mt-8 mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-            System
-          </p>
-
-          <Nav
-            icon={
-              <Settings size={18} />
-            }
-            label="Settings"
-            onClick={() =>
-              navigate(
-                "/settings",
-              )
-            }
-          />
+          <p className={`px-3 mt-8 mb-2 text-[10px] font-bold uppercase tracking-widest ${textMuted}`}>System</p>
+          <Nav icon={<Settings size={18} />} label="Settings" onClick={() => navigate("/settings")} darkMode={darkMode} />
         </div>
-
-        {/* SIDEBAR FOOTER */}
-
-        <div className="space-y-3">
-          <div className="p-3 rounded-2xl bg-gray-50 border border-gray-100">
+        <div className="space-y-2.5 flex-shrink-0 pt-3">
+          <div className={`p-3 rounded-2xl border ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-gray-50 border-gray-100"}`}>
             <div className="flex items-center gap-3">
-              <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-green-100 flex items-center justify-center flex-shrink-0">
-                {adminPhoto ? (
-                  <img
-                    src={adminPhoto}
-                    alt={adminName}
-                    className="w-full h-full object-cover"
-                    onError={(
-                      e,
-                    ) => {
-                      e.currentTarget.style.display =
-                        "none";
-                    }}
-                  />
-                ) : (
-                  <span className="text-green-700 font-bold">
-                    {adminName
-                      .charAt(
-                        0,
-                      )
-                      .toUpperCase()}
-                  </span>
-                )}
-
+              <div className={`relative w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 ${darkMode ? "bg-emerald-950/60" : "bg-green-100"}`}>
+                {adminPhoto ? <img src={adminPhoto} alt={adminName} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} /> : <span className="text-green-700 font-bold">{adminName.charAt(0).toUpperCase()}</span>}
                 <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white" />
               </div>
-
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] uppercase tracking-wider font-bold text-gray-400">
-                  Administrator
-                </p>
-
-                <p className="text-sm font-bold text-gray-900 truncate">
-                  {adminName}
-                </p>
+                <p className={`text-[9px] uppercase tracking-wider font-bold ${textMuted}`}>Administrator</p>
+                <p className={`text-sm font-bold truncate ${textPrimary}`}>{adminName}</p>
               </div>
             </div>
           </div>
-
-          <button
-            onClick={logout}
-            className="
-              w-full
-              flex
-              items-center
-              justify-center
-              gap-2
-              py-2.5
-              rounded-xl
-              text-sm
-              font-semibold
-              text-gray-600
-              border border-gray-200
-              hover:bg-red-50
-              hover:text-red-600
-              hover:border-red-100
-              transition
-            "
-          >
-            <LogOut size={16} />
-            Sign out
+          <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
+          <button onClick={logout} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition ${darkMode ? "text-slate-300 border-emerald-950/60 hover:bg-red-950/30 hover:text-red-300" : "text-gray-600 border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100"}`}>
+            <LogOut size={16} /> Sign out
           </button>
         </div>
       </aside>
 
-      {/* =====================================================
-          MAIN
-      ===================================================== */}
+      {/* MOBILE SIDEBAR */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setMobileMenuOpen(false)} className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden" />
+            <motion.aside initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }} transition={{ type: "spring", stiffness: 300, damping: 30 }} className={`fixed left-0 top-0 bottom-0 z-50 w-[270px] flex flex-col justify-between px-4 py-6 overflow-hidden border-r lg:hidden ${darkMode ? "bg-[#09150F] border-emerald-950/60" : "bg-white border-gray-100"}`}>
+              <div className="flex-1 min-h-0 overflow-y-auto pr-0.5">
+                <div className="flex items-center justify-between px-3 mb-8">
+                  <div className="flex items-center gap-3"><img src="/school-logo.webp" alt="School Logo" className="w-10 h-10 object-contain" /><div><h1 className={`text-xl font-extrabold ${textPrimary}`}>Guid<span className="text-green-500">Ed</span></h1><p className={`text-[9px] uppercase tracking-widest font-semibold ${textMuted}`}>Student Guidance</p></div></div>
+                  <button onClick={() => setMobileMenuOpen(false)} className={`w-9 h-9 rounded-xl flex items-center justify-center ${darkMode ? "text-slate-300 hover:bg-emerald-950/40" : "text-gray-500 hover:bg-gray-50"}`}><X size={18} /></button>
+                </div>
+                <p className={`px-3 mb-2 text-[10px] font-bold uppercase tracking-widest ${textMuted}`}>Main Menu</p>
+                <div className="space-y-1">
+                  <Nav icon={<LayoutDashboard size={18} />} label="Dashboard" onClick={() => { setMobileMenuOpen(false); navigate("/dashboard"); }} darkMode={darkMode} />
+                  <Nav icon={<Users size={18} />} label="Students" onClick={() => { setMobileMenuOpen(false); navigate("/students"); }} darkMode={darkMode} />
+                  <Nav icon={<ShieldX size={18} />} label="Guidance" onClick={() => { setMobileMenuOpen(false); navigate("/guidance"); }} darkMode={darkMode} />
+                  <Nav icon={<ChartNoAxesCombined size={18} />} label="Reports" onClick={() => { setMobileMenuOpen(false); navigate("/reports"); }} darkMode={darkMode} />
+                  <Nav icon={<BriefcaseBusiness size={18} />} label="Cases" onClick={() => { setMobileMenuOpen(false); navigate("/cases"); }} darkMode={darkMode} />
+                  <Nav icon={<HandHelping size={18} />} label="Interventions" active darkMode={darkMode} />
+                </div>
+                <p className={`px-3 mt-8 mb-2 text-[10px] font-bold uppercase tracking-widest ${textMuted}`}>System</p>
+                <Nav icon={<Settings size={18} />} label="Settings" onClick={() => { setMobileMenuOpen(false); navigate("/settings"); }} darkMode={darkMode} />
+              </div>
+              <div className="space-y-2.5 flex-shrink-0 pt-3">
+                <div className={`p-3 rounded-2xl border ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-gray-50 border-gray-100"}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`relative w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 ${darkMode ? "bg-emerald-950/60" : "bg-green-100"}`}>
+                      {adminPhoto ? <img src={adminPhoto} alt={adminName} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} /> : <span className={`font-bold ${darkMode ? "text-emerald-300" : "text-green-700"}`}>{adminName.charAt(0).toUpperCase()}</span>}
+                      <span className={`absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 ${darkMode ? "border-[#0C1913]" : "border-white"}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-[9px] uppercase tracking-wider font-bold ${textMuted}`}>Administrator</p>
+                      <p className={`text-sm font-bold truncate ${textPrimary}`}>{adminName}</p>
+                    </div>
+                  </div>
+                </div>
+                <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
+                <button onClick={logout} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border ${darkMode ? "text-slate-300 border-emerald-950/60 hover:bg-red-950/30 hover:text-red-300" : "text-gray-600 border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100"}`}><LogOut size={16} /> Sign out</button>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
 
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 lg:ml-[250px] xl:ml-[270px] overflow-y-auto">
         {/* HEADER */}
 
-        <header className="sticky top-0 z-30 bg-[#F7F9F8]/90 backdrop-blur-xl border-b border-gray-100">
-          <div className="px-8 py-6 flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-xs text-gray-400 mb-2">
-                <span>
-                  Guidance
-                </span>
-
-                <ChevronRight
-                  size={13}
-                />
-
-                <span className="text-green-600 font-medium">
-                  Interventions
-                </span>
+        <header className={`sticky top-0 z-30 backdrop-blur-xl border-b transition-colors duration-300 ${darkMode ? "bg-[#07110D]/90 border-emerald-950/50" : "bg-[#F7F9F8]/90 border-gray-100"}`}>
+          <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className={`flex items-center gap-2 text-xs mb-1.5 ${textMuted}`}>
+                <button className={`lg:hidden mr-1 w-9 h-9 rounded-xl flex items-center justify-center border ${darkMode ? "border-emerald-950/60 bg-[#0C1913] text-slate-300" : "border-gray-200 bg-white text-gray-600"}`} onClick={() => setMobileMenuOpen(true)} aria-label="Open menu"><Menu size={18} /></button>
+                <span>Management</span>
+                <ChevronRight size={13} />
+                <span className="text-green-600 font-semibold">Interventions</span>
               </div>
-
-              <h2 className="text-3xl font-black tracking-tight text-gray-900">
-                Intervention Management
-              </h2>
-
-              <p className="text-sm text-gray-500 mt-1.5">
-                Manage student interventions,
-                sanctions, and rehabilitation plans.
-              </p>
+              <h2 className={`text-2xl sm:text-3xl font-black tracking-tight ${textPrimary}`}>Intervention Management</h2>
+              <p className={`text-xs sm:text-sm mt-1 ${textMuted}`}>Manage student interventions, sanctions, and rehabilitation plans.</p>
             </div>
 
-            {/* NOTIFICATION */}
-
-            <div className="relative">
-              <button
-                onClick={() =>
-                  setOpenNotif(
-                    !openNotif,
-                  )
-                }
-                className="
-                  relative
-                  w-11 h-11
-                  rounded-xl
-                  bg-white
-                  border border-gray-200
-                  text-gray-600
-                  flex items-center justify-center
-                  hover:bg-gray-50
-                  hover:border-gray-300
-                  transition
-                "
-              >
-                <Bell size={18} />
-
-                {notifications.length >
-                  0 && (
-                  <span
-                    className="
-                      absolute
-                      -top-1
-                      -right-1
-                      min-w-[18px]
-                      h-[18px]
-                      px-1
-                      rounded-full
-                      bg-red-500
-                      text-white
-                      text-[9px]
-                      font-bold
-                      flex
-                      items-center
-                      justify-center
-                      border-2
-                      border-white
-                    "
-                  >
-                    {notifications.length >
-                    9
-                      ? "9+"
-                      : notifications.length}
-                  </span>
-                )}
+            <div className="flex items-center gap-2 shrink-0">
+              <button onClick={() => setDarkMode((v) => !v)} className={`hidden sm:flex w-10 h-10 rounded-xl items-center justify-center border transition ${darkMode ? "bg-[#0C1913] border-emerald-950/60 text-slate-300 hover:bg-emerald-950/30" : "bg-white border-gray-100 text-gray-500 hover:bg-gray-50"}`} aria-label="Toggle theme">
+                {darkMode ? <Sun size={17} /> : <Moon size={17} />}
               </button>
-
-              <AnimatePresence>
-                {openNotif && (
-                  <motion.div
-                    initial={{
-                      opacity: 0,
-                      y: 8,
-                      scale: 0.97,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      y: 0,
-                      scale: 1,
-                    }}
-                    exit={{
-                      opacity: 0,
-                      y: 8,
-                      scale: 0.97,
-                    }}
-                    className="
-                      absolute
-                      right-0
-                      mt-3
-                      w-[380px]
-                      bg-white
-                      border border-gray-200
-                      rounded-2xl
-                      shadow-xl
-                      overflow-hidden
-                      z-50
-                    "
-                  >
-                    <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                      <div>
-                        <h3 className="font-bold text-gray-900 text-sm">
-                          Notifications
-                        </h3>
-
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          Cases requiring attention
-                        </p>
+              <div className="relative">
+                <button onClick={() => setOpenNotif(!openNotif)} className={`relative w-10 h-10 rounded-xl flex items-center justify-center border shadow-sm transition ${darkMode ? "bg-[#0C1913] border-emerald-950/60 text-slate-300 hover:bg-emerald-950/30" : "bg-white border-gray-100 text-gray-500 hover:bg-gray-50"}`}>
+                  <Bell size={17} />
+                  {notifications.length > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border-2 border-[#F7F9F8]">{notifications.length > 9 ? "9+" : notifications.length}</span>}
+                </button>
+                <AnimatePresence>
+                  {openNotif && (
+                    <motion.div initial={{ opacity: 0, y: 8, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: 0.97 }} className={`absolute right-0 mt-3 w-[330px] max-w-[calc(100vw-32px)] rounded-2xl overflow-hidden shadow-xl z-50 border ${darkMode ? "bg-[#0C1913] border-emerald-950/60" : "bg-white border-gray-100"}`}>
+                      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                        <div><h3 className="font-bold text-gray-900 text-sm">Notifications</h3><p className="text-xs text-gray-400 mt-0.5">Cases requiring attention</p></div>
+                        <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center"><Sparkles size={15} /></div>
                       </div>
-
-                      <div className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center">
-                        <Sparkles
-                          size={15}
-                        />
+                      <div className="max-h-[380px] overflow-y-auto">
+                        {notifications.length === 0 ? <div className="py-12 text-center"><Bell size={24} className="mx-auto text-gray-300 mb-3" /><p className="text-sm text-gray-500">No notifications</p></div> : notifications.map((n) => (
+                          <div key={n.id} className="px-5 py-4 border-b border-gray-100">
+                            <div className="flex gap-3"><div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0"><AlertCircle size={16} /></div><div className="min-w-0"><p className="font-semibold text-sm text-gray-900">{n.title}</p><p className="text-xs text-gray-500 mt-1 line-clamp-2">{n.text}</p><div className="flex items-center justify-between gap-3 mt-2"><span className="text-[11px] font-semibold text-green-700 truncate">{n.student}</span><span className="text-[10px] text-gray-400 shrink-0">{new Date(n.time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</span></div></div></div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-
-                    <div className="max-h-[380px] overflow-y-auto">
-                      {notifications.length ===
-                      0 ? (
-                        <div className="py-12 text-center">
-                          <Bell
-                            size={24}
-                            className="mx-auto text-gray-300 mb-3"
-                          />
-
-                          <p className="text-sm text-gray-500">
-                            No notifications
-                          </p>
-                        </div>
-                      ) : (
-                        notifications.map(
-                          (n) => (
-                            <motion.div
-                              key={n.id}
-                              whileHover={{
-                                backgroundColor:
-                                  "#f9fafb",
-                              }}
-                              className="px-5 py-4 border-b border-gray-100 cursor-pointer"
-                            >
-                              <div className="flex gap-3">
-                                <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                                  <AlertCircle
-                                    size={
-                                      16
-                                    }
-                                  />
-                                </div>
-
-                                <div className="min-w-0">
-                                  <p className="font-semibold text-sm text-gray-900">
-                                    {
-                                      n.title
-                                    }
-                                  </p>
-
-                                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                                    {
-                                      n.text
-                                    }
-                                  </p>
-
-                                  <div className="flex items-center justify-between gap-3 mt-2">
-                                    <span className="text-[11px] font-semibold text-green-700 truncate">
-                                      {
-                                        n.student
-                                      }
-                                    </span>
-
-                                    <span className="text-[10px] text-gray-400 shrink-0">
-                                      {new Date(
-                                        n.time,
-                                      ).toLocaleTimeString(
-                                        [],
-                                        {
-                                          hour: "numeric",
-                                          minute:
-                                            "2-digit",
-                                        },
-                                      )}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </motion.div>
-                          ),
-                        )
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
         </header>
 
         {/* CONTENT */}
 
-        <div className="p-8 max-w-[1600px] mx-auto">
-          {/* OVERVIEW */}
+        <div className="px-4 sm:px-6 lg:px-8 py-5 sm:py-7 max-w-[1600px] mx-auto">
+          {/* =================================================
+              INTERVENTION MANAGEMENT HERO
+              Matches the CaseManagement hero card exactly.
+          ================================================= */}
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">
-                Intervention Overview
-              </h3>
-
-              <p className="text-sm text-gray-400 mt-1">
-                Monitor the current state of student
-                intervention cases.
-              </p>
-            </div>
-
-            <button
-              onClick={() =>
-                setShowPrintableReport(
-                  true,
-                )
-              }
-              className="
-                h-10
-                px-4
-                rounded-xl
-                bg-white
+          <section className="mb-8">
+            <div
+              className={`
+                relative
+                overflow-hidden
+                rounded-3xl
                 border
-                border-gray-200
-                text-gray-600
-                text-xs
-                font-semibold
-                flex
-                items-center
-                justify-center
-                gap-2
-                hover:bg-gray-50
-                hover:border-gray-300
-                transition
-                shadow-sm
-              "
+                p-5 sm:p-7
+                ${
+                  darkMode
+                    ? "bg-gradient-to-br from-[#0C2418] via-[#0D321F] to-[#091B12] border-emerald-900/40"
+                    : "bg-gradient-to-br from-white via-[#EFF9F3] to-[#E5F5EB] border-green-100"
+                }
+              `}
             >
-              <Printer size={15} />
-              Printable Report
-            </button>
-          </div>
+              <div className="absolute -right-20 -top-20 w-64 h-64 rounded-full bg-green-400/10 blur-3xl pointer-events-none" />
+              <div className="absolute -left-16 -bottom-24 w-52 h-52 rounded-full bg-emerald-400/10 blur-3xl pointer-events-none" />
 
-          {/* STATS */}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
-            <StatCard
-              icon={
-                <FileText size={18} />
-              }
-              label="Total Cases"
-              value={stats.total}
-              description="All intervention-ready cases"
-            />
-
-            <StatCard
-              icon={
-                <Timer size={18} />
-              }
-              label="Ongoing"
-              value={stats.ongoing}
-              description="Currently being handled"
-              iconBg="bg-amber-50"
-              iconColor="text-amber-600"
-            />
-
-            <StatCard
-              icon={
-                <CircleCheck
-                  size={18}
-                />
-              }
-              label="Completed"
-              value={
-                stats.completed
-              }
-              description="Successfully resolved"
-              iconBg="bg-emerald-50"
-              iconColor="text-emerald-600"
-            />
-
-            <StatCard
-              icon={
-                <Clock3 size={18} />
-              }
-              label="Pending"
-              value={stats.pending}
-              description="Awaiting intervention"
-              iconBg="bg-blue-50"
-              iconColor="text-blue-600"
-            />
-          </div>
-
-          {/* SEARCH + FILTER */}
-
-          <div
-            className="
-              bg-white
-              border border-gray-100
-              rounded-2xl
-              shadow-sm
-              p-5
-              mb-6
-            "
-          >
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div
-                className="
-                  flex
-                  items-center
-                  gap-3
-                  h-11
-                  px-4
-                  rounded-xl
-                  bg-gray-50
-                  border
-                  border-gray-200
-                  w-full
-                  lg:max-w-md
-                  focus-within:border-green-300
-                  focus-within:ring-4
-                  focus-within:ring-green-50
-                  transition
-                "
-              >
-                <Search
-                  size={17}
-                  className="text-gray-400 shrink-0"
-                />
-
-                <input
-                  className="
-                    bg-transparent
-                    outline-none
-                    w-full
-                    text-sm
-                    text-gray-700
-                    placeholder:text-gray-400
-                  "
-                  value={search}
-                  onChange={(e) =>
-                    setSearch(
-                      e.target.value,
-                    )
-                  }
-                  placeholder="Search student or offense..."
-                />
-
-                {search && (
-                  <button
-                    onClick={() =>
-                      setSearch("")
-                    }
-                    className="text-gray-400 hover:text-gray-700"
-                  >
-                    <X size={15} />
-                  </button>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 overflow-x-auto pb-1">
-                {[
-                  {
-                    id: "all",
-                    label: "All",
-                  },
-                  {
-                    id: "none",
-                    label: "Pending",
-                  },
-                  {
-                    id: "ongoing",
-                    label: "Ongoing",
-                  },
-                  {
-                    id: "completed",
-                    label: "Completed",
-                  },
-                ].map(
-                  (item) => (
-                    <Tab
-                      key={item.id}
-                      label={
-                        item.label
-                      }
-                      active={
-                        tab ===
-                        item.id
-                      }
-                      onClick={() =>
-                        setTab(
-                          item.id,
-                        )
-                      }
-                    />
-                  ),
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* RESULTS HEADER */}
-
-          <div className="flex items-center justify-between mb-4 px-1">
-            <div>
-              <p className="text-sm font-semibold text-gray-700">
-                Intervention Cases
-              </p>
-
-              <p className="text-xs text-gray-400 mt-0.5">
-                Showing{" "}
-                {filtered.length}{" "}
-                {filtered.length ===
-                1
-                  ? "case"
-                  : "cases"}
-              </p>
-            </div>
-
-            {search && (
-              <span className="text-xs text-gray-400">
-                Search results for{" "}
-                <span className="font-semibold text-gray-600">
-                  "{search}"
-                </span>
-              </span>
-            )}
-          </div>
-
-          {/* CASES */}
-
-          <div
-            className="
-              bg-white
-              border border-gray-100
-              rounded-2xl
-              shadow-sm
-              p-5
-            "
-          >
-            {filtered.length ===
-            0 ? (
-              <div className="min-h-[420px] flex items-center justify-center">
-                <div className="text-center max-w-sm">
+              <div className="relative flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+                <div className="max-w-2xl">
                   <div
-                    className="
-                      w-16
-                      h-16
-                      rounded-2xl
-                      bg-green-50
-                      text-green-600
-                      flex
-                      items-center
-                      justify-center
-                      mx-auto
-                      mb-4
-                    "
+                    className={`
+                      inline-flex items-center gap-2 px-3 py-1.5 rounded-full
+                      border text-[10px] sm:text-[11px] font-bold uppercase tracking-wider
+                      ${
+                        darkMode
+                          ? "bg-emerald-950/50 border-emerald-800/50 text-emerald-300"
+                          : "bg-white/80 border-green-100 text-green-700"
+                      }
+                    `}
                   >
-                    <ClipboardCheck
-                      size={28}
-                    />
+                    <Sparkles size={12} />
+                    GuidEd • Intervention Management
                   </div>
 
-                  <h3 className="text-lg font-bold text-gray-900">
-                    No intervention cases
-                  </h3>
+                  <h1
+                    className={`
+                      text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight mt-4
+                      ${darkMode ? "text-white" : "text-slate-900"}
+                    `}
+                  >
+                    Your intervention workload,
+                    <span className="text-green-500">{" "}at a glance.</span>
+                  </h1>
 
-                  <p className="text-sm text-gray-400 mt-2 leading-relaxed">
-                    There are no cases matching your
-                    current search or intervention
-                    filter.
+                  <p
+                    className={`
+                      text-sm sm:text-base leading-relaxed mt-3 max-w-xl
+                      ${darkMode ? "text-slate-300" : "text-slate-500"}
+                    `}
+                  >
+                    Review active interventions, monitor student support progress, and keep every
+                    intervention moving through the guidance workflow from one organized workspace.
                   </p>
 
-                  {(search ||
-                    tab !==
-                      "all") && (
-                    <button
-                      onClick={() => {
-                        setSearch(
-                          "",
-                        );
-                        setTab(
-                          "all",
-                        );
-                      }}
-                      className="
-                        mt-5
-                        px-4
-                        py-2
-                        rounded-xl
-                        text-sm
-                        font-semibold
-                        text-green-700
-                        bg-green-50
-                        hover:bg-green-100
-                        transition
-                      "
+                  <div className="flex flex-wrap gap-2 mt-5">
+                    <div
+                      className={`
+                        inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold
+                        ${
+                          darkMode
+                            ? "bg-white/5 text-slate-300 border border-white/10"
+                            : "bg-white/80 text-slate-600 border border-white"
+                        }
+                      `}
                     >
-                      Clear Filters
-                    </button>
-                  )}
+                      <BriefcaseBusiness size={14} className="text-green-500" />
+                      {stats.total} interventions
+                    </div>
+
+                    <div
+                      className={`
+                        inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold
+                        ${
+                          darkMode
+                            ? "bg-amber-950/30 text-amber-300 border border-amber-900/30"
+                            : "bg-amber-50 text-amber-700 border border-amber-100"
+                        }
+                      `}
+                    >
+                      <Activity size={14} />
+                      {stats.ongoing} ongoing
+                    </div>
+
+                    <div
+                      className={`
+                        inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold
+                        ${
+                          darkMode
+                            ? "bg-emerald-950/30 text-emerald-300 border border-emerald-900/30"
+                            : "bg-green-50 text-green-700 border border-green-100"
+                        }
+                      `}
+                    >
+                      <ShieldCheck size={14} />
+                      {stats.completed} completed
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  className={`
+                    shrink-0 w-full xl:w-[260px] rounded-2xl p-4 border
+                    ${darkMode ? "bg-black/10 border-white/10" : "bg-white/70 border-white"}
+                  `}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-green-500 text-white flex items-center justify-center shadow-lg shadow-green-500/20">
+                      <ClipboardList size={20} />
+                    </div>
+
+                    <div>
+                      <p className={`text-xs font-semibold ${textMuted}`}>Directory</p>
+                      <p className={`text-lg font-extrabold ${textPrimary}`}>{filtered.length}</p>
+                    </div>
+                  </div>
+
+                  <p className={`text-xs leading-relaxed mt-3 ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
+                    Currently matching your selected search and filters.
+                  </p>
                 </div>
               </div>
+            </div>
+          </section>
+
+          {/* INTERVENTION COMMAND CENTER */}
+
+          <section className="mb-7">
+            <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_.65fr] gap-4">
+              <div className={`relative overflow-hidden rounded-3xl border p-5 sm:p-6 ${darkMode ? "bg-[#0C1913] border-emerald-950/60" : "bg-white border-gray-100"} shadow-sm`}>
+                <div className="absolute -right-12 -top-12 w-40 h-40 rounded-full bg-green-500/5 pointer-events-none" />
+                <div className="relative">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? "bg-emerald-950/60 text-emerald-300" : "bg-green-50 text-green-600"}`}>
+                        <Activity size={18} />
+                      </div>
+                      <div>
+                        <p className={`text-[10px] uppercase tracking-widest font-bold ${textMuted}`}>Intervention command center</p>
+                        <h3 className={`text-lg font-black ${textPrimary}`}>Keep every support plan moving.</h3>
+                      </div>
+                    </div>
+                    <button onClick={fetchData} className={`h-10 px-4 rounded-xl border text-xs font-bold flex items-center gap-2 transition ${darkMode ? "bg-[#101F17] border-emerald-950/60 text-slate-300 hover:bg-emerald-950/30" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
+                      <Activity size={14} /> Refresh
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
+                    {[
+                      { label: "Total", value: stats.total, icon: FileText, tone: "green" },
+                      { label: "Pending", value: stats.pending, icon: Clock3, tone: "blue" },
+                      { label: "Ongoing", value: stats.ongoing, icon: Activity, tone: "amber" },
+                      { label: "Completed", value: stats.completed, icon: CircleCheck, tone: "emerald" },
+                    ].map((item) => {
+                      const Icon = item.icon;
+                      const toneClass =
+                        item.tone === "amber"
+                          ? darkMode ? "bg-amber-950/30 text-amber-300" : "bg-amber-50 text-amber-600"
+                          : item.tone === "blue"
+                            ? darkMode ? "bg-blue-950/30 text-blue-300" : "bg-blue-50 text-blue-600"
+                            : darkMode ? "bg-emerald-950/40 text-emerald-300" : "bg-green-50 text-green-600";
+                      return (
+                        <div key={item.label} className={`rounded-2xl border p-3.5 ${darkMode ? "bg-[#101F17] border-emerald-950/50" : "bg-[#F8FAFC] border-gray-100"}`}>
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${toneClass}`}><Icon size={15} /></div>
+                          <p className={`text-2xl font-black ${textPrimary}`}>{item.value}</p>
+                          <p className={`text-[10px] uppercase tracking-wider font-bold mt-0.5 ${textMuted}`}>{item.label}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className={`rounded-3xl border p-5 sm:p-6 ${darkMode ? "bg-[#0C1913] border-emerald-950/60" : "bg-white border-gray-100"} shadow-sm`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className={`text-[10px] uppercase tracking-widest font-bold ${textMuted}`}>Workload pulse</p>
+                    <h3 className={`text-base font-black mt-1 ${textPrimary}`}>Intervention progress</h3>
+                  </div>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${darkMode ? "bg-emerald-950/50 text-emerald-300" : "bg-green-50 text-green-600"}`}><ChartNoAxesCombined size={17} /></div>
+                </div>
+                <div className="mt-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-xs font-semibold ${textMuted}`}>Completion rate</span>
+                    <span className={`text-sm font-black ${darkMode ? "text-emerald-300" : "text-green-700"}`}>{stats.total ? Math.round((stats.completed / stats.total) * 100) : 0}%</span>
+                  </div>
+                  <div className={`h-2.5 rounded-full overflow-hidden ${darkMode ? "bg-emerald-950/50" : "bg-green-50"}`}>
+                    <div className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all duration-500" style={{ width: `${stats.total ? Math.round((stats.completed / stats.total) * 100) : 0}%` }} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mt-5">
+                  {[
+                    { label: "Pending", value: stats.pending, dot: "bg-blue-500" },
+                    { label: "Ongoing", value: stats.ongoing, dot: "bg-amber-500" },
+                    { label: "Done", value: stats.completed, dot: "bg-emerald-500" },
+                  ].map((item) => (
+                    <div key={item.label} className={`rounded-xl p-3 ${darkMode ? "bg-[#101F17]" : "bg-gray-50"}`}>
+                      <div className="flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${item.dot}`} /><span className={`text-[10px] font-bold ${textMuted}`}>{item.label}</span></div>
+                      <p className={`text-lg font-black mt-1 ${textPrimary}`}>{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* QUICK ACTIONS */}
+
+          <section className="mb-7">
+            <div className="mb-4">
+              <p className={`text-[10px] uppercase tracking-widest font-bold ${textMuted}`}>Shortcuts</p>
+              <h3 className={`text-xl font-black mt-1 ${textPrimary}`}>Move faster</h3>
+              <p className={`text-sm mt-1 ${textMuted}`}>Jump straight to the work that needs attention.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+              {[
+                { label: "Review pending", description: `${stats.pending} case${stats.pending === 1 ? "" : "s"} waiting`, icon: Clock3, action: () => setTab("none"), className: darkMode ? "bg-blue-950/20 border-blue-900/40 hover:bg-blue-950/30" : "bg-blue-50/60 border-blue-100 hover:bg-blue-50", iconClass: darkMode ? "bg-blue-950/50 text-blue-300" : "bg-white text-blue-600" },
+                { label: "Continue ongoing", description: `${stats.ongoing} active plan${stats.ongoing === 1 ? "" : "s"}`, icon: Activity, action: () => setTab("ongoing"), className: darkMode ? "bg-amber-950/20 border-amber-900/40 hover:bg-amber-950/30" : "bg-amber-50/60 border-amber-100 hover:bg-amber-50", iconClass: darkMode ? "bg-amber-950/50 text-amber-300" : "bg-white text-amber-600" },
+                { label: "Create intervention", description: "Start a new support plan", icon: Plus, action: () => { const target = filtered[0] || interventionCases[0]; if (target) { setSelected(target); setOpen(true); } }, className: darkMode ? "bg-emerald-950/20 border-emerald-900/40 hover:bg-emerald-950/30" : "bg-green-50/60 border-green-100 hover:bg-green-50", iconClass: darkMode ? "bg-emerald-950/50 text-emerald-300" : "bg-white text-green-600" },
+                { label: "Printable report", description: "Prepare a case summary", icon: Printer, action: () => setShowPrintableReport(true), className: darkMode ? "bg-[#101F17] border-emerald-950/50 hover:bg-emerald-950/30" : "bg-white border-gray-100 hover:bg-gray-50", iconClass: darkMode ? "bg-[#14231C] text-slate-300" : "bg-gray-50 text-gray-600" },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button key={item.label} onClick={item.action} className={`group text-left rounded-2xl border p-4 transition ${item.className}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${item.iconClass}`}><Icon size={17} /></div>
+                      <div className="min-w-0 flex-1"><p className={`text-sm font-bold ${textPrimary}`}>{item.label}</p><p className={`text-[11px] mt-0.5 ${textMuted}`}>{item.description}</p></div>
+                      <ChevronRight size={15} className={`shrink-0 transition-transform group-hover:translate-x-1 ${textMuted}`} />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* FIND + FILTER WORKSPACE */}
+
+          <section className={`rounded-3xl border p-4 sm:p-5 mb-6 ${darkMode ? "bg-[#0C1913] border-emerald-950/60" : "bg-white border-gray-100"} shadow-sm`}>
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+              <div>
+                <p className={`text-[10px] uppercase tracking-widest font-bold ${textMuted}`}>Intervention directory</p>
+                <h3 className={`text-lg font-black mt-1 ${textPrimary}`}>Find the right case</h3>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
+                <div className={`flex items-center gap-3 h-11 px-4 rounded-xl border w-full sm:w-[330px] focus-within:ring-4 transition ${darkMode ? "bg-[#101F17] border-emerald-950/60 focus-within:border-emerald-700 focus-within:ring-emerald-950/30" : "bg-gray-50 border-gray-200 focus-within:border-green-300 focus-within:ring-green-50"}`}>
+                  <Search size={16} className={textMuted} />
+                  <input className={`bg-transparent outline-none w-full text-sm ${darkMode ? "text-slate-100 placeholder:text-slate-500" : "text-gray-700 placeholder:text-gray-400"}`} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search student or incident..." />
+                  {search && <button onClick={() => setSearch("")} className={textMuted} aria-label="Clear search"><X size={15} /></button>}
+                </div>
+                <div className={`flex items-center rounded-xl border p-1 overflow-x-auto ${darkMode ? "bg-[#101F17] border-emerald-950/60" : "bg-gray-50 border-gray-200"}`}>
+                  {[
+                    { id: "all", label: "All" },
+                    { id: "none", label: "Pending" },
+                    { id: "ongoing", label: "Ongoing" },
+                    { id: "completed", label: "Completed" },
+                  ].map((item) => (
+                    <button key={item.id} onClick={() => setTab(item.id)} className={`px-3 py-2 rounded-lg text-[11px] font-bold whitespace-nowrap transition ${tab === item.id ? darkMode ? "bg-emerald-900/50 text-emerald-200" : "bg-white text-green-700 shadow-sm" : textMuted}`}>{item.label}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 pt-4 border-t ${darkMode ? "border-emerald-950/40" : "border-gray-100"}`}>
+              <div className="flex items-center gap-2 overflow-x-auto">
+                <span className={`text-[10px] uppercase tracking-wider font-bold shrink-0 ${textMuted}`}>Priority</span>
+                {[
+                  { id: "all", label: "All cases" },
+                  { id: "High", label: "High risk" },
+                  { id: "Medium", label: "Medium" },
+                  { id: "Low", label: "Low" },
+                ].map((item) => (
+                  <button key={item.id} onClick={() => setPriorityFilter(item.id)} className={`px-3 py-1.5 rounded-lg border text-[10px] font-bold whitespace-nowrap transition ${priorityFilter === item.id ? darkMode ? "bg-emerald-950/50 border-emerald-800/60 text-emerald-200" : "bg-green-50 border-green-100 text-green-700" : darkMode ? "border-emerald-950/50 text-slate-400 hover:bg-emerald-950/20" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>{item.label}</button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-semibold ${textMuted}`}>
+                  {filtered.filter((c) => priorityFilter === "all" || String(c.level || "").toLowerCase() === priorityFilter.toLowerCase()).length} matching
+                </span>
+                <div className={`flex items-center rounded-lg border p-0.5 ${darkMode ? "border-emerald-950/60 bg-[#101F17]" : "border-gray-200 bg-gray-50"}`}>
+                  <button onClick={() => setViewMode("cards")} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold ${viewMode === "cards" ? darkMode ? "bg-emerald-900/50 text-emerald-200" : "bg-white text-green-700 shadow-sm" : textMuted}`}>Cards</button>
+                  <button onClick={() => setViewMode("compact")} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold ${viewMode === "compact" ? darkMode ? "bg-emerald-900/50 text-emerald-200" : "bg-white text-green-700 shadow-sm" : textMuted}`}>Compact</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* CASE DIRECTORY */}
+
+          <section className="mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4">
+              <div>
+                <p className={`text-[10px] uppercase tracking-widest font-bold ${textMuted}`}>Active workload</p>
+                <h3 className={`text-xl font-black mt-1 ${textPrimary}`}>Intervention cases</h3>
+                <p className={`text-sm mt-1 ${textMuted}`}>Open a case to review its plan, history, and GuidEd AI recommendation.</p>
+              </div>
+              {(search || tab !== "all" || priorityFilter !== "all") && (
+                <button onClick={() => { setSearch(""); setTab("all"); setPriorityFilter("all"); }} className={`text-xs font-bold px-3 py-2 rounded-xl border ${darkMode ? "border-emerald-950/60 text-emerald-300 hover:bg-emerald-950/30" : "border-green-100 text-green-700 hover:bg-green-50"}`}>Clear filters</button>
+              )}
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className={`rounded-3xl border p-10 sm:p-16 text-center ${darkMode ? "bg-[#0C1913] border-emerald-950/60" : "bg-white border-gray-100"} shadow-sm`}>
+                <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center ${darkMode ? "bg-emerald-950/40 text-emerald-300" : "bg-green-50 text-green-600"}`}><ClipboardCheck size={28} /></div>
+                <h3 className={`text-lg font-black mt-5 ${textPrimary}`}>No matching intervention cases</h3>
+                <p className={`text-sm max-w-sm mx-auto mt-2 leading-relaxed ${textMuted}`}>Try another search or clear the filters to see more cases in the intervention directory.</p>
+                <button onClick={() => { setSearch(""); setTab("all"); setPriorityFilter("all"); }} className={`mt-5 px-4 py-2.5 rounded-xl text-xs font-bold ${darkMode ? "bg-emerald-950/50 text-emerald-200 hover:bg-emerald-950/70" : "bg-green-50 text-green-700 hover:bg-green-100"}`}>Reset workspace</button>
+              </div>
             ) : (
-              <motion.div
-                layout
-                className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
-              >
-                {filtered.map(
-                  (c) => {
-                    const status =
-                      getIncidentInterventionStatus(
-                        c.incidentId,
+              <div className={viewMode === "cards" ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" : "space-y-3"}>
+                {filtered
+                  .filter((c) => priorityFilter === "all" || String(c.level || "").toLowerCase() === priorityFilter.toLowerCase())
+                  .map((c, index) => {
+                    const status = getIncidentInterventionStatus(c.incidentId);
+                    const statusConfig = getStatusConfig(status);
+                    const StatusIcon = statusConfig.icon;
+                    const interventionCount = getIncidentInterventions(c.incidentId).length;
+                    const aiResult = getAIRecommendation(c.incidentId);
+
+                    if (viewMode === "compact") {
+                      return (
+                        <button key={c._id} onClick={() => openCase(c)} className={`w-full text-left rounded-2xl border p-4 transition group ${darkMode ? "bg-[#0C1913] border-emerald-950/60 hover:bg-[#101F17]" : "bg-white border-gray-100 hover:border-green-100 hover:shadow-sm"}`}>
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${darkMode ? "bg-emerald-950/50 text-emerald-300" : "bg-green-50 text-green-700"}`}>{getInitials(c.studentName)}</div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className={`text-sm font-black ${textPrimary}`}>{c.studentName}</p>
+                                <span className={`px-2 py-1 rounded-lg border text-[9px] font-bold ${statusConfig.badge}`}><StatusIcon size={10} className="inline mr-1" />{statusConfig.label}</span>
+                                <span className={`px-2 py-1 rounded-lg text-[9px] font-bold ${String(c.level).toLowerCase() === "high" ? darkMode ? "bg-red-950/40 text-red-300" : "bg-red-50 text-red-700" : String(c.level).toLowerCase() === "medium" ? darkMode ? "bg-amber-950/40 text-amber-300" : "bg-amber-50 text-amber-700" : darkMode ? "bg-emerald-950/40 text-emerald-300" : "bg-emerald-50 text-emerald-700"}`}>{c.level} risk</span>
+                              </div>
+                              <p className={`text-xs mt-1 truncate ${textMuted}`}>{c.offense} • {c.grade} • {c.studentCode}</p>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="text-right"><p className={`text-[10px] font-bold ${textMuted}`}>{interventionCount} intervention{interventionCount === 1 ? "" : "s"}</p><p className={`text-[10px] mt-1 ${textMuted}`}>{aiResult?.conclusion || "AI review available"}</p></div>
+                              <ChevronRight size={16} className={textMuted} />
+                            </div>
+                          </div>
+                        </button>
                       );
-
-                    const statusConfig =
-                      getStatusConfig(
-                        status,
-                      );
-
-                    const StatusIcon =
-                      statusConfig.icon;
-
-                    const interventionCount =
-                      getIncidentInterventions(
-                        c.incidentId,
-                      ).length;
-
-                    const aiResult =
-                      getAIRecommendation(
-                        c.incidentId,
-                      );
+                    }
 
                     return (
-                      <motion.div
-                        layout
-                        key={c._id}
-                        whileHover={{
-                          y: -3,
-                          boxShadow:
-                            "0 12px 30px rgba(15, 23, 42, 0.07)",
-                        }}
-                        transition={{
-                          duration: 0.2,
-                        }}
-                        onClick={() =>
-                          openCase(c)
-                        }
-                        className="
-                          group
-                          bg-white
-                          border
-                          border-gray-100
-                          rounded-2xl
-                          p-5
-                          cursor-pointer
-                          transition-all
-                          relative
-                          overflow-hidden
-                        "
-                      >
-                        {/* TOP */}
-
-                        <div className="flex items-start justify-between gap-4">
-                          <div
-                            className="
-                              w-12
-                              h-12
-                              rounded-xl
-                              bg-green-50
-                              text-green-700
-                              flex
-                              items-center
-                              justify-center
-                              font-bold
-                              text-sm
-                              shrink-0
-                            "
-                          >
-                            {getInitials(
-                              c.studentName,
-                            )}
+                      <motion.article key={c._id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18, delay: Math.min(index * 0.025, 0.15) }} onClick={() => openCase(c)} className={`group relative overflow-hidden rounded-3xl border p-5 cursor-pointer transition-all ${darkMode ? "bg-[#0C1913] border-emerald-950/60 hover:border-emerald-800/70 hover:bg-[#101F17]" : "bg-white border-gray-100 hover:border-green-100 hover:shadow-[0_18px_45px_rgba(15,23,42,0.07)]"}`}>
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-green-400 to-emerald-600 opacity-70" />
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 ${darkMode ? "bg-emerald-950/50 text-emerald-300" : "bg-green-50 text-green-700"}`}>{getInitials(c.studentName)}</div>
+                            <div className="min-w-0"><h3 className={`text-base font-black truncate group-hover:text-green-600 transition-colors ${textPrimary}`}>{c.studentName}</h3><p className={`text-[10px] mt-1 truncate ${textMuted}`}>{c.studentCode} • {c.grade} • {c.gender}</p></div>
                           </div>
+                          <span className={`shrink-0 px-2.5 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-wide ${statusConfig.badge}`}><StatusIcon size={11} className="inline mr-1" />{statusConfig.label}</span>
+                        </div>
 
-                          <div
-                            className={`
-                              flex
-                              items-center
-                              gap-1.5
-                              px-2.5
-                              py-1.5
-                              rounded-lg
-                              border
-                              text-[10px]
-                              font-bold
-                              uppercase
-                              tracking-wide
-                              ${statusConfig.badge}
-                            `}
-                          >
-                            <StatusIcon
-                              size={
-                                11
-                              }
-                            />
+                        <div className={`mt-5 rounded-2xl border p-4 ${darkMode ? "bg-[#101F17] border-emerald-950/50" : "bg-gray-50 border-gray-100"}`}>
+                          <div className="flex items-center justify-between gap-3 mb-2">
+                            <div className="flex items-center gap-2"><AlertCircle size={13} className={darkMode ? "text-slate-400" : "text-gray-500"} /><span className={`text-[9px] uppercase tracking-widest font-black ${textMuted}`}>Current incident</span></div>
+                            <span className={`px-2 py-1 rounded-lg text-[9px] font-black ${String(c.level).toLowerCase() === "high" ? darkMode ? "bg-red-950/40 text-red-300" : "bg-red-50 text-red-700" : String(c.level).toLowerCase() === "medium" ? darkMode ? "bg-amber-950/40 text-amber-300" : "bg-amber-50 text-amber-700" : darkMode ? "bg-emerald-950/40 text-emerald-300" : "bg-emerald-50 text-emerald-700"}`}>{c.level} risk</span>
+                          </div>
+                          <p className={`text-sm font-bold leading-relaxed line-clamp-2 ${darkMode ? "text-slate-200" : "text-gray-700"}`}>{c.offense}</p>
+                          <div className="flex flex-wrap gap-2 mt-3"><span className={`px-2 py-1 rounded-lg text-[9px] font-semibold ${darkMode ? "bg-[#0C1913] text-slate-400" : "bg-white text-gray-500"}`}>{c.category}</span><span className={`px-2 py-1 rounded-lg text-[9px] font-semibold ${darkMode ? "bg-[#0C1913] text-slate-400" : "bg-white text-gray-500"}`}>{interventionCount} plan{interventionCount === 1 ? "" : "s"}</span></div>
+                        </div>
 
-                            {
-                              statusConfig.label
-                            }
+                        <div className={`mt-4 rounded-2xl border p-3.5 ${darkMode ? "bg-emerald-950/20 border-emerald-900/50" : "bg-green-50/60 border-green-100"}`}>
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${darkMode ? "bg-emerald-950/50 text-emerald-300" : "bg-white text-green-600"}`}><Brain size={15} /></div>
+                            <div className="min-w-0 flex-1"><p className={`text-[9px] uppercase tracking-widest font-black ${darkMode ? "text-emerald-400" : "text-green-600"}`}>GuidEd AI Review</p><p className={`text-xs font-bold mt-0.5 truncate ${darkMode ? "text-emerald-200" : "text-green-900"}`}>{aiResult?.conclusion || "Open case to generate a recommendation"}</p></div>
+                            <ChevronRight size={15} className={darkMode ? "text-emerald-400" : "text-green-500"} />
                           </div>
                         </div>
 
-                        {/* STUDENT */}
-
-                        <div className="mt-4">
-                          <h3
-                            className="
-                              text-base
-                              font-bold
-                              text-gray-900
-                              group-hover:text-green-700
-                              transition-colors
-                            "
-                          >
-                            {
-                              c.studentName
-                            }
-                          </h3>
-
-                          <p className="text-xs text-gray-400 mt-1">
-                            {c.grade} •{" "}
-                            {
-                              c.studentCode
-                            }{" "}
-                            •{" "}
-                            {
-                              c.gender
-                            }
-                          </p>
+                        <div className={`flex items-center justify-between gap-3 mt-4 pt-4 border-t ${darkMode ? "border-emerald-950/50" : "border-gray-100"}`}>
+                          <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${statusConfig.dot}`} /><span className={`text-[10px] font-semibold ${textMuted}`}>{interventionCount ? `${interventionCount} intervention${interventionCount === 1 ? "" : "s"} recorded` : "No intervention recorded yet"}</span></div>
+                          <span className={`text-[10px] font-black flex items-center gap-1 ${darkMode ? "text-emerald-300" : "text-green-700"}`}>Open case <ChevronRight size={12} /></span>
                         </div>
-
-                        {/* INCIDENT */}
-
-                        <div className="mt-5">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-5 h-5 rounded-md bg-gray-100 flex items-center justify-center">
-                              <AlertCircle
-                                size={
-                                  11
-                                }
-                                className="text-gray-500"
-                              />
-                            </div>
-
-                            <p
-                              className="
-                                text-[10px]
-                                uppercase
-                                tracking-wider
-                                font-bold
-                                text-gray-400
-                              "
-                            >
-                              Incident
-                            </p>
-                          </div>
-
-                          <p
-                            className="
-                              text-sm
-                              text-gray-700
-                              leading-relaxed
-                              line-clamp-2
-                              min-h-[40px]
-                            "
-                          >
-                            {
-                              c.offense
-                            }
-                          </p>
-                        </div>
-
-                        {/* AI */}
-
-                        <div
-                          className="
-                            mt-5
-                            p-3.5
-                            rounded-xl
-                            bg-green-50/70
-                            border
-                            border-green-100
-                          "
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div
-                                className="
-                                  w-7
-                                  h-7
-                                  rounded-lg
-                                  bg-white
-                                  text-green-600
-                                  flex
-                                  items-center
-                                  justify-center
-                                  shrink-0
-                                "
-                              >
-                                {aiLoading &&
-                                selected?.incidentId ===
-                                  c.incidentId ? (
-                                  <Loader2
-                                    size={
-                                      14
-                                    }
-                                    className="animate-spin"
-                                  />
-                                ) : (
-                                  <Brain
-                                    size={
-                                      14
-                                    }
-                                  />
-                                )}
-                              </div>
-
-                              <div className="min-w-0">
-                                <p
-                                  className="
-                                    text-[9px]
-                                    uppercase
-                                    tracking-wider
-                                    font-bold
-                                    text-green-600
-                                  "
-                                >
-                                  AI Recommendation
-                                </p>
-
-                                <p
-                                  className="
-                                    text-xs
-                                    font-semibold
-                                    text-green-900
-                                    mt-0.5
-                                    line-clamp-2
-                                  "
-                                >
-                                  {aiResult?.conclusion ||
-                                    (aiLoading &&
-                                    selected?.incidentId ===
-                                      c.incidentId
-                                      ? "Analyzing..."
-                                      : "Open case to analyze")}
-                                </p>
-                              </div>
-                            </div>
-
-                            <ChevronRight
-                              size={15}
-                              className="
-                                text-green-400
-                                group-hover:translate-x-0.5
-                                transition
-                                shrink-0
-                              "
-                            />
-                          </div>
-                        </div>
-
-                        {/* FOOTER */}
-
-                        <div
-                          className="
-                            flex
-                            items-center
-                            justify-between
-                            mt-5
-                            pt-4
-                            border-t
-                            border-gray-100
-                          "
-                        >
-                          <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                            <HandHelping
-                              size={
-                                13
-                              }
-                            />
-
-                            {
-                              interventionCount
-                            }{" "}
-                            {interventionCount ===
-                            1
-                              ? "intervention"
-                              : "interventions"}
-                          </div>
-
-                          <span
-                            className="
-                              text-xs
-                              font-semibold
-                              text-green-600
-                              opacity-0
-                              group-hover:opacity-100
-                              transition
-                            "
-                          >
-                            View Case →
-                          </span>
-                        </div>
-                      </motion.div>
+                      </motion.article>
                     );
-                  },
-                )}
-              </motion.div>
+                  })}
+              </div>
             )}
-          </div>
+          </section>
+
+          {/* SUPPORT SNAPSHOT */}
+
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-6">
+            {[
+              { label: "Support queue", title: `${stats.pending} pending cases`, text: "Pending cases are ready for an intervention plan or follow-up action.", icon: ClipboardList, iconClass: darkMode ? "bg-blue-950/40 text-blue-300" : "bg-blue-50 text-blue-600" },
+              { label: "In progress", title: `${stats.ongoing} active plans`, text: "Keep active support plans updated until their intended action is completed.", icon: Timer, iconClass: darkMode ? "bg-amber-950/40 text-amber-300" : "bg-amber-50 text-amber-600" },
+              { label: "Resolved", title: `${stats.completed} completed`, text: "Completed interventions remain available in the case history for future context.", icon: ShieldCheck, iconClass: darkMode ? "bg-emerald-950/40 text-emerald-300" : "bg-emerald-50 text-emerald-600" },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className={`rounded-3xl border p-5 ${darkMode ? "bg-[#0C1913] border-emerald-950/60" : "bg-white border-gray-100"} shadow-sm`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.iconClass}`}><Icon size={17} /></div>
+                    <div><p className={`text-[10px] uppercase tracking-widest font-bold ${textMuted}`}>{item.label}</p><h4 className={`font-black ${textPrimary}`}>{item.title}</h4></div>
+                  </div>
+                  <p className={`text-xs leading-relaxed mt-4 ${textMuted}`}>{item.text}</p>
+                </div>
+              );
+            })}
+          </section>
         </div>
       </main>
 
@@ -2431,12 +2088,12 @@ const InterventionPage = () => {
                   w-full
                   max-w-6xl
                   max-h-[92vh]
+                  intervention-modal
                   bg-[#F8FAFC]
                   rounded-3xl
                   shadow-2xl
                   overflow-hidden
                   border
-                  border-white
                   flex
                   flex-col
                 "
@@ -2845,26 +2502,11 @@ const InterventionPage = () => {
 
                       return (
                         <div
-                          className="
-                            rounded-2xl
-                            border
-                            border-green-100
-                            bg-green-50/80
-                            p-5
-                          "
+                          className={`rounded-2xl border p-5 ${darkMode ? "border-emerald-900/60 bg-emerald-950/35" : "border-green-100 bg-green-50/80"}`}
                         >
                           <div className="flex items-center gap-3 mb-3">
                             <div
-                              className="
-                                w-9
-                                h-9
-                                rounded-xl
-                                bg-white
-                                text-green-600
-                                flex
-                                items-center
-                                justify-center
-                              "
+                              className={`w-9 h-9 rounded-xl flex items-center justify-center ${darkMode ? "bg-[#101F17] text-emerald-400" : "bg-white text-green-600"}`}
                             >
                               {aiLoading ? (
                                 <Loader2
@@ -2884,24 +2526,13 @@ const InterventionPage = () => {
 
                             <div>
                               <p
-                                className="
-                                  text-[10px]
-                                  uppercase
-                                  tracking-wider
-                                  font-bold
-                                  text-green-600
-                                "
+                                className={`text-[10px] uppercase tracking-wider font-bold ${darkMode ? "text-emerald-400" : "text-green-600"}`}
                               >
                                 AI Recommendation
                               </p>
 
                               <p
-                                className="
-                                  text-base
-                                  font-bold
-                                  text-green-900
-                                  mt-0.5
-                                "
+                                className={`text-base font-bold mt-0.5 ${darkMode ? "text-emerald-200" : "text-green-900"}`}
                               >
                                 {aiLoading
                                   ? "Analyzing current incident..."
@@ -3992,6 +3623,7 @@ const Nav = ({
   label,
   onClick,
   active,
+  darkMode = false,
 }) => (
   <button
     onClick={onClick}
@@ -4008,8 +3640,10 @@ const Nav = ({
       transition
       ${
         active
-          ? "bg-green-50 text-green-700 font-semibold"
-          : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+          ? (darkMode ? "bg-emerald-950/50 text-emerald-300 font-semibold" : "bg-green-50 text-green-700 font-semibold")
+          : darkMode
+            ? "text-slate-400 hover:bg-emerald-950/30 hover:text-slate-100"
+            : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
       }
     `}
   >
@@ -4019,7 +3653,9 @@ const Nav = ({
         ${
           active
             ? "text-green-600"
-            : "text-gray-400 group-hover:text-gray-700"
+            : darkMode
+              ? "text-slate-500 group-hover:text-emerald-400"
+              : "text-gray-400 group-hover:text-gray-700"
         }
       `}
     >
@@ -4071,6 +3707,27 @@ const Tab = ({
    STAT CARD
 ========================================================= */
 
+const HeroMetric = ({ icon, value, label, darkMode = false, tone = "green" }) => {
+  const toneClass = {
+    green: darkMode ? "bg-emerald-950/50 text-emerald-400" : "bg-green-50 text-green-700",
+    amber: darkMode ? "bg-amber-950/40 text-amber-400" : "bg-amber-50 text-amber-700",
+    emerald: darkMode ? "bg-emerald-950/50 text-emerald-400" : "bg-emerald-50 text-emerald-700",
+    blue: darkMode ? "bg-blue-950/40 text-blue-400" : "bg-blue-50 text-blue-700",
+  }[tone];
+
+  return (
+    <div className={`rounded-2xl border p-3.5 sm:p-4 ${darkMode ? "bg-[#101F17] border-emerald-950/45" : "bg-gray-50/70 border-gray-100"}`}>
+      <div className="flex items-center gap-2">
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${toneClass}`}>{icon}</div>
+        <div className="min-w-0">
+          <p className={`text-xl sm:text-2xl font-black leading-none ${darkMode ? "text-slate-100" : "text-gray-900"}`}>{value}</p>
+          <p className={`text-[9px] uppercase tracking-wider font-bold mt-1 truncate ${darkMode ? "text-slate-500" : "text-gray-400"}`}>{label}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const StatCard = ({
   icon,
   label,
@@ -4078,21 +3735,21 @@ const StatCard = ({
   description,
   iconBg = "bg-green-50",
   iconColor = "text-green-600",
+  darkMode = false,
 }) => (
   <motion.div
     whileHover={{
       y: -2,
     }}
-    className="
-      bg-white
+    className={`
       border
-      border-gray-100
       rounded-2xl
       p-5
       shadow-sm
-      transition-shadow
+      transition-all
       hover:shadow-md
-    "
+      ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-white border-gray-100"}
+    `}
   >
     <div className="flex items-start justify-between">
       <div

@@ -61,33 +61,56 @@ const LoginPage = () => {
   const navigate = useNavigate();
 
   const {
-    login,
-    verifyLoginOTP,
-    otpRequired,
-    setOtpRequired,
-    isLoading,
-    error,
-    clearError,
-  } = useAuthStore();
-
+  login,
+  verifyLoginOTP,
+  otpRequired,
+  setOtpRequired,
+  isLoading,
+  error,
+  clearError,
+  user,
+} = useAuthStore();
   /* =========================================================
      LOGIN
   ========================================================= */
 
   const handleLogin = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!email || !password) {
-      toast.error("Please enter email and password");
+  if (!email || !password) {
+    toast.error("Please enter email and password");
+    return;
+  }
+
+  try {
+    const result = await login(email, password);
+
+    if (result?.requiresOTP) {
       return;
     }
 
-    try {
-      await login(email, password);
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Login failed");
+    const authenticatedUser = useAuthStore.getState().user;
+
+    console.log("Authenticated user:", authenticatedUser);
+
+    const userRole =
+      authenticatedUser?.role ||
+      authenticatedUser?.accountType ||
+      authenticatedUser?.user?.role;
+
+    console.log("Authenticated user role:", userRole);
+
+    if (userRole === "student") {
+      navigate("/student-dashboard", { replace: true });
+    } else if (userRole === "teacher") {
+      navigate("/teacher-dashboard", { replace: true });
+    } else {
+      navigate("/dashboard", { replace: true });
     }
-  };
+  } catch (err) {
+    toast.error(err.response?.data?.message || "Login failed");
+  }
+};
 
   useEffect(() => {
   clearError();
@@ -98,18 +121,34 @@ const LoginPage = () => {
   ========================================================= */
 
   const handleVerifyOTP = async (otp) => {
-    try {
-      await verifyLoginOTP(otp);
+  try {
+    await verifyLoginOTP(otp);
 
-      toast.success("Login successful!");
+    toast.success("Login successful!");
 
-      setOtpRequired(false);
+    setOtpRequired(false);
 
-      navigate("/dashboard");
-    } catch (err) {
-      toast.error(err.response?.data?.message || "OTP verification failed");
+    // Get the latest authenticated user from the auth store
+    const authenticatedUser = useAuthStore.getState().user;
+
+    const userRole =
+      authenticatedUser?.role ||
+      authenticatedUser?.accountType ||
+      authenticatedUser?.user?.role;
+
+    if (userRole === "student") {
+      navigate("/student-dashboard", { replace: true });
+    } else if (userRole === "teacher") {
+      navigate("/teacher-dashboard", { replace: true });
+    } else {
+      navigate("/dashboard", { replace: true });
     }
-  };
+  } catch (err) {
+    toast.error(
+      err.response?.data?.message || "OTP verification failed"
+    );
+  }
+};
 
   if (otpRequired) {
     return (

@@ -29,6 +29,8 @@ import notificationSettingsRoutes from "./routes/notificationSettings.js";
 import pushNotificationRoutes from "./routes/pushNotificationRoutes.js";
 import settingsRoutes from "./routes/settings.js";
 import researchReferenceRoutes from "./routes/researchReferenceRoutes.js";
+import teacherClassRoutes from "./routes/teacherClassRoutes.js";
+
 
 import { User } from "./models/userModel.js";
 
@@ -307,9 +309,15 @@ app.use("/api/notification-settings", notificationSettingsRoutes);
 app.use("/api/push-notifications", pushNotificationRoutes);
 
 app.use("/api/settings", settingsRoutes);
+
 app.use(
   "/api/research-references",
   researchReferenceRoutes,
+);
+
+app.use(
+  "/api/teacher-class",
+  teacherClassRoutes,
 );
 
 /* =========================================================
@@ -398,7 +406,39 @@ app.get("/api/test-notif", (req, res) => {
    ONLINE USERS
 ========================================================= */
 
+/*
+  onlineUsers structure:
+
+  userId -> Set of socket IDs
+
+  Example:
+
+  "65abc123" -> Set("socket1", "socket2")
+  "65def456" -> Set("socket3")
+
+  This means one user can be connected from multiple
+  browser tabs/devices without being incorrectly marked
+  offline when only one connection disconnects.
+*/
+
 const onlineUsers = new Map();
+
+/* =========================================================
+   BROADCAST ONLINE USERS
+========================================================= */
+
+const broadcastOnlineUsers = () => {
+  const users = Array.from(onlineUsers.keys());
+
+  io.emit("online_users", {
+    users,
+    count: users.length,
+  });
+
+  console.log("🟢 Online users:", users);
+
+  console.log("👥 Online count:", users.length);
+};
 
 /* =========================================================
    SEND SOCKET NOTIFICATION
@@ -421,7 +461,7 @@ io.on("connection", (socket) => {
 
   /* ===================================================
        REGISTER USER
-    =================================================== */
+  =================================================== */
 
   socket.on("register", (userId) => {
     if (!userId) {
@@ -432,11 +472,44 @@ io.on("connection", (socket) => {
 
     const userIdString = String(userId);
 
+    /*
+      Store the user ID directly on the socket.
+
+      This lets the disconnect event know exactly which
+      user owns this socket.
+    */
+    socket.userId = userIdString;
+
+    /*
+      Join the user's private room.
+
+      Used by notifications and private messages.
+    */
     socket.join(userIdString);
 
-    onlineUsers.set(userIdString, socket.id);
+    /*
+      Create a Set for this user if one doesn't exist.
 
-    console.log(`👤 User registered: ${userIdString}`);
+      Set prevents the same socket from being counted twice.
+    */
+    if (!onlineUsers.has(userIdString)) {
+      onlineUsers.set(userIdString, new Set());
+    }
+
+    /*
+      Add this socket to the user's active connections.
+    */
+    onlineUsers.get(userIdString).add(socket.id);
+
+    console.log(
+      `👤 User registered: ${userIdString} | Socket: ${socket.id}`,
+    );
+
+    /*
+      Tell every connected frontend about the updated
+      online-user list.
+    */
+    broadcastOnlineUsers();
   });
 
   /* ===================================================
@@ -445,7 +518,7 @@ io.on("connection", (socket) => {
        Your frontend emits this too.
        Keeping it makes the system compatible with both
        register and join.
-    =================================================== */
+  =================================================== */
 
   socket.on("join", (userId) => {
     if (!userId) {
@@ -454,20 +527,44 @@ io.on("connection", (socket) => {
 
     const userIdString = String(userId);
 
+    /*
+      Store the user ID on the socket so disconnect()
+      can identify the user.
+    */
+    socket.userId = userIdString;
+
     socket.join(userIdString);
 
-    console.log(`📡 User joined room: ${userIdString}`);
+    /*
+      Also track this connection as online.
+    */
+    if (!onlineUsers.has(userIdString)) {
+      onlineUsers.set(userIdString, new Set());
+    }
+
+    onlineUsers.get(userIdString).add(socket.id);
+
+    console.log(
+      `📡 User joined room: ${userIdString} | Socket: ${socket.id}`,
+    );
+
+    broadcastOnlineUsers();
   });
 
   /* ===================================================
        SEND MESSAGE
-    =================================================== */
+  =================================================== */
 
   socket.on("send_message", async (msg, callback) => {
     try {
       console.log("📨 Socket message received:", msg);
 
-      const { sender, receiver, text, clientMessageId } = msg || {};
+      const {
+        sender,
+        receiver,
+        text,
+        clientMessageId,
+      } = msg || {};
 
       if (!sender || !receiver || !text?.trim()) {
         if (typeof callback === "function") {
@@ -481,11 +578,13 @@ io.on("connection", (socket) => {
         return;
       }
 
-      const chatId = [String(sender), String(receiver)].sort().join("-");
+      const chatId = [String(sender), String(receiver)]
+        .sort()
+        .join("-");
 
       /* =============================================
              GET USERS
-          ============================================= */
+      ============================================= */
 
       const senderUser = await User.findById(sender).select(
         "name firstName middleName lastName email profilePhoto",
@@ -521,21 +620,26 @@ io.on("connection", (socket) => {
 
       /* =============================================
              SENDER INFO
-          ============================================= */
+      ============================================= */
 
       const senderName =
         senderUser.name ||
-        [senderUser.firstName, senderUser.middleName, senderUser.lastName]
+        [
+          senderUser.firstName,
+          senderUser.middleName,
+          senderUser.lastName,
+        ]
           .filter(Boolean)
           .join(" ")
           .trim() ||
         "User";
 
-      const senderProfilePhoto = senderUser.profilePhoto || null;
+      const senderProfilePhoto =
+        senderUser.profilePhoto || null;
 
       /* =============================================
              SAVE MESSAGE
-          ============================================= */
+      ============================================= */
 
       const message = await Message.create({
         chatId,
@@ -553,7 +657,7 @@ io.on("connection", (socket) => {
 
       /* =============================================
              REALTIME MESSAGE
-          ============================================= */
+      ============================================= */
 
       const realtimeMessage = {
         ...message.toObject(),
@@ -571,19 +675,25 @@ io.on("connection", (socket) => {
 
       /* =============================================
              SEND MESSAGE TO RECEIVER
-          ============================================= */
+      ============================================= */
 
-      io.to(String(receiver)).emit("receive_message", realtimeMessage);
+      io.to(String(receiver)).emit(
+        "receive_message",
+        realtimeMessage,
+      );
 
       /* =============================================
              SEND MESSAGE TO SENDER
-          ============================================= */
+      ============================================= */
 
-      io.to(String(sender)).emit("receive_message", realtimeMessage);
+      io.to(String(sender)).emit(
+        "receive_message",
+        realtimeMessage,
+      );
 
       /* =============================================
              SAVE NOTIFICATION
-          ============================================= */
+      ============================================= */
 
       const notification = await Notification.create({
         user: receiver,
@@ -612,9 +722,22 @@ io.on("connection", (socket) => {
       });
 
       console.log("🔔 MESSAGE NOTIFICATION SAVED");
-      console.log("Notification ID:", notification._id.toString());
-      console.log("Notification USER:", notification.user.toString());
-      console.log("Receiver ID:", String(receiver));
+
+      console.log(
+        "Notification ID:",
+        notification._id.toString(),
+      );
+
+      console.log(
+        "Notification USER:",
+        notification.user.toString(),
+      );
+
+      console.log(
+        "Receiver ID:",
+        String(receiver),
+      );
+
       console.log(
         "USER MATCH:",
         String(notification.user) === String(receiver),
@@ -622,7 +745,7 @@ io.on("connection", (socket) => {
 
       /* =============================================
              SOCKET NOTIFICATION
-          ============================================= */
+      ============================================= */
 
       io.to(String(receiver)).emit("newNotification", {
         ...notification.toObject(),
@@ -635,31 +758,32 @@ io.on("connection", (socket) => {
       });
 
       /* =============================================
-             GET EXPO TOKENS
+             GET FCM MOBILE TOKENS
 
              Android + iOS
-          ============================================= */
+      ============================================= */
 
-      /* =============================================
-   GET FCM MOBILE TOKENS
-
-   Android + iOS
-============================================= */
-
-      const fcmTokens = Array.isArray(receiverUser.pushTokens)
+      const fcmTokens = Array.isArray(
+        receiverUser.pushTokens,
+      )
         ? receiverUser.pushTokens.filter(
             (pushToken) =>
               pushToken?.provider === "fcm" &&
-              ["android", "ios"].includes(pushToken?.platform) &&
+              ["android", "ios"].includes(
+                pushToken?.platform,
+              ) &&
               pushToken?.token,
           )
         : [];
 
-      console.log(`📱 FCM tokens for ${receiverUser.email}:`, fcmTokens.length);
+      console.log(
+        `📱 FCM tokens for ${receiverUser.email}:`,
+        fcmTokens.length,
+      );
 
       /* =============================================
-   SEND PHONE PUSH
-============================================= */
+             SEND PHONE PUSH
+      ============================================= */
 
       for (const pushToken of fcmTokens) {
         try {
@@ -685,15 +809,21 @@ io.on("connection", (socket) => {
             },
           });
 
-          console.log("📱 Socket message FCM push sent:", receiverUser.email);
+          console.log(
+            "📱 Socket message FCM push sent:",
+            receiverUser.email,
+          );
         } catch (pushError) {
-          console.error("⚠️ SOCKET MESSAGE FCM PUSH ERROR:", pushError);
+          console.error(
+            "⚠️ SOCKET MESSAGE FCM PUSH ERROR:",
+            pushError,
+          );
         }
       }
 
       /* =============================================
              ACTIVITY FEED
-          ============================================= */
+      ============================================= */
 
       io.emit("activity_feed", {
         type: "message",
@@ -705,7 +835,7 @@ io.on("connection", (socket) => {
 
       /* =============================================
              CALLBACK
-          ============================================= */
+      ============================================= */
 
       if (typeof callback === "function") {
         callback({
@@ -715,7 +845,10 @@ io.on("connection", (socket) => {
         });
       }
     } catch (err) {
-      console.error("❌ SOCKET SEND MESSAGE ERROR:", err);
+      console.error(
+        "❌ SOCKET SEND MESSAGE ERROR:",
+        err,
+      );
 
       if (typeof callback === "function") {
         callback({
@@ -732,20 +865,63 @@ io.on("connection", (socket) => {
 
   /* ===================================================
        DISCONNECT
-    =================================================== */
+  =================================================== */
 
   socket.on("disconnect", () => {
-    console.log("🔴 Socket disconnected:", socket.id);
+    console.log(
+      "🔴 Socket disconnected:",
+      socket.id,
+    );
 
-    for (const [userId, socketId] of onlineUsers.entries()) {
-      if (socketId === socket.id) {
-        onlineUsers.delete(userId);
+    /*
+      Retrieve the user that owns this socket.
+    */
+    const userId = socket.userId;
 
-        console.log(`👤 User offline: ${userId}`);
-
-        break;
-      }
+    /*
+      Socket was never registered.
+    */
+    if (!userId) {
+      return;
     }
+
+    /*
+      Get all active connections belonging to this user.
+    */
+    const userSockets = onlineUsers.get(userId);
+
+    if (!userSockets) {
+      return;
+    }
+
+    /*
+      Remove ONLY this socket.
+
+      If the user has another tab/device connected,
+      their other socket(s) remain in the Set.
+    */
+    userSockets.delete(socket.id);
+
+    /*
+      The user is offline only when they have zero
+      remaining Socket.IO connections.
+    */
+    if (userSockets.size === 0) {
+      onlineUsers.delete(userId);
+
+      console.log(
+        `👤 User offline: ${userId}`,
+      );
+    } else {
+      console.log(
+        `👤 User ${userId} still online with ${userSockets.size} connection(s)`,
+      );
+    }
+
+    /*
+      Update all connected frontends.
+    */
+    broadcastOnlineUsers();
   });
 });
 
@@ -796,10 +972,20 @@ server.listen(PORT, "0.0.0.0", async () => {
   try {
     await connectDB();
 
-    console.log("🚀 Server running on port:", PORT);
+    console.log(
+      "🚀 Server running on port:",
+      PORT,
+    );
 
-    console.log(`🔐 Environment: ${process.env.NODE_ENV || "development"}`);
+    console.log(
+      `🔐 Environment: ${
+        process.env.NODE_ENV || "development"
+      }`,
+    );
   } catch (error) {
-    console.error("❌ Database connection failed:", error);
+    console.error(
+      "❌ Database connection failed:",
+      error,
+    );
   }
 });

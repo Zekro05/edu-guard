@@ -5,6 +5,9 @@ import {
   updateNotificationSettings,
   getSecuritySettings,
   updateSecuritySettings,
+  getProfile,
+  updateProfilePhone,
+
 } from "../controllers/settingsController.js";
 
 import { verifyToken } from "../middleware/verifyToken.js";
@@ -27,6 +30,13 @@ router.put(
   updateNotificationSettings
 );
 
+router.get("/profile", verifyToken, getProfile);
+
+router.put(
+  "/profile/phone",
+  verifyToken,
+  updateProfilePhone
+);
 /* =========================================================
    SECURITY SETTINGS
 ========================================================= */
