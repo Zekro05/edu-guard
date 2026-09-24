@@ -36,6 +36,8 @@ import {
   ClipboardList,
   ShieldCheck,
   Loader2,
+  LayoutGrid,
+  List,
   Menu,
   Moon,
   Sun,
@@ -98,6 +100,7 @@ const InterventionPage = () => {
   const [showPrintableReport, setShowPrintableReport] = useState(false);
 
   const [tab, setTab] = useState("all");
+  const [viewMode, setViewMode] = useState("cards");
   const [search, setSearch] = useState("");
 
   const [cases, setCases] = useState([]);
@@ -125,8 +128,6 @@ const InterventionPage = () => {
   });
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [viewMode, setViewMode] = useState("cards");
-  const [priorityFilter, setPriorityFilter] = useState("all");
 
   useEffect(() => {
     try {
@@ -224,6 +225,13 @@ const InterventionPage = () => {
           grade: student.grade || "N/A",
           gender: student.gender || "N/A",
           studentCode: student.studentId || "N/A",
+
+          studentPhoto:
+            student.profilePhoto ||
+            student.profilePicture ||
+            student.avatar ||
+            student.photo ||
+            null,
 
           age: student.birthDate
             ? new Date().getFullYear() -
@@ -1379,6 +1387,36 @@ const InterventionPage = () => {
       className={`case-intervention min-h-screen w-full flex ${pageBg} ${textPrimary} overflow-hidden transition-colors duration-300 ${darkMode ? "case-intervention-dark" : ""}`}
     >
       <style>{`
+        /* Modal typography: readable, polished, and consistent */
+        .intervention-modal {
+          font-family: "Inter", "Plus Jakarta Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif !important;
+          font-size: 15px;
+          letter-spacing: -0.005em;
+        }
+        .intervention-modal p,
+        .intervention-modal span,
+        .intervention-modal label,
+        .intervention-modal button,
+        .intervention-modal input,
+        .intervention-modal textarea,
+        .intervention-modal select {
+          font-family: inherit;
+        }
+        .intervention-modal .text-\[9px\] { font-size: 12px !important; }
+        .intervention-modal .text-\[10px\] { font-size: 13px !important; }
+        .intervention-modal .text-\[11px\] { font-size: 13px !important; }
+        .intervention-modal .text-xs { font-size: 14px !important; }
+        .intervention-modal .text-sm { font-size: 15px !important; }
+        .intervention-modal .text-base { font-size: 16px !important; }
+        .intervention-modal .text-lg { font-size: 20px !important; }
+        .intervention-modal input,
+        .intervention-modal textarea,
+        .intervention-modal select {
+          font-size: 15px !important;
+          line-height: 1.5;
+        }
+        .intervention-modal ::placeholder { font-size: 14px !important; }
+
         .case-intervention-dark [class*="bg-white"] { background-color: #0C1913 !important; }
         .case-intervention-dark [class*="bg-gray-50"] { background-color: #101F17 !important; }
         .case-intervention-dark [class*="bg-gray-100"] { background-color: #14231C !important; }
@@ -1746,281 +1784,651 @@ const InterventionPage = () => {
             </div>
           </section>
 
-          {/* INTERVENTION COMMAND CENTER */}
+          <div
+            className="intervention-content-typography"
+            style={{ fontFamily: '"Inter", "Plus Jakarta Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif' }}
+          >
 
-          <section className="mb-7">
-            <div className="grid grid-cols-1 xl:grid-cols-[1.35fr_.65fr] gap-4">
-              <div className={`relative overflow-hidden rounded-3xl border p-5 sm:p-6 ${darkMode ? "bg-[#0C1913] border-emerald-950/60" : "bg-white border-gray-100"} shadow-sm`}>
-                <div className="absolute -right-12 -top-12 w-40 h-40 rounded-full bg-green-500/5 pointer-events-none" />
-                <div className="relative">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? "bg-emerald-950/60 text-emerald-300" : "bg-green-50 text-green-600"}`}>
-                        <Activity size={18} />
-                      </div>
-                      <div>
-                        <p className={`text-[10px] uppercase tracking-widest font-bold ${textMuted}`}>Intervention command center</p>
-                        <h3 className={`text-lg font-black ${textPrimary}`}>Keep every support plan moving.</h3>
-                      </div>
-                    </div>
-                    <button onClick={fetchData} className={`h-10 px-4 rounded-xl border text-xs font-bold flex items-center gap-2 transition ${darkMode ? "bg-[#101F17] border-emerald-950/60 text-slate-300 hover:bg-emerald-950/30" : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"}`}>
-                      <Activity size={14} /> Refresh
-                    </button>
-                  </div>
+          {/* OVERVIEW */}
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
-                    {[
-                      { label: "Total", value: stats.total, icon: FileText, tone: "green" },
-                      { label: "Pending", value: stats.pending, icon: Clock3, tone: "blue" },
-                      { label: "Ongoing", value: stats.ongoing, icon: Activity, tone: "amber" },
-                      { label: "Completed", value: stats.completed, icon: CircleCheck, tone: "emerald" },
-                    ].map((item) => {
-                      const Icon = item.icon;
-                      const toneClass =
-                        item.tone === "amber"
-                          ? darkMode ? "bg-amber-950/30 text-amber-300" : "bg-amber-50 text-amber-600"
-                          : item.tone === "blue"
-                            ? darkMode ? "bg-blue-950/30 text-blue-300" : "bg-blue-50 text-blue-600"
-                            : darkMode ? "bg-emerald-950/40 text-emerald-300" : "bg-green-50 text-green-600";
-                      return (
-                        <div key={item.label} className={`rounded-2xl border p-3.5 ${darkMode ? "bg-[#101F17] border-emerald-950/50" : "bg-[#F8FAFC] border-gray-100"}`}>
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${toneClass}`}><Icon size={15} /></div>
-                          <p className={`text-2xl font-black ${textPrimary}`}>{item.value}</p>
-                          <p className={`text-[10px] uppercase tracking-wider font-bold mt-0.5 ${textMuted}`}>{item.label}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">
+                Intervention Overview
+              </h3>
 
-              <div className={`rounded-3xl border p-5 sm:p-6 ${darkMode ? "bg-[#0C1913] border-emerald-950/60" : "bg-white border-gray-100"} shadow-sm`}>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className={`text-[10px] uppercase tracking-widest font-bold ${textMuted}`}>Workload pulse</p>
-                    <h3 className={`text-base font-black mt-1 ${textPrimary}`}>Intervention progress</h3>
-                  </div>
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${darkMode ? "bg-emerald-950/50 text-emerald-300" : "bg-green-50 text-green-600"}`}><ChartNoAxesCombined size={17} /></div>
-                </div>
-                <div className="mt-5">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`text-xs font-semibold ${textMuted}`}>Completion rate</span>
-                    <span className={`text-sm font-black ${darkMode ? "text-emerald-300" : "text-green-700"}`}>{stats.total ? Math.round((stats.completed / stats.total) * 100) : 0}%</span>
-                  </div>
-                  <div className={`h-2.5 rounded-full overflow-hidden ${darkMode ? "bg-emerald-950/50" : "bg-green-50"}`}>
-                    <div className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-400 transition-all duration-500" style={{ width: `${stats.total ? Math.round((stats.completed / stats.total) * 100) : 0}%` }} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-2 mt-5">
-                  {[
-                    { label: "Pending", value: stats.pending, dot: "bg-blue-500" },
-                    { label: "Ongoing", value: stats.ongoing, dot: "bg-amber-500" },
-                    { label: "Done", value: stats.completed, dot: "bg-emerald-500" },
-                  ].map((item) => (
-                    <div key={item.label} className={`rounded-xl p-3 ${darkMode ? "bg-[#101F17]" : "bg-gray-50"}`}>
-                      <div className="flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${item.dot}`} /><span className={`text-[10px] font-bold ${textMuted}`}>{item.label}</span></div>
-                      <p className={`text-lg font-black mt-1 ${textPrimary}`}>{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* QUICK ACTIONS */}
-
-          <section className="mb-7">
-            <div className="mb-4">
-              <p className={`text-[10px] uppercase tracking-widest font-bold ${textMuted}`}>Shortcuts</p>
-              <h3 className={`text-xl font-black mt-1 ${textPrimary}`}>Move faster</h3>
-              <p className={`text-sm mt-1 ${textMuted}`}>Jump straight to the work that needs attention.</p>
+              <p className="text-[15px] text-gray-400 mt-1">
+                Monitor the current state of student
+                intervention cases.
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-              {[
-                { label: "Review pending", description: `${stats.pending} case${stats.pending === 1 ? "" : "s"} waiting`, icon: Clock3, action: () => setTab("none"), className: darkMode ? "bg-blue-950/20 border-blue-900/40 hover:bg-blue-950/30" : "bg-blue-50/60 border-blue-100 hover:bg-blue-50", iconClass: darkMode ? "bg-blue-950/50 text-blue-300" : "bg-white text-blue-600" },
-                { label: "Continue ongoing", description: `${stats.ongoing} active plan${stats.ongoing === 1 ? "" : "s"}`, icon: Activity, action: () => setTab("ongoing"), className: darkMode ? "bg-amber-950/20 border-amber-900/40 hover:bg-amber-950/30" : "bg-amber-50/60 border-amber-100 hover:bg-amber-50", iconClass: darkMode ? "bg-amber-950/50 text-amber-300" : "bg-white text-amber-600" },
-                { label: "Create intervention", description: "Start a new support plan", icon: Plus, action: () => { const target = filtered[0] || interventionCases[0]; if (target) { setSelected(target); setOpen(true); } }, className: darkMode ? "bg-emerald-950/20 border-emerald-900/40 hover:bg-emerald-950/30" : "bg-green-50/60 border-green-100 hover:bg-green-50", iconClass: darkMode ? "bg-emerald-950/50 text-emerald-300" : "bg-white text-green-600" },
-                { label: "Printable report", description: "Prepare a case summary", icon: Printer, action: () => setShowPrintableReport(true), className: darkMode ? "bg-[#101F17] border-emerald-950/50 hover:bg-emerald-950/30" : "bg-white border-gray-100 hover:bg-gray-50", iconClass: darkMode ? "bg-[#14231C] text-slate-300" : "bg-gray-50 text-gray-600" },
-              ].map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button key={item.label} onClick={item.action} className={`group text-left rounded-2xl border p-4 transition ${item.className}`}>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${item.iconClass}`}><Icon size={17} /></div>
-                      <div className="min-w-0 flex-1"><p className={`text-sm font-bold ${textPrimary}`}>{item.label}</p><p className={`text-[11px] mt-0.5 ${textMuted}`}>{item.description}</p></div>
-                      <ChevronRight size={15} className={`shrink-0 transition-transform group-hover:translate-x-1 ${textMuted}`} />
-                    </div>
+            <button
+              onClick={() =>
+                setShowPrintableReport(
+                  true,
+                )
+              }
+              className="
+                h-10
+                px-4
+                rounded-xl
+                bg-white
+                border
+                border-gray-200
+                text-gray-600
+                text-xs
+                font-semibold
+                flex
+                items-center
+                justify-center
+                gap-2
+                hover:bg-gray-50
+                hover:border-gray-300
+                transition
+                shadow-sm
+              "
+            >
+              <Printer size={15} />
+              Printable Report
+            </button>
+          </div>
+
+          {/* STATS */}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+            <StatCard
+              icon={
+                <FileText size={18} />
+              }
+              label="Total Cases"
+              value={stats.total}
+              description="All intervention-ready cases"
+              darkMode={darkMode}
+            />
+
+            <StatCard
+              icon={
+                <Timer size={18} />
+              }
+              label="Ongoing"
+              value={stats.ongoing}
+              description="Currently being handled"
+              iconBg="bg-amber-50"
+              iconColor="text-amber-600"
+              darkMode={darkMode}
+            />
+
+            <StatCard
+              icon={
+                <CircleCheck
+                  size={18}
+                />
+              }
+              label="Completed"
+              value={
+                stats.completed
+              }
+              description="Successfully resolved"
+              iconBg="bg-emerald-50"
+              iconColor="text-emerald-600"
+              darkMode={darkMode}
+            />
+
+            <StatCard
+              icon={
+                <Clock3 size={18} />
+              }
+              label="Pending"
+              value={stats.pending}
+              description="Awaiting intervention"
+              iconBg="bg-blue-50"
+              iconColor="text-blue-600"
+              darkMode={darkMode}
+            />
+          </div>
+
+          {/* SEARCH + FILTER */}
+
+          <div
+            className="
+              bg-white
+              border border-gray-100
+              rounded-2xl
+              shadow-sm
+              p-5
+              mb-6
+            "
+          >
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div
+                className="
+                  flex
+                  items-center
+                  gap-3
+                  h-11
+                  px-4
+                  rounded-xl
+                  bg-gray-50
+                  border
+                  border-gray-200
+                  w-full
+                  lg:max-w-md
+                  focus-within:border-green-300
+                  focus-within:ring-4
+                  focus-within:ring-green-50
+                  transition
+                "
+              >
+                <Search
+                  size={17}
+                  className="text-gray-400 shrink-0"
+                />
+
+                <input
+                  className="
+                    bg-transparent
+                    outline-none
+                    w-full
+                    text-sm
+                    text-gray-700
+                    placeholder:text-gray-400
+                  "
+                  value={search}
+                  onChange={(e) =>
+                    setSearch(
+                      e.target.value,
+                    )
+                  }
+                  placeholder="Search student or offense..."
+                />
+
+                {search && (
+                  <button
+                    onClick={() =>
+                      setSearch("")
+                    }
+                    className="text-gray-400 hover:text-gray-700"
+                  >
+                    <X size={15} />
                   </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* FIND + FILTER WORKSPACE */}
-
-          <section className={`rounded-3xl border p-4 sm:p-5 mb-6 ${darkMode ? "bg-[#0C1913] border-emerald-950/60" : "bg-white border-gray-100"} shadow-sm`}>
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-              <div>
-                <p className={`text-[10px] uppercase tracking-widest font-bold ${textMuted}`}>Intervention directory</p>
-                <h3 className={`text-lg font-black mt-1 ${textPrimary}`}>Find the right case</h3>
+                )}
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto">
-                <div className={`flex items-center gap-3 h-11 px-4 rounded-xl border w-full sm:w-[330px] focus-within:ring-4 transition ${darkMode ? "bg-[#101F17] border-emerald-950/60 focus-within:border-emerald-700 focus-within:ring-emerald-950/30" : "bg-gray-50 border-gray-200 focus-within:border-green-300 focus-within:ring-green-50"}`}>
-                  <Search size={16} className={textMuted} />
-                  <input className={`bg-transparent outline-none w-full text-sm ${darkMode ? "text-slate-100 placeholder:text-slate-500" : "text-gray-700 placeholder:text-gray-400"}`} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search student or incident..." />
-                  {search && <button onClick={() => setSearch("")} className={textMuted} aria-label="Clear search"><X size={15} /></button>}
-                </div>
-                <div className={`flex items-center rounded-xl border p-1 overflow-x-auto ${darkMode ? "bg-[#101F17] border-emerald-950/60" : "bg-gray-50 border-gray-200"}`}>
-                  {[
-                    { id: "all", label: "All" },
-                    { id: "none", label: "Pending" },
-                    { id: "ongoing", label: "Ongoing" },
-                    { id: "completed", label: "Completed" },
-                  ].map((item) => (
-                    <button key={item.id} onClick={() => setTab(item.id)} className={`px-3 py-2 rounded-lg text-[11px] font-bold whitespace-nowrap transition ${tab === item.id ? darkMode ? "bg-emerald-900/50 text-emerald-200" : "bg-white text-green-700 shadow-sm" : textMuted}`}>{item.label}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
 
-            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-4 pt-4 border-t ${darkMode ? "border-emerald-950/40" : "border-gray-100"}`}>
-              <div className="flex items-center gap-2 overflow-x-auto">
-                <span className={`text-[10px] uppercase tracking-wider font-bold shrink-0 ${textMuted}`}>Priority</span>
+              <div className="flex items-center gap-2 overflow-x-auto pb-1">
                 {[
-                  { id: "all", label: "All cases" },
-                  { id: "High", label: "High risk" },
-                  { id: "Medium", label: "Medium" },
-                  { id: "Low", label: "Low" },
-                ].map((item) => (
-                  <button key={item.id} onClick={() => setPriorityFilter(item.id)} className={`px-3 py-1.5 rounded-lg border text-[10px] font-bold whitespace-nowrap transition ${priorityFilter === item.id ? darkMode ? "bg-emerald-950/50 border-emerald-800/60 text-emerald-200" : "bg-green-50 border-green-100 text-green-700" : darkMode ? "border-emerald-950/50 text-slate-400 hover:bg-emerald-950/20" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>{item.label}</button>
-                ))}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-[10px] font-semibold ${textMuted}`}>
-                  {filtered.filter((c) => priorityFilter === "all" || String(c.level || "").toLowerCase() === priorityFilter.toLowerCase()).length} matching
-                </span>
-                <div className={`flex items-center rounded-lg border p-0.5 ${darkMode ? "border-emerald-950/60 bg-[#101F17]" : "border-gray-200 bg-gray-50"}`}>
-                  <button onClick={() => setViewMode("cards")} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold ${viewMode === "cards" ? darkMode ? "bg-emerald-900/50 text-emerald-200" : "bg-white text-green-700 shadow-sm" : textMuted}`}>Cards</button>
-                  <button onClick={() => setViewMode("compact")} className={`px-2.5 py-1.5 rounded-md text-[10px] font-bold ${viewMode === "compact" ? darkMode ? "bg-emerald-900/50 text-emerald-200" : "bg-white text-green-700 shadow-sm" : textMuted}`}>Compact</button>
-                </div>
+                  {
+                    id: "all",
+                    label: "All",
+                  },
+                  {
+                    id: "none",
+                    label: "Pending",
+                  },
+                  {
+                    id: "ongoing",
+                    label: "Ongoing",
+                  },
+                  {
+                    id: "completed",
+                    label: "Completed",
+                  },
+                ].map(
+                  (item) => (
+                    <Tab
+                      key={item.id}
+                      label={
+                        item.label
+                      }
+                      active={
+                        tab ===
+                        item.id
+                      }
+                      onClick={() =>
+                        setTab(
+                          item.id,
+                        )
+                      }
+                    />
+                  ),
+                )}
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* CASE DIRECTORY */}
+          {/* RESULTS HEADER */}
 
-          <section className="mb-8">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4">
-              <div>
-                <p className={`text-[10px] uppercase tracking-widest font-bold ${textMuted}`}>Active workload</p>
-                <h3 className={`text-xl font-black mt-1 ${textPrimary}`}>Intervention cases</h3>
-                <p className={`text-sm mt-1 ${textMuted}`}>Open a case to review its plan, history, and GuidEd AI recommendation.</p>
+          <div className="flex items-center justify-between mb-4 px-1">
+            <div>
+              <p className="text-sm font-semibold text-gray-700">
+                Intervention Cases
+              </p>
+
+              <p className="text-xs text-gray-400 mt-0.5">
+                Showing{" "}
+                {filtered.length}{" "}
+                {filtered.length ===
+                1
+                  ? "case"
+                  : "cases"}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="inline-flex items-center p-1 rounded-xl bg-gray-100 border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("cards")}
+                  className={`h-8 px-3 rounded-lg flex items-center gap-1.5 text-xs font-semibold transition ${
+                    viewMode === "cards"
+                      ? "bg-white text-green-700 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                  aria-label="Cards view"
+                  aria-pressed={viewMode === "cards"}
+                >
+                  <LayoutGrid size={14} />
+                  Cards
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("compact")}
+                  className={`h-8 px-3 rounded-lg flex items-center gap-1.5 text-xs font-semibold transition ${
+                    viewMode === "compact"
+                      ? "bg-white text-green-700 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                  aria-label="Compact view"
+                  aria-pressed={viewMode === "compact"}
+                >
+                  <List size={14} />
+                  Compact
+                </button>
               </div>
-              {(search || tab !== "all" || priorityFilter !== "all") && (
-                <button onClick={() => { setSearch(""); setTab("all"); setPriorityFilter("all"); }} className={`text-xs font-bold px-3 py-2 rounded-xl border ${darkMode ? "border-emerald-950/60 text-emerald-300 hover:bg-emerald-950/30" : "border-green-100 text-green-700 hover:bg-green-50"}`}>Clear filters</button>
+
+              {search && (
+              <span className="text-xs text-gray-400 hidden md:block">
+                Search results for{" "}
+                <span className="font-semibold text-gray-600">
+                  "{search}"
+                </span>
+              </span>
               )}
             </div>
+          </div>
 
-            {filtered.length === 0 ? (
-              <div className={`rounded-3xl border p-10 sm:p-16 text-center ${darkMode ? "bg-[#0C1913] border-emerald-950/60" : "bg-white border-gray-100"} shadow-sm`}>
-                <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center ${darkMode ? "bg-emerald-950/40 text-emerald-300" : "bg-green-50 text-green-600"}`}><ClipboardCheck size={28} /></div>
-                <h3 className={`text-lg font-black mt-5 ${textPrimary}`}>No matching intervention cases</h3>
-                <p className={`text-sm max-w-sm mx-auto mt-2 leading-relaxed ${textMuted}`}>Try another search or clear the filters to see more cases in the intervention directory.</p>
-                <button onClick={() => { setSearch(""); setTab("all"); setPriorityFilter("all"); }} className={`mt-5 px-4 py-2.5 rounded-xl text-xs font-bold ${darkMode ? "bg-emerald-950/50 text-emerald-200 hover:bg-emerald-950/70" : "bg-green-50 text-green-700 hover:bg-green-100"}`}>Reset workspace</button>
+          {/* CASES */}
+
+          <div
+            className="
+              bg-white
+              border border-gray-100
+              rounded-2xl
+              shadow-sm
+              p-5
+            "
+          >
+            {filtered.length ===
+            0 ? (
+              <div className="min-h-[420px] flex items-center justify-center">
+                <div className="text-center max-w-sm">
+                  <div
+                    className="
+                      w-16
+                      h-16
+                      rounded-2xl
+                      bg-green-50
+                      text-green-600
+                      flex
+                      items-center
+                      justify-center
+                      mx-auto
+                      mb-4
+                    "
+                  >
+                    <ClipboardCheck
+                      size={28}
+                    />
+                  </div>
+
+                  <h3 className="text-lg font-bold text-gray-900">
+                    No intervention cases
+                  </h3>
+
+                  <p className="text-sm text-gray-400 mt-2 leading-relaxed">
+                    There are no cases matching your
+                    current search or intervention
+                    filter.
+                  </p>
+
+                  {(search ||
+                    tab !==
+                      "all") && (
+                    <button
+                      onClick={() => {
+                        setSearch(
+                          "",
+                        );
+                        setTab(
+                          "all",
+                        );
+                      }}
+                      className="
+                        mt-5
+                        px-4
+                        py-2
+                        rounded-xl
+                        text-sm
+                        font-semibold
+                        text-green-700
+                        bg-green-50
+                        hover:bg-green-100
+                        transition
+                      "
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
-              <div className={viewMode === "cards" ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" : "space-y-3"}>
-                {filtered
-                  .filter((c) => priorityFilter === "all" || String(c.level || "").toLowerCase() === priorityFilter.toLowerCase())
-                  .map((c, index) => {
-                    const status = getIncidentInterventionStatus(c.incidentId);
-                    const statusConfig = getStatusConfig(status);
-                    const StatusIcon = statusConfig.icon;
-                    const interventionCount = getIncidentInterventions(c.incidentId).length;
-                    const aiResult = getAIRecommendation(c.incidentId);
-
-                    if (viewMode === "compact") {
-                      return (
-                        <button key={c._id} onClick={() => openCase(c)} className={`w-full text-left rounded-2xl border p-4 transition group ${darkMode ? "bg-[#0C1913] border-emerald-950/60 hover:bg-[#101F17]" : "bg-white border-gray-100 hover:border-green-100 hover:shadow-sm"}`}>
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${darkMode ? "bg-emerald-950/50 text-emerald-300" : "bg-green-50 text-green-700"}`}>{getInitials(c.studentName)}</div>
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <p className={`text-sm font-black ${textPrimary}`}>{c.studentName}</p>
-                                <span className={`px-2 py-1 rounded-lg border text-[9px] font-bold ${statusConfig.badge}`}><StatusIcon size={10} className="inline mr-1" />{statusConfig.label}</span>
-                                <span className={`px-2 py-1 rounded-lg text-[9px] font-bold ${String(c.level).toLowerCase() === "high" ? darkMode ? "bg-red-950/40 text-red-300" : "bg-red-50 text-red-700" : String(c.level).toLowerCase() === "medium" ? darkMode ? "bg-amber-950/40 text-amber-300" : "bg-amber-50 text-amber-700" : darkMode ? "bg-emerald-950/40 text-emerald-300" : "bg-emerald-50 text-emerald-700"}`}>{c.level} risk</span>
-                              </div>
-                              <p className={`text-xs mt-1 truncate ${textMuted}`}>{c.offense} • {c.grade} • {c.studentCode}</p>
-                            </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                              <div className="text-right"><p className={`text-[10px] font-bold ${textMuted}`}>{interventionCount} intervention{interventionCount === 1 ? "" : "s"}</p><p className={`text-[10px] mt-1 ${textMuted}`}>{aiResult?.conclusion || "AI review available"}</p></div>
-                              <ChevronRight size={16} className={textMuted} />
-                            </div>
-                          </div>
-                        </button>
+              <motion.div
+                layout
+                className={`grid gap-4 ${
+                  viewMode === "cards"
+                    ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
+                    : "grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-3"
+                }`}
+              >
+                {filtered.map(
+                  (c) => {
+                    const status =
+                      getIncidentInterventionStatus(
+                        c.incidentId,
                       );
-                    }
+
+                    const statusConfig =
+                      getStatusConfig(
+                        status,
+                      );
+
+                    const StatusIcon =
+                      statusConfig.icon;
+
+                    const interventionCount =
+                      getIncidentInterventions(
+                        c.incidentId,
+                      ).length;
+
+                    const aiResult =
+                      getAIRecommendation(
+                        c.incidentId,
+                      );
 
                     return (
-                      <motion.article key={c._id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18, delay: Math.min(index * 0.025, 0.15) }} onClick={() => openCase(c)} className={`group relative overflow-hidden rounded-3xl border p-5 cursor-pointer transition-all ${darkMode ? "bg-[#0C1913] border-emerald-950/60 hover:border-emerald-800/70 hover:bg-[#101F17]" : "bg-white border-gray-100 hover:border-green-100 hover:shadow-[0_18px_45px_rgba(15,23,42,0.07)]"}`}>
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-green-400 to-emerald-600 opacity-70" />
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 ${darkMode ? "bg-emerald-950/50 text-emerald-300" : "bg-green-50 text-green-700"}`}>{getInitials(c.studentName)}</div>
-                            <div className="min-w-0"><h3 className={`text-base font-black truncate group-hover:text-green-600 transition-colors ${textPrimary}`}>{c.studentName}</h3><p className={`text-[10px] mt-1 truncate ${textMuted}`}>{c.studentCode} • {c.grade} • {c.gender}</p></div>
+                      <motion.div
+                        layout
+                        key={c._id}
+                        whileHover={{
+                          y: -3,
+                          boxShadow:
+                            "0 12px 30px rgba(15, 23, 42, 0.07)",
+                        }}
+                        transition={{
+                          duration: 0.2,
+                        }}
+                        onClick={() =>
+                          openCase(c)
+                        }
+                        className={`
+                          group
+                          bg-white
+                          border
+                          border-gray-100
+                          rounded-2xl
+                          cursor-pointer
+                          transition-all
+                          relative
+                          overflow-hidden
+                          ${viewMode === "cards" ? "p-5" : "p-3.5"}
+                        `}
+                      >
+                        {/* TOP */}
+
+                        <div className="flex items-start justify-between gap-4">
+                          <div
+                            className={`
+                              ${viewMode === "cards" ? "w-14 h-14 rounded-2xl" : "w-12 h-12 rounded-xl"}
+                              overflow-hidden
+                              bg-green-50
+                              text-green-700
+                              flex
+                              items-center
+                              justify-center
+                              font-bold
+                              text-base
+                              shrink-0
+                              border
+                              ${darkMode ? "border-emerald-900/50" : "border-green-100"}
+                            `}
+                          >
+                            {c.studentPhoto ? (
+                              <img
+                                src={c.studentPhoto}
+                                alt={`${c.studentName} profile`}
+                                className="w-full h-full object-cover"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = "none";
+                                }}
+                              />
+                            ) : (
+                              getInitials(c.studentName)
+                            )}
                           </div>
-                          <span className={`shrink-0 px-2.5 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-wide ${statusConfig.badge}`}><StatusIcon size={11} className="inline mr-1" />{statusConfig.label}</span>
+
+                          <div
+                            className={`
+                              flex
+                              items-center
+                              gap-1.5
+                              px-2.5
+                              py-1.5
+                              rounded-lg
+                              border
+                              text-[10px]
+                              font-bold
+                              uppercase
+                              tracking-wide
+                              ${statusConfig.badge}
+                            `}
+                          >
+                            <StatusIcon
+                              size={
+                                11
+                              }
+                            />
+
+                            {
+                              statusConfig.label
+                            }
+                          </div>
                         </div>
 
-                        <div className={`mt-5 rounded-2xl border p-4 ${darkMode ? "bg-[#101F17] border-emerald-950/50" : "bg-gray-50 border-gray-100"}`}>
-                          <div className="flex items-center justify-between gap-3 mb-2">
-                            <div className="flex items-center gap-2"><AlertCircle size={13} className={darkMode ? "text-slate-400" : "text-gray-500"} /><span className={`text-[9px] uppercase tracking-widest font-black ${textMuted}`}>Current incident</span></div>
-                            <span className={`px-2 py-1 rounded-lg text-[9px] font-black ${String(c.level).toLowerCase() === "high" ? darkMode ? "bg-red-950/40 text-red-300" : "bg-red-50 text-red-700" : String(c.level).toLowerCase() === "medium" ? darkMode ? "bg-amber-950/40 text-amber-300" : "bg-amber-50 text-amber-700" : darkMode ? "bg-emerald-950/40 text-emerald-300" : "bg-emerald-50 text-emerald-700"}`}>{c.level} risk</span>
-                          </div>
-                          <p className={`text-sm font-bold leading-relaxed line-clamp-2 ${darkMode ? "text-slate-200" : "text-gray-700"}`}>{c.offense}</p>
-                          <div className="flex flex-wrap gap-2 mt-3"><span className={`px-2 py-1 rounded-lg text-[9px] font-semibold ${darkMode ? "bg-[#0C1913] text-slate-400" : "bg-white text-gray-500"}`}>{c.category}</span><span className={`px-2 py-1 rounded-lg text-[9px] font-semibold ${darkMode ? "bg-[#0C1913] text-slate-400" : "bg-white text-gray-500"}`}>{interventionCount} plan{interventionCount === 1 ? "" : "s"}</span></div>
+                        {/* STUDENT */}
+
+                        <div className="mt-4">
+                          <h3
+                            className="
+                              text-xl
+                              font-bold
+                              text-gray-900
+                              group-hover:text-green-700
+                              transition-colors
+                            "
+                          >
+                            {
+                              c.studentName
+                            }
+                          </h3>
+
+                          <p className="text-sm text-gray-400 mt-1">
+                            {c.grade} •{" "}
+                            {
+                              c.studentCode
+                            }{" "}
+                            •{" "}
+                            {
+                              c.gender
+                            }
+                          </p>
                         </div>
 
-                        <div className={`mt-4 rounded-2xl border p-3.5 ${darkMode ? "bg-emerald-950/20 border-emerald-900/50" : "bg-green-50/60 border-green-100"}`}>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${darkMode ? "bg-emerald-950/50 text-emerald-300" : "bg-white text-green-600"}`}><Brain size={15} /></div>
-                            <div className="min-w-0 flex-1"><p className={`text-[9px] uppercase tracking-widest font-black ${darkMode ? "text-emerald-400" : "text-green-600"}`}>GuidEd AI Review</p><p className={`text-xs font-bold mt-0.5 truncate ${darkMode ? "text-emerald-200" : "text-green-900"}`}>{aiResult?.conclusion || "Open case to generate a recommendation"}</p></div>
-                            <ChevronRight size={15} className={darkMode ? "text-emerald-400" : "text-green-500"} />
+                        {/* INCIDENT */}
+
+                        <div className="mt-5">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-5 h-5 rounded-md bg-gray-100 flex items-center justify-center">
+                              <AlertCircle
+                                size={
+                                  11
+                                }
+                                className="text-gray-500"
+                              />
+                            </div>
+
+                            <p
+                              className="
+                                text-[12px]
+                                uppercase
+                                tracking-wider
+                                font-bold
+                                text-gray-400
+                              "
+                            >
+                              Incident
+                            </p>
+                          </div>
+
+                          <p
+                            className="
+                              text-[16px]
+                              text-gray-700
+                              leading-relaxed
+                              line-clamp-2
+                              min-h-[40px]
+                            "
+                          >
+                            {
+                              c.offense
+                            }
+                          </p>
+                        </div>
+
+                        {/* AI */}
+
+                        <div
+                          className={`mt-5 p-3.5 rounded-xl border ${darkMode ? "bg-emerald-950/35 border-emerald-900/60" : "bg-green-50/70 border-green-100"}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div
+                                className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${darkMode ? "bg-[#101F17] text-emerald-400" : "bg-white text-green-600"}`}
+                              >
+                                {aiLoading &&
+                                selected?.incidentId ===
+                                  c.incidentId ? (
+                                  <Loader2
+                                    size={
+                                      14
+                                    }
+                                    className="animate-spin"
+                                  />
+                                ) : (
+                                  <Brain
+                                    size={
+                                      14
+                                    }
+                                  />
+                                )}
+                              </div>
+
+                              <div className="min-w-0">
+                                <p
+                                  className={`text-[11px] uppercase tracking-wider font-bold ${darkMode ? "text-emerald-400" : "text-green-600"}`}
+                                >
+                                  AI Recommendation
+                                </p>
+
+                                <p
+                                  className={`text-[14px] font-semibold mt-0.5 line-clamp-2 ${darkMode ? "text-emerald-200" : "text-green-900"}`}
+                                >
+                                  {aiResult?.conclusion ||
+                                    (aiLoading &&
+                                    selected?.incidentId ===
+                                      c.incidentId
+                                      ? "Analyzing..."
+                                      : "Open case to analyze")}
+                                </p>
+                              </div>
+                            </div>
+
+                            <ChevronRight
+                              size={15}
+                              className={`group-hover:translate-x-0.5 transition shrink-0 ${darkMode ? "text-emerald-400" : "text-green-400"}`}
+                            />
                           </div>
                         </div>
 
-                        <div className={`flex items-center justify-between gap-3 mt-4 pt-4 border-t ${darkMode ? "border-emerald-950/50" : "border-gray-100"}`}>
-                          <div className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${statusConfig.dot}`} /><span className={`text-[10px] font-semibold ${textMuted}`}>{interventionCount ? `${interventionCount} intervention${interventionCount === 1 ? "" : "s"} recorded` : "No intervention recorded yet"}</span></div>
-                          <span className={`text-[10px] font-black flex items-center gap-1 ${darkMode ? "text-emerald-300" : "text-green-700"}`}>Open case <ChevronRight size={12} /></span>
+                        {/* FOOTER */}
+
+                        <div
+                          className="
+                            flex
+                            items-center
+                            justify-between
+                            mt-5
+                            pt-4
+                            border-t
+                            border-gray-100
+                          "
+                        >
+                          <div className="flex items-center gap-1.5 text-[14px] text-gray-400">
+                            <HandHelping
+                              size={
+                                13
+                              }
+                            />
+
+                            {
+                              interventionCount
+                            }{" "}
+                            {interventionCount ===
+                            1
+                              ? "intervention"
+                              : "interventions"}
+                          </div>
+
+                          <span
+                            className="
+                              text-[13px]
+                              font-semibold
+                              text-green-600
+                              opacity-0
+                              group-hover:opacity-100
+                              transition
+                            "
+                          >
+                            View Case →
+                          </span>
                         </div>
-                      </motion.article>
+                      </motion.div>
                     );
-                  })}
-              </div>
+                  },
+                )}
+              </motion.div>
             )}
-          </section>
-
-          {/* SUPPORT SNAPSHOT */}
-
-          <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-6">
-            {[
-              { label: "Support queue", title: `${stats.pending} pending cases`, text: "Pending cases are ready for an intervention plan or follow-up action.", icon: ClipboardList, iconClass: darkMode ? "bg-blue-950/40 text-blue-300" : "bg-blue-50 text-blue-600" },
-              { label: "In progress", title: `${stats.ongoing} active plans`, text: "Keep active support plans updated until their intended action is completed.", icon: Timer, iconClass: darkMode ? "bg-amber-950/40 text-amber-300" : "bg-amber-50 text-amber-600" },
-              { label: "Resolved", title: `${stats.completed} completed`, text: "Completed interventions remain available in the case history for future context.", icon: ShieldCheck, iconClass: darkMode ? "bg-emerald-950/40 text-emerald-300" : "bg-emerald-50 text-emerald-600" },
-            ].map((item) => {
-              const Icon = item.icon;
-              return (
-                <div key={item.label} className={`rounded-3xl border p-5 ${darkMode ? "bg-[#0C1913] border-emerald-950/60" : "bg-white border-gray-100"} shadow-sm`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.iconClass}`}><Icon size={17} /></div>
-                    <div><p className={`text-[10px] uppercase tracking-widest font-bold ${textMuted}`}>{item.label}</p><h4 className={`font-black ${textPrimary}`}>{item.title}</h4></div>
-                  </div>
-                  <p className={`text-xs leading-relaxed mt-4 ${textMuted}`}>{item.text}</p>
-                </div>
-              );
-            })}
-          </section>
+          </div>
+          </div>
         </div>
       </main>
 
@@ -2116,19 +2524,37 @@ const InterventionPage = () => {
                   <div className="flex items-center gap-4">
                     <div
                       className="
-                        w-12
-                        h-12
-                        rounded-xl
+                        relative
+                        w-14
+                        h-14
+                        rounded-2xl
+                        overflow-hidden
                         bg-green-50
                         text-green-700
                         flex
                         items-center
                         justify-center
                         font-bold
+                        text-base
+                        shrink-0
+                        border
+                        border-green-100
+                        shadow-sm
                       "
                     >
-                      {getInitials(
-                        selected.studentName,
+                      <span className="absolute inset-0 flex items-center justify-center">
+                        {getInitials(selected.studentName)}
+                      </span>
+
+                      {selected.studentPhoto && (
+                        <img
+                          src={selected.studentPhoto}
+                          alt={`${selected.studentName} profile`}
+                          className="relative z-10 w-full h-full object-cover"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
                       )}
                     </div>
 

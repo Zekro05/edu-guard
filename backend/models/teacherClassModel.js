@@ -6,8 +6,6 @@ const teacherClassRosterSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true,
-      index: true,
     },
 
     studentIds: [
@@ -23,6 +21,7 @@ const teacherClassRosterSchema = new mongoose.Schema(
   },
 );
 
+// One unique index for each teacher
 teacherClassRosterSchema.index(
   { teacherId: 1 },
   { unique: true },

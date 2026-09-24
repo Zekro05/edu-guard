@@ -58,7 +58,7 @@ const Nav = ({ icon, label, onClick, active, darkMode }) => (
   <button
     onClick={onClick}
     className={`
-      group flex items-center gap-3 px-3.5 py-2.5 rounded-xl w-full text-sm transition
+      group flex items-center gap-3 px-3.5 py-2.5 rounded-xl w-full text-[15px] transition
       ${
         active
           ? darkMode
@@ -223,7 +223,7 @@ const InfoBlock = memo(({ icon, label, value }) => (
       </p>
     </div>
 
-    <p className="text-sm font-semibold text-gray-800 break-words">
+    <p className="text-[15px] font-semibold text-gray-800 break-words">
       {value || "N/A"}
     </p>
   </div>
@@ -263,7 +263,7 @@ const StatCard = memo(
           <p
             className={`
               text-[10px]
-              sm:text-xs
+              sm:text-[13px]
               font-semibold
               uppercase
               tracking-wider
@@ -592,7 +592,7 @@ const normalizeEvidenceUrl = (url) => {
   return url;
 };
 
-const CaseCard = memo(({ caseData, onClick, darkMode = false }) => {
+const CaseCard = memo(({ caseData, onClick, darkMode = false, compact = false }) => {
   const ai = classifyCase(caseData);
   const student = caseData.student || {};
   const status = caseData.status || "received";
@@ -620,14 +620,14 @@ const CaseCard = memo(({ caseData, onClick, darkMode = false }) => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18 }}
       className={`
-        group relative overflow-hidden rounded-[26px] border
+        group relative overflow-hidden border ${compact ? "rounded-2xl" : "rounded-[26px]"}
         ${riskShell}
         ${darkMode ? "shadow-[0_16px_45px_rgba(0,0,0,.18)]" : "shadow-[0_12px_35px_rgba(15,23,42,.06)]"}
         hover:-translate-y-1 hover:shadow-[0_20px_45px_rgba(15,23,42,.10)]
         transition-all duration-200
       `}
     >
-      <button type="button" onClick={onClick} className="w-full text-left p-4 sm:p-5">
+      <button type="button" onClick={onClick} className={`w-full text-left ${compact ? "p-3 sm:p-3.5" : "p-4 sm:p-5"}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="relative shrink-0">
@@ -639,10 +639,10 @@ const CaseCard = memo(({ caseData, onClick, darkMode = false }) => {
               <span className="absolute -right-1 -bottom-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white" />
             </div>
             <div className="min-w-0">
-              <p className={`text-sm font-extrabold truncate ${darkMode ? "text-slate-100" : "text-slate-900"}`}>
+              <p className={`text-[16px] font-extrabold truncate ${darkMode ? "text-slate-100" : "text-slate-900"}`}>
                 {student.name || "Unknown Student"}
               </p>
-              <p className={`text-[10px] mt-1 truncate ${darkMode ? "text-slate-500" : "text-gray-400"}`}>
+              <p className={`text-[12px] mt-1 truncate ${darkMode ? "text-slate-500" : "text-gray-400"}`}>
                 {student.studentId || "No student ID"}
                 {student.grade ? ` • ${student.grade}` : ""}
                 {student.section ? ` • ${student.section}` : ""}
@@ -652,22 +652,22 @@ const CaseCard = memo(({ caseData, onClick, darkMode = false }) => {
           <ChevronRight size={17} className={darkMode ? "text-slate-600" : "text-gray-300"} />
         </div>
 
-        <div className={`mt-5 rounded-2xl p-4 border ${darkMode ? "bg-[#0A1711]/80 border-emerald-950/60" : "bg-white/80 border-white"}`}>
+        <div className={`${compact ? "mt-3 rounded-xl p-3" : "mt-5 rounded-2xl p-4"} border ${darkMode ? "bg-[#0A1711]/80 border-emerald-950/60" : "bg-white/80 border-white"}`}>
           <div className="flex items-center justify-between gap-3">
-            <span className={`text-[9px] uppercase tracking-[.16em] font-bold ${darkMode ? "text-slate-500" : "text-gray-400"}`}>
+            <span className={`text-[11px] uppercase tracking-[.16em] font-bold ${darkMode ? "text-slate-500" : "text-gray-400"}`}>
               Current incident
             </span>
             <RiskBadge risk={ai.risk} />
           </div>
-          <h3 className={`mt-2 text-sm sm:text-[15px] font-extrabold leading-snug line-clamp-2 ${darkMode ? "text-slate-100" : "text-slate-800"}`}>
+          <h3 className={`mt-2 text-[17px] sm:text-[18px] font-extrabold leading-snug line-clamp-2 ${darkMode ? "text-slate-100" : "text-slate-800"}`}>
             {caseData.offense}
           </h3>
-          <p className={`mt-2 text-[10px] line-clamp-2 leading-relaxed ${darkMode ? "text-slate-500" : "text-gray-400"}`}>
+          <p className={`mt-2 text-[13px] line-clamp-2 leading-relaxed ${darkMode ? "text-slate-500" : "text-gray-400"}`}>
             {caseData.description || ai.insight}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 mt-4">
+        <div className={`flex flex-wrap items-center gap-2 ${compact ? "mt-3" : "mt-4"}`}>
           <StatusBadge status={status} />
           {caseData.category && (
             <span className={`px-2.5 py-1.5 rounded-full text-[10px] font-bold border ${darkMode ? "bg-white/5 border-white/10 text-slate-400" : "bg-white border-gray-100 text-gray-500"}`}>
@@ -676,17 +676,17 @@ const CaseCard = memo(({ caseData, onClick, darkMode = false }) => {
           )}
         </div>
 
-        <div className="mt-5">
+        <div className={compact ? "mt-3" : "mt-5"}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
-              <span className={`text-[9px] uppercase tracking-wider font-bold ${darkMode ? "text-slate-500" : "text-gray-400"}`}>
+              <span className={`text-[11px] uppercase tracking-wider font-bold ${darkMode ? "text-slate-500" : "text-gray-400"}`}>
                 Workflow
               </span>
-              <span className={`text-[9px] font-bold ${darkMode ? "text-emerald-400" : "text-green-600"}`}>
+              <span className={`text-[11px] font-bold ${darkMode ? "text-emerald-400" : "text-green-600"}`}>
                 {Math.round(progress)}%
               </span>
             </div>
-            <span className={`text-[9px] ${darkMode ? "text-slate-600" : "text-gray-400"}`}>
+            <span className={`text-[11px] ${darkMode ? "text-slate-600" : "text-gray-400"}`}>
               {caseData.createdAt ? new Date(caseData.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "No date"}
             </span>
           </div>
@@ -698,25 +698,25 @@ const CaseCard = memo(({ caseData, onClick, darkMode = false }) => {
           </div>
         </div>
 
-        <div className={`grid grid-cols-2 gap-2 mt-4 pt-4 border-t ${darkMode ? "border-emerald-950/50" : "border-gray-100"}`}>
+        <div className={`grid grid-cols-2 gap-2 ${compact ? "mt-3 pt-3" : "mt-4 pt-4"} border-t ${darkMode ? "border-emerald-950/50" : "border-gray-100"}`}>
           <div className={`rounded-xl px-3 py-2.5 ${darkMode ? "bg-white/[.03]" : "bg-gray-50/80"}`}>
-            <p className={`text-[8px] uppercase tracking-wider font-bold ${darkMode ? "text-slate-600" : "text-gray-400"}`}>Location</p>
-            <p className={`text-[10px] font-semibold truncate mt-1 ${darkMode ? "text-slate-400" : "text-gray-600"}`}>
+            <p className={`text-[10px] uppercase tracking-wider font-bold ${darkMode ? "text-slate-600" : "text-gray-400"}`}>Location</p>
+            <p className={`text-[12px] font-semibold truncate mt-1 ${darkMode ? "text-slate-400" : "text-gray-600"}`}>
               {caseData.location || "Unknown"}
             </p>
           </div>
           <div className={`rounded-xl px-3 py-2.5 ${darkMode ? "bg-white/[.03]" : "bg-gray-50/80"}`}>
             <p className={`text-[8px] uppercase tracking-wider font-bold ${darkMode ? "text-slate-600" : "text-gray-400"}`}>Latest activity</p>
-            <p className={`text-[10px] font-semibold truncate mt-1 ${darkMode ? "text-slate-400" : "text-gray-600"}`}>
+            <p className={`text-[12px] font-semibold truncate mt-1 ${darkMode ? "text-slate-400" : "text-gray-600"}`}>
               {latestLog?.changedByName || "No activity"}
             </p>
           </div>
         </div>
       </button>
 
-      <div className={`px-4 sm:px-5 pb-4 flex items-center justify-between gap-3 ${darkMode ? "text-slate-500" : "text-gray-400"}`}>
-        <span className="text-[9px]">Click to open case workspace</span>
-        <span className={`inline-flex items-center gap-1.5 text-[9px] font-bold ${darkMode ? "text-emerald-400" : "text-green-600"}`}>
+      <div className={`${compact ? "px-3 sm:px-3.5 pb-3" : "px-4 sm:px-5 pb-4"} flex items-center justify-between gap-3 ${darkMode ? "text-slate-500" : "text-gray-400"}`}>
+        <span className="text-[11px]">Click to open case workspace</span>
+        <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${darkMode ? "text-emerald-400" : "text-green-600"}`}>
           <Eye size={11} /> Open case
         </span>
       </div>
@@ -725,7 +725,7 @@ const CaseCard = memo(({ caseData, onClick, darkMode = false }) => {
 });
 
 const ThemeToggle = ({ darkMode, setDarkMode }) => (
-  <button onClick={() => setDarkMode((current) => !current)} className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-sm font-semibold transition ${darkMode ? "bg-[#101F17] border-emerald-950/50 text-slate-300 hover:bg-[#14261C]" : "bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100"}`}>
+  <button onClick={() => setDarkMode((current) => !current)} className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border text-[15px] font-semibold transition ${darkMode ? "bg-[#101F17] border-emerald-950/50 text-slate-300 hover:bg-[#14261C]" : "bg-gray-50 border-gray-100 text-gray-600 hover:bg-gray-100"}`}>
     <div className="flex items-center gap-3">
       <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${darkMode ? "bg-amber-950/40 text-amber-300" : "bg-white text-slate-500"}`}>
         {darkMode ? <Sun size={15} /> : <Moon size={15} />}
@@ -769,6 +769,7 @@ export default function CaseManagement() {
   });
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [caseViewMode, setCaseViewMode] = useState("cards");
 
   useEffect(() => {
     try {
@@ -1755,7 +1756,7 @@ provided incident information.
                 </p>
               </div>
             </div>
-            <p className={`text-[11px] leading-relaxed mt-4 ${textMuted}`}>
+            <p className={`text-[12px] leading-relaxed mt-4 ${textMuted}`}>
               Our Lady of the Holy Rosary School<br />General Trias Campus
             </p>
           </div>
@@ -1787,14 +1788,14 @@ provided incident information.
               </div>
               <div className="min-w-0 flex-1">
                 <p className={`text-[9px] uppercase tracking-wider font-bold ${textMuted}`}>Administrator</p>
-                <p className={`text-sm font-bold truncate ${textPrimary}`}>{adminName}</p>
+                <p className={`text-[15px] font-bold truncate ${textPrimary}`}>{adminName}</p>
               </div>
             </div>
           </div>
 
           <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
 
-          <button onClick={logout} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition ${darkMode ? "text-slate-400 border-emerald-950/50 hover:bg-red-950/30 hover:text-red-300 hover:border-red-900/40" : "text-gray-600 border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100"}`}>
+          <button onClick={logout} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[15px] font-semibold border transition ${darkMode ? "text-slate-400 border-emerald-950/50 hover:bg-red-950/30 hover:text-red-300 hover:border-red-900/40" : "text-gray-600 border-gray-200 hover:bg-red-50 hover:text-red-600 hover:border-red-100"}`}>
             <LogOut size={16} /> Sign out
           </button>
         </div>
@@ -1821,7 +1822,7 @@ provided incident information.
                     </div>
                     <button onClick={() => setMobileMenuOpen(false)} className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${darkMode ? "bg-[#101F17] text-slate-400" : "bg-gray-50 text-gray-500"}`} aria-label="Close menu"><X size={18} /></button>
                   </div>
-                  <p className={`text-[11px] leading-relaxed mt-4 ${textMuted}`}>Our Lady of the Holy Rosary School<br />General Trias Campus</p>
+                  <p className={`text-[12px] leading-relaxed mt-4 ${textMuted}`}>Our Lady of the Holy Rosary School<br />General Trias Campus</p>
                 </div>
                 <p className={`px-3 mb-2 text-[10px] font-bold uppercase tracking-widest ${textMuted}`}>Main Menu</p>
                 <div className="space-y-1">
@@ -1842,11 +1843,11 @@ provided incident information.
                       {adminPhoto ? <img src={adminPhoto} alt={adminName} className="w-full h-full object-cover" /> : <span className="font-bold">{adminName.charAt(0).toUpperCase()}</span>}
                       <span className={`absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 ${darkMode ? "border-[#101F17]" : "border-white"}`} />
                     </div>
-                    <div className="min-w-0 flex-1"><p className={`text-[9px] uppercase tracking-wider font-bold ${textMuted}`}>Administrator</p><p className={`text-sm font-bold truncate ${textPrimary}`}>{adminName}</p></div>
+                    <div className="min-w-0 flex-1"><p className={`text-[9px] uppercase tracking-wider font-bold ${textMuted}`}>Administrator</p><p className={`text-[15px] font-bold truncate ${textPrimary}`}>{adminName}</p></div>
                   </div>
                 </div>
                 <ThemeToggle darkMode={darkMode} setDarkMode={setDarkMode} />
-                <button onClick={logout} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition ${darkMode ? "text-slate-400 border-emerald-950/50 hover:bg-red-950/30 hover:text-red-300" : "text-gray-600 border-gray-200 hover:bg-red-50 hover:text-red-600"}`}><LogOut size={16} /> Sign out</button>
+                <button onClick={logout} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[15px] font-semibold border transition ${darkMode ? "text-slate-400 border-emerald-950/50 hover:bg-red-950/30 hover:text-red-300" : "text-gray-600 border-gray-200 hover:bg-red-50 hover:text-red-600"}`}><LogOut size={16} /> Sign out</button>
               </div>
             </motion.aside>
           </>
@@ -1875,7 +1876,7 @@ provided incident information.
               </button>
 
               <div className="min-w-0 flex-1">
-                <div className="hidden sm:flex items-center gap-2 text-xs mb-1">
+                <div className="hidden sm:flex items-center gap-2 text-[13px] mb-1">
                   <span className={textMuted}>Management</span>
                   <ChevronRight size={12} className={textMuted} />
                   <span className="text-green-500 font-semibold">Cases</span>
@@ -1885,7 +1886,7 @@ provided incident information.
                   Case Management
                 </h2>
 
-                <p className={`text-xs sm:text-sm mt-1 truncate sm:whitespace-normal ${textSecondary}`}>
+                <p className={`text-[13px] sm:text-[15px] mt-1 truncate sm:whitespace-normal ${textSecondary}`}>
                   Monitor incidents, review cases, and manage intervention workflows.
                 </p>
               </div>
@@ -1901,7 +1902,7 @@ provided incident information.
 
                 <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${darkMode ? "bg-[#101F17] border-emerald-950/50" : "bg-white border-gray-100"}`}>
                   <Database size={15} className="text-green-500" />
-                  <span className={`text-xs font-semibold ${textSecondary}`}>{totalCases} records</span>
+                  <span className={`text-[13px] font-semibold ${textSecondary}`}>{totalCases} records</span>
                 </div>
               </div>
             </div>
@@ -1977,7 +1978,7 @@ provided incident information.
                   >
                     <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                       <div>
-                        <h3 className="font-bold text-gray-900 text-sm">
+                        <h3 className="font-bold text-gray-900 text-[15px]">
                           Notifications
                         </h3>
 
@@ -2015,7 +2016,7 @@ provided incident information.
                             <Bell size={18} />
                           </div>
 
-                          <p className="text-xs font-semibold text-gray-500 mt-3">
+                          <p className="text-[13px] font-semibold text-gray-500 mt-3">
                             No notifications
                           </p>
 
@@ -2038,11 +2039,11 @@ provided incident information.
                                 transition
                               "
                           >
-                            <p className="font-semibold text-xs text-gray-900">
+                            <p className="font-semibold text-[13px] text-gray-900">
                               {n.title}
                             </p>
 
-                            <p className="text-[11px] text-gray-500 mt-1">
+                            <p className="text-[12px] text-gray-500 mt-1">
                               {n.text}
                             </p>
 
@@ -2092,7 +2093,7 @@ provided incident information.
                   <div
                     className={`
                       inline-flex items-center gap-2 px-3 py-1.5 rounded-full
-                      border text-[10px] sm:text-[11px] font-bold uppercase tracking-wider
+                      border text-[10px] sm:text-[12px] font-bold uppercase tracking-wider
                       ${
                         darkMode
                           ? "bg-emerald-950/50 border-emerald-800/50 text-emerald-300"
@@ -2116,7 +2117,7 @@ provided incident information.
 
                   <p
                     className={`
-                      text-sm sm:text-base leading-relaxed mt-3 max-w-xl
+                      text-[15px] sm:text-base leading-relaxed mt-3 max-w-xl
                       ${darkMode ? "text-slate-300" : "text-slate-500"}
                     `}
                   >
@@ -2127,7 +2128,7 @@ provided incident information.
                   <div className="flex flex-wrap gap-2 mt-5">
                     <div
                       className={`
-                        inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold
+                        inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] font-semibold
                         ${
                           darkMode
                             ? "bg-white/5 text-slate-300 border border-white/10"
@@ -2141,7 +2142,7 @@ provided incident information.
 
                     <div
                       className={`
-                        inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold
+                        inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] font-semibold
                         ${
                           darkMode
                             ? "bg-red-950/30 text-red-300 border border-red-900/30"
@@ -2155,7 +2156,7 @@ provided incident information.
 
                     <div
                       className={`
-                        inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold
+                        inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] font-semibold
                         ${
                           darkMode
                             ? "bg-emerald-950/30 text-emerald-300 border border-emerald-900/30"
@@ -2181,18 +2182,26 @@ provided incident information.
                     </div>
 
                     <div>
-                      <p className={`text-xs font-semibold ${textMuted}`}>Directory</p>
+                      <p className={`text-[13px] font-semibold ${textMuted}`}>Directory</p>
                       <p className={`text-lg font-extrabold ${textPrimary}`}>{visibleCases.length}</p>
                     </div>
                   </div>
 
-                  <p className={`text-xs leading-relaxed mt-3 ${textSecondary}`}>
+                  <p className={`text-[13px] leading-relaxed mt-3 ${textSecondary}`}>
                     Currently matching your selected search and filters.
                   </p>
                 </div>
               </div>
             </div>
           </section>
+
+          <div
+            className="case-content-typography"
+            style={{
+              fontFamily:
+                '"Inter", "Plus Jakarta Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif',
+            }}
+          >
 
           {/* ===================================================
               CASE WORKSPACE
@@ -2205,12 +2214,12 @@ provided incident information.
                   <Search size={17} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className={`text-[9px] uppercase tracking-[.16em] font-bold ${textMuted}`}>Case finder</p>
+                  <p className={`text-[12px] uppercase tracking-[.16em] font-bold ${textMuted}`}>Case finder</p>
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search student, offense, status, or location..."
-                    className={`w-full mt-1 bg-transparent outline-none text-sm ${textPrimary} placeholder:text-gray-400`}
+                    className={`w-full mt-1 bg-transparent outline-none text-[16px] ${textPrimary} placeholder:text-gray-400`}
                   />
                 </div>
                 {search && (
@@ -2232,7 +2241,7 @@ provided incident information.
                     key={value}
                     type="button"
                     onClick={() => setSortMode(value)}
-                    className={`whitespace-nowrap px-3.5 py-2 rounded-xl text-[10px] font-bold transition ${
+                    className={`whitespace-nowrap px-3.5 py-2 rounded-xl text-[13px] font-bold transition ${
                       sortMode === value
                         ? "bg-green-600 text-white shadow-sm"
                         : darkMode
@@ -2281,9 +2290,9 @@ provided incident information.
             ].map((item) => (
               <div key={item.label} className={`rounded-2xl border p-4 shadow-sm ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-white border-gray-100"}`}>
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center border ${item.tone}`}>{item.icon}</div>
-                <p className={`text-[9px] uppercase tracking-wider font-bold mt-4 ${textMuted}`}>{item.label}</p>
+                <p className={`text-[12px] uppercase tracking-wider font-bold mt-4 ${textMuted}`}>{item.label}</p>
                 <p className={`text-2xl font-extrabold mt-1 ${textPrimary}`}>{item.value}</p>
-                <p className={`text-[9px] mt-1 ${textMuted}`}>{item.hint}</p>
+                <p className={`text-[12px] mt-1 ${textMuted}`}>{item.hint}</p>
               </div>
             ))}
           </section>
@@ -2295,9 +2304,9 @@ provided incident information.
               <div className="relative">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className={`text-[9px] uppercase tracking-[.18em] font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>Case pulse</p>
+                    <p className={`text-[12px] uppercase tracking-[.18em] font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>Case pulse</p>
                     <h3 className={`text-lg sm:text-xl font-extrabold mt-1 ${darkMode ? "text-white" : "text-slate-900"}`}>Risk balance across your queue</h3>
-                    <p className={`text-[10px] leading-relaxed mt-1 max-w-lg ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+                    <p className={`text-[13px] leading-relaxed mt-1 max-w-lg ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
                       A quick visual snapshot of locally classified case risk. Use it as a review aid, not a final decision.
                     </p>
                   </div>
@@ -2321,7 +2330,7 @@ provided incident information.
                     ["Low", cases.filter((c) => classifyCase(c).risk === "LOW").length, "text-emerald-500"],
                   ].map(([label, value, color]) => (
                     <div key={label}>
-                      <p className={`text-[9px] font-bold uppercase tracking-wider ${textMuted}`}>{label}</p>
+                      <p className={`text-[12px] font-bold uppercase tracking-wider ${textMuted}`}>{label}</p>
                       <p className={`text-xl font-extrabold mt-1 ${color}`}>{value}</p>
                     </div>
                   ))}
@@ -2332,7 +2341,7 @@ provided incident information.
             <div className={`rounded-[26px] border p-5 sm:p-6 ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-white border-gray-100"} shadow-sm`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-[9px] uppercase tracking-[.18em] font-bold ${textMuted}`}>Workflow health</p>
+                  <p className={`text-[12px] uppercase tracking-[.18em] font-bold ${textMuted}`}>Workflow health</p>
                   <h3 className={`text-lg font-extrabold mt-1 ${textPrimary}`}>Where cases are sitting</h3>
                 </div>
                 <Activity size={18} className={darkMode ? "text-emerald-400" : "text-green-600"} />
@@ -2346,8 +2355,8 @@ provided incident information.
                 ].map(([label, value]) => (
                   <div key={label}>
                     <div className="flex justify-between mb-1.5">
-                      <span className={`text-[10px] font-semibold ${textSecondary}`}>{label}</span>
-                      <span className={`text-[10px] font-bold ${textPrimary}`}>{value}</span>
+                      <span className={`text-[13px] font-semibold ${textSecondary}`}>{label}</span>
+                      <span className={`text-[13px] font-bold ${textPrimary}`}>{value}</span>
                     </div>
                     <div className={`h-1.5 rounded-full ${darkMode ? "bg-white/5" : "bg-gray-100"}`}>
                       <div className="h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-400" style={{ width: `${totalCases ? Math.max(4, (value / totalCases) * 100) : 0}%` }} />
@@ -2363,15 +2372,31 @@ provided incident information.
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className={`text-base font-extrabold ${textPrimary}`}>Active Case Directory</h3>
-                  <span className={`px-2 py-1 rounded-full text-[9px] font-bold ${darkMode ? "bg-emerald-950/40 text-emerald-300" : "bg-green-50 text-green-700"}`}>{visibleCases.length}</span>
+                  <h3 className={`text-lg font-extrabold ${textPrimary}`}>Active Case Directory</h3>
+                  <div className={`ml-2 inline-flex items-center rounded-xl border p-1 ${darkMode ? "bg-[#101F17] border-emerald-950/50" : "bg-gray-50 border-gray-200"}`}>
+                    <button
+                      type="button"
+                      onClick={() => setCaseViewMode("cards")}
+                      className={`px-3 py-1.5 rounded-lg text-[12px] font-bold transition ${caseViewMode === "cards" ? (darkMode ? "bg-emerald-900/60 text-emerald-200" : "bg-white text-green-700 shadow-sm") : (darkMode ? "text-slate-400" : "text-gray-500")}`}
+                    >
+                      Cards
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCaseViewMode("compact")}
+                      className={`px-3 py-1.5 rounded-lg text-[12px] font-bold transition ${caseViewMode === "compact" ? (darkMode ? "bg-emerald-900/60 text-emerald-200" : "bg-white text-green-700 shadow-sm") : (darkMode ? "text-slate-400" : "text-gray-500")}`}
+                    >
+                      Compact
+                    </button>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-[12px] font-bold ${darkMode ? "bg-emerald-950/40 text-emerald-300" : "bg-green-50 text-green-700"}`}>{visibleCases.length}</span>
                 </div>
-                <p className={`text-[11px] mt-1 ${textMuted}`}>Open any case to review evidence, student statements, AI analysis, workflow history, and next actions.</p>
+                <p className={`text-[14px] mt-1 ${textMuted}`}>Open any case to review evidence, student statements, AI analysis, workflow history, and next actions.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowCasePrintableReport(true)}
-                className={`inline-flex items-center justify-center gap-2 px-4 h-10 rounded-xl border text-xs font-bold transition ${
+                className={`inline-flex items-center justify-center gap-2 px-4 h-10 rounded-xl border text-[14px] font-bold transition ${
                   darkMode ? "bg-[#0C1913] border-emerald-950/60 text-slate-300 hover:bg-[#10231A]" : "bg-white border-gray-200 text-gray-700 hover:bg-green-50 hover:border-green-200 hover:text-green-700"
                 }`}
               >
@@ -2380,7 +2405,7 @@ provided incident information.
             </div>
 
             {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className={caseViewMode === "cards" ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5" : "space-y-2"}>
                 {[1, 2, 3, 4, 5, 6].map((item) => (
                   <div key={item} className={`h-[330px] rounded-[26px] border animate-pulse ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-white border-gray-100"}`} />
                 ))}
@@ -2391,20 +2416,21 @@ provided incident information.
                   <ClipboardList size={26} />
                 </div>
                 <h3 className={`font-extrabold mt-4 ${textPrimary}`}>Your case queue is clear</h3>
-                <p className={`text-xs mt-1 ${textMuted}`}>No cases match the current search or risk filter.</p>
+                <p className={`text-[14px] mt-1 ${textMuted}`}>No cases match the current search or risk filter.</p>
                 {search && (
-                  <button type="button" onClick={() => setSearch("")} className="mt-4 px-4 py-2 rounded-xl bg-green-600 text-white text-[10px] font-bold">
+                  <button type="button" onClick={() => setSearch("")} className="mt-4 px-4 py-2 rounded-xl bg-green-600 text-white text-[13px] font-bold">
                     Clear search
                   </button>
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className={caseViewMode === "cards" ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5" : "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-3"}>
                 {visibleCases.map((c) => (
                   <CaseCard
                     key={c._id}
                     caseData={c}
                     darkMode={darkMode}
+                    compact={caseViewMode === "compact"}
                     onClick={() => {
                       setSelected(c);
                       runGeminiAnalysis(c);
@@ -2414,6 +2440,7 @@ provided incident information.
               </div>
             )}
           </section>
+          </div>
         </div>
       </main>
 
@@ -2434,6 +2461,10 @@ provided incident information.
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 18 }}
               transition={{ duration: 0.18 }}
+              style={{
+                fontFamily:
+                  '"Inter", "Plus Jakarta Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif',
+              }}
               className={`case-modal w-full max-w-6xl max-h-[100dvh] sm:max-h-[94vh] overflow-hidden rounded-t-[30px] sm:rounded-[30px] border shadow-2xl ${darkMode ? "bg-[#0B1710] border-emerald-950/60" : "bg-[#F7FAF8] border-white"}`}
             >
               <div className={`case-modal-header sticky top-0 z-20 px-4 sm:px-6 py-4 border-b ${darkMode ? "bg-[#0C1913] border-emerald-950/60" : "bg-white border-gray-100"}`}>
@@ -2443,12 +2474,12 @@ provided incident information.
                   </button>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-[9px] uppercase tracking-[.18em] font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>Case workspace</span>
+                      <span className={`text-[12px] uppercase tracking-[.18em] font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>Case workspace</span>
                       <StatusBadge status={getStatus(selected)} />
                     </div>
                     <h2 className={`text-base sm:text-lg font-extrabold truncate mt-1 ${textPrimary}`}>{selected.offense || "Case Details"}</h2>
                   </div>
-                  <button type="button" onClick={() => setShowCasePrintableReport(true)} className={`hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-[10px] font-bold ${darkMode ? "border-emerald-950/60 text-slate-300 hover:bg-white/5" : "border-gray-200 text-gray-600 hover:bg-green-50 hover:text-green-700"}`}>
+                  <button type="button" onClick={() => setShowCasePrintableReport(true)} className={`hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-[13px] font-bold ${darkMode ? "border-emerald-950/60 text-slate-300 hover:bg-white/5" : "border-gray-200 text-gray-600 hover:bg-green-50 hover:text-green-700"}`}>
                     <Printer size={14} /> Print
                   </button>
                 </div>
@@ -2463,9 +2494,9 @@ provided incident information.
                       <div className="flex items-center gap-4 min-w-0">
                         <img src={selected.student?.avatar || DEFAULT_AVATAR} alt={selected.student?.name || "Student"} className="w-16 h-16 sm:w-20 sm:h-20 rounded-[22px] object-cover border-4 border-white/80 shadow-lg shrink-0" />
                         <div className="min-w-0">
-                          <p className={`text-[9px] uppercase tracking-[.18em] font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>Student case</p>
+                          <p className={`text-[12px] uppercase tracking-[.18em] font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>Student case</p>
                           <h3 className={`text-xl sm:text-2xl font-extrabold truncate mt-1 ${darkMode ? "text-white" : "text-slate-900"}`}>{selected.student?.name || "Unknown Student"}</h3>
-                          <p className={`text-xs mt-1 ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
+                          <p className={`text-[14px] mt-1 ${darkMode ? "text-slate-400" : "text-gray-500"}`}>
                             {selected.student?.studentId || "No student ID"}
                             {selected.student?.grade ? ` • ${selected.student.grade}` : ""}
                             {selected.student?.section ? ` • ${selected.student.section}` : ""}
@@ -2474,15 +2505,15 @@ provided incident information.
                       </div>
                       <div className="grid grid-cols-3 gap-2">
                         <div className={`rounded-2xl px-3 py-3 border text-center ${darkMode ? "bg-white/5 border-white/10" : "bg-white/70 border-white"}`}>
-                          <p className={`text-[8px] uppercase tracking-wider font-bold ${darkMode ? "text-slate-500" : "text-gray-400"}`}>Risk</p>
+                          <p className={`text-[12px] uppercase tracking-wider font-bold ${darkMode ? "text-slate-500" : "text-gray-400"}`}>Risk</p>
                           <div className="mt-1"><RiskBadge risk={aiAnalysis?.risk || ai?.risk || "LOW"} /></div>
                         </div>
                         <div className={`rounded-2xl px-3 py-3 border text-center ${darkMode ? "bg-white/5 border-white/10" : "bg-white/70 border-white"}`}>
-                          <p className={`text-[8px] uppercase tracking-wider font-bold ${darkMode ? "text-slate-500" : "text-gray-400"}`}>Evidence</p>
+                          <p className={`text-[12px] uppercase tracking-wider font-bold ${darkMode ? "text-slate-500" : "text-gray-400"}`}>Evidence</p>
                           <p className={`text-lg font-extrabold mt-1 ${darkMode ? "text-white" : "text-slate-900"}`}>{selected.evidence?.length || 0}</p>
                         </div>
                         <div className={`rounded-2xl px-3 py-3 border text-center ${darkMode ? "bg-white/5 border-white/10" : "bg-white/70 border-white"}`}>
-                          <p className={`text-[8px] uppercase tracking-wider font-bold ${darkMode ? "text-slate-500" : "text-gray-400"}`}>Updates</p>
+                          <p className={`text-[12px] uppercase tracking-wider font-bold ${darkMode ? "text-slate-500" : "text-gray-400"}`}>Updates</p>
                           <p className={`text-lg font-extrabold mt-1 ${darkMode ? "text-white" : "text-slate-900"}`}>{selected.logs?.length || 0}</p>
                         </div>
                       </div>
@@ -2501,8 +2532,8 @@ provided incident information.
                     ].map(([Icon, label, value]) => (
                       <div key={label} className={`rounded-2xl border p-3.5 ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-white border-gray-100"} shadow-sm`}>
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${darkMode ? "bg-emerald-950/40 text-emerald-300" : "bg-green-50 text-green-700"}`}><Icon size={14} /></div>
-                        <p className={`text-[8px] uppercase tracking-wider font-bold mt-3 ${textMuted}`}>{label}</p>
-                        <p className={`text-[10px] font-bold mt-1 truncate ${textPrimary}`}>{value || "N/A"}</p>
+                        <p className={`text-[12px] uppercase tracking-wider font-bold mt-3 ${textMuted}`}>{label}</p>
+                        <p className={`text-[13px] font-bold mt-1 truncate ${textPrimary}`}>{value || "N/A"}</p>
                       </div>
                     ))}
                   </section>
@@ -2511,10 +2542,10 @@ provided incident information.
                   <section className={`rounded-[26px] border p-5 sm:p-6 ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-white border-gray-100"} shadow-sm`}>
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className={`text-[9px] uppercase tracking-[.18em] font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>Case journey</p>
+                        <p className={`text-[12px] uppercase tracking-[.18em] font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>Case journey</p>
                         <h3 className={`text-lg font-extrabold mt-1 ${textPrimary}`}>Workflow progress</h3>
                       </div>
-                      <span className={`text-xs font-extrabold ${darkMode ? "text-emerald-300" : "text-green-700"}`}>{Math.round(((Math.max(flow.indexOf(getStatus(selected)), 0) + 1) / flow.length) * 100)}%</span>
+                      <span className={`text-[14px] font-extrabold ${darkMode ? "text-emerald-300" : "text-green-700"}`}>{Math.round(((Math.max(flow.indexOf(getStatus(selected)), 0) + 1) / flow.length) * 100)}%</span>
                     </div>
                     <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-3">
                       {flowWithMeta.map((step, index) => (
@@ -2522,8 +2553,8 @@ provided incident information.
                           <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${step.done ? (darkMode ? "bg-emerald-900/60 text-emerald-300" : "bg-green-600 text-white") : (darkMode ? "bg-white/5 text-slate-600" : "bg-white text-gray-300 border border-gray-100")}`}>
                             {step.done ? <CheckCircle size={15} /> : <CircleDot size={15} />}
                           </div>
-                          <p className={`text-[9px] font-extrabold mt-3 leading-snug ${textPrimary}`}>{step.label}</p>
-                          <p className={`text-[8px] mt-1 ${textMuted}`}>{step.time ? new Date(step.time).toLocaleDateString() : "Pending"}</p>
+                          <p className={`text-[12px] font-extrabold mt-3 leading-snug ${textPrimary}`}>{step.label}</p>
+                          <p className={`text-[12px] mt-1 ${textMuted}`}>{step.time ? new Date(step.time).toLocaleDateString() : "Pending"}</p>
                           {index < flowWithMeta.length - 1 && <span className={`hidden md:block absolute top-7 -right-3 w-3 h-px ${step.done ? "bg-green-500" : darkMode ? "bg-white/10" : "bg-gray-200"}`} />}
                         </div>
                       ))}
@@ -2535,17 +2566,17 @@ provided incident information.
                     <div className={`rounded-[26px] border p-5 ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-white border-gray-100"} shadow-sm`}>
                       <div className="flex items-center gap-3 mb-4">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? "bg-blue-950/40 text-blue-300" : "bg-blue-50 text-blue-700"}`}><FileText size={16} /></div>
-                        <div><p className={`text-sm font-extrabold ${textPrimary}`}>Incident story</p><p className={`text-[9px] ${textMuted}`}>What was reported</p></div>
+                        <div><p className={`text-[16px] font-extrabold ${textPrimary}`}>Incident story</p><p className={`text-[12px] ${textMuted}`}>What was reported</p></div>
                       </div>
-                      <p className={`text-sm leading-7 whitespace-pre-wrap ${textSecondary}`}>{selected.description || "No description provided."}</p>
+                      <p className={`text-[16px] leading-7 whitespace-pre-wrap ${textSecondary}`}>{selected.description || "No description provided."}</p>
                     </div>
                     <div className={`rounded-[26px] border p-5 ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-white border-gray-100"} shadow-sm`}>
                       <div className="flex items-center gap-3 mb-4">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? "bg-purple-950/40 text-purple-300" : "bg-purple-50 text-purple-700"}`}><MessageSquare size={16} /></div>
-                        <div><p className={`text-sm font-extrabold ${textPrimary}`}>Student voice</p><p className={`text-[9px] ${textMuted}`}>Recorded statement</p></div>
+                        <div><p className={`text-[16px] font-extrabold ${textPrimary}`}>Student voice</p><p className={`text-[12px] ${textMuted}`}>Recorded statement</p></div>
                       </div>
                       <div className={`rounded-2xl p-4 min-h-[130px] ${darkMode ? "bg-white/[.03]" : "bg-gray-50"}`}>
-                        <p className={`text-sm leading-7 whitespace-pre-wrap ${textSecondary}`}>{selected.studentStatement || "No student statement recorded yet."}</p>
+                        <p className={`text-[16px] leading-7 whitespace-pre-wrap ${textSecondary}`}>{selected.studentStatement || "No student statement recorded yet."}</p>
                       </div>
                     </div>
                   </section>
@@ -2555,9 +2586,9 @@ provided incident information.
                     <div className="flex items-center justify-between gap-3 mb-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? "bg-cyan-950/40 text-cyan-300" : "bg-cyan-50 text-cyan-700"}`}><ImageIcon size={16} /></div>
-                        <div><p className={`text-sm font-extrabold ${textPrimary}`}>Evidence locker</p><p className={`text-[9px] ${textMuted}`}>{selected.evidence?.length || 0} attached item(s)</p></div>
+                        <div><p className={`text-[16px] font-extrabold ${textPrimary}`}>Evidence locker</p><p className={`text-[12px] ${textMuted}`}>{selected.evidence?.length || 0} attached item(s)</p></div>
                       </div>
-                      <span className={`text-[9px] font-bold ${textMuted}`}>Click images to inspect</span>
+                      <span className={`text-[12px] font-bold ${textMuted}`}>Click images to inspect</span>
                     </div>
                     {Array.isArray(selected.evidence) && selected.evidence.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -2573,10 +2604,10 @@ provided incident information.
                           return isImage ? (
                             <button key={i} type="button" onClick={() => setPreviewImage(url)} className={`group relative aspect-[4/3] overflow-hidden rounded-2xl border ${darkMode ? "border-emerald-950/50" : "border-gray-100"}`}>
                               <img src={url} alt={`Evidence ${i + 1}`} className="w-full h-full object-cover transition duration-300 group-hover:scale-105" />
-                              <span className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 rounded-lg bg-black/55 py-1.5 text-[9px] font-bold text-white opacity-0 group-hover:opacity-100 transition"><Eye size={11} /> Inspect</span>
+                              <span className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 rounded-lg bg-black/55 py-1.5 text-[12px] font-bold text-white opacity-0 group-hover:opacity-100 transition"><Eye size={11} /> Inspect</span>
                             </button>
                           ) : (
-                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className={`aspect-[4/3] rounded-2xl border flex flex-col items-center justify-center gap-2 text-[10px] font-bold ${darkMode ? "border-emerald-950/50 bg-white/[.03] text-slate-400" : "border-gray-100 bg-gray-50 text-gray-500"}`}>
+                            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className={`aspect-[4/3] rounded-2xl border flex flex-col items-center justify-center gap-2 text-[13px] font-bold ${darkMode ? "border-emerald-950/50 bg-white/[.03] text-slate-400" : "border-gray-100 bg-gray-50 text-gray-500"}`}>
                               <FileText size={20} /> Open file
                             </a>
                           );
@@ -2585,7 +2616,7 @@ provided incident information.
                     ) : (
                       <div className={`rounded-2xl border border-dashed p-8 text-center ${darkMode ? "border-emerald-900/60 bg-white/[.02]" : "border-gray-200 bg-gray-50"}`}>
                         <ImageIcon size={22} className="mx-auto text-gray-400" />
-                        <p className={`text-xs font-bold mt-2 ${textSecondary}`}>No evidence attached</p>
+                        <p className={`text-[14px] font-bold mt-2 ${textSecondary}`}>No evidence attached</p>
                       </div>
                     )}
                   </section>
@@ -2598,14 +2629,14 @@ provided incident information.
                         <div className="flex items-center gap-3">
                           <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${darkMode ? "bg-emerald-900/60 text-emerald-300" : "bg-green-600 text-white shadow-lg shadow-green-600/20"}`}><Brain size={19} /></div>
                           <div>
-                            <p className={`text-[9px] uppercase tracking-[.18em] font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>Intelligence layer</p>
+                            <p className={`text-[12px] uppercase tracking-[.18em] font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>Intelligence layer</p>
                             <h3 className={`text-base font-extrabold mt-0.5 ${textPrimary}`}>GuidEd AI Case Review</h3>
-                            <p className={`text-[9px] mt-0.5 ${textMuted}`}>Current incident first • previous records are supporting context</p>
+                            <p className={`text-[12px] mt-0.5 ${textMuted}`}>Current incident first • previous records are supporting context</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <RiskBadge risk={aiAnalysis?.risk || ai?.risk || "LOW"} />
-                          <button type="button" onClick={() => runGeminiAnalysis(selected)} disabled={aiLoading} className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold border transition ${darkMode ? "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10" : "bg-white border-gray-100 text-gray-600 hover:text-green-700"}`}>
+                          <button type="button" onClick={() => runGeminiAnalysis(selected)} disabled={aiLoading} className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-[13px] font-bold border transition ${darkMode ? "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10" : "bg-white border-gray-100 text-gray-600 hover:text-green-700"}`}>
                             <RefreshCw size={12} className={aiLoading ? "animate-spin" : ""} /> {aiLoading ? "Analyzing..." : "Refresh"}
                           </button>
                         </div>
@@ -2619,8 +2650,8 @@ provided incident information.
                           ["Student", selected.student?.name || "Unknown"],
                         ].map(([label, value]) => (
                           <div key={label} className={`rounded-2xl p-3 border ${darkMode ? "bg-white/[.03] border-white/5" : "bg-white/80 border-white"}`}>
-                            <p className={`text-[8px] uppercase tracking-wider font-bold ${textMuted}`}>{label}</p>
-                            <p className={`text-[10px] font-extrabold mt-1 truncate ${textPrimary}`}>{value}</p>
+                            <p className={`text-[12px] uppercase tracking-wider font-bold ${textMuted}`}>{label}</p>
+                            <p className={`text-[13px] font-extrabold mt-1 truncate ${textPrimary}`}>{value}</p>
                           </div>
                         ))}
                       </div>
@@ -2628,13 +2659,13 @@ provided incident information.
                       {aiLoading && (
                         <div className={`mt-4 rounded-2xl p-5 flex items-center gap-3 ${darkMode ? "bg-white/[.03]" : "bg-white/80"}`}>
                           <div className="w-10 h-10 rounded-xl bg-green-600 text-white flex items-center justify-center"><Brain size={17} className="animate-pulse" /></div>
-                          <div><p className={`text-xs font-bold ${textPrimary}`}>GuidEd AI is reviewing the current incident…</p><p className={`text-[9px] mt-1 ${textMuted}`}>This may take a moment.</p></div>
+                          <div><p className={`text-[14px] font-bold ${textPrimary}`}>GuidEd AI is reviewing the current incident…</p><p className={`text-[12px] mt-1 ${textMuted}`}>This may take a moment.</p></div>
                         </div>
                       )}
 
                       {!aiLoading && aiError && (
                         <div className="mt-4 rounded-2xl bg-red-50 border border-red-100 p-4">
-                          <div className="flex items-start gap-3"><AlertTriangle size={17} className="text-red-600 shrink-0" /><div><p className="text-xs font-extrabold text-red-700">AI review unavailable</p><p className="text-[10px] text-red-600 mt-1">{aiError}</p><button type="button" onClick={() => runGeminiAnalysis(selected)} className="mt-3 px-3 py-2 rounded-xl bg-white border border-red-200 text-[10px] font-bold text-red-700">Try again</button></div></div>
+                          <div className="flex items-start gap-3"><AlertTriangle size={17} className="text-red-600 shrink-0" /><div><p className="text-[14px] font-extrabold text-red-700">AI review unavailable</p><p className="text-[13px] text-red-600 mt-1">{aiError}</p><button type="button" onClick={() => runGeminiAnalysis(selected)} className="mt-3 px-3 py-2 rounded-xl bg-white border border-red-200 text-[13px] font-bold text-red-700">Try again</button></div></div>
                         </div>
                       )}
 
@@ -2649,19 +2680,19 @@ provided incident information.
                             ["AI Notes", aiAnalysis.notes, ClipboardList],
                           ].filter(([, value]) => value).map(([label, value, Icon]) => (
                             <div key={label} className={`rounded-2xl p-4 border ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-white border-green-100"}`}>
-                              <div className="flex items-center gap-2"><Icon size={13} className={darkMode ? "text-emerald-400" : "text-green-600"} /><p className={`text-[9px] uppercase tracking-wider font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>{label}</p></div>
-                              <p className={`text-[11px] leading-relaxed mt-2 ${textSecondary}`}>{value}</p>
+                              <div className="flex items-center gap-2"><Icon size={13} className={darkMode ? "text-emerald-400" : "text-green-600"} /><p className={`text-[12px] uppercase tracking-wider font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>{label}</p></div>
+                              <p className={`text-[14px] leading-relaxed mt-2 ${textSecondary}`}>{value}</p>
                             </div>
                           ))}
                           {Array.isArray(aiAnalysis.references) && aiAnalysis.references.length > 0 && (
                             <div className={`md:col-span-2 rounded-2xl p-4 border ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-white border-green-100"}`}>
-                              <div className="flex items-center gap-2"><FileText size={13} className="text-green-600" /><p className={`text-[9px] uppercase tracking-wider font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>Research support</p></div>
+                              <div className="flex items-center gap-2"><FileText size={13} className="text-green-600" /><p className={`text-[12px] uppercase tracking-wider font-bold ${darkMode ? "text-emerald-400" : "text-green-700"}`}>Research support</p></div>
                               <div className="space-y-2 mt-3">
                                 {aiAnalysis.references.slice(0, 5).map((reference, index) => (
                                   <div key={reference.referenceId || reference.id || index} className={`rounded-xl p-3 ${darkMode ? "bg-white/[.03]" : "bg-gray-50"}`}>
-                                    <p className={`text-[10px] font-bold ${textPrimary}`}>{reference.referenceId || `Reference ${index + 1}`}</p>
-                                    {reference.citation && <p className={`text-[10px] mt-1 leading-relaxed ${textSecondary}`}>{reference.citation}</p>}
-                                    {reference.doi && <p className="text-[9px] text-green-700 font-semibold mt-1">DOI: {reference.doi}</p>}
+                                    <p className={`text-[13px] font-bold ${textPrimary}`}>{reference.referenceId || `Reference ${index + 1}`}</p>
+                                    {reference.citation && <p className={`text-[13px] mt-1 leading-relaxed ${textSecondary}`}>{reference.citation}</p>}
+                                    {reference.doi && <p className="text-[12px] text-green-700 font-semibold mt-1">DOI: {reference.doi}</p>}
                                   </div>
                                 ))}
                               </div>
@@ -2673,9 +2704,9 @@ provided incident information.
                       {!aiLoading && !aiError && !aiAnalysis && (
                         <div className={`mt-4 rounded-2xl p-6 text-center border ${darkMode ? "bg-white/[.03] border-white/5" : "bg-white/80 border-white"}`}>
                           <Brain size={24} className="mx-auto text-green-500" />
-                          <p className={`text-xs font-extrabold mt-2 ${textPrimary}`}>No AI review yet</p>
-                          <p className={`text-[10px] mt-1 ${textMuted}`}>Generate an incident-focused review when you're ready.</p>
-                          <button type="button" onClick={() => runGeminiAnalysis(selected)} className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-600 text-white text-[10px] font-bold hover:bg-green-700"><Sparkles size={13} /> Run AI Review</button>
+                          <p className={`text-[14px] font-extrabold mt-2 ${textPrimary}`}>No AI review yet</p>
+                          <p className={`text-[13px] mt-1 ${textMuted}`}>Generate an incident-focused review when you're ready.</p>
+                          <button type="button" onClick={() => runGeminiAnalysis(selected)} className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-600 text-white text-[13px] font-bold hover:bg-green-700"><Sparkles size={13} /> Run AI Review</button>
                         </div>
                       )}
                     </div>
@@ -2686,18 +2717,18 @@ provided incident information.
                     <section className={`rounded-[26px] border p-5 ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-white border-gray-100"} shadow-sm`}>
                       <div className="flex items-center gap-3 mb-4">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? "bg-blue-950/40 text-blue-300" : "bg-blue-50 text-blue-700"}`}><FileText size={16} /></div>
-                        <div><p className={`text-sm font-extrabold ${textPrimary}`}>Record student statement</p><p className={`text-[9px] ${textMuted}`}>Use this when a statement needs to be entered manually.</p></div>
+                        <div><p className={`text-[16px] font-extrabold ${textPrimary}`}>Record student statement</p><p className={`text-[12px] ${textMuted}`}>Use this when a statement needs to be entered manually.</p></div>
                       </div>
-                      <textarea value={studentInput} onChange={(e) => setStudentInput(e.target.value)} minLength={MIN_TEXT_LENGTH} placeholder="Write the student's statement…" className={`w-full min-h-[120px] p-4 rounded-2xl border outline-none resize-none text-sm ${darkMode ? "bg-white/[.03] border-emerald-950/60 text-slate-200" : "bg-gray-50 border-gray-200 text-gray-700"} ${studentInput.trim().length > 0 && studentInput.trim().length < MIN_TEXT_LENGTH ? "border-red-300" : ""}`} />
-                      <div className="flex items-center justify-between mt-2"><p className={`text-[10px] ${studentInput.trim().length > 0 && studentInput.trim().length < MIN_TEXT_LENGTH ? "text-red-500" : textMuted}`}>{studentInput.trim().length < MIN_TEXT_LENGTH ? `${MIN_TEXT_LENGTH - studentInput.trim().length} more characters required` : "Minimum length reached"}</p><span className={`text-[10px] ${textMuted}`}>{studentInput.length} characters</span></div>
-                      <button type="button" onClick={saveStudentStatement} className="mt-3 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold">Save Statement</button>
+                      <textarea value={studentInput} onChange={(e) => setStudentInput(e.target.value)} minLength={MIN_TEXT_LENGTH} placeholder="Write the student's statement…" className={`w-full min-h-[120px] p-4 rounded-2xl border outline-none resize-none text-[16px] ${darkMode ? "bg-white/[.03] border-emerald-950/60 text-slate-200" : "bg-gray-50 border-gray-200 text-gray-700"} ${studentInput.trim().length > 0 && studentInput.trim().length < MIN_TEXT_LENGTH ? "border-red-300" : ""}`} />
+                      <div className="flex items-center justify-between mt-2"><p className={`text-[13px] ${studentInput.trim().length > 0 && studentInput.trim().length < MIN_TEXT_LENGTH ? "text-red-500" : textMuted}`}>{studentInput.trim().length < MIN_TEXT_LENGTH ? `${MIN_TEXT_LENGTH - studentInput.trim().length} more characters required` : "Minimum length reached"}</p><span className={`text-[13px] ${textMuted}`}>{studentInput.length} characters</span></div>
+                      <button type="button" onClick={saveStudentStatement} className="mt-3 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-bold">Save Statement</button>
                     </section>
                   )}
 
                   {/* ESCALATION */}
                   {getStatus(selected) === "intervention-ready" && (
                     <section className={`rounded-[26px] border p-5 ${darkMode ? "bg-red-950/15 border-red-900/40" : "bg-red-50 border-red-100"}`}>
-                      <div className="flex items-center gap-3 mb-5"><div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? "bg-red-950/50 text-red-300" : "bg-red-100 text-red-600"}`}><AlertTriangle size={17} /></div><div><p className={`text-sm font-extrabold ${darkMode ? "text-red-300" : "text-red-800"}`}>Escalation record</p><p className={`text-[9px] ${darkMode ? "text-red-400/70" : "text-red-500"}`}>Information captured during intervention referral.</p></div></div>
+                      <div className="flex items-center gap-3 mb-5"><div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? "bg-red-950/50 text-red-300" : "bg-red-100 text-red-600"}`}><AlertTriangle size={17} /></div><div><p className={`text-[16px] font-extrabold ${darkMode ? "text-red-300" : "text-red-800"}`}>Escalation record</p><p className={`text-[12px] ${darkMode ? "text-red-400/70" : "text-red-500"}`}>Information captured during intervention referral.</p></div></div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <InfoBlock icon={<User2 size={14} />} label="Involved Persons" value={selected?.escalationInfo?.involvedPersons} />
                         <InfoBlock icon={<Users size={14} />} label="Additional Participants" value={selected?.escalationInfo?.additionalParticipants} />
@@ -2709,7 +2740,7 @@ provided incident information.
                   {/* ESCALATION INPUT */}
                   {canEscalate(selected) && (
                     <section className={`rounded-[26px] border p-5 ${darkMode ? "bg-red-950/10 border-red-900/40" : "bg-red-50/70 border-red-100"}`}>
-                      <div className="flex items-center gap-3 mb-5"><div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? "bg-red-950/50 text-red-300" : "bg-red-100 text-red-600"}`}><AlertTriangle size={17} /></div><div><p className={`text-sm font-extrabold ${darkMode ? "text-red-300" : "text-red-800"}`}>Prepare intervention referral</p><p className={`text-[9px] ${darkMode ? "text-red-400/70" : "text-red-500"}`}>Complete the supporting details before escalating this case.</p></div></div>
+                      <div className="flex items-center gap-3 mb-5"><div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? "bg-red-950/50 text-red-300" : "bg-red-100 text-red-600"}`}><AlertTriangle size={17} /></div><div><p className={`text-[16px] font-extrabold ${darkMode ? "text-red-300" : "text-red-800"}`}>Prepare intervention referral</p><p className={`text-[12px] ${darkMode ? "text-red-400/70" : "text-red-500"}`}>Complete the supporting details before escalating this case.</p></div></div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {[
                           ["Involved Persons", involvedPersons, setInvolvedPersons, "Primary involved persons…"],
@@ -2717,8 +2748,8 @@ provided incident information.
                           ["Approval Details", approvalDetails, setApprovalDetails, "Guidance / dean approval remarks…"],
                         ].map(([label, value, setter, placeholder]) => (
                           <div key={label}>
-                            <label className={`text-[9px] uppercase tracking-wider font-bold ${textMuted}`}>{label}</label>
-                            <textarea value={value} onChange={(e) => setter(e.target.value)} placeholder={placeholder} className={`mt-2 w-full min-h-[110px] p-3 rounded-2xl border outline-none resize-none text-xs ${darkMode ? "bg-[#0C1913] border-emerald-950/60 text-slate-200" : "bg-white border-gray-200 text-gray-700"}`} />
+                            <label className={`text-[12px] uppercase tracking-wider font-bold ${textMuted}`}>{label}</label>
+                            <textarea value={value} onChange={(e) => setter(e.target.value)} placeholder={placeholder} className={`mt-2 w-full min-h-[110px] p-3 rounded-2xl border outline-none resize-none text-[14px] ${darkMode ? "bg-[#0C1913] border-emerald-950/60 text-slate-200" : "bg-white border-gray-200 text-gray-700"}`} />
                           </div>
                         ))}
                       </div>
@@ -2728,7 +2759,7 @@ provided incident information.
                   {/* ACTIVITY */}
                   <section className={`rounded-[26px] border p-5 sm:p-6 ${darkMode ? "bg-[#0C1913] border-emerald-950/50" : "bg-white border-gray-100"} shadow-sm`}>
                     <div className="flex items-center justify-between">
-                      <div><p className={`text-[9px] uppercase tracking-[.18em] font-bold ${textMuted}`}>Audit trail</p><h3 className={`text-lg font-extrabold mt-1 ${textPrimary}`}>Case activity</h3></div>
+                      <div><p className={`text-[12px] uppercase tracking-[.18em] font-bold ${textMuted}`}>Audit trail</p><h3 className={`text-lg font-extrabold mt-1 ${textPrimary}`}>Case activity</h3></div>
                       <Clock3 size={18} className={darkMode ? "text-emerald-400" : "text-green-600"} />
                     </div>
                     <div className="mt-5 space-y-3">
@@ -2736,13 +2767,13 @@ provided incident information.
                         <div key={l._id || i} className={`flex gap-3 rounded-2xl border p-3.5 ${darkMode ? "bg-white/[.02] border-white/5" : "bg-gray-50/70 border-gray-100"}`}>
                           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${darkMode ? "bg-emerald-950/50 text-emerald-300" : "bg-green-50 text-green-600"}`}><CircleCheck size={15} /></div>
                           <div className="min-w-0">
-                            <p className={`text-xs font-extrabold ${textPrimary}`}>{actionLabels[l.stage] || l.stage}</p>
-                            {l.note && <p className={`text-[10px] leading-relaxed mt-1 ${textSecondary}`}>{l.note}</p>}
-                            <p className={`text-[9px] mt-2 ${textMuted}`}>{l.changedByName ? `By ${l.changedByName} • ` : ""}{l.time ? new Date(l.time).toLocaleString() : "No date"}</p>
+                            <p className={`text-[14px] font-extrabold ${textPrimary}`}>{actionLabels[l.stage] || l.stage}</p>
+                            {l.note && <p className={`text-[13px] leading-relaxed mt-1 ${textSecondary}`}>{l.note}</p>}
+                            <p className={`text-[12px] mt-2 ${textMuted}`}>{l.changedByName ? `By ${l.changedByName} • ` : ""}{l.time ? new Date(l.time).toLocaleString() : "No date"}</p>
                           </div>
                         </div>
                       ))}
-                      {(!selected.logs || selected.logs.length === 0) && <div className={`py-8 text-center text-xs ${textMuted}`}>No case activity recorded yet.</div>}
+                      {(!selected.logs || selected.logs.length === 0) && <div className={`py-8 text-center text-[14px] ${textMuted}`}>No case activity recorded yet.</div>}
                     </div>
                   </section>
 
@@ -2750,14 +2781,14 @@ provided incident information.
                   <section className={`rounded-[28px] border p-5 sm:p-6 ${darkMode ? "bg-gradient-to-br from-[#0C1913] to-[#09150F] border-emerald-950/60" : "bg-white border-gray-100"} shadow-sm`}>
                     <div className="flex items-start gap-3">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${darkMode ? "bg-emerald-950/50 text-emerald-300" : "bg-green-50 text-green-700"}`}><ClipboardList size={16} /></div>
-                      <div><p className={`text-sm font-extrabold ${textPrimary}`}>Action center</p><p className={`text-[9px] mt-0.5 ${textMuted}`}>Add a clear admin note before changing the case stage.</p></div>
+                      <div><p className={`text-[16px] font-extrabold ${textPrimary}`}>Action center</p><p className={`text-[12px] mt-0.5 ${textMuted}`}>Add a clear admin note before changing the case stage.</p></div>
                     </div>
-                    <textarea value={note} onChange={(e) => setNote(e.target.value)} minLength={MIN_TEXT_LENGTH} placeholder="Explain the reason, observation, or context for this action…" className={`mt-4 w-full min-h-[115px] p-4 rounded-2xl border outline-none resize-none text-sm ${darkMode ? "bg-white/[.03] border-emerald-950/60 text-slate-200" : "bg-gray-50 border-gray-200 text-gray-700"}`} />
-                    <div className="flex items-center justify-between mt-2"><span className={`text-[10px] ${note.trim().length > 0 && note.trim().length < MIN_TEXT_LENGTH ? "text-red-500" : textMuted}`}>{note.trim().length < MIN_TEXT_LENGTH ? `${MIN_TEXT_LENGTH - note.trim().length} more characters required` : "Ready to submit"}</span><span className={`text-[10px] ${textMuted}`}>{note.length} characters</span></div>
+                    <textarea value={note} onChange={(e) => setNote(e.target.value)} minLength={MIN_TEXT_LENGTH} placeholder="Explain the reason, observation, or context for this action…" className={`mt-4 w-full min-h-[115px] p-4 rounded-2xl border outline-none resize-none text-[16px] ${darkMode ? "bg-white/[.03] border-emerald-950/60 text-slate-200" : "bg-gray-50 border-gray-200 text-gray-700"}`} />
+                    <div className="flex items-center justify-between mt-2"><span className={`text-[13px] ${note.trim().length > 0 && note.trim().length < MIN_TEXT_LENGTH ? "text-red-500" : textMuted}`}>{note.trim().length < MIN_TEXT_LENGTH ? `${MIN_TEXT_LENGTH - note.trim().length} more characters required` : "Ready to submit"}</span><span className={`text-[13px] ${textMuted}`}>{note.length} characters</span></div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-4">
-                      <button type="button" onClick={() => updateStatus("reviewing")} disabled={!canReview(selected)} className={`py-3 rounded-xl flex items-center justify-center gap-2 text-[10px] font-extrabold transition ${canReview(selected) ? "bg-amber-500 hover:bg-amber-600 text-white" : darkMode ? "bg-white/5 text-slate-600 cursor-not-allowed" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}><Eye size={14} /> Review Case</button>
-                      <button type="button" onClick={() => updateStatus("refer-for-intervention")} disabled={!canEscalate(selected)} className={`py-3 rounded-xl flex items-center justify-center gap-2 text-[10px] font-extrabold transition ${canEscalate(selected) ? "bg-red-500 hover:bg-red-600 text-white" : darkMode ? "bg-white/5 text-slate-600 cursor-not-allowed" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}><AlertTriangle size={14} /> Refer Intervention</button>
-                      <button type="button" onClick={() => updateStatus("intervention-ready")} disabled={!canIntervene(selected)} className={`py-3 rounded-xl flex items-center justify-center gap-2 text-[10px] font-extrabold transition ${canIntervene(selected) ? "bg-green-600 hover:bg-green-700 text-white" : darkMode ? "bg-white/5 text-slate-600 cursor-not-allowed" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}><CheckCircle size={14} /> Intervention Ready</button>
+                      <button type="button" onClick={() => updateStatus("reviewing")} disabled={!canReview(selected)} className={`py-3 rounded-xl flex items-center justify-center gap-2 text-[13px] font-extrabold transition ${canReview(selected) ? "bg-amber-500 hover:bg-amber-600 text-white" : darkMode ? "bg-white/5 text-slate-600 cursor-not-allowed" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}><Eye size={14} /> Review Case</button>
+                      <button type="button" onClick={() => updateStatus("refer-for-intervention")} disabled={!canEscalate(selected)} className={`py-3 rounded-xl flex items-center justify-center gap-2 text-[13px] font-extrabold transition ${canEscalate(selected) ? "bg-red-500 hover:bg-red-600 text-white" : darkMode ? "bg-white/5 text-slate-600 cursor-not-allowed" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}><AlertTriangle size={14} /> Refer Intervention</button>
+                      <button type="button" onClick={() => updateStatus("intervention-ready")} disabled={!canIntervene(selected)} className={`py-3 rounded-xl flex items-center justify-center gap-2 text-[13px] font-extrabold transition ${canIntervene(selected) ? "bg-green-600 hover:bg-green-700 text-white" : darkMode ? "bg-white/5 text-slate-600 cursor-not-allowed" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}><CheckCircle size={14} /> Intervention Ready</button>
                     </div>
                   </section>
                 </div>

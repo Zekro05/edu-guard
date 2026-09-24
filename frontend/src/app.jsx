@@ -6,7 +6,7 @@ import {
   useLocation,
 } from "react-router-dom";
 
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 import { Toaster } from "react-hot-toast";
 
@@ -129,42 +129,115 @@ const GlobalNotifications = lazy(
 );
 
 /* =========================================================
-   EDU-GUARD LOADING SCREEN
+   GUIDED LOADING SCREEN
 ========================================================= */
 
 const PageLoader = ({
   message = "Preparing your workspace...",
 }) => {
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof document === "undefined") {
+      return false;
+    }
+
+    return document.documentElement.classList.contains("dark");
+  });
+
+  useEffect(() => {
+    const updateTheme = () => {
+      setDarkMode(
+        document.documentElement.classList.contains("dark"),
+      );
+    };
+
+    updateTheme();
+
+    const observer = new MutationObserver(() => {
+      updateTheme();
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-[9999] overflow-hidden bg-[#F7F9F8]">
+    <div
+      className={`fixed inset-0 z-[9999] overflow-hidden transition-colors duration-300 ${
+        darkMode
+          ? "bg-[#07110C] text-white"
+          : "bg-[#F7F9F8] text-gray-800"
+      }`}
+    >
       {/* =================================================
           SOFT BACKGROUND GLOW
       ================================================= */}
 
-      <div className="absolute -top-32 -left-32 w-80 h-80 rounded-full bg-emerald-200/30 blur-3xl" />
+      <div
+        className={`absolute -top-32 -left-32 w-80 h-80 rounded-full blur-3xl ${
+          darkMode
+            ? "bg-emerald-950/50"
+            : "bg-emerald-200/30"
+        }`}
+      />
 
-      <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-green-200/30 blur-3xl" />
+      <div
+        className={`absolute -bottom-32 -right-32 w-96 h-96 rounded-full blur-3xl ${
+          darkMode
+            ? "bg-green-950/50"
+            : "bg-green-200/30"
+        }`}
+      />
 
-      <div className="absolute top-1/2 left-1/2 w-72 h-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-100/20 blur-3xl" />
+      <div
+        className={`absolute top-1/2 left-1/2 w-72 h-72 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl ${
+          darkMode
+            ? "bg-emerald-900/20"
+            : "bg-emerald-100/20"
+        }`}
+      />
 
       {/* =================================================
           FLOATING DECORATIVE SHAPES
       ================================================= */}
 
-      <div className="absolute top-[15%] left-[12%] w-3 h-3 rounded-full bg-emerald-400/40 animate-pulse" />
+      <div
+        className={`absolute top-[15%] left-[12%] w-3 h-3 rounded-full animate-pulse ${
+          darkMode
+            ? "bg-emerald-400/30"
+            : "bg-emerald-400/40"
+        }`}
+      />
 
       <div
-        className="absolute top-[25%] right-[15%] w-2 h-2 rounded-full bg-green-500/30 animate-pulse"
+        className={`absolute top-[25%] right-[15%] w-2 h-2 rounded-full animate-pulse ${
+          darkMode
+            ? "bg-green-400/25"
+            : "bg-green-500/30"
+        }`}
         style={{ animationDelay: "500ms" }}
       />
 
       <div
-        className="absolute bottom-[20%] left-[18%] w-2 h-2 rounded-full bg-emerald-500/30 animate-pulse"
+        className={`absolute bottom-[20%] left-[18%] w-2 h-2 rounded-full animate-pulse ${
+          darkMode
+            ? "bg-emerald-400/25"
+            : "bg-emerald-500/30"
+        }`}
         style={{ animationDelay: "1000ms" }}
       />
 
       <div
-        className="absolute bottom-[28%] right-[12%] w-3 h-3 rounded-full bg-green-400/30 animate-pulse"
+        className={`absolute bottom-[28%] right-[12%] w-3 h-3 rounded-full animate-pulse ${
+          darkMode
+            ? "bg-green-400/25"
+            : "bg-green-400/30"
+        }`}
         style={{ animationDelay: "1500ms" }}
       />
 
@@ -173,7 +246,13 @@ const PageLoader = ({
       ================================================= */}
 
       <div className="relative z-10 min-h-screen flex items-center justify-center px-6">
-        <div className="flex flex-col items-center text-center">
+        <div
+          className="flex flex-col items-center text-center"
+          style={{
+            fontFamily:
+              '"Inter", "Plus Jakarta Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif',
+          }}
+        >
           {/* =================================================
               LOGO CONTAINER
           ================================================= */}
@@ -181,11 +260,23 @@ const PageLoader = ({
           <div className="relative mb-7">
             {/* Soft glow */}
 
-            <div className="absolute inset-0 rounded-[28px] bg-emerald-400/20 blur-xl scale-125" />
+            <div
+              className={`absolute inset-0 rounded-[28px] blur-xl scale-125 ${
+                darkMode
+                  ? "bg-emerald-500/10"
+                  : "bg-emerald-400/20"
+              }`}
+            />
 
             {/* Logo card */}
 
-            <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-[26px] bg-white border border-emerald-100 shadow-[0_12px_40px_rgba(16,185,129,0.12)] flex items-center justify-center">
+            <div
+              className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-[26px] flex items-center justify-center transition-all duration-300 ${
+                darkMode
+                  ? "bg-[#102019] border border-emerald-900/60 shadow-[0_12px_40px_rgba(16,185,129,0.10)]"
+                  : "bg-white border border-emerald-100 shadow-[0_12px_40px_rgba(16,185,129,0.12)]"
+              }`}
+            >
               <img
                 src="/school-logo.webp"
                 alt="GuidEd"
@@ -197,7 +288,13 @@ const PageLoader = ({
                 ROTATING RING
             ================================================= */}
 
-            <div className="absolute -inset-2 rounded-[30px] border-2 border-transparent border-t-emerald-500/70 border-r-emerald-400/30 animate-spin" />
+            <div
+              className={`absolute -inset-2 rounded-[30px] border-2 border-transparent animate-spin ${
+                darkMode
+                  ? "border-t-emerald-400/70 border-r-emerald-500/20"
+                  : "border-t-emerald-500/70 border-r-emerald-400/30"
+              }`}
+            />
           </div>
 
           {/* =================================================
@@ -205,14 +302,26 @@ const PageLoader = ({
           ================================================= */}
 
           <div className="mb-2">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-gray-800">
+            <h1
+              className={`text-2xl sm:text-3xl font-bold tracking-tight transition-colors duration-300 ${
+                darkMode
+                  ? "text-white"
+                  : "text-gray-800"
+              }`}
+            >
               Guid
-              <span className="text-emerald-600">
+              <span className="text-emerald-500">
                 Ed
               </span>
             </h1>
 
-            <p className="mt-1 text-xs sm:text-sm font-medium tracking-wide text-gray-500">
+            <p
+              className={`mt-1 text-sm sm:text-[15px] font-medium tracking-wide transition-colors duration-300 ${
+                darkMode
+                  ? "text-emerald-100/60"
+                  : "text-gray-500"
+              }`}
+            >
               Student Guidance
             </p>
           </div>
@@ -242,7 +351,13 @@ const PageLoader = ({
               STATUS MESSAGE
           ================================================= */}
 
-          <p className="mt-4 text-sm text-gray-500">
+          <p
+            className={`mt-4 text-[15px] leading-relaxed transition-colors duration-300 ${
+              darkMode
+                ? "text-gray-300"
+                : "text-gray-500"
+            }`}
+          >
             {message}
           </p>
 
@@ -250,11 +365,23 @@ const PageLoader = ({
               SCHOOL BRANDING
           ================================================= */}
 
-          <p className="mt-8 text-[10px] sm:text-xs text-gray-400 tracking-wide">
+          <p
+            className={`mt-8 text-[11px] sm:text-xs font-medium tracking-wide transition-colors duration-300 ${
+              darkMode
+                ? "text-gray-500"
+                : "text-gray-400"
+            }`}
+          >
             Our Lady of the Holy Rosary School
           </p>
 
-          <p className="mt-1 text-[9px] sm:text-[10px] text-gray-400">
+          <p
+            className={`mt-1 text-[10px] sm:text-[11px] transition-colors duration-300 ${
+              darkMode
+                ? "text-gray-600"
+                : "text-gray-400"
+            }`}
+          >
             General Trias Campus
           </p>
         </div>
