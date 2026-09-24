@@ -516,7 +516,6 @@ const MyHistory = () => {
           <Nav icon={<LayoutDashboard size={18} />} label="Dashboard" path="/student-dashboard" />
           <Nav icon={<FileText size={18} />} label="My Reports" path="/my-reports" />
           <Nav icon={<FileClock size={18} />} label="My History" path="/my-history" active />
-          <Nav icon={<MessageSquare size={18} />} label="Messages" path="/message-admin" />
           <Nav icon={<Plus size={18} />} label="Report an Incident" path="/student-reporting" />
         </div>
 
@@ -524,8 +523,8 @@ const MyHistory = () => {
           Support
         </p>
 
-        <Nav icon={<BookOpen size={18} />} label="Guidance Resources" path="/guidance" />
-        <Nav icon={<HelpCircle size={18} />} label="Get Support" path="/messages" />
+        <Nav icon={<BookOpen size={18} />} label="Guidance Resources" path="/guidance-resources" />
+        <Nav icon={<HelpCircle size={18} />} label="Get Support" path="/message-admin" />
 
         <p className={`px-3 mt-7 mb-2 text-[11px] font-bold uppercase tracking-widest ${theme.muted}`}>
           System

@@ -142,7 +142,7 @@ const StatusBadge = memo(({ status, darkMode = false }) => {
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[11px] font-bold whitespace-nowrap ${config.classes}`}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[13px] font-bold whitespace-nowrap ${config.classes}`}
     >
       <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
       {config.icon}
@@ -174,7 +174,7 @@ const InfoTile = memo(({ icon, label, value, darkMode = false }) => (
 
       <div className="min-w-0">
         <p
-          className={`text-[9px] uppercase tracking-[0.12em] font-bold ${
+          className={`text-[13px] uppercase tracking-[0.12em] font-bold ${
             darkMode ? "text-gray-500" : "text-gray-400"
           }`}
         >
@@ -182,7 +182,7 @@ const InfoTile = memo(({ icon, label, value, darkMode = false }) => (
         </p>
 
         <p
-          className={`mt-0.5 text-sm font-semibold leading-5 break-words ${
+          className={`mt-0.5 text-[15px] font-semibold leading-5 break-words ${
             darkMode ? "text-gray-100" : "text-gray-800"
           }`}
         >
@@ -226,7 +226,7 @@ const AILevelBadge = memo(({ label, value, darkMode = false }) => {
   return (
     <div>
       <p
-        className={`text-[9px] uppercase tracking-[0.12em] font-bold mb-1.5 ${
+        className={`text-[13px] uppercase tracking-[0.12em] font-bold mb-1.5 ${
           darkMode ? "text-gray-500" : "text-gray-400"
         }`}
       >
@@ -234,7 +234,7 @@ const AILevelBadge = memo(({ label, value, darkMode = false }) => {
       </p>
 
       <span
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold ${classes}`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[13px] font-bold ${classes}`}
       >
         {icon}
         {value || "Not analyzed"}
@@ -275,7 +275,7 @@ const EvidenceBadge = memo(({ value, darkMode = false }) => {
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[11px] font-bold ${classes}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-[13px] font-bold ${classes}`}
     >
       {icon}
       {value || "Not analyzed"}
@@ -299,7 +299,7 @@ const SectionHeader = memo(({ icon, title, subtitle, darkMode = false }) => (
 
     <div className="min-w-0">
       <p
-        className={`text-sm font-extrabold ${
+        className={`text-[15px] font-extrabold ${
           darkMode ? "text-gray-100" : "text-gray-800"
         }`}
       >
@@ -308,7 +308,7 @@ const SectionHeader = memo(({ icon, title, subtitle, darkMode = false }) => (
 
       {subtitle && (
         <p
-          className={`text-[11px] mt-0.5 leading-4 ${
+          className={`text-[13px] mt-0.5 leading-4 ${
             darkMode ? "text-gray-500" : "text-gray-400"
           }`}
         >
@@ -348,7 +348,7 @@ const EvidenceSection = memo(({ evidence = [], darkMode = false }) => {
         </div>
 
         <p
-          className={`mt-3 text-sm font-bold ${
+          className={`mt-3 text-[15px] font-bold ${
             darkMode ? "text-gray-300" : "text-gray-600"
           }`}
         >
@@ -356,7 +356,7 @@ const EvidenceSection = memo(({ evidence = [], darkMode = false }) => {
         </p>
 
         <p
-          className={`mt-1 text-[11px] ${
+          className={`mt-1 text-[13px] ${
             darkMode ? "text-gray-600" : "text-gray-400"
           }`}
         >
@@ -391,14 +391,14 @@ const EvidenceSection = memo(({ evidence = [], darkMode = false }) => {
 
             <div className="min-w-0">
               <p
-                className={`text-sm font-extrabold ${
+                className={`text-[15px] font-extrabold ${
                   darkMode ? "text-gray-100" : "text-gray-800"
                 }`}
               >
                 Evidence & attachments
               </p>
               <p
-                className={`text-[10px] mt-0.5 ${
+                className={`text-[13px] mt-0.5 ${
                   darkMode ? "text-gray-500" : "text-gray-400"
                 }`}
               >
@@ -449,7 +449,7 @@ const EvidenceSection = memo(({ evidence = [], darkMode = false }) => {
                           }}
                         />
 
-                        <span className="absolute inset-x-2 bottom-2 px-2 py-1.5 rounded-lg bg-black/65 text-white text-[9px] font-bold text-left backdrop-blur-sm">
+                        <span className="absolute inset-x-2 bottom-2 px-2 py-1.5 rounded-lg bg-black/65 text-white text-[13px] font-bold text-left backdrop-blur-sm">
                           Evidence {index + 1}
                         </span>
 
@@ -481,7 +481,7 @@ const EvidenceSection = memo(({ evidence = [], darkMode = false }) => {
                         />
 
                         <span
-                          className={`text-xs font-semibold truncate flex-1 ${
+                          className={`text-[13px] font-semibold truncate flex-1 ${
                             darkMode ? "text-gray-300" : "text-gray-700"
                           }`}
                         >
@@ -495,7 +495,7 @@ const EvidenceSection = memo(({ evidence = [], darkMode = false }) => {
                 )}
 
                 <div
-                  className={`mt-3 flex items-start gap-2 text-[10px] leading-4 ${
+                  className={`mt-3 flex items-start gap-2 text-[13px] leading-4 ${
                     darkMode ? "text-gray-600" : "text-gray-400"
                   }`}
                 >
@@ -587,7 +587,7 @@ const AIReviewPanel = memo(
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <h4
-                  className={`text-[15px] font-extrabold tracking-tight ${
+                  className={`text-[16px] font-extrabold tracking-tight ${
                     darkMode ? "text-gray-100" : "text-gray-900"
                   }`}
                 >
@@ -595,7 +595,7 @@ const AIReviewPanel = memo(
                 </h4>
 
                 <span
-                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[9px] font-bold ${
+                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[13px] font-bold ${
                     darkMode
                       ? "bg-[#163B20] border-[#285C32] text-green-300"
                       : "bg-white border-green-200 text-green-700"
@@ -607,7 +607,7 @@ const AIReviewPanel = memo(
               </div>
 
               <p
-                className={`text-[11px] leading-4 mt-1 ${
+                className={`text-[13px] leading-4 mt-1 ${
                   darkMode ? "text-gray-500" : "text-gray-500"
                 }`}
               >
@@ -626,16 +626,16 @@ const AIReviewPanel = memo(
               }`}
             >
               <div className="rounded-xl px-2.5 py-2 text-center">
-                <p className={`text-[8px] uppercase tracking-wider font-bold ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Risk</p>
-                <p className={`text-[11px] font-extrabold mt-0.5 ${darkMode ? "text-gray-200" : "text-gray-800"}`}>{aiReview?.riskLevel || "—"}</p>
+                <p className={`text-[13px] uppercase tracking-wider font-bold ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Risk</p>
+                <p className={`text-[13px] font-extrabold mt-0.5 ${darkMode ? "text-gray-200" : "text-gray-800"}`}>{aiReview?.riskLevel || "—"}</p>
               </div>
               <div className={`rounded-xl px-2.5 py-2 text-center border-x ${darkMode ? "border-[#1A2C20]" : "border-green-100"}`}>
-                <p className={`text-[8px] uppercase tracking-wider font-bold ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Severity</p>
-                <p className={`text-[11px] font-extrabold mt-0.5 ${darkMode ? "text-gray-200" : "text-gray-800"}`}>{aiReview?.severity || "—"}</p>
+                <p className={`text-[13px] uppercase tracking-wider font-bold ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Severity</p>
+                <p className={`text-[13px] font-extrabold mt-0.5 ${darkMode ? "text-gray-200" : "text-gray-800"}`}>{aiReview?.severity || "—"}</p>
               </div>
               <div className="rounded-xl px-2.5 py-2 text-center">
-                <p className={`text-[8px] uppercase tracking-wider font-bold ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Priority</p>
-                <p className={`text-[11px] font-extrabold mt-0.5 ${darkMode ? "text-gray-200" : "text-gray-800"}`}>{aiReview?.reviewPriority || "—"}</p>
+                <p className={`text-[13px] uppercase tracking-wider font-bold ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Priority</p>
+                <p className={`text-[13px] font-extrabold mt-0.5 ${darkMode ? "text-gray-200" : "text-gray-800"}`}>{aiReview?.reviewPriority || "—"}</p>
               </div>
             </div>
           )}
@@ -645,7 +645,7 @@ const AIReviewPanel = memo(
               <button
                 type="button"
                 onClick={() => setExpanded((value) => !value)}
-                className={`min-h-10 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 ${
+                className={`min-h-10 rounded-xl border text-[13px] font-bold flex items-center justify-center gap-1.5 ${
                   darkMode
                     ? "bg-[#0D1A12] border-[#24392A] text-gray-300"
                     : "bg-white border-gray-200 text-gray-600"
@@ -660,7 +660,7 @@ const AIReviewPanel = memo(
               type="button"
               onClick={onAnalyze}
               disabled={analyzing}
-              className={`min-h-10 rounded-xl bg-green-700 hover:bg-green-800 disabled:bg-green-400 text-white text-[11px] font-bold flex items-center justify-center gap-1.5 ${
+              className={`min-h-10 rounded-xl bg-green-700 hover:bg-green-800 disabled:bg-green-400 text-white text-[13px] font-bold flex items-center justify-center gap-1.5 ${
                 analyzed ? "" : "col-span-2"
               }`}
             >
@@ -685,7 +685,7 @@ const AIReviewPanel = memo(
 
           {aiError && (
             <div
-              className={`mt-3 rounded-xl border p-3 flex items-start gap-2 text-[11px] leading-4 ${
+              className={`mt-3 rounded-xl border p-3 flex items-start gap-2 text-[13px] leading-4 ${
                 darkMode
                   ? "bg-red-950/40 border-red-800/60 text-red-300"
                   : "bg-red-50 border-red-200 text-red-700"
@@ -741,7 +741,7 @@ const AIReviewPanel = memo(
                     }`}
                   >
                     <p
-                      className={`text-[9px] uppercase tracking-[0.12em] font-bold mb-1.5 ${
+                      className={`text-[13px] uppercase tracking-[0.12em] font-bold mb-1.5 ${
                         darkMode ? "text-gray-500" : "text-gray-400"
                       }`}
                     >
@@ -764,7 +764,7 @@ const AIReviewPanel = memo(
                     <div className="flex items-center gap-2 mb-1.5">
                       <ShieldAlert size={14} className="text-green-600" />
                       <p
-                        className={`text-xs font-bold ${
+                        className={`text-[13px] font-bold ${
                           darkMode ? "text-gray-200" : "text-gray-700"
                         }`}
                       >
@@ -773,7 +773,7 @@ const AIReviewPanel = memo(
                     </div>
 
                     <p
-                      className={`text-[11px] leading-5 ${
+                      className={`text-[13px] leading-5 ${
                         darkMode ? "text-gray-400" : "text-gray-600"
                       }`}
                     >
@@ -792,7 +792,7 @@ const AIReviewPanel = memo(
                       <div className="flex items-center gap-2 mb-2">
                         <Eye size={14} className="text-green-600" />
                         <p
-                          className={`text-xs font-bold ${
+                          className={`text-[13px] font-bold ${
                             darkMode ? "text-gray-200" : "text-gray-700"
                           }`}
                         >
@@ -804,7 +804,7 @@ const AIReviewPanel = memo(
                         {aiReview.evidenceFindings.map((finding, index) => (
                           <li
                             key={`${index}-${finding}`}
-                            className={`flex items-start gap-2 text-[11px] leading-5 ${
+                            className={`flex items-start gap-2 text-[13px] leading-5 ${
                               darkMode ? "text-gray-400" : "text-gray-600"
                             }`}
                           >
@@ -830,7 +830,7 @@ const AIReviewPanel = memo(
                         className={darkMode ? "text-green-300" : "text-green-700"}
                       />
                       <p
-                        className={`text-xs font-bold ${
+                        className={`text-[13px] font-bold ${
                           darkMode ? "text-green-300" : "text-green-900"
                         }`}
                       >
@@ -839,7 +839,7 @@ const AIReviewPanel = memo(
                     </div>
 
                     <p
-                      className={`text-[11px] leading-5 ${
+                      className={`text-[13px] leading-5 ${
                         darkMode ? "text-gray-300" : "text-gray-700"
                       }`}
                     >
@@ -862,7 +862,7 @@ const AIReviewPanel = memo(
                         className={darkMode ? "text-amber-300" : "text-amber-700"}
                       />
                       <p
-                        className={`text-xs font-bold ${
+                        className={`text-[13px] font-bold ${
                           darkMode ? "text-amber-300" : "text-amber-800"
                         }`}
                       >
@@ -874,7 +874,7 @@ const AIReviewPanel = memo(
                       {aiReview.limitations.map((limitation, index) => (
                         <li
                           key={`${index}-${limitation}`}
-                          className={`text-[10px] leading-4 ${
+                          className={`text-[13px] leading-4 ${
                             darkMode ? "text-amber-300" : "text-amber-800"
                           }`}
                         >
@@ -893,7 +893,7 @@ const AIReviewPanel = memo(
                   }`}
                 >
                   <InfoIcon size={14} className="shrink-0 mt-0.5" />
-                  <p className="text-[10px] leading-4">
+                  <p className="text-[13px] leading-4">
                     <span className="font-bold">Human review required.</span>{" "}
                     GuidEd AI Review provides decision support only and does not automatically
                     accept or reject the report.
@@ -901,7 +901,7 @@ const AIReviewPanel = memo(
                 </div>
 
                 <div
-                  className={`flex flex-wrap items-center justify-between gap-2 text-[9px] ${
+                  className={`flex flex-wrap items-center justify-between gap-2 text-[13px] ${
                     darkMode ? "text-gray-600" : "text-gray-400"
                   }`}
                 >
@@ -1072,6 +1072,10 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed }) => {
 
   return (
     <article
+      style={{
+        fontFamily:
+          '"Inter", "Plus Jakarta Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif',
+      }}
       className={`relative w-full overflow-hidden rounded-[30px] border ${
         darkMode
           ? "bg-[#08110C] border-[#1B3022] text-white"
@@ -1102,17 +1106,17 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed }) => {
 
               <div className="min-w-0">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-500">
+                  <span className="text-[13px] font-black uppercase tracking-[0.18em] text-emerald-500">
                     GuidEd Mobile Desk
                   </span>
-                  <span className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-wider ${darkMode ? "bg-white/10 text-emerald-300" : "bg-emerald-100 text-emerald-700"}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-[13px] font-black uppercase tracking-wider ${darkMode ? "bg-white/10 text-emerald-300" : "bg-emerald-100 text-emerald-700"}`}>
                     Live case
                   </span>
                 </div>
-                <h3 className={`truncate text-xl font-black tracking-tight ${darkMode ? "text-white" : "text-gray-950"}`}>
+                <h3 className={`truncate text-[22px] leading-tight font-black tracking-[-0.02em] ${darkMode ? "text-white" : "text-gray-950"}`}>
                   Incident Report
                 </h3>
-                <p className={`mt-1 max-w-md text-[10px] leading-4 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                <p className={`mt-1 max-w-md text-[13px] leading-4 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
                   Review the case, inspect supporting evidence, then make a guidance decision.
                 </p>
               </div>
@@ -1128,27 +1132,27 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed }) => {
               onClick={copyReference}
               className={`group rounded-2xl border p-3 text-left transition-colors ${darkMode ? "border-white/10 bg-white/[0.05] hover:bg-white/[0.08]" : "border-gray-200 bg-white/75 hover:bg-white"}`}
             >
-              <div className={`mb-1 flex items-center gap-1.5 text-[8px] font-black uppercase tracking-wider ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+              <div className={`mb-1 flex items-center gap-1.5 text-[13px] font-black uppercase tracking-wider ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
                 <Hash size={10} /> Case ID
               </div>
-              <div className={`flex items-center gap-1.5 text-[11px] font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>
+              <div className={`flex items-center gap-1.5 text-[13px] font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>
                 #{reportReference}
                 {copiedId ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} className="opacity-50 group-hover:opacity-100" />}
               </div>
             </button>
 
             <div className={`rounded-2xl border p-3 ${darkMode ? "border-white/10 bg-white/[0.05]" : "border-gray-200 bg-white/75"}`}>
-              <div className={`mb-1 flex items-center gap-1.5 text-[8px] font-black uppercase tracking-wider ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+              <div className={`mb-1 flex items-center gap-1.5 text-[13px] font-black uppercase tracking-wider ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
                 <Calendar size={10} /> Submitted
               </div>
-              <div className={`text-[11px] font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>{createdDate}</div>
+              <div className={`text-[13px] font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>{createdDate}</div>
             </div>
 
             <div className={`col-span-2 rounded-2xl border p-3 sm:col-span-1 ${darkMode ? "border-white/10 bg-white/[0.05]" : "border-gray-200 bg-white/75"}`}>
-              <div className={`mb-1 flex items-center gap-1.5 text-[8px] font-black uppercase tracking-wider ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+              <div className={`mb-1 flex items-center gap-1.5 text-[13px] font-black uppercase tracking-wider ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
                 <Clock3 size={10} /> Time received
               </div>
-              <div className={`text-[11px] font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>{createdTime || "N/A"}</div>
+              <div className={`text-[13px] font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>{createdTime || "N/A"}</div>
             </div>
           </div>
         </div>
@@ -1162,16 +1166,16 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed }) => {
               <Shield size={14} />
             </div>
             <div className="min-w-0">
-              <p className={`text-[10px] font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>Review progress</p>
-              <p className={`truncate text-[9px] ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Case completeness before final action</p>
+              <p className={`text-[13px] font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>Review progress</p>
+              <p className={`truncate text-[13px] ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Case completeness before final action</p>
             </div>
           </div>
-          <span className={`text-sm font-black ${darkMode ? "text-emerald-400" : "text-emerald-600"}`}>{reviewProgress}%</span>
+          <span className={`text-[15px] font-black ${darkMode ? "text-emerald-400" : "text-emerald-600"}`}>{reviewProgress}%</span>
         </div>
         <div className={`mt-2 h-2 overflow-hidden rounded-full ${darkMode ? "bg-[#17251B]" : "bg-gray-100"}`}>
           <div className={`h-full rounded-full bg-gradient-to-r ${riskAccent}`} style={{ width: `${reviewProgress}%` }} />
         </div>
-        <div className="mt-2 flex items-center justify-between text-[8px] font-bold">
+        <div className="mt-2 flex items-center justify-between text-[13px] font-bold">
           <span className={report?.studentName ? "text-emerald-600" : darkMode ? "text-gray-600" : "text-gray-400"}>Student</span>
           <span className={report?.description ? "text-emerald-600" : darkMode ? "text-gray-600" : "text-gray-400"}>Narrative</span>
           <span className={evidenceCount > 0 ? "text-emerald-600" : darkMode ? "text-gray-600" : "text-gray-400"}>Evidence</span>
@@ -1183,10 +1187,10 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed }) => {
       <div className={`p-5 sm:p-6 ${darkMode ? "bg-[#08110C]" : "bg-[#F8FAF9]"}`}>
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
-            <p className={`text-[8px] font-black uppercase tracking-[0.18em] ${darkMode ? "text-emerald-500" : "text-emerald-600"}`}>Case snapshot</p>
-            <h4 className={`mt-0.5 text-sm font-black ${darkMode ? "text-white" : "text-gray-900"}`}>What we know so far</h4>
+            <p className={`text-[13px] font-black uppercase tracking-[0.18em] ${darkMode ? "text-emerald-500" : "text-emerald-600"}`}>Case snapshot</p>
+            <h4 className={`mt-0.5 text-[15px] font-black ${darkMode ? "text-white" : "text-gray-900"}`}>What we know so far</h4>
           </div>
-          <span className={`text-[9px] font-bold ${darkMode ? "text-gray-600" : "text-gray-400"}`}>{evidenceCount} attachment{evidenceCount === 1 ? "" : "s"}</span>
+          <span className={`text-[13px] font-bold ${darkMode ? "text-gray-600" : "text-gray-400"}`}>{evidenceCount} attachment{evidenceCount === 1 ? "" : "s"}</span>
         </div>
 
         <div className="grid grid-cols-2 gap-2.5">
@@ -1203,18 +1207,18 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed }) => {
               <MessageSquareText size={16} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className={`text-[8px] font-black uppercase tracking-wider ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Submitted by</p>
-              <p className={`truncate text-[11px] font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>{reporterName}</p>
+              <p className={`text-[13px] font-black uppercase tracking-wider ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Submitted by</p>
+              <p className={`truncate text-[13px] font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>{reporterName}</p>
             </div>
-            <span className={`hidden rounded-full px-2 py-1 text-[8px] font-black sm:block ${darkMode ? "bg-white/5 text-gray-500" : "bg-gray-50 text-gray-400"}`}>Student app</span>
+            <span className={`hidden rounded-full px-2 py-1 text-[13px] font-black sm:block ${darkMode ? "bg-white/5 text-gray-500" : "bg-gray-50 text-gray-400"}`}>Student app</span>
           </div>
 
           <div className={`rounded-2xl border px-4 py-3.5 sm:min-w-[150px] ${darkMode ? "border-[#1B3022] bg-[#0D1A12]" : "border-gray-100 bg-white"}`}>
             <div className="flex items-center justify-between gap-3">
-              <span className={`text-[8px] font-black uppercase tracking-wider ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Case pulse</span>
+              <span className={`text-[13px] font-black uppercase tracking-wider ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Case pulse</span>
               <span className={`h-2 w-2 rounded-full ${status === "pending" ? "bg-amber-400" : status === "accepted" ? "bg-emerald-500" : "bg-rose-500"}`} />
             </div>
-            <p className={`mt-1 text-xs font-black capitalize ${darkMode ? "text-gray-200" : "text-gray-700"}`}>{status}</p>
+            <p className={`mt-1 text-[13px] font-black capitalize ${darkMode ? "text-gray-200" : "text-gray-700"}`}>{status}</p>
           </div>
         </div>
 
@@ -1222,8 +1226,8 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed }) => {
         <div className={`mt-4 rounded-[22px] border p-4 ${darkMode ? "border-[#1B3022] bg-[#0D1A12]" : "border-gray-100 bg-white"}`}>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className={`text-[8px] font-black uppercase tracking-[0.16em] ${darkMode ? "text-emerald-500" : "text-emerald-600"}`}>Reviewer checklist</p>
-              <p className={`mt-0.5 text-xs font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>Before you decide</p>
+              <p className={`text-[13px] font-black uppercase tracking-[0.16em] ${darkMode ? "text-emerald-500" : "text-emerald-600"}`}>Reviewer checklist</p>
+              <p className={`mt-0.5 text-[13px] font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>Before you decide</p>
             </div>
             <ShieldCheck size={17} className={reviewProgress === 100 ? "text-emerald-500" : darkMode ? "text-gray-600" : "text-gray-300"} />
           </div>
@@ -1238,7 +1242,7 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed }) => {
                 <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${done ? "bg-emerald-500 text-white" : darkMode ? "bg-white/10 text-gray-600" : "bg-gray-200 text-gray-400"}`}>
                   {done ? <Check size={10} /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
                 </span>
-                <span className={`text-[9px] font-bold ${done ? (darkMode ? "text-emerald-300" : "text-emerald-700") : darkMode ? "text-gray-600" : "text-gray-400"}`}>{label}</span>
+                <span className={`text-[13px] font-bold ${done ? (darkMode ? "text-emerald-300" : "text-emerald-700") : darkMode ? "text-gray-600" : "text-gray-400"}`}>{label}</span>
               </div>
             ))}
           </div>
@@ -1250,14 +1254,14 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed }) => {
             <div className="flex min-w-0 items-center gap-3">
               <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${darkMode ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-50 text-emerald-600"}`}><FileText size={15} /></div>
               <div className="min-w-0">
-                <p className={`text-[11px] font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>Incident story</p>
-                <p className={`text-[9px] ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Reporter-provided narrative</p>
+                <p className={`text-[13px] font-black ${darkMode ? "text-gray-200" : "text-gray-700"}`}>Incident story</p>
+                <p className={`text-[13px] ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Reporter-provided narrative</p>
               </div>
             </div>
             <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${darkMode ? "bg-white/5 text-gray-500" : "bg-gray-50 text-gray-500"}`}>{showDescription ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</span>
           </button>
           {showDescription && (
-            <div className={`mx-4 mb-4 rounded-2xl border p-4 text-[12px] leading-6 whitespace-pre-wrap break-words ${darkMode ? "border-[#24392A] bg-[#101F15] text-gray-300" : "border-gray-100 bg-[#F8FAF9] text-gray-600"}`}>
+            <div className={`mx-4 mb-4 rounded-2xl border p-4 text-[14px] leading-6 whitespace-pre-wrap break-words ${darkMode ? "border-[#24392A] bg-[#101F15] text-gray-300" : "border-gray-100 bg-[#F8FAF9] text-gray-600"}`}>
               {report?.description || "No description provided."}
             </div>
           )}
@@ -1280,20 +1284,20 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed }) => {
               <div className="flex items-center gap-2.5">
                 <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${darkMode ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-100 text-emerald-700"}`}><ShieldCheck size={16} /></div>
                 <div>
-                  <p className={`text-[11px] font-black ${darkMode ? "text-gray-200" : "text-gray-800"}`}>Decision deck</p>
-                  <p className={`text-[9px] ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Choose the action that matches your review.</p>
+                  <p className={`text-[13px] font-black ${darkMode ? "text-gray-200" : "text-gray-800"}`}>Decision deck</p>
+                  <p className={`text-[13px] ${darkMode ? "text-gray-600" : "text-gray-400"}`}>Choose the action that matches your review.</p>
                 </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2.5 p-3.5">
-              <button type="button" onClick={() => onAccept?.(report._id)} className="min-h-12 rounded-2xl bg-emerald-700 px-3 text-xs font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] flex items-center justify-center gap-2 touch-manipulation"><Check size={16} /> Accept</button>
-              <button type="button" onClick={() => onReject?.(report._id)} className="min-h-12 rounded-2xl border border-rose-200 bg-rose-50 px-3 text-xs font-black text-rose-700 transition hover:bg-rose-100 active:scale-[0.99] flex items-center justify-center gap-2 touch-manipulation dark:border-rose-900/50 dark:bg-rose-500/10 dark:text-rose-300"><X size={16} /> Reject</button>
+              <button type="button" onClick={() => onAccept?.(report._id)} className="min-h-12 rounded-2xl bg-emerald-700 px-3 text-[13px] font-black text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.99] flex items-center justify-center gap-2 touch-manipulation"><Check size={16} /> Accept</button>
+              <button type="button" onClick={() => onReject?.(report._id)} className="min-h-12 rounded-2xl border border-rose-200 bg-rose-50 px-3 text-[13px] font-black text-rose-700 transition hover:bg-rose-100 active:scale-[0.99] flex items-center justify-center gap-2 touch-manipulation dark:border-rose-900/50 dark:bg-rose-500/10 dark:text-rose-300"><X size={16} /> Reject</button>
             </div>
           </div>
         )}
 
         {/* FOOTER NOTE */}
-        <div className={`flex items-start gap-2 px-1 pt-1 text-[9px] leading-4 ${darkMode ? "text-gray-600" : "text-gray-400"}`}>
+        <div className={`flex items-start gap-2 px-1 pt-1 text-[13px] leading-4 ${darkMode ? "text-gray-600" : "text-gray-400"}`}>
           <InfoIcon size={12} className="mt-0.5 shrink-0" />
           <p>Mobile reports are intended for authorized guidance review. AI output is advisory and should be considered together with the submitted information and applicable school procedures.</p>
         </div>

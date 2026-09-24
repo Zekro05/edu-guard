@@ -496,7 +496,6 @@ const TeacherMyClassPage = () => {
           <Nav icon={<LayoutDashboard size={18} />} label="Dashboard" path="/teacher-dashboard" onNavigate={navigateTo} />
           <Nav icon={<FileWarning size={18} />} label="My Reports" path="/teacher-my-reports" onNavigate={navigateTo} />
           <Nav icon={<UsersRound size={18} />} label="My Class" active onNavigate={() => {}} />
-          <Nav icon={<MessageSquare size={18} />} label="Messages" path="/messages" onNavigate={navigateTo} />
           <Nav
             icon={<Plus size={18} />}
             label="Report an Incident"
@@ -509,15 +508,15 @@ const TeacherMyClassPage = () => {
         </p>
 
         <div className="space-y-1">
-          <Nav icon={<BookOpen size={18} />} label="Guidance Resources" path="/guidance" onNavigate={navigateTo} />
-          <Nav icon={<LifeBuoy size={18} />} label="Contact Guidance" path="/messages" onNavigate={navigateTo} />
+          <Nav icon={<BookOpen size={18} />} label="Guidance Resources" path="/guidance-resources" onNavigate={navigateTo} />
+          <Nav icon={<LifeBuoy size={18} />} label="Contact Guidance" path="/contact" onNavigate={navigateTo} />
         </div>
 
         <p className={`px-3 mt-7 mb-2 text-[11px] font-bold uppercase tracking-widest ${theme.muted}`}>
           System
         </p>
 
-        <Nav icon={<Settings size={18} />} label="Settings" path="/settings" onNavigate={navigateTo} />
+        <Nav icon={<Settings size={18} />} label="Settings" path="/my-settings" onNavigate={navigateTo} />
       </div>
 
       <div className="space-y-3">

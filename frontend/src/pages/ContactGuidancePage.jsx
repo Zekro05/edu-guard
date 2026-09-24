@@ -258,16 +258,16 @@ export default function MessageAdminPage() {
           <Nav
             icon={<LayoutDashboard size={18} />}
             label="Dashboard"
-            path="/student-dashboard"
+            path="/teacher-dashboard"
           />
 
           <Nav
             icon={<FileText size={18} />}
             label="My Reports"
-            path="/my-reports"
+            path="/teacher-my-reports"
           />
 
-          <Nav icon={<FileClock size={18} />} label="My History" path="/my-history"/>
+          <Nav icon={<FileClock size={18} />} label="My Class" path="/teacher-class"/>
 
           <Nav
             icon={<Plus size={18} />}
@@ -615,7 +615,7 @@ export default function MessageAdminPage() {
               <button type="button" onClick={() => setMobileMenuOpen(true)} className={`lg:hidden w-10 h-10 rounded-xl border flex items-center justify-center ${darkMode ? "bg-[#0D1A12] border-[#24392A] text-gray-300" : "bg-white border-gray-200 text-gray-700"}`}><Menu size={19} /></button>
               <div className="min-w-0">
                 <div className={`hidden sm:flex items-center gap-2 text-sm mb-1 ${theme.muted}`}>
-                  <span>Student Portal</span><ChevronRight size={12} /><span className="text-green-500 font-medium">Messages</span>
+                  <span>Teacher Portal</span><ChevronRight size={12} /><span className="text-green-500 font-medium">Messages</span>
                 </div>
                 <h2 className={`text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight truncate ${theme.heading}`}>Messages</h2>
                 <p className={`text-sm mt-1 ${theme.body}`}>Connect directly with the GuidEd administrators for support.</p>

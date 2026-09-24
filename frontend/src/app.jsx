@@ -92,6 +92,10 @@ const TeacherReporting = lazy (
   () => import("./pages/TeacherReporting.jsx")
 )
 
+const GuidanceResources = lazy(() => import("./pages/GuidanceResources.jsx"));
+
+const ContactGuidancePage = lazy(() => import("./pages/ContactGuidancePage.jsx"));
+
 const SettingsPage = lazy(
   () => import("./pages/SettingsPage.jsx"),
 );
@@ -632,7 +636,7 @@ function App() {
           <Route
             path="/message-admin"
             element={
-              <ProtectedRoute allowedRoles={["student"]}>
+              <ProtectedRoute allowedRoles={["student", "teacher"]}>
                 <MessageAdminPage />
               </ProtectedRoute>
             }
@@ -719,6 +723,24 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["admin"]}>
                 <InterventionPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/guidance-resources"
+            element={
+              <ProtectedRoute allowedRoles={["teacher", "student"]}>
+                <GuidanceResources />
+              </ProtectedRoute>
+            }
+          />
+          
+          <Route
+            path="/contact"
+            element={
+              <ProtectedRoute allowedRoles={["teacher", "student"]}>
+                <ContactGuidancePage />
               </ProtectedRoute>
             }
           />

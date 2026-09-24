@@ -692,12 +692,6 @@ const MyReportsPage = () => {
           <Nav icon={<FileClock size={18} />} label="My History" path="/my-history"/>
 
           <Nav
-            icon={<MessageSquare size={18} />}
-            label="Messages"
-            path="/message-admin"
-          />
-
-          <Nav
             icon={<Plus size={18} />}
             label="Report an Incident"
             path="/student-reporting"
@@ -713,13 +707,13 @@ const MyReportsPage = () => {
         <Nav
           icon={<BookOpen size={18} />}
           label="Guidance Resources"
-          path="/guidance"
+          path="/guidance-resources"
         />
 
         <Nav
           icon={<HelpCircle size={18} />}
           label="Get Support"
-          path="/messages"
+          path="/message-admin"
         />
 
         <p

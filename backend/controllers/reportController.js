@@ -126,7 +126,8 @@ export const createReport = async (req, res) => {
 
       reporterId: req.userId || null,
 
-      reporterType: req.userId ? "student" : "guest",
+      reporterType: req.userId ? req.user?.role || "student" : "guest",
+
 
       evidence,
     });

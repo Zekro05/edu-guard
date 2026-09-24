@@ -368,7 +368,6 @@ const TeacherDashboardPage = () => {
             
           />
           <Nav icon={<ClipboardList size={18} />} label="My Class" path="/teacher-class" />
-          <Nav icon={<MessageSquare size={18} />} label="Messages" path="/messages" />
           <Nav
             icon={<Plus size={18} />}
             label="Report an Incident"
@@ -381,15 +380,15 @@ const TeacherDashboardPage = () => {
         </p>
 
         <div className="space-y-1">
-          <Nav icon={<BookOpen size={18} />} label="Guidance Resources" path="/guidance" />
-          <Nav icon={<LifeBuoy size={18} />} label="Contact Guidance" path="/messages" />
+          <Nav icon={<BookOpen size={18} />} label="Guidance Resources" path="/guidance-resources" />
+          <Nav icon={<LifeBuoy size={18} />} label="Contact Guidance" path="/contact" />
         </div>
 
         <p className={`px-3 mt-7 mb-2 text-[11px] font-bold uppercase tracking-widest ${theme.muted}`}>
           System
         </p>
 
-        <Nav icon={<Settings size={18} />} label="Settings" path="/settings" />
+        <Nav icon={<Settings size={18} />} label="Settings" path="/my-settings" />
       </div>
 
       <div className="space-y-3">
