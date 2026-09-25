@@ -5,8 +5,6 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { API } from "../lib/api";
 
 import { io } from "socket.io-client";
-import { motion, AnimatePresence } from "framer-motion";
-
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -50,6 +48,8 @@ import {
   BookOpen,
   Sun,
   Moon,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 
 /* =========================================================
@@ -70,6 +70,22 @@ const ReportPage = () => {
   const { user, logout } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState("mobile");
+  const [reportViewMode, setReportViewMode] = useState(() => {
+    try {
+      return localStorage.getItem("guided-report-view") || "cards";
+    } catch {
+      return "cards";
+    }
+  });
+
+  const changeReportViewMode = (mode) => {
+    setReportViewMode(mode);
+    try {
+      localStorage.setItem("guided-report-view", mode);
+    } catch {
+      // Ignore storage errors.
+    }
+  };
   const [reports, setReports] = useState([]);
   const [allReports, setAllReports] = useState([]);
   const [search, setSearch] = useState("");
@@ -1097,30 +1113,19 @@ const ReportPage = () => {
           MOBILE OVERLAY
       ============================================================ */}
 
-      <AnimatePresence>
+      <>
         {mobileSidebarOpen && (
           <>
             {/* BACKDROP */}
 
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+            <div
               onClick={() => setMobileSidebarOpen(false)}
               className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
             />
 
             {/* MOBILE SIDEBAR */}
 
-            <motion.aside
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{
-                type: "spring",
-                stiffness: 300,
-                damping: 30,
-              }}
+            <aside
               className={`
                 fixed
                 left-0
@@ -1443,10 +1448,10 @@ const ReportPage = () => {
                   Sign out
                 </button>
               </div>
-            </motion.aside>
+            </aside>
           </>
         )}
-      </AnimatePresence>
+      </>
     </>
   );
 
@@ -1832,14 +1837,10 @@ const ReportPage = () => {
           MOBILE SIDEBAR OVERLAY
       ===================================================== */}
 
-        <AnimatePresence>
+        <>
           {mobileSidebarOpen && (
             <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
+              <div
                 onClick={() => setMobileSidebarOpen(false)}
                 className="
                 fixed
@@ -1851,15 +1852,7 @@ const ReportPage = () => {
               "
               />
 
-              <motion.aside
-                initial={{ x: "-100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "-100%" }}
-                transition={{
-                  type: "spring",
-                  damping: 28,
-                  stiffness: 300,
-                }}
+              <aside
                 className={`
                   fixed
                   left-0
@@ -1881,10 +1874,10 @@ const ReportPage = () => {
                 `}
               >
                 <SidebarContent mobile />
-              </motion.aside>
+              </aside>
             </>
           )}
-        </AnimatePresence>
+        </>
 
         {/* =====================================================
           MAIN
@@ -2510,7 +2503,7 @@ const ReportPage = () => {
 
               {/* CONTENT */}
 
-              <motion.div
+              <div
                 layout
                 className="
                 bg-white
@@ -2573,18 +2566,60 @@ const ReportPage = () => {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-2 self-start lg:self-center">
+                      <div className="flex flex-wrap items-center gap-2 self-start lg:self-center">
                         <div
-                          className="
-                          px-2.5
-                          py-1
-                          rounded-lg
-                          bg-green-50
-                          text-green-700
-                          text-[10px]
-                          font-bold
-                          whitespace-nowrap
-                        "
+                          className={`flex items-center rounded-xl border p-1 ${
+                            isDarkMode
+                              ? "border-[#294332] bg-[#0D1A12]"
+                              : "border-gray-200 bg-gray-50"
+                          }`}
+                          aria-label="Report view mode"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => changeReportViewMode("cards")}
+                            title="Card view"
+                            aria-pressed={reportViewMode === "cards"}
+                            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-black transition ${
+                              reportViewMode === "cards"
+                                ? isDarkMode
+                                  ? "bg-emerald-500/15 text-emerald-300"
+                                  : "bg-white text-green-700 shadow-sm"
+                                : isDarkMode
+                                  ? "text-gray-500 hover:text-gray-300"
+                                  : "text-gray-400 hover:text-gray-600"
+                            }`}
+                          >
+                            <LayoutGrid size={14} />
+                            Cards
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => changeReportViewMode("compact")}
+                            title="Compact view"
+                            aria-pressed={reportViewMode === "compact"}
+                            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-black transition ${
+                              reportViewMode === "compact"
+                                ? isDarkMode
+                                  ? "bg-emerald-500/15 text-emerald-300"
+                                  : "bg-white text-green-700 shadow-sm"
+                                : isDarkMode
+                                  ? "text-gray-500 hover:text-gray-300"
+                                  : "text-gray-400 hover:text-gray-600"
+                            }`}
+                          >
+                            <List size={14} />
+                            Compact
+                          </button>
+                        </div>
+
+                        <div
+                          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap ${
+                            isDarkMode
+                              ? "bg-emerald-500/10 text-emerald-300"
+                              : "bg-green-50 text-green-700"
+                          }`}
                         >
                           {filteredReports.length}{" "}
                           {filteredReports.length === 1 ? "REPORT" : "REPORTS"}
@@ -2983,20 +3018,9 @@ const ReportPage = () => {
                     ) : filteredReports.length ? (
                       <div className="space-y-3 min-w-0">
                         {filteredReports.map((report) => (
-                          <motion.div
+                          <div
                             key={report._id}
                             layout
-                            initial={{
-                              opacity: 0,
-                              y: 8,
-                            }}
-                            animate={{
-                              opacity: 1,
-                              y: 0,
-                            }}
-                            whileHover={{
-                              y: -1,
-                            }}
                             className={`
                               border
                               rounded-xl
@@ -3019,9 +3043,10 @@ const ReportPage = () => {
                                 onAccept={handleAccept}
                                 onReject={handleReject}
                                 onAIAnalyzed={handleAIAnalyzed}
+                                viewMode={reportViewMode}
                               />
                             </div>
-                          </motion.div>
+                          </div>
                         ))}
                       </div>
                     ) : (
@@ -3042,7 +3067,7 @@ const ReportPage = () => {
 
                 {activeTab === "complaint" && (
                   <div className="min-w-0 overflow-x-auto">
-                    <ComplaintReport />
+                    <ComplaintReport darkMode={isDarkMode} />
                   </div>
                 )}
 
@@ -3050,7 +3075,7 @@ const ReportPage = () => {
 
                 {activeTab === "overview" && (
                   <div className="min-w-0 overflow-x-auto">
-                    <Overview />
+                    <Overview darkMode={isDarkMode} />
                   </div>
                 )}
 
@@ -3058,10 +3083,10 @@ const ReportPage = () => {
 
                 {activeTab === "ai" && (
                   <div className="min-w-0 overflow-x-auto">
-                    <AIPredictions />
+                    <AIPredictions darkMode={isDarkMode} />
                   </div>
                 )}
-              </motion.div>
+              </div>
             </section>
           </div>
         </main>
@@ -3070,13 +3095,10 @@ const ReportPage = () => {
           NOTIFICATION DRAWER
       ===================================================== */}
 
-        <AnimatePresence>
+        <>
           {openNotif && (
             <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+              <div
                 onClick={() => setOpenNotif(false)}
                 className="
                 fixed
@@ -3087,14 +3109,7 @@ const ReportPage = () => {
               "
               />
 
-              <motion.div
-                initial={{ x: "100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "100%" }}
-                transition={{
-                  type: "spring",
-                  damping: 28,
-                }}
+              <div
                 className="
                 fixed
                 right-0
@@ -3210,16 +3225,8 @@ const ReportPage = () => {
                   ) : (
                     <div className="space-y-3">
                       {notifications.map((notification) => (
-                        <motion.div
+                        <div
                           key={notification.id}
-                          initial={{
-                            opacity: 0,
-                            y: 5,
-                          }}
-                          animate={{
-                            opacity: 1,
-                            y: 0,
-                          }}
                           className="
                             p-3
                             sm:p-4
@@ -3314,43 +3321,23 @@ const ReportPage = () => {
                               </div>
                             </div>
                           </div>
-                        </motion.div>
+                        </div>
                       ))}
                     </div>
                   )}
                 </div>
-              </motion.div>
+              </div>
             </>
           )}
-        </AnimatePresence>
+        </>
 
         {/* =====================================================
           TOAST
       ===================================================== */}
 
-        <AnimatePresence>
+        <>
           {toastNotif && (
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: -15,
-                x: 20,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-                x: 0,
-              }}
-              exit={{
-                opacity: 0,
-                y: -15,
-                x: 20,
-              }}
-              transition={{
-                type: "spring",
-                stiffness: 350,
-                damping: 25,
-              }}
+            <div
               className="
               fixed
               top-3
@@ -3469,18 +3456,12 @@ const ReportPage = () => {
                 </div>
               </div>
 
-              <motion.div
-                initial={{ width: "100%" }}
-                animate={{ width: "0%" }}
-                transition={{
-                  duration: 4,
-                  ease: "linear",
-                }}
+              <div
                 className="h-1 bg-green-500"
               />
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </>
 
         {/* =====================================================
           AI ANALYSIS COMPLETE MODAL
@@ -3935,12 +3916,9 @@ const AIAnalysisResultsModal = ({
   }
 
   return (
-    <AnimatePresence>
-      <motion.div
+    <>
+      <div
         key="ai-results-modal"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
         className="
           fixed
           inset-0
@@ -3960,27 +3938,7 @@ const AIAnalysisResultsModal = ({
           }
         }}
       >
-        <motion.div
-          initial={{
-            opacity: 0,
-            scale: 0.97,
-            y: 15,
-          }}
-          animate={{
-            opacity: 1,
-            scale: 1,
-            y: 0,
-          }}
-          exit={{
-            opacity: 0,
-            scale: 0.97,
-            y: 15,
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 280,
-            damping: 24,
-          }}
+        <div
           className="
             w-full
             max-w-6xl
@@ -4315,9 +4273,9 @@ const AIAnalysisResultsModal = ({
               Done
             </button>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </div>
+      </div>
+    </>
   );
 };
 
@@ -4358,8 +4316,7 @@ const AIResultCard = ({ result, onClick }) => {
   }
 
   return (
-    <motion.button
-      whileHover={{ y: -1 }}
+    <button
       onClick={onClick}
       className="
         w-full
@@ -4505,7 +4462,7 @@ const AIResultCard = ({ result, onClick }) => {
           </p>
         </div>
       </div>
-    </motion.button>
+    </button>
   );
 };
 
@@ -4520,13 +4477,10 @@ const AIResultDetailModal = ({ result, onClose }) => {
   const ai = result?.aiReview;
 
   return (
-    <AnimatePresence>
+    <>
       {result && (
-        <motion.div
+        <div
           key="ai-result-detail"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
           className="
             fixed
             inset-0
@@ -4546,22 +4500,7 @@ const AIResultDetailModal = ({ result, onClose }) => {
             }
           }}
         >
-          <motion.div
-            initial={{
-              opacity: 0,
-              scale: 0.97,
-              y: 15,
-            }}
-            animate={{
-              opacity: 1,
-              scale: 1,
-              y: 0,
-            }}
-            exit={{
-              opacity: 0,
-              scale: 0.97,
-              y: 15,
-            }}
+          <div
             className="
               w-full
               max-w-4xl
@@ -4984,10 +4923,10 @@ const AIResultDetailModal = ({ result, onClose }) => {
                 Close
               </button>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   );
 };
 
@@ -5226,15 +5165,7 @@ const StatCard = ({ title, value, icon, type }) => {
   const s = styles[type];
 
   return (
-    <motion.div
-      whileHover={{
-        y: -2,
-      }}
-      transition={{
-        type: "spring",
-        stiffness: 300,
-        damping: 22,
-      }}
+    <div
       className="
         relative
         overflow-hidden
@@ -5297,7 +5228,7 @@ const StatCard = ({ title, value, icon, type }) => {
           ${s.line}
         `}
       />
-    </motion.div>
+    </div>
   );
 };
 

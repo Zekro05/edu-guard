@@ -1,839 +1,2105 @@
-import React, { memo, useEffect, useMemo, useState } from "react";
-import { API } from "../../lib/api";
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import {
   Activity,
   AlertTriangle,
   BarChart3,
-  ChevronRight,
-  TrendingDown,
+  CheckCircle2,
+  Clock3,
+  FileText,
+  RefreshCw,
+  ShieldAlert,
   TrendingUp,
-  ShieldCheck,
-  FileWarning,
+  Users,
+  ChevronRight,
+  CircleDot,
 } from "lucide-react";
 
+import { API } from "../../lib/api";
+
 /* =========================================================
-   MAIN
+   HELPERS
 ========================================================= */
 
-const Overview = () => {
+const getDateValue = (value) => {
+  if (!value) return null;
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getMonthKey = (date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+const getMonthLabel = (date) =>
+  date.toLocaleDateString("en-US", {
+    month: "short",
+  });
+
+const formatDateTime = (value) => {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
+/* =========================================================
+   SKELETON
+========================================================= */
+
+const Skeleton = memo(function Skeleton({
+  className = "",
+  darkMode = false,
+}) {
+  return (
+    <div
+      className={`animate-pulse rounded-xl ${
+        darkMode ? "bg-gray-800" : "bg-gray-200"
+      } ${className}`}
+    />
+  );
+});
+
+/* =========================================================
+   STAT CARD
+========================================================= */
+
+const StatCard = memo(function StatCard({
+  icon: Icon,
+  label,
+  value,
+  description,
+  iconClass,
+  darkMode,
+}) {
+  return (
+    <div
+      className={`
+        group
+        rounded-2xl
+        border
+        p-4
+        sm:p-5
+        transition-all
+        duration-300
+        hover:-translate-y-0.5
+        hover:shadow-lg
+        ${
+          darkMode
+            ? "border-gray-700/70 bg-gray-50 hover:border-gray-600 shadow-black/10"
+            : "border-gray-100 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.025)]"
+        }
+      `}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div
+          className={`flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl ${iconClass}`}
+        >
+          <Icon size={19} strokeWidth={2} />
+        </div>
+
+        <Activity
+          size={16}
+          className={
+            darkMode ? "text-gray-700" : "text-gray-200"
+          }
+        />
+      </div>
+
+      <p
+        className={`
+          mt-4 sm:mt-5
+          text-[9px] sm:text-[10px]
+          font-extrabold
+          uppercase
+          tracking-[0.14em]
+          ${
+            darkMode
+              ? "text-gray-500"
+              : "text-gray-400"
+          }
+        `}
+      >
+        {label}
+      </p>
+
+      <p
+        className={`
+          mt-1
+          text-2xl sm:text-3xl
+          font-extrabold
+          tracking-tight
+          ${
+            darkMode
+              ? "text-white"
+              : "text-gray-900"
+          }
+        `}
+      >
+        {value}
+      </p>
+
+      <p
+        className={`
+          mt-2
+          text-[11px] sm:text-xs
+          leading-5
+          ${
+            darkMode
+              ? "text-gray-500"
+              : "text-gray-400"
+          }
+        `}
+      >
+        {description}
+      </p>
+    </div>
+  );
+});
+
+/* =========================================================
+   SECTION TITLE
+========================================================= */
+
+const SectionTitle = memo(function SectionTitle({
+  eyebrow,
+  title,
+  description,
+  darkMode,
+}) {
+  return (
+    <div className="min-w-0">
+      <p
+        className={`
+          text-[9px] sm:text-[10px]
+          font-extrabold
+          uppercase
+          tracking-[0.16em]
+          ${
+            darkMode
+              ? "text-green-400"
+              : "text-green-700"
+          }
+        `}
+      >
+        {eyebrow}
+      </p>
+
+      <h2
+        className={`
+          mt-1
+          text-lg sm:text-xl
+          font-extrabold
+          tracking-tight
+          ${
+            darkMode
+              ? "text-white"
+              : "text-gray-900"
+          }
+        `}
+      >
+        {title}
+      </h2>
+
+      {description && (
+        <p
+          className={`
+            mt-1
+            text-[11px] sm:text-xs
+            leading-5
+            ${
+              darkMode
+                ? "text-gray-500"
+                : "text-gray-400"
+            }
+          `}
+        >
+          {description}
+        </p>
+      )}
+    </div>
+  );
+});
+
+/* =========================================================
+   PANEL
+========================================================= */
+
+const Panel = memo(function Panel({
+  children,
+  className = "",
+  darkMode,
+}) {
+  return (
+    <section
+      className={`
+        min-w-0
+        rounded-2xl
+        sm:rounded-3xl
+        border
+        overflow-hidden
+        ${
+          darkMode
+            ? "border-gray-700/70 bg-gray-50 shadow-black/10"
+            : "border-gray-100 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.025)]"
+        }
+        ${className}
+      `}
+    >
+      {children}
+    </section>
+  );
+});
+
+/* =========================================================
+   OVERVIEW
+========================================================= */
+
+function Overview({ darkMode = false }) {
   const [reports, setReports] = useState([]);
   const [incidents, setIncidents] = useState([]);
+  const [students, setStudents] = useState([]);
+
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
+  /*
+   * ReportPage owns the theme.
+   * Overview only consumes the darkMode prop so the page
+   * stays synchronized with the ReportPage appearance toggle.
+   */
+
+  /* =========================================================
+     FETCH DATA
+  ========================================================= */
+
+  const fetchData = useCallback(
+    async (showRefresh = false) => {
       try {
-        setLoading(true);
+        if (showRefresh) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
 
-        const [reportRes, incidentRes] = await Promise.all([
+        const [
+          studentsResponse,
+          reportsResponse,
+          incidentsResponse,
+        ] = await Promise.all([
+          API.get("/api/students"),
           API.get("/api/reports"),
           API.get("/api/incidents"),
         ]);
 
-        setReports(reportRes.data?.reports || reportRes.data || []);
-        setIncidents(incidentRes.data || []);
-      } catch (err) {
-        console.error("Overview fetch error:", err);
+        const studentData =
+          studentsResponse?.data;
+
+        const reportData =
+          reportsResponse?.data;
+
+        const incidentData =
+          incidentsResponse?.data;
+
+        const normalizedStudents =
+          Array.isArray(studentData)
+            ? studentData
+            : Array.isArray(
+                studentData?.students,
+              )
+            ? studentData.students
+            : [];
+
+        const normalizedReports =
+          Array.isArray(reportData)
+            ? reportData
+            : Array.isArray(
+                reportData?.reports,
+              )
+            ? reportData.reports
+            : [];
+
+        const normalizedIncidents =
+          Array.isArray(incidentData)
+            ? incidentData
+            : Array.isArray(
+                incidentData?.incidents,
+              )
+            ? incidentData.incidents
+            : [];
+
+        setStudents(normalizedStudents);
+        setReports(normalizedReports);
+        setIncidents(normalizedIncidents);
+        setLastUpdated(new Date());
+      } catch (error) {
+        console.error(
+          "Overview fetch error:",
+          error,
+        );
+
+        setStudents([]);
+        setReports([]);
+        setIncidents([]);
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  /* =========================================================
+     SUMMARY
+  ========================================================= */
+
+  const summary = useMemo(() => {
+    const totalReports = reports.length;
+
+    const totalIncidents =
+      incidents.length;
+
+    const pendingReports =
+      reports.filter(
+        (report) =>
+          String(
+            report?.status || "",
+          ).toLowerCase() === "pending",
+      ).length;
+
+    const acceptedReports =
+      reports.filter(
+        (report) =>
+          String(
+            report?.status || "",
+          ).toLowerCase() === "accepted",
+      ).length;
+
+    const rejectedReports =
+      reports.filter(
+        (report) =>
+          String(
+            report?.status || "",
+          ).toLowerCase() === "rejected",
+      ).length;
+
+    /*
+     * Risk is calculated the same way as DashboardPage: by the
+     * student's total recorded incidents. This keeps the Overview
+     * distribution consistent with the main dashboard.
+     *
+     * High   = 5+ incidents
+     * Medium = 2-4 incidents
+     * Low    = 0-1 incidents
+     */
+    const getStudentRisk = (student) => {
+      const count = Number(student?.totalIncidents || 0);
+
+      if (count >= 5) return "High";
+      if (count >= 2) return "Medium";
+
+      return "Low";
     };
 
-    fetchData();
-  }, []);
+    const totalStudents = students.length;
+
+    const highRisk = students.filter(
+      (student) => getStudentRisk(student) === "High",
+    ).length;
+
+    const mediumRisk = students.filter(
+      (student) => getStudentRisk(student) === "Medium",
+    ).length;
+
+    const lowRisk = students.filter(
+      (student) => getStudentRisk(student) === "Low",
+    ).length;
+
+    return {
+      totalStudents,
+      totalReports,
+      totalIncidents,
+      pendingReports,
+      acceptedReports,
+      rejectedReports,
+      highRisk,
+      mediumRisk,
+      lowRisk,
+    };
+  }, [students, reports, incidents]);
 
   /* =========================================================
      MONTHLY INCIDENTS
   ========================================================= */
 
   const monthlyIncidents = useMemo(() => {
-    const map = {};
+    const now = new Date();
+
+    const months = [];
+
+    for (let i = 5; i >= 0; i -= 1) {
+      const date = new Date(
+        now.getFullYear(),
+        now.getMonth() - i,
+        1,
+      );
+
+      months.push({
+        key: getMonthKey(date),
+        label: getMonthLabel(date),
+        value: 0,
+      });
+    }
+
+    const monthMap = new Map(
+      months.map((month) => [
+        month.key,
+        month,
+      ]),
+    );
 
     incidents.forEach((incident) => {
-      if (!incident.createdAt) return;
+      const date = getDateValue(
+        incident?.createdAt ||
+          incident?.date ||
+          incident?.incidentDate,
+      );
 
-      const date = new Date(incident.createdAt);
+      if (!date) return;
 
-      if (isNaN(date.getTime())) return;
+      const month = monthMap.get(
+        getMonthKey(date),
+      );
 
-      const key = `${date.getFullYear()}-${String(
-        date.getMonth() + 1,
-      ).padStart(2, "0")}`;
-
-      if (!map[key]) {
-        map[key] = {
-          month: date.toLocaleString("en-US", {
-            month: "short",
-            year: "numeric",
-          }),
-          count: 0,
-          date,
-        };
+      if (month) {
+        month.value += 1;
       }
-
-      map[key].count++;
     });
 
-    const sorted = Object.values(map).sort((a, b) => a.date - b.date);
-
-    return sorted.map((item, index) => {
-      const previous = sorted[index - 1]?.count;
-
-      return {
-        ...item,
-        change:
-          previous === undefined
-            ? "neutral"
-            : item.count >= previous
-              ? "up"
-              : "down",
-      };
-    });
+    return months;
   }, [incidents]);
 
   /* =========================================================
-     OFFENSE STATS
+     OFFENSE STATISTICS
   ========================================================= */
 
   const offenseStats = useMemo(() => {
-    const total = reports.length;
+    const counts = {};
 
-    const counts = {
-      Minor: 0,
-      Moderate: 0,
-      Major: 0,
-    };
+    incidents.forEach((incident) => {
+      const offense =
+        incident?.offense ||
+        incident?.offenseType ||
+        incident?.type ||
+        "Other";
 
-    reports.forEach((report) => {
-      const level = report.level || "Minor";
+      const normalized =
+        String(offense).trim() || "Other";
 
-      if (level === "High") {
-        counts.Major++;
-      } else if (level === "Medium") {
-        counts.Moderate++;
-      } else {
-        counts.Minor++;
-      }
+      counts[normalized] =
+        (counts[normalized] || 0) + 1;
     });
 
-    return [
-      {
-        label: "Minor",
-        count: counts.Minor,
-        percentage: total ? (counts.Minor / total) * 100 : 0,
-        color: "green",
-      },
-      {
-        label: "Moderate",
-        count: counts.Moderate,
-        percentage: total ? (counts.Moderate / total) * 100 : 0,
-        color: "amber",
-      },
-      {
-        label: "Major",
-        count: counts.Major,
-        percentage: total ? (counts.Major / total) * 100 : 0,
-        color: "red",
-      },
-    ];
-  }, [reports]);
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([name, value]) => ({
+        name,
+        value,
+      }));
+  }, [incidents]);
 
   /* =========================================================
      RISK DISTRIBUTION
   ========================================================= */
 
-  const riskDistribution = useMemo(() => {
-    const counts = {
-      High: 0,
-      Medium: 0,
-      Low: 0,
-    };
-
-    incidents.forEach((incident) => {
-      const level = incident.level || "Low";
-
-      if (level === "High") {
-        counts.High++;
-      } else if (level === "Medium") {
-        counts.Medium++;
-      } else {
-        counts.Low++;
-      }
-    });
-
-    return [
+  const riskDistribution = useMemo(
+    () => [
       {
         label: "High Risk",
-        count: counts.High,
-        type: "high",
-        icon: <AlertTriangle size={18} />,
+        value: summary.highRisk,
+        icon: ShieldAlert,
+        iconClass: darkMode
+          ? "bg-red-500/10 text-red-400"
+          : "bg-red-50 text-red-600",
+        barClass: "bg-red-500",
       },
       {
         label: "Medium Risk",
-        count: counts.Medium,
-        type: "medium",
-        icon: <Activity size={18} />,
+        value: summary.mediumRisk,
+        icon: AlertTriangle,
+        iconClass: darkMode
+          ? "bg-amber-500/10 text-amber-400"
+          : "bg-amber-50 text-amber-600",
+        barClass: "bg-amber-500",
       },
       {
         label: "Low Risk",
-        count: counts.Low,
-        type: "low",
-        icon: <ShieldCheck size={18} />,
+        value: summary.lowRisk,
+        icon: CheckCircle2,
+        iconClass: darkMode
+          ? "bg-green-500/10 text-green-400"
+          : "bg-green-50 text-green-600",
+        barClass: "bg-green-500",
       },
-    ];
-  }, [incidents]);
-
-  /* =========================================================
-     SUMMARY
-  ========================================================= */
-
-  const totalReports = reports.length;
-  const totalIncidents = incidents.length;
-
-  const highRisk = riskDistribution.find(
-    (item) => item.type === "high",
-  )?.count;
-
-  const lowRisk = riskDistribution.find(
-    (item) => item.type === "low",
-  )?.count;
-
-  /* =========================================================
-     SKELETON
-  ========================================================= */
-
-  const Skeleton = ({ className = "" }) => (
-    <div
-      className={`animate-pulse bg-gray-100 rounded-2xl ${className}`}
-    />
+    ],
+    [summary, darkMode],
   );
 
   /* =========================================================
-     RENDER
+     TREND
   ========================================================= */
 
-  return (
-    <div className="min-h-full bg-[#F7F9F8] text-gray-900">
-      {/* =====================================================
-          HEADER
-      ===================================================== */}
+  const trend = useMemo(() => {
+    if (monthlyIncidents.length < 2) {
+      return 0;
+    }
 
-      <div className="px-6 md:px-10 pt-7 pb-5">
-        <div className="flex items-center gap-2 text-xs text-gray-400 mb-2">
-          <span>Reports</span>
-          <ChevronRight size={12} />
-          <span className="text-green-600 font-medium">
-            Overview
-          </span>
-        </div>
+    const previous =
+      monthlyIncidents[
+        monthlyIncidents.length - 2
+      ]?.value || 0;
 
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900">
-              Overview Analytics
-            </h2>
+    const current =
+      monthlyIncidents[
+        monthlyIncidents.length - 1
+      ]?.value || 0;
 
-            <p className="text-sm text-gray-500 mt-1">
-              System insights, incident activity, and risk breakdown.
-            </p>
-          </div>
+    if (previous === 0) {
+      return current > 0 ? 100 : 0;
+    }
 
-          <div className="hidden sm:flex w-11 h-11 rounded-xl bg-white border border-gray-200 items-center justify-center text-green-600">
-            <BarChart3 size={19} />
-          </div>
-        </div>
-      </div>
+    return Math.round(
+      ((current - previous) / previous) * 100,
+    );
+  }, [monthlyIncidents]);
 
-      {/* =====================================================
-          CONTENT
-      ===================================================== */}
-
-      <div className="px-6 md:px-10 pb-10 space-y-6">
-        {/* ===================================================
-            SUMMARY CARDS
-        =================================================== */}
-
-        <section>
-          <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            {loading ? (
-              <>
-                <Skeleton className="h-[118px]" />
-                <Skeleton className="h-[118px]" />
-                <Skeleton className="h-[118px]" />
-                <Skeleton className="h-[118px]" />
-              </>
-            ) : (
-              <>
-                <SummaryCard
-                  label="Total Reports"
-                  value={totalReports}
-                  icon={<FileWarning size={18} />}
-                  type="neutral"
-                  description="Submitted reports"
-                />
-
-                <SummaryCard
-                  label="Total Incidents"
-                  value={totalIncidents}
-                  icon={<Activity size={18} />}
-                  type="green"
-                  description="Recorded incidents"
-                />
-
-                <SummaryCard
-                  label="High Risk"
-                  value={highRisk || 0}
-                  icon={<AlertTriangle size={18} />}
-                  type="red"
-                  description="Requires attention"
-                />
-
-                <SummaryCard
-                  label="Low Risk"
-                  value={lowRisk || 0}
-                  icon={<ShieldCheck size={18} />}
-                  type="green"
-                  description="Currently low risk"
-                />
-              </>
-            )}
-          </div>
-        </section>
-
-        {/* ===================================================
-            MAIN ANALYTICS
-        =================================================== */}
-
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-bold text-gray-900">
-                Analytics
-              </h3>
-
-              <p className="text-xs text-gray-400 mt-0.5">
-                Monitor incident trends and behavioral risk levels
-              </p>
-            </div>
-
-            <Activity size={18} className="text-gray-300" />
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {/* =================================================
-                MONTHLY INCIDENTS
-            ================================================= */}
-
-            <AnalyticsCard
-              title="Monthly Incidents"
-              subtitle="Incident activity over time"
-              icon={<Activity size={17} />}
-            >
-              {loading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-12" />
-                  <Skeleton className="h-12" />
-                  <Skeleton className="h-12" />
-                  <Skeleton className="h-12" />
-                </div>
-              ) : monthlyIncidents.length === 0 ? (
-                <EmptyState
-                  icon={<Activity size={21} />}
-                  title="No incident data"
-                  description="Incident activity will appear here."
-                />
-              ) : (
-                <div className="space-y-2">
-                  {monthlyIncidents.map((item) => (
-                    <div
-                      key={item.month}
-                      className="
-                        flex
-                        items-center
-                        justify-between
-                        px-4
-                        py-3
-                        rounded-2xl
-                        bg-gray-50
-                        border
-                        border-gray-100
-                        hover:bg-white
-                        hover:shadow-sm
-                        transition
-                      "
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
-                          <Activity size={16} />
-                        </div>
-
-                        <div>
-                          <p className="text-sm font-semibold text-gray-800">
-                            {item.month}
-                          </p>
-
-                          <p className="text-[10px] text-gray-400">
-                            Recorded incidents
-                          </p>
-                        </div>
-                      </div>
-
-                      <div
-                        className={`
-                          flex
-                          items-center
-                          gap-1
-                          px-2.5
-                          py-1
-                          rounded-lg
-                          text-xs
-                          font-bold
-                          ${
-                            item.change === "up"
-                              ? "bg-red-50 text-red-600"
-                              : item.change === "down"
-                                ? "bg-green-50 text-green-600"
-                                : "bg-gray-100 text-gray-500"
-                          }
-                        `}
-                      >
-                        {item.change === "up" && (
-                          <TrendingUp size={13} />
-                        )}
-
-                        {item.change === "down" && (
-                          <TrendingDown size={13} />
-                        )}
-
-                        {item.change === "neutral" && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                        )}
-
-                        {item.count}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </AnalyticsCard>
-
-            {/* =================================================
-                OFFENSE BREAKDOWN
-            ================================================= */}
-
-            <AnalyticsCard
-              title="Offense Breakdown"
-              subtitle="Distribution of reported offense severity"
-              icon={<BarChart3 size={17} />}
-            >
-              {loading ? (
-                <div className="space-y-6">
-                  <Skeleton className="h-8" />
-                  <Skeleton className="h-8" />
-                  <Skeleton className="h-8" />
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {offenseStats.map((offense) => (
-                    <div key={offense.label}>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`
-                              w-2 h-2 rounded-full
-                              ${
-                                offense.color === "green"
-                                  ? "bg-green-500"
-                                  : offense.color === "amber"
-                                    ? "bg-amber-500"
-                                    : "bg-red-500"
-                              }
-                            `}
-                          />
-
-                          <span className="text-xs font-semibold text-gray-600">
-                            {offense.label}
-                          </span>
-                        </div>
-
-                        <span className="text-xs font-bold text-gray-800">
-                          {offense.count}
-                        </span>
-                      </div>
-
-                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className={`
-                            h-full
-                            rounded-full
-                            transition-all
-                            duration-700
-                            ${
-                              offense.color === "green"
-                                ? "bg-green-500"
-                                : offense.color === "amber"
-                                  ? "bg-amber-500"
-                                  : "bg-red-500"
-                            }
-                          `}
-                          style={{
-                            width: `${Math.max(
-                              offense.percentage,
-                              offense.count > 0 ? 3 : 0,
-                            )}%`,
-                          }}
-                        />
-                      </div>
-
-                      <p className="text-[10px] text-gray-400 mt-1">
-                        {offense.percentage.toFixed(1)}% of all reports
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </AnalyticsCard>
-          </div>
-        </section>
-
-        {/* ===================================================
-            RISK DISTRIBUTION
-        =================================================== */}
-
-        <section>
-          <AnalyticsCard
-            title="Risk Distribution"
-            subtitle="Current behavioral risk classification"
-            icon={<ShieldCheck size={17} />}
-          >
-            {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Skeleton className="h-32" />
-                <Skeleton className="h-32" />
-                <Skeleton className="h-32" />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {riskDistribution.map((risk) => (
-                  <RiskCard
-                    key={risk.label}
-                    label={risk.label}
-                    count={risk.count}
-                    type={risk.type}
-                    icon={risk.icon}
-                  />
-                ))}
-              </div>
-            )}
-          </AnalyticsCard>
-        </section>
-
-        {/* ===================================================
-            INSIGHT
-        =================================================== */}
-
-        {!loading && (
-          <section>
-            <div
-              className="
-                relative
-                overflow-hidden
-                bg-gradient-to-br
-                from-[#14532D]
-                via-[#166534]
-                to-[#15803D]
-                rounded-3xl
-                p-6
-                text-white
-                shadow-[0_12px_40px_rgba(21,128,61,0.12)]
-              "
-            >
-              <div className="absolute -right-16 -top-16 w-48 h-48 rounded-full bg-white/10 blur-3xl" />
-
-              <div className="absolute -left-16 -bottom-16 w-48 h-48 rounded-full bg-green-300/10 blur-3xl" />
-
-              <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-                <div>
-                  <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur flex items-center justify-center mb-4">
-                    <BarChart3 size={19} />
-                  </div>
-
-                  <h3 className="text-lg font-bold">
-                    Analytics Summary
-                  </h3>
-
-                  <p className="text-sm text-green-100 mt-1 max-w-2xl leading-relaxed">
-                    The system currently has{" "}
-                    <span className="font-bold text-white">
-                      {totalReports}
-                    </span>{" "}
-                    reports and{" "}
-                    <span className="font-bold text-white">
-                      {totalIncidents}
-                    </span>{" "}
-                    recorded incidents.{" "}
-                    {highRisk > 0
-                      ? `${highRisk} high-risk incident${
-                          highRisk > 1 ? "s" : ""
-                        } currently require attention.`
-                      : "No high-risk incidents are currently recorded."}
-                  </p>
-                </div>
-
-                <div className="flex-shrink-0">
-                  <div className="px-4 py-3 rounded-2xl bg-white/10 border border-white/10">
-                    <p className="text-[10px] uppercase tracking-widest text-green-100 font-bold">
-                      System Status
-                    </p>
-
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className="w-2 h-2 rounded-full bg-green-300" />
-
-                      <span className="text-sm font-semibold">
-                        Analytics Active
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-      </div>
-    </div>
+  const maxMonthlyValue = useMemo(
+    () =>
+      Math.max(
+        ...monthlyIncidents.map(
+          (month) => month.value,
+        ),
+        1,
+      ),
+    [monthlyIncidents],
   );
-};
 
-/* =========================================================
-   SUMMARY CARD
-========================================================= */
+  const maxOffenseValue = useMemo(
+    () =>
+      Math.max(
+        ...offenseStats.map(
+          (item) => item.value,
+        ),
+        1,
+      ),
+    [offenseStats],
+  );
 
-const SummaryCard = ({
-  label,
-  value,
-  icon,
-  type,
-  description,
-}) => {
-  const styles = {
-    neutral: {
-      icon: "bg-gray-100 text-gray-700",
-      number: "text-gray-900",
-      line: "bg-gray-400",
-    },
-    green: {
-      icon: "bg-green-50 text-green-600",
-      number: "text-green-600",
-      line: "bg-green-500",
-    },
-    red: {
-      icon: "bg-red-50 text-red-600",
-      number: "text-red-600",
-      line: "bg-red-500",
-    },
-  };
+  /* =========================================================
+     SYSTEM MESSAGE
+  ========================================================= */
 
-  const style = styles[type];
+  const systemMessage = useMemo(() => {
+    if (summary.highRisk > 0) {
+      return {
+        type: "warning",
+        title:
+          "High-risk incidents require attention",
+        text: `${summary.highRisk} high-risk incident${
+          summary.highRisk === 1
+            ? ""
+            : "s"
+        } currently appear in the recorded data.`,
+      };
+    }
 
-  return (
-    <div
-      className="
-        relative
-        overflow-hidden
-        bg-white
-        border
-        border-gray-100
-        rounded-3xl
-        p-5
-        shadow-[0_4px_24px_rgba(0,0,0,0.025)]
-        hover:shadow-md
-        transition
-      "
-    >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-semibold text-gray-400">
-            {label}
-          </p>
+    if (summary.pendingReports > 0) {
+      return {
+        type: "info",
+        title:
+          "Reports are waiting for review",
+        text: `${summary.pendingReports} report${
+          summary.pendingReports === 1
+            ? ""
+            : "s"
+        } currently have a pending status.`,
+      };
+    }
 
-          <p
-            className={`text-3xl font-extrabold tracking-tight mt-3 ${style.number}`}
-          >
-            {value}
-          </p>
+    return {
+      type: "success",
+      title:
+        "System overview is up to date",
+      text:
+        "No immediate high-risk or pending-report indicators were detected.",
+    };
+  }, [summary]);
 
-          <p className="text-[10px] text-gray-400 mt-1">
-            {description}
-          </p>
-        </div>
+  /* =========================================================
+     LOADING STATE
+  ========================================================= */
 
-        <div
-          className={`
-            w-10
-            h-10
-            rounded-xl
-            flex
-            items-center
-            justify-center
-            ${style.icon}
-          `}
-        >
-          {icon}
-        </div>
-      </div>
-
+  if (loading) {
+    return (
       <div
-        className={`mt-4 h-1 w-10 rounded-full ${style.line}`}
-      />
-    </div>
-  );
-};
+        className={`
+          min-h-screen
+          w-full
+          p-4
+          sm:p-6
+          lg:p-8
+          transition-colors
+          duration-300
+          text-inherit
+        `}
+      >
+        <div className="mx-auto max-w-7xl">
+          <Skeleton
+            darkMode={darkMode}
+            className="h-9 w-52"
+          />
 
-/* =========================================================
-   ANALYTICS CARD
-========================================================= */
+          <Skeleton
+            darkMode={darkMode}
+            className="mt-3 h-4 w-80"
+          />
 
-const AnalyticsCard = ({
-  title,
-  subtitle,
-  icon,
-  children,
-}) => (
-  <div
-    className="
-      bg-white
-      border
-      border-gray-100
-      rounded-3xl
-      p-5
-      shadow-[0_4px_24px_rgba(0,0,0,0.025)]
-    "
-  >
-    <div className="flex items-start justify-between mb-5">
-      <div>
-        <h3 className="font-bold text-sm text-gray-900">
-          {title}
-        </h3>
+          <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Skeleton
+              darkMode={darkMode}
+              className="h-36"
+            />
 
-        <p className="text-[11px] text-gray-400 mt-1">
-          {subtitle}
-        </p>
+            <Skeleton
+              darkMode={darkMode}
+              className="h-36"
+            />
+
+            <Skeleton
+              darkMode={darkMode}
+              className="h-36"
+            />
+
+            <Skeleton
+              darkMode={darkMode}
+              className="h-36"
+            />
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+            <Skeleton
+              darkMode={darkMode}
+              className="h-96"
+            />
+
+            <Skeleton
+              darkMode={darkMode}
+              className="h-96"
+            />
+          </div>
+        </div>
       </div>
+    );
+  }
 
-      <div className="w-9 h-9 rounded-xl bg-gray-50 text-gray-400 flex items-center justify-center">
-        {icon}
-      </div>
-    </div>
-
-    {children}
-  </div>
-);
-
-/* =========================================================
-   RISK CARD
-========================================================= */
-
-const RiskCard = ({
-  label,
-  count,
-  type,
-  icon,
-}) => {
-  const styles = {
-    high: {
-      wrapper: "bg-red-50/60 border-red-100",
-      icon: "bg-red-100 text-red-600",
-      number: "text-red-600",
-      dot: "bg-red-500",
-    },
-    medium: {
-      wrapper: "bg-amber-50/60 border-amber-100",
-      icon: "bg-amber-100 text-amber-600",
-      number: "text-amber-600",
-      dot: "bg-amber-500",
-    },
-    low: {
-      wrapper: "bg-green-50/60 border-green-100",
-      icon: "bg-green-100 text-green-600",
-      number: "text-green-600",
-      dot: "bg-green-500",
-    },
-  };
-
-  const style = styles[type];
+  /* =========================================================
+     MAIN RENDER
+  ========================================================= */
 
   return (
     <div
       className={`
-        rounded-2xl
-        border
-        p-4
-        ${style.wrapper}
-        transition
-        hover:shadow-sm
+        relative
+        min-h-screen
+        w-full
+        overflow-x-hidden
+        transition-colors
+        duration-300
+        text-inherit
       `}
     >
-      <div className="flex items-start justify-between">
-        <div
-          className={`
-            w-9
-            h-9
-            rounded-xl
-            flex
-            items-center
-            justify-center
-            ${style.icon}
-          `}
-        >
-          {icon}
-        </div>
-
-        <span
-          className={`w-2 h-2 rounded-full ${style.dot}`}
-        />
-      </div>
-
-      <p
+      <div
         className={`
-          text-3xl
-          font-extrabold
-          tracking-tight
-          mt-5
-          ${style.number}
+          relative
+          z-10
+          mx-auto
+          max-w-7xl
+          p-4
+          sm:p-6
+          lg:p-8
         `}
       >
-        {count}
-      </p>
+        {/* =====================================================
+            HEADER
+        ===================================================== */}
 
-      <p className="text-xs font-semibold text-gray-600 mt-1">
-        {label}
-      </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2">
+              <div
+                className={`
+                  flex
+                  h-8
+                  w-8
+                  items-center
+                  justify-center
+                  rounded-xl
+                  ${
+                    darkMode
+                      ? "bg-green-500/10 text-green-400"
+                      : "bg-green-50 text-green-700"
+                  }
+                `}
+              >
+                <BarChart3 size={16} />
+              </div>
+
+              <span
+                className={`
+                  text-[9px]
+                  sm:text-[10px]
+                  font-bold
+                  uppercase
+                  tracking-[0.18em]
+                  ${
+                    darkMode
+                      ? "text-green-400"
+                      : "text-green-700"
+                  }
+                `}
+              >
+                Guidance Analytics
+              </span>
+            </div>
+
+            <h1
+              className={`
+                text-2xl
+                sm:text-3xl
+                font-extrabold
+                tracking-tight
+                ${
+                  darkMode
+                    ? "text-white"
+                    : "text-gray-900"
+                }
+              `}
+            >
+              Overview
+            </h1>
+
+            <p
+              className={`
+                mt-1
+                max-w-2xl
+                text-xs
+                sm:text-sm
+                leading-relaxed
+                ${
+                  darkMode
+                    ? "text-gray-500"
+                    : "text-gray-500"
+                }
+              `}
+            >
+              Monitor reports, incidents, risk
+              levels, and recent guidance activity
+              from one place.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {lastUpdated && (
+              <div
+                className={`
+                  hidden
+                  sm:flex
+                  items-center
+                  gap-2
+                  rounded-xl
+                  border
+                  px-3
+                  py-2
+                  ${
+                    darkMode
+                      ? "border-gray-700 bg-gray-800 text-gray-500"
+                      : "border-gray-100 bg-white text-gray-400"
+                  }
+                `}
+              >
+                <Clock3 size={13} />
+
+                <span className="text-[10px] font-medium">
+                  Updated{" "}
+                  {lastUpdated.toLocaleTimeString(
+                    [],
+                    {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    },
+                  )}
+                </span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => fetchData(true)}
+              disabled={refreshing}
+              className={`
+                flex
+                h-10
+                items-center
+                gap-2
+                rounded-xl
+                border
+                px-3.5
+                text-xs
+                font-semibold
+                transition
+                ${
+                  darkMode
+                    ? "border-gray-700 bg-gray-800 text-gray-300 hover:bg-gray-750 hover:border-gray-600"
+                    : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:border-gray-300"
+                }
+              `}
+            >
+              <RefreshCw
+                size={14}
+                className={
+                  refreshing
+                    ? "animate-spin"
+                    : ""
+                }
+              />
+
+              <span className="hidden sm:inline">
+                Refresh
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* =====================================================
+            SYSTEM STATUS
+        ===================================================== */}
+
+        <div
+          className={`
+            mt-6
+            flex
+            items-start
+            gap-3
+            rounded-2xl
+            border
+            p-4
+            ${
+              systemMessage.type ===
+              "warning"
+                ? darkMode
+                  ? "border-amber-500/20 bg-amber-500/5"
+                  : "border-amber-100 bg-amber-50/60"
+                : systemMessage.type ===
+                  "info"
+                ? darkMode
+                  ? "border-gray-700 bg-gray-800/60"
+                  : "border-gray-100 bg-gray-50"
+                : darkMode
+                ? "border-green-500/20 bg-green-500/5"
+                : "border-green-100 bg-green-50/60"
+            }
+          `}
+        >
+          <div
+            className={`
+              mt-0.5
+              flex
+              h-8
+              w-8
+              shrink-0
+              items-center
+              justify-center
+              rounded-xl
+              ${
+                systemMessage.type ===
+                "warning"
+                  ? darkMode
+                    ? "bg-amber-500/10 text-amber-400"
+                    : "bg-amber-100 text-amber-600"
+                  : systemMessage.type ===
+                    "info"
+                  ? darkMode
+                    ? "bg-gray-700 text-gray-300"
+                    : "bg-gray-100 text-gray-600"
+                  : darkMode
+                  ? "bg-green-500/10 text-green-400"
+                  : "bg-green-100 text-green-600"
+              }
+            `}
+          >
+            {systemMessage.type ===
+            "warning" ? (
+              <AlertTriangle size={16} />
+            ) : systemMessage.type ===
+              "info" ? (
+              <Clock3 size={16} />
+            ) : (
+              <CheckCircle2 size={16} />
+            )}
+          </div>
+
+          <div className="min-w-0">
+            <p
+              className={`
+                text-xs
+                sm:text-sm
+                font-bold
+                ${
+                  darkMode
+                    ? "text-gray-200"
+                    : "text-gray-800"
+                }
+              `}
+            >
+              {systemMessage.title}
+            </p>
+
+            <p
+              className={`
+                mt-0.5
+                text-[11px]
+                sm:text-xs
+                leading-5
+                ${
+                  darkMode
+                    ? "text-gray-500"
+                    : "text-gray-500"
+                }
+              `}
+            >
+              {systemMessage.text}
+            </p>
+          </div>
+        </div>
+
+        {/* =====================================================
+            STAT CARDS
+        ===================================================== */}
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            icon={FileText}
+            label="Total Reports"
+            value={summary.totalReports}
+            description="All recorded reports"
+            darkMode={darkMode}
+            iconClass={
+              darkMode
+                ? "bg-gray-700 text-gray-300"
+                : "bg-gray-100 text-gray-600"
+            }
+          />
+
+          <StatCard
+            icon={AlertTriangle}
+            label="Pending Reports"
+            value={summary.pendingReports}
+            description="Reports awaiting review"
+            darkMode={darkMode}
+            iconClass={
+              darkMode
+                ? "bg-amber-500/10 text-amber-400"
+                : "bg-amber-50 text-amber-600"
+            }
+          />
+
+          <StatCard
+            icon={ShieldAlert}
+            label="High Risk"
+            value={summary.highRisk}
+            description="High or critical incidents"
+            darkMode={darkMode}
+            iconClass={
+              darkMode
+                ? "bg-red-500/10 text-red-400"
+                : "bg-red-50 text-red-600"
+            }
+          />
+
+          <StatCard
+            icon={CheckCircle2}
+            label="Accepted Reports"
+            value={summary.acceptedReports}
+            description="Reports accepted into records"
+            darkMode={darkMode}
+            iconClass={
+              darkMode
+                ? "bg-green-500/10 text-green-400"
+                : "bg-green-50 text-green-700"
+            }
+          />
+        </div>
+
+        {/* =====================================================
+            MAIN ANALYTICS
+        ===================================================== */}
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+          {/* MONTHLY TREND */}
+
+          <Panel darkMode={darkMode}>
+            <div
+              className={`
+                flex
+                flex-col
+                gap-3
+                border-b
+                p-5
+                sm:flex-row
+                sm:items-start
+                sm:justify-between
+                sm:p-6
+                ${
+                  darkMode
+                    ? "border-gray-700"
+                    : "border-gray-100"
+                }
+              `}
+            >
+              <SectionTitle
+                eyebrow="Incident Activity"
+                title="Monthly Incident Trend"
+                description="Incident records across the last six months."
+                darkMode={darkMode}
+              />
+
+              <div
+                className={`
+                  flex
+                  w-fit
+                  items-center
+                  gap-2
+                  rounded-xl
+                  px-3
+                  py-2
+                  ${
+                    darkMode
+                      ? "bg-gray-700/60"
+                      : "bg-gray-50"
+                  }
+                `}
+              >
+                <TrendingUp
+                  size={14}
+                  className={
+                    trend >= 0
+                      ? "text-green-500"
+                      : "text-red-500"
+                  }
+                />
+
+                <span
+                  className={`
+                    text-[11px]
+                    font-bold
+                    ${
+                      trend >= 0
+                        ? darkMode
+                          ? "text-green-400"
+                          : "text-green-700"
+                        : darkMode
+                        ? "text-red-400"
+                        : "text-red-600"
+                    }
+                  `}
+                >
+                  {trend > 0 ? "+" : ""}
+                  {trend}%
+                </span>
+
+                <span
+                  className={`
+                    text-[10px]
+                    ${
+                      darkMode
+                        ? "text-gray-500"
+                        : "text-gray-400"
+                    }
+                  `}
+                >
+                  vs. previous month
+                </span>
+              </div>
+            </div>
+
+            <div className="p-5 sm:p-6">
+              <div className="flex h-64 items-end gap-2 sm:gap-4">
+                {monthlyIncidents.map(
+                  (month) => {
+                    const height =
+                      month.value === 0
+                        ? 4
+                        : Math.max(
+                            (month.value /
+                              maxMonthlyValue) *
+                              100,
+                            8,
+                          );
+
+                    return (
+                      <div
+                        key={month.key}
+                        className="flex h-full flex-1 flex-col items-center justify-end gap-2"
+                      >
+                        <div className="relative flex h-full w-full items-end justify-center">
+                          {month.value > 0 && (
+                            <span
+                              className={`
+                                absolute
+                                bottom-[calc(${height}%+8px)]
+                                text-[10px]
+                                font-bold
+                                ${
+                                  darkMode
+                                    ? "text-gray-400"
+                                    : "text-gray-500"
+                                }
+                              `}
+                              style={{
+                                bottom: `calc(${height}% + 7px)`,
+                              }}
+                            >
+                              {month.value}
+                            </span>
+                          )}
+
+                          <div
+                            className={`
+                              w-full
+                              max-w-12
+                              rounded-t-xl
+                              transition-all
+                              duration-500
+                              ${
+                                month.value > 0
+                                  ? darkMode
+                                    ? "bg-green-500/80 hover:bg-green-500"
+                                    : "bg-green-600 hover:bg-green-700"
+                                  : darkMode
+                                  ? "bg-gray-700"
+                                  : "bg-gray-100"
+                              }
+                            `}
+                            style={{
+                              height: `${height}%`,
+                            }}
+                          />
+                        </div>
+
+                        <span
+                          className={`
+                            text-[10px]
+                            font-semibold
+                            ${
+                              darkMode
+                                ? "text-gray-500"
+                                : "text-gray-400"
+                            }
+                          `}
+                        >
+                          {month.label}
+                        </span>
+                      </div>
+                    );
+                  },
+                )}
+              </div>
+            </div>
+          </Panel>
+
+          {/* RISK DISTRIBUTION */}
+
+          <Panel darkMode={darkMode}>
+            <div
+              className={`
+                border-b
+                p-5
+                sm:p-6
+                ${
+                  darkMode
+                    ? "border-gray-700"
+                    : "border-gray-100"
+                }
+              `}
+            >
+              <SectionTitle
+                eyebrow="Risk Monitoring"
+                title="Risk Distribution"
+                description="Current student risk distribution based on recorded incidents."
+                darkMode={darkMode}
+              />
+            </div>
+
+            <div className="space-y-5 p-5 sm:p-6">
+              {riskDistribution.map(
+                (item) => {
+                  const Icon = item.icon;
+
+                  const total =
+                    summary.highRisk +
+                    summary.mediumRisk +
+                    summary.lowRisk;
+
+                  const percentage =
+                    total > 0
+                      ? Math.round(
+                          (item.value / total) *
+                            100,
+                        )
+                      : 0;
+
+                  return (
+                    <div
+                      key={item.label}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div
+                            className={`
+                              flex
+                              h-9
+                              w-9
+                              shrink-0
+                              items-center
+                              justify-center
+                              rounded-xl
+                              ${item.iconClass}
+                            `}
+                          >
+                            <Icon size={16} />
+                          </div>
+
+                          <div className="min-w-0">
+                            <p
+                              className={`
+                                truncate
+                                text-xs
+                                font-bold
+                                ${
+                                  darkMode
+                                    ? "text-gray-200"
+                                    : "text-gray-700"
+                                }
+                              `}
+                            >
+                              {item.label}
+                            </p>
+
+                            <p
+                              className={`
+                                mt-0.5
+                                text-[10px]
+                                ${
+                                  darkMode
+                                    ? "text-gray-500"
+                                    : "text-gray-400"
+                                }
+                              `}
+                            >
+                              {percentage}% of
+                              incidents
+                            </p>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`
+                            text-lg
+                            font-extrabold
+                            ${
+                              darkMode
+                                ? "text-white"
+                                : "text-gray-900"
+                            }
+                          `}
+                        >
+                          {item.value}
+                        </span>
+                      </div>
+
+                      <div
+                        className={`
+                          mt-3
+                          h-1.5
+                          overflow-hidden
+                          rounded-full
+                          ${
+                            darkMode
+                              ? "bg-gray-700"
+                              : "bg-gray-100"
+                          }
+                        `}
+                      >
+                        <div
+                          className={`h-full rounded-full ${item.barClass}`}
+                          style={{
+                            width: `${percentage}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                },
+              )}
+
+              {summary.totalStudents ===
+                0 && (
+                <div
+                  className={`
+                    rounded-xl
+                    border
+                    p-4
+                    text-center
+                    ${
+                      darkMode
+                        ? "border-gray-700 bg-gray-900/40"
+                        : "border-gray-100 bg-gray-50"
+                    }
+                  `}
+                >
+                  <p
+                    className={`
+                      text-xs
+                      ${
+                        darkMode
+                          ? "text-gray-500"
+                          : "text-gray-400"
+                      }
+                    `}
+                  >
+                    No student risk data
+                    available yet.
+                  </p>
+                </div>
+              )}
+            </div>
+          </Panel>
+        </div>
+
+        {/* =====================================================
+            LOWER ANALYTICS
+        ===================================================== */}
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          {/* TOP OFFENSES */}
+
+          <Panel darkMode={darkMode}>
+            <div
+              className={`
+                flex
+                items-start
+                justify-between
+                gap-4
+                border-b
+                p-5
+                sm:p-6
+                ${
+                  darkMode
+                    ? "border-gray-700"
+                    : "border-gray-100"
+                }
+              `}
+            >
+              <SectionTitle
+                eyebrow="Incident Categories"
+                title="Most Recorded Offenses"
+                description="Top offense categories based on recorded incidents."
+                darkMode={darkMode}
+              />
+
+              <div
+                className={`
+                  hidden
+                  h-9
+                  w-9
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-xl
+                  sm:flex
+                  ${
+                    darkMode
+                      ? "bg-gray-700 text-gray-400"
+                      : "bg-gray-50 text-gray-400"
+                  }
+                `}
+              >
+                <BarChart3 size={16} />
+              </div>
+            </div>
+
+            <div className="p-5 sm:p-6">
+              {offenseStats.length > 0 ? (
+                <div className="space-y-4">
+                  {offenseStats.map(
+                    (item, index) => {
+                      const percentage =
+                        Math.round(
+                          (item.value /
+                            maxOffenseValue) *
+                            100,
+                        );
+
+                      return (
+                        <div
+                          key={`${item.name}-${index}`}
+                        >
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <span
+                                className={`
+                                  flex
+                                  h-6
+                                  w-6
+                                  shrink-0
+                                  items-center
+                                  justify-center
+                                  rounded-lg
+                                  text-[9px]
+                                  font-bold
+                                  ${
+                                    darkMode
+                                      ? "bg-gray-700 text-gray-400"
+                                      : "bg-gray-100 text-gray-500"
+                                  }
+                                `}
+                              >
+                                {index + 1}
+                              </span>
+
+                              <span
+                                className={`
+                                  truncate
+                                  text-xs
+                                  font-semibold
+                                  ${
+                                    darkMode
+                                      ? "text-gray-300"
+                                      : "text-gray-700"
+                                  }
+                                `}
+                                title={item.name}
+                              >
+                                {item.name}
+                              </span>
+                            </div>
+
+                            <span
+                              className={`
+                                shrink-0
+                                text-xs
+                                font-bold
+                                ${
+                                  darkMode
+                                    ? "text-gray-400"
+                                    : "text-gray-500"
+                                }
+                              `}
+                            >
+                              {item.value}
+                            </span>
+                          </div>
+
+                          <div
+                            className={`
+                              ml-[34px]
+                              h-2
+                              overflow-hidden
+                              rounded-full
+                              ${
+                                darkMode
+                                  ? "bg-gray-700"
+                                  : "bg-gray-100"
+                              }
+                            `}
+                          >
+                            <div
+                              className={`
+                                h-full
+                                rounded-full
+                                transition-all
+                                duration-500
+                                ${
+                                  darkMode
+                                    ? "bg-green-500/80"
+                                    : "bg-green-600"
+                                }
+                              `}
+                              style={{
+                                width: `${percentage}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+              ) : (
+                <div
+                  className={`
+                    flex
+                    min-h-52
+                    flex-col
+                    items-center
+                    justify-center
+                    rounded-2xl
+                    border
+                    ${
+                      darkMode
+                        ? "border-gray-700 bg-gray-900/40"
+                        : "border-gray-100 bg-gray-50"
+                    }
+                  `}
+                >
+                  <FileText
+                    size={24}
+                    className={
+                      darkMode
+                        ? "text-gray-600"
+                        : "text-gray-300"
+                    }
+                  />
+
+                  <p
+                    className={`
+                      mt-3
+                      text-xs
+                      font-semibold
+                      ${
+                        darkMode
+                          ? "text-gray-500"
+                          : "text-gray-500"
+                      }
+                    `}
+                  >
+                    No offense data yet
+                  </p>
+
+                  <p
+                    className={`
+                      mt-1
+                      text-[10px]
+                      ${
+                        darkMode
+                          ? "text-gray-600"
+                          : "text-gray-400"
+                      }
+                    `}
+                  >
+                    Recorded incidents will
+                    appear here.
+                  </p>
+                </div>
+              )}
+            </div>
+          </Panel>
+
+          {/* REPORT STATUS */}
+
+          <Panel darkMode={darkMode}>
+            <div
+              className={`
+                border-b
+                p-5
+                sm:p-6
+                ${
+                  darkMode
+                    ? "border-gray-700"
+                    : "border-gray-100"
+                }
+              `}
+            >
+              <SectionTitle
+                eyebrow="Report Management"
+                title="Report Status"
+                description="Current distribution of submitted reports."
+                darkMode={darkMode}
+              />
+            </div>
+
+            <div className="p-5 sm:p-6">
+              <div className="grid grid-cols-3 gap-3">
+                <div
+                  className={`
+                    rounded-2xl
+                    border
+                    p-4
+                    ${
+                      darkMode
+                        ? "border-gray-700 bg-gray-900/40"
+                        : "border-gray-100 bg-gray-50"
+                    }
+                  `}
+                >
+                  <div
+                    className={`
+                      mb-3
+                      flex
+                      h-8
+                      w-8
+                      items-center
+                      justify-center
+                      rounded-xl
+                      ${
+                        darkMode
+                          ? "bg-amber-500/10 text-amber-400"
+                          : "bg-amber-50 text-amber-600"
+                      }
+                    `}
+                  >
+                    <Clock3 size={15} />
+                  </div>
+
+                  <p
+                    className={`
+                      text-2xl
+                      font-extrabold
+                      ${
+                        darkMode
+                          ? "text-white"
+                          : "text-gray-900"
+                      }
+                    `}
+                  >
+                    {summary.pendingReports}
+                  </p>
+
+                  <p
+                    className={`
+                      mt-1
+                      text-[10px]
+                      font-semibold
+                      ${
+                        darkMode
+                          ? "text-gray-500"
+                          : "text-gray-400"
+                      }
+                    `}
+                  >
+                    Pending
+                  </p>
+                </div>
+
+                <div
+                  className={`
+                    rounded-2xl
+                    border
+                    p-4
+                    ${
+                      darkMode
+                        ? "border-gray-700 bg-gray-900/40"
+                        : "border-gray-100 bg-gray-50"
+                    }
+                  `}
+                >
+                  <div
+                    className={`
+                      mb-3
+                      flex
+                      h-8
+                      w-8
+                      items-center
+                      justify-center
+                      rounded-xl
+                      ${
+                        darkMode
+                          ? "bg-green-500/10 text-green-400"
+                          : "bg-green-50 text-green-600"
+                      }
+                    `}
+                  >
+                    <CheckCircle2 size={15} />
+                  </div>
+
+                  <p
+                    className={`
+                      text-2xl
+                      font-extrabold
+                      ${
+                        darkMode
+                          ? "text-white"
+                          : "text-gray-900"
+                      }
+                    `}
+                  >
+                    {summary.acceptedReports}
+                  </p>
+
+                  <p
+                    className={`
+                      mt-1
+                      text-[10px]
+                      font-semibold
+                      ${
+                        darkMode
+                          ? "text-gray-500"
+                          : "text-gray-400"
+                      }
+                    `}
+                  >
+                    Accepted
+                  </p>
+                </div>
+
+                <div
+                  className={`
+                    rounded-2xl
+                    border
+                    p-4
+                    ${
+                      darkMode
+                        ? "border-gray-700 bg-gray-900/40"
+                        : "border-gray-100 bg-gray-50"
+                    }
+                  `}
+                >
+                  <div
+                    className={`
+                      mb-3
+                      flex
+                      h-8
+                      w-8
+                      items-center
+                      justify-center
+                      rounded-xl
+                      ${
+                        darkMode
+                          ? "bg-red-500/10 text-red-400"
+                          : "bg-red-50 text-red-600"
+                      }
+                    `}
+                  >
+                    <AlertTriangle size={15} />
+                  </div>
+
+                  <p
+                    className={`
+                      text-2xl
+                      font-extrabold
+                      ${
+                        darkMode
+                          ? "text-white"
+                          : "text-gray-900"
+                      }
+                    `}
+                  >
+                    {summary.rejectedReports}
+                  </p>
+
+                  <p
+                    className={`
+                      mt-1
+                      text-[10px]
+                      font-semibold
+                      ${
+                        darkMode
+                          ? "text-gray-500"
+                          : "text-gray-400"
+                      }
+                    `}
+                  >
+                    Rejected
+                  </p>
+                </div>
+              </div>
+
+              {/* REPORT SUMMARY BAR */}
+
+              <div className="mt-6">
+                <div className="mb-2 flex items-center justify-between">
+                  <span
+                    className={`
+                      text-[10px]
+                      font-bold
+                      uppercase
+                      tracking-wider
+                      ${
+                        darkMode
+                          ? "text-gray-500"
+                          : "text-gray-400"
+                      }
+                    `}
+                  >
+                    Overall report distribution
+                  </span>
+
+                  <span
+                    className={`
+                      text-[10px]
+                      font-semibold
+                      ${
+                        darkMode
+                          ? "text-gray-500"
+                          : "text-gray-400"
+                      }
+                    `}
+                  >
+                    {summary.totalReports} total
+                  </span>
+                </div>
+
+                <div
+                  className={`
+                    flex
+                    h-3
+                    overflow-hidden
+                    rounded-full
+                    ${
+                      darkMode
+                        ? "bg-gray-700"
+                        : "bg-gray-100"
+                    }
+                  `}
+                >
+                  {summary.totalReports >
+                    0 && (
+                    <>
+                      <div
+                        className="bg-green-500 transition-all"
+                        style={{
+                          width: `${
+                            (summary.acceptedReports /
+                              summary.totalReports) *
+                            100
+                          }%`,
+                        }}
+                      />
+
+                      <div
+                        className="bg-amber-400 transition-all"
+                        style={{
+                          width: `${
+                            (summary.pendingReports /
+                              summary.totalReports) *
+                            100
+                          }%`,
+                        }}
+                      />
+
+                      <div
+                        className="bg-red-500 transition-all"
+                        style={{
+                          width: `${
+                            (summary.rejectedReports /
+                              summary.totalReports) *
+                            100
+                          }%`,
+                        }}
+                      />
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* QUICK INFO */}
+
+              <div
+                className={`
+                  mt-6
+                  rounded-2xl
+                  border
+                  p-4
+                  ${
+                    darkMode
+                      ? "border-gray-700 bg-gray-900/40"
+                      : "border-gray-100 bg-gray-50"
+                  }
+                `}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`
+                      flex
+                      h-8
+                      w-8
+                      shrink-0
+                      items-center
+                      justify-center
+                      rounded-xl
+                      ${
+                        darkMode
+                          ? "bg-gray-700 text-gray-400"
+                          : "bg-white text-gray-500 border border-gray-100"
+                      }
+                    `}
+                  >
+                    <CircleDot size={15} />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p
+                      className={`
+                        text-xs
+                        font-bold
+                        ${
+                          darkMode
+                            ? "text-gray-300"
+                            : "text-gray-700"
+                        }
+                      `}
+                    >
+                      Incident records
+                    </p>
+
+                    <p
+                      className={`
+                        mt-1
+                        text-[11px]
+                        leading-5
+                        ${
+                          darkMode
+                            ? "text-gray-500"
+                            : "text-gray-400"
+                        }
+                      `}
+                    >
+                      {summary.totalIncidents}{" "}
+                      incident
+                      {summary.totalIncidents ===
+                      1
+                        ? ""
+                        : "s"}{" "}
+                      currently recorded in the
+                      guidance management system.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Panel>
+        </div>
+
+        {/* =====================================================
+            BOTTOM SUMMARY
+        ===================================================== */}
+
+        <div
+          className={`
+            mt-6
+            rounded-2xl
+            sm:rounded-3xl
+            border
+            p-4
+            sm:p-5
+            ${
+              darkMode
+                ? "border-gray-700/70 bg-gray-800/70"
+                : "border-gray-100 bg-white"
+            }
+          `}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <div
+                className={`
+                  flex
+                  h-9
+                  w-9
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-xl
+                  ${
+                    darkMode
+                      ? "bg-gray-700 text-gray-400"
+                      : "bg-gray-50 text-gray-500"
+                  }
+                `}
+              >
+                <Users size={16} />
+              </div>
+
+              <div className="min-w-0">
+                <p
+                  className={`
+                    text-xs
+                    font-bold
+                    ${
+                      darkMode
+                        ? "text-gray-300"
+                        : "text-gray-700"
+                    }
+                  `}
+                >
+                  Guidance Management Overview
+                </p>
+
+                <p
+                  className={`
+                    mt-0.5
+                    text-[10px]
+                    leading-5
+                    ${
+                      darkMode
+                        ? "text-gray-500"
+                        : "text-gray-400"
+                    }
+                  `}
+                >
+                  Review your latest report and
+                  incident indicators above.
+                </p>
+              </div>
+            </div>
+
+            <div
+              className={`
+                flex
+                items-center
+                gap-1.5
+                text-[10px]
+                font-semibold
+                ${
+                  darkMode
+                    ? "text-gray-600"
+                    : "text-gray-400"
+                }
+              `}
+            >
+              <span>
+                GuidEd Guidance System
+              </span>
+
+              <ChevronRight size={13} />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
-};
+}
 
-/* =========================================================
-   EMPTY STATE
-========================================================= */
-
-const EmptyState = ({
-  icon,
-  title,
-  description,
-}) => (
-  <div className="py-10 text-center">
-    <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-3 text-gray-300">
-      {icon}
-    </div>
-
-    <p className="text-sm font-semibold text-gray-700">
-      {title}
-    </p>
-
-    <p className="text-xs text-gray-400 mt-1">
-      {description}
-    </p>
-  </div>
-);
-
-export default memo(Overview);
+export default Overview;

@@ -1,5 +1,4 @@
 import React, { memo, useEffect, useMemo, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { API } from "../../lib/api";
 
 import {
@@ -32,6 +31,7 @@ import {
   Timer,
   MessageSquareText,
   Hash,
+  FileWarning
 } from "lucide-react";
 
 /* =========================================================
@@ -417,16 +417,12 @@ const EvidenceSection = memo(({ evidence = [], darkMode = false }) => {
           </span>
         </button>
 
-        <AnimatePresence initial={false}>
-          {expanded && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className={`border-t ${
-                darkMode ? "border-[#1A2C20]" : "border-gray-100"
-              }`}
-            >
+        {expanded && (
+          <div
+            className={`border-t ${
+              darkMode ? "border-[#1A2C20]" : "border-gray-100"
+            }`}
+          >
               <div className="p-4">
                 {imageEvidence.length > 0 && (
                   <div className="grid grid-cols-2 gap-2.5">
@@ -507,18 +503,13 @@ const EvidenceSection = memo(({ evidence = [], darkMode = false }) => {
                   </span>
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        )}
       </div>
 
-      <AnimatePresence>
-        {preview && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setPreview(null)}
+      {preview && (
+        <div
+          onClick={() => setPreview(null)}
             className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm p-4 flex items-center justify-center"
           >
             <button
@@ -529,17 +520,14 @@ const EvidenceSection = memo(({ evidence = [], darkMode = false }) => {
               <X size={19} />
             </button>
 
-            <motion.img
-              initial={{ scale: 0.96, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              src={preview}
-              alt="Evidence preview"
-              onClick={(event) => event.stopPropagation()}
-              className="max-w-full max-h-[85vh] rounded-2xl object-contain shadow-2xl"
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+          <img
+            src={preview}
+            alt="Evidence preview"
+            onClick={(event) => event.stopPropagation()}
+            className="max-w-full max-h-[85vh] rounded-2xl object-contain shadow-2xl"
+          />
+        </div>
+      )}
     </>
   );
 });
@@ -697,14 +685,10 @@ const AIReviewPanel = memo(
           )}
         </div>
 
-        <AnimatePresence initial={false}>
-          {analyzed && expanded && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className={`border-t ${darkMode ? "border-[#1A2C20]" : "border-gray-100"}`}
-            >
+        {analyzed && expanded && (
+          <div
+            className={`border-t ${darkMode ? "border-[#1A2C20]" : "border-gray-100"}`}
+          >
               <div className="p-4 space-y-3">
                 <div className="grid grid-cols-2 gap-2.5">
                   <div
@@ -913,9 +897,8 @@ const AIReviewPanel = memo(
                   )}
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        )}
       </div>
     );
   }
@@ -925,14 +908,14 @@ const AIReviewPanel = memo(
    MAIN MOBILE REPORT
 ========================================================= */
 
-const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed }) => {
+const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed, viewMode = "cards" }) => {
   const darkMode = useGuidedTheme();
 
   const [aiReview, setAiReview] = useState(report?.aiReview || null);
   const [analyzing, setAnalyzing] = useState(false);
   const [aiError, setAiError] = useState("");
   const [showDescription, setShowDescription] = useState(true);
-  const [copiedId, setCopiedId] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);  const [compactExpanded, setCompactExpanded] = useState(false);
 
   useEffect(() => {
     setAiReview(report?.aiReview || null);
@@ -1070,6 +1053,89 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed }) => {
     }
   };
 
+  if (viewMode === "compact" && !compactExpanded) {
+    const compactRisk = currentAIReview?.riskLevel?.toLowerCase();
+    const compactRiskClass =
+      compactRisk === "high"
+        ? darkMode ? "bg-red-500/10 text-red-300 border-red-900/40" : "bg-red-50 text-red-700 border-red-100"
+        : compactRisk === "medium"
+          ? darkMode ? "bg-amber-500/10 text-amber-300 border-amber-900/40" : "bg-amber-50 text-amber-700 border-amber-100"
+          : compactRisk === "low"
+            ? darkMode ? "bg-emerald-500/10 text-emerald-300 border-emerald-900/40" : "bg-emerald-50 text-emerald-700 border-emerald-100"
+            : darkMode ? "bg-gray-500/10 text-gray-400 border-gray-700" : "bg-gray-50 text-gray-500 border-gray-200";
+
+    return (
+      <article
+        className={`rounded-2xl border p-3.5 sm:p-4 transition ${
+          darkMode
+            ? "border-[#1A2C20] bg-[#0D1A12] hover:bg-[#101F15]"
+            : "border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm"
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+            darkMode ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-50 text-emerald-600"
+          }`}>
+            <FileWarning size={17} />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className={`truncate text-[15px] font-black ${darkMode ? "text-gray-100" : "text-gray-800"}`}>
+                {report?.studentName || "Unknown student"}
+              </p>
+              <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-black ${
+                statusConfig.badge || (darkMode ? "border-gray-700 text-gray-300" : "border-gray-200 text-gray-600")
+              }`}>
+                {status}
+              </span>
+              {compactRisk && (
+                <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-black capitalize ${compactRiskClass}`}>
+                  {compactRisk} risk
+                </span>
+              )}
+            </div>
+
+            <p className={`mt-1 truncate text-[13px] font-bold ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+              {report?.offense || "Report"} · {report?.location || "Location not provided"}
+            </p>
+
+            <div className={`mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+              <span>{incidentDate}</span>
+              <span>{evidenceCount} attachment{evidenceCount === 1 ? "" : "s"}</span>
+              <span>Ref #{reportReference}</span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setCompactExpanded(true)}
+            className={`shrink-0 rounded-xl border px-3 py-2 text-[12px] font-black transition ${
+              darkMode
+                ? "border-[#294332] bg-[#101F15] text-emerald-300 hover:bg-[#163B20]"
+                : "border-green-100 bg-green-50 text-green-700 hover:bg-green-100"
+            }`}
+          >
+            View
+          </button>
+        </div>
+
+        {status === "pending" && (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => onAccept?.(report._id)}
+              className="min-h-10 rounded-xl bg-emerald-700 px-3 text-[12px] font-black text-white transition hover:bg-emerald-800 active:scale-[0.99]">
+              Accept
+            </button>
+            <button type="button" onClick={() => onReject?.(report._id)}
+              className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 px-3 text-[12px] font-black text-rose-700 transition hover:bg-rose-100 active:scale-[0.99] dark:border-rose-900/50 dark:bg-rose-500/10 dark:text-rose-300">
+              Reject
+            </button>
+          </div>
+        )}
+      </article>
+    );
+  }
+
   return (
     <article
       style={{
@@ -1081,7 +1147,22 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed }) => {
           ? "bg-[#08110C] border-[#1B3022] text-white"
           : "bg-[#F8FAF9] border-[#E6ECE8] text-gray-900"
       }`}
-    >
+    >      {viewMode === "compact" && compactExpanded && (
+        <div className="mb-3 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setCompactExpanded(false)}
+            className={`rounded-xl border px-3 py-2 text-[12px] font-black ${
+              darkMode
+                ? "border-[#294332] bg-[#101F15] text-emerald-300 hover:bg-[#163B20]"
+                : "border-green-100 bg-green-50 text-green-700 hover:bg-green-100"
+            }`}
+          >
+            Back to compact
+          </button>
+        </div>
+      )}
+
       {/* CASE COCKPIT HEADER */}
       <div
         className={`relative overflow-hidden ${
