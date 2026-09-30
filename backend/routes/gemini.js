@@ -13,7 +13,7 @@ import Student from "../models/studentModel.js";
 
 const router = express.Router();
 
-const GEMINI_MODEL = "models/gemini-3-flash-preview";
+const GUIDEDAI_MODEL = "models/gemini-3-flash-preview";
 const MAX_RETRIES = 4;
 const MAX_EVIDENCE_IMAGES = 5;
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -51,10 +51,10 @@ const generateWithRetry = async (contents, options = {}) => {
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`🤖 Gemini request attempt ${attempt + 1}/${maxRetries + 1}`);
+      console.log(`🤖 GuidedAI request attempt ${attempt + 1}/${maxRetries + 1}`);
 
       const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
+        model: "gemini-3-flash-preview",
         contents,
         ...(config ? { config } : {}),
       });
@@ -62,13 +62,13 @@ const generateWithRetry = async (contents, options = {}) => {
       const blockReason = response?.promptFeedback?.blockReason;
 
       if (blockReason) {
-        console.error("🚫 Gemini blocked the request:", blockReason);
+        console.error("🚫 GuidedAI blocked the request:", blockReason);
 
         const blockedError = new Error(
-          `Gemini blocked the request: ${blockReason}`,
+          `GuidedAI blocked the request: ${blockReason}`,
         );
 
-        blockedError.code = "GEMINI_CONTENT_BLOCKED";
+        blockedError.code = "GUIDEDAI_CONTENT_BLOCKED";
 
         blockedError.blockReason = blockReason;
 
@@ -83,15 +83,15 @@ const generateWithRetry = async (contents, options = {}) => {
         candidates.length === 0
       ) {
         const emptyError = new Error(
-          "Gemini returned no generated candidates.",
+          "GuidedAI returned no generated candidates.",
         );
 
-        emptyError.code = "GEMINI_EMPTY_RESPONSE";
+        emptyError.code = "GUIDEDAI_EMPTY_RESPONSE";
 
         throw emptyError;
       }
 
-      console.log("✅ Gemini request successful.");
+      console.log("✅ GuidedAI request successful.");
 
       return response;
     } catch (error) {
@@ -99,18 +99,18 @@ const generateWithRetry = async (contents, options = {}) => {
 
       const status = getErrorStatus(error);
 
-      console.error(`❌ Gemini attempt ${attempt + 1} failed.`, {
+      console.error(`❌ GuidedAI attempt ${attempt + 1} failed.`, {
         status,
         code: error?.code,
         blockReason: error?.blockReason,
-        message: error?.message || "Unknown Gemini error",
+        message: error?.message || "Unknown GuidedAI error",
       });
 
-      if (error?.code === "GEMINI_CONTENT_BLOCKED") {
+      if (error?.code === "GUIDEDAI_CONTENT_BLOCKED") {
         throw error;
       }
 
-      if (error?.code === "GEMINI_EMPTY_RESPONSE") {
+      if (error?.code === "GUIDEDAI_EMPTY_RESPONSE") {
         throw error;
       }
 
@@ -135,7 +135,7 @@ const generateWithRetry = async (contents, options = {}) => {
   throw lastError;
 };
 
-const getGeminiText = (response) => {
+const getGuidedAIText = (response) => {
   return (
     response?.candidates?.[0]?.content?.parts
       ?.map((part) => part?.text || "")
@@ -169,6 +169,57 @@ const cleanJsonText = (text) => {
 
   return cleaned;
 };
+
+
+/*
+ * GuidedAI normally returns valid JSON with responseMimeType:
+ * "application/json", but malformed generations can still happen.
+ *
+ * We intentionally repair only one narrow corruption pattern:
+ * a standalone quote accidentally placed before a closing } or ].
+ * Broad JSON regex-repair is avoided because it can corrupt valid
+ * string values.
+ */
+const parseGuidedAIJson = (text, label = "GuidedAI") => {
+  const cleaned = cleanJsonText(text);
+
+  if (!cleaned) {
+    throw new Error(`${label} returned an empty JSON response.`);
+  }
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (firstError) {
+    const repaired = cleaned.replace(
+      /^(\s*)"\s*([}\]])\s*$/gm,
+      "$1$2",
+    );
+
+    if (repaired !== cleaned) {
+      try {
+        const parsed = JSON.parse(repaired);
+
+        console.warn(
+          `⚠️ ${label} returned malformed JSON; repaired a stray quote before a closing bracket.`,
+        );
+
+        return parsed;
+      } catch {
+        // Keep the original parse failure if the narrow repair did not work.
+      }
+    }
+
+    const error = new Error(
+      `${label} returned invalid JSON: ${firstError.message}`,
+    );
+
+    error.cause = firstError;
+    error.rawText = cleaned;
+
+    throw error;
+  }
+};
+
 
 const normalizeConclusion = (conclusion) => {
   if (!conclusion) {
@@ -247,7 +298,7 @@ const normalizeConfidence = (value) => {
   }
 
   /*
-    Handle Gemini returning 0.84 instead of 84.
+    Handle GuidedAI returning 0.84 instead of 84.
   */
   if (number > 0 && number <= 1) {
     number *= 100;
@@ -325,6 +376,45 @@ const getDateRange = (items) => {
     earliest: dates[0].toISOString(),
 
     latest: dates[dates.length - 1].toISOString(),
+  };
+};
+
+
+/**
+ * Explainable descriptive indicators; never a predictive or disciplinary score.
+ */
+const buildPatternIndicators = (items = []) => {
+  const records = Array.isArray(items) ? items : [];
+  const categoryCounts = countBy(records, (x) => x?.category || x?.title || x?.offense || "Unspecified");
+  const locationCounts = countBy(records, (x) => x?.location || "Unspecified");
+  const severityCounts = countBy(records, (x) => x?.level || x?.riskLevel || x?.severity || "Unspecified");
+  const dated = records.map((item) => ({ item, date: new Date(getDateValue(item) || "") }))
+    .filter(({ date }) => !Number.isNaN(date.getTime())).sort((a, b) => a.date - b.date);
+  const monthly = {};
+  for (const { date } of dated) {
+    const key = date.toISOString().slice(0, 7);
+    monthly[key] = (monthly[key] || 0) + 1;
+  }
+  const months = Object.entries(monthly).sort(([a], [b]) => a.localeCompare(b));
+  const recent = months.slice(-3), previous = months.slice(-6, -3);
+  const recentCount = recent.reduce((n, [, count]) => n + count, 0);
+  const comparisonCount = previous.reduce((n, [, count]) => n + count, 0);
+  return {
+    recordCount: records.length, datedRecordCount: dated.length,
+    dateRange: dated.length ? { earliest: dated[0].date.toISOString(), latest: dated.at(-1).date.toISOString() } : { earliest: null, latest: null },
+    mostCommonCategories: categoryCounts.slice(0, 5),
+    mostCommonLocations: locationCounts.slice(0, 5),
+    severityCounts,
+    monthlyCounts: months.map(([month, count]) => ({ month, count })),
+    periodComparison: {
+      recentPeriod: recent.map(([month]) => month), recentCount,
+      comparisonPeriod: previous.map(([month]) => month), comparisonCount,
+      direction: previous.length === 0 ? "Insufficient historical monthly data for comparison" :
+        recentCount > comparisonCount ? "More records in the latest available 3-month period" :
+        recentCount < comparisonCount ? "Fewer records in the latest available 3-month period" :
+        "Record count is unchanged across the compared periods"
+    },
+    caveat: "Descriptive indicators only. Data completeness and consistent categorization affect these counts; they do not establish cause or predict individual behavior."
   };
 };
 
@@ -418,7 +508,7 @@ const buildSchoolWideStatistics = ({ reports, incidents, students }) => {
 
   /*
     Anonymous student behavior summary.
-    Student names are intentionally not sent to Gemini.
+    Student names are intentionally not sent to GuidedAI.
   */
   const studentBehaviorMap = {};
 
@@ -529,6 +619,9 @@ const buildSchoolWideStatistics = ({ reports, incidents, students }) => {
     reportDateRange: getDateRange(reports),
 
     incidentDateRange: getDateRange(incidents),
+    patternIndicators: buildPatternIndicators([...reports, ...incidents]),
+    reportPatternIndicators: buildPatternIndicators(reports),
+    incidentPatternIndicators: buildPatternIndicators(incidents),
   };
 };
 
@@ -570,7 +663,7 @@ const getMimeTypeFromUrl = (url) => {
 
 /*
   Download a public evidence image and convert it into
-  Gemini inlineData.
+  GuidedAI inlineData.
 */
 const fetchImageAsInlineData = async (url) => {
   if (!url) {
@@ -903,7 +996,7 @@ const analyzePendingReportData = async (report) => {
   const evidence = Array.isArray(report.evidence) ? report.evidence : [];
 
   /*
-      Only image evidence is sent to Gemini in this version.
+      Only image evidence is sent to GuidedAI in this version.
 
       Video/document analysis can be added separately later.
     */
@@ -926,7 +1019,7 @@ const analyzePendingReportData = async (report) => {
 
   /*
       Download each image from Cloudinary and prepare it
-      for Gemini.
+      for GuidedAI.
     */
   for (const evidenceItem of imageEvidence) {
     try {
@@ -951,7 +1044,7 @@ const analyzePendingReportData = async (report) => {
   });
 
   /*
-      Gemini multimodal request.
+      GuidedAI multimodal request.
 
       The first part contains the text prompt.
       Following parts contain the actual images.
@@ -981,23 +1074,23 @@ const analyzePendingReportData = async (report) => {
 
     if (Number(status) === 429) {
       throw new Error(
-        "Gemini rate limit reached. Please wait before analyzing more reports.",
+        "GuidedAI rate limit reached. Please wait before analyzing more reports.",
       );
     }
 
     if (Number(status) === 503) {
       throw new Error(
-        "Gemini is temporarily unavailable. Please try again later.",
+        "GuidedAI is temporarily unavailable. Please try again later.",
       );
     }
 
     throw error;
   }
 
-  const text = getGeminiText(response);
+  const text = getGuidedAIText(response);
 
   if (!text.trim()) {
-    throw new Error("Gemini returned an empty response for this report.");
+    throw new Error("GuidedAI returned an empty response for this report.");
   }
 
   const cleaned = cleanJsonText(text);
@@ -1007,11 +1100,11 @@ const analyzePendingReportData = async (report) => {
   try {
     parsed = JSON.parse(cleaned);
   } catch (error) {
-    console.error("❌ Pending report Gemini JSON parse error:", error);
+    console.error("❌ Pending report GuidedAI JSON parse error:", error);
 
-    console.error("Gemini returned:", text);
+    console.error("GuidedAI returned:", text);
 
-    throw new Error("Gemini returned invalid JSON for this report.");
+    throw new Error("GuidedAI returned invalid JSON for this report.");
   }
 
   /* =======================================================
@@ -1104,7 +1197,7 @@ const analyzePendingReportData = async (report) => {
 
     analyzedAt: new Date(),
 
-    model: GEMINI_MODEL,
+    model: "GuidedAI",
 
     riskLevel,
 
@@ -1149,13 +1242,13 @@ router.post("/generate", async (req, res) => {
 
     const response = await generateWithRetry(prompt);
 
-    const text = getGeminiText(response);
+    const text = getGuidedAIText(response);
 
     if (!text) {
       return res.status(500).json({
         success: false,
-        error: "Gemini returned an empty response.",
-        code: "GEMINI_EMPTY_RESPONSE",
+        error: "GuidedAI returned an empty response.",
+        code: "GUIDEDAI_EMPTY_RESPONSE",
       });
     }
 
@@ -1164,23 +1257,23 @@ router.post("/generate", async (req, res) => {
       text,
     });
   } catch (err) {
-    console.error("Gemini API error:", err);
+    console.error("GuidedAI API error:", err);
 
-    if (err?.code === "GEMINI_CONTENT_BLOCKED") {
+    if (err?.code === "GUIDEDAI_CONTENT_BLOCKED") {
       return res.status(422).json({
         success: false,
         error:
-          "Gemini blocked this content and could not generate an AI response.",
-        code: "GEMINI_CONTENT_BLOCKED",
+          "GuidedAI blocked this content and could not generate an AI response.",
+        code: "GUIDEDAI_CONTENT_BLOCKED",
         reason: err?.blockReason || "PROHIBITED_CONTENT",
       });
     }
 
-    if (err?.code === "GEMINI_EMPTY_RESPONSE") {
+    if (err?.code === "GUIDEDAI_EMPTY_RESPONSE") {
       return res.status(500).json({
         success: false,
-        error: "Gemini returned no generated content.",
-        code: "GEMINI_EMPTY_RESPONSE",
+        error: "GuidedAI returned no generated content.",
+        code: "GUIDEDAI_EMPTY_RESPONSE",
       });
     }
 
@@ -1190,8 +1283,8 @@ router.post("/generate", async (req, res) => {
       return res.status(503).json({
         success: false,
         error:
-          "Gemini AI is temporarily experiencing high demand. Please try again in a few moments.",
-        code: "GEMINI_UNAVAILABLE",
+          "GuidedAI AI is temporarily experiencing high demand. Please try again in a few moments.",
+        code: "GUIDEDAI_UNAVAILABLE",
       });
     }
 
@@ -1199,8 +1292,8 @@ router.post("/generate", async (req, res) => {
       return res.status(429).json({
         success: false,
         error:
-          "Gemini AI request limit has been reached. Please try again shortly.",
-        code: "GEMINI_RATE_LIMIT",
+          "GuidedAI AI request limit has been reached. Please try again shortly.",
+        code: "GUIDEDAI_RATE_LIMIT",
       });
     }
 
@@ -1526,6 +1619,48 @@ RESEARCH REFERENCE DATABASE
 ${researchContext}
 
 =========================================================
+PATTERN ANALYSIS — REQUIRED DETAIL AND LENGTH
+=========================================================
+
+The "pattern" field is a student-history narrative for the
+ViewProfileModal's "Pattern Analysis" card.
+
+Write approximately 140–220 words, normally in exactly TWO
+readable paragraphs separated by one blank line. Keep the
+language professional, clear, cautious, and evidence-based.
+
+Across those two paragraphs, address all of the following
+when the supplied records contain enough information:
+
+1. Frequency and recurrence: state the number of available
+   relevant records when it can be counted, and whether
+   similar events recur.
+2. Repeated categories/offenses: identify recurring categories
+   using the actual labels found in the records.
+3. Severity changes: describe recorded severity/level changes,
+   without treating missing values as a severity change.
+4. Locations and circumstances: mention recorded locations
+   and relevant documented circumstances, if provided.
+5. Trends over time: describe the dated sequence or monthly
+   pattern where dates permit a comparison.
+6. Overall pattern: characterize the recorded activity as
+   persistent, increasing, decreasing, or inconsistent ONLY
+   when the records support that description. Otherwise say
+   the trend is unclear or there is insufficient history.
+7. Limitations: note missing dates, vague categories, sparse
+   records, inconsistent labels, or other material gaps.
+8. Concrete evidence: cite specific record details such as
+   dates, category names, counts, severity labels, locations,
+   statuses, or documented actions. Do not invent examples.
+
+Do not pad the response to reach the word count. If records
+are sparse, explain that limitation and keep conclusions
+proportionate. Do not infer intent, personality, diagnosis,
+or future misconduct. A higher number of reports does not
+by itself prove an increase in underlying behavior; reporting
+and record completeness may also affect the count.
+
+=========================================================
 ANALYSIS RULES
 =========================================================
 
@@ -1618,31 +1753,29 @@ Return ONLY valid JSON.
       },
     });
 
-    let text = getGeminiText(response);
+    let text = getGuidedAIText(response);
 
     if (!text) {
       return res.status(500).json({
         success: false,
-        error: "Gemini returned an empty response.",
-        code: "GEMINI_EMPTY_RESPONSE",
+        error: "GuidedAI returned an empty response.",
+        code: "GUIDEDAI_EMPTY_RESPONSE",
       });
     }
-
-    text = cleanJsonText(text);
 
     let analysis;
 
     try {
-      analysis = JSON.parse(text);
+      analysis = parseGuidedAIJson(text, "Research AI");
     } catch (parseError) {
       console.error("❌ Research AI JSON Parse Error:", parseError);
 
-      console.error("Gemini returned:", text);
+      console.error("GuidedAI returned:", text);
 
       return res.status(500).json({
         success: false,
-        error: "Gemini returned invalid JSON.",
-        code: "GEMINI_INVALID_JSON",
+        error: "GuidedAI returned invalid JSON.",
+        code: "GUIDEDAI_INVALID_JSON",
       });
     }
 
@@ -1763,7 +1896,9 @@ Return ONLY valid JSON.
       summary: analysis?.summary || "No summary was generated.",
 
       pattern:
-        analysis?.pattern || "No clear behavioral pattern was identified.",
+        typeof analysis?.pattern === "string" && analysis.pattern.trim()
+          ? analysis.pattern.trim()
+          : "No clear behavioral pattern was identified from the available records.",
 
       risk: validatedRisk,
 
@@ -1800,21 +1935,21 @@ Return ONLY valid JSON.
   } catch (err) {
     console.error("❌ Research-backed AI analysis error:", err);
 
-    if (err?.code === "GEMINI_CONTENT_BLOCKED") {
+    if (err?.code === "GUIDEDAI_CONTENT_BLOCKED") {
       return res.status(422).json({
         success: false,
         error:
-          "AI analysis could not be generated because Gemini blocked the submitted content.",
-        code: "GEMINI_CONTENT_BLOCKED",
+          "AI analysis could not be generated because GuidedAI blocked the submitted content.",
+        code: "GUIDEDAI_CONTENT_BLOCKED",
         reason: err?.blockReason || "PROHIBITED_CONTENT",
       });
     }
 
-    if (err?.code === "GEMINI_EMPTY_RESPONSE") {
+    if (err?.code === "GUIDEDAI_EMPTY_RESPONSE") {
       return res.status(500).json({
         success: false,
-        error: "Gemini returned no generated content.",
-        code: "GEMINI_EMPTY_RESPONSE",
+        error: "GuidedAI returned no generated content.",
+        code: "GUIDEDAI_EMPTY_RESPONSE",
       });
     }
 
@@ -1824,8 +1959,8 @@ Return ONLY valid JSON.
       return res.status(429).json({
         success: false,
         error:
-          "Gemini AI request limit has been reached. Please try again shortly.",
-        code: "GEMINI_RATE_LIMIT",
+          "GuidedAI AI request limit has been reached. Please try again shortly.",
+        code: "GUIDEDAI_RATE_LIMIT",
       });
     }
 
@@ -1833,8 +1968,8 @@ Return ONLY valid JSON.
       return res.status(503).json({
         success: false,
         error:
-          "Gemini AI is temporarily experiencing high demand. Please try again in a few moments.",
-        code: "GEMINI_UNAVAILABLE",
+          "GuidedAI AI is temporarily experiencing high demand. Please try again in a few moments.",
+        code: "GUIDEDAI_UNAVAILABLE",
       });
     }
 
@@ -2084,6 +2219,15 @@ MONTHLY BEHAVIORAL TREND
 ${JSON.stringify(schoolStats.monthlyTrend, null, 2)}
 
 =========================================================
+DETERMINISTIC PATTERN INDICATORS
+=========================================================
+
+${JSON.stringify(schoolStats.patternIndicators, null, 2)}
+
+Explain notable trends using supporting counts and time windows.
+These are descriptive indicators, not evidence of causation.
+
+=========================================================
 REPEATED RECORDED INCIDENT PATTERNS
 =========================================================
 
@@ -2171,11 +2315,21 @@ REQUIRED OUTPUT
 
 Return ONLY valid JSON.
 
+IMPORTANT JSON FORMATTING RULES:
+- Every property value must be properly quoted and closed.
+- Do not output standalone quotation marks on their own line.
+- Do not put an extra quotation mark before a closing } or ].
+- Do not include markdown, comments, or trailing commas.
+
 {
   "summary": "",
   "pattern": "",
+  "patternInsights": [
+    { "finding": "", "supportingData": "", "timeWindow": "", "confidence": "Low" }
+  ],
   "risk": "",
   "prediction": "",
+  "dataQuality": { "limitations": [], "recommendedChecks": [] },
   "interventions": [
     {
       "recommendation": "",
@@ -2204,31 +2358,29 @@ Return exactly 3 school-wide recommendations.
       },
     });
 
-    let text = getGeminiText(response);
+    let text = getGuidedAIText(response);
 
     if (!text) {
       return res.status(500).json({
         success: false,
-        error: "Gemini returned an empty response.",
-        code: "GEMINI_EMPTY_RESPONSE",
+        error: "GuidedAI returned an empty response.",
+        code: "GUIDEDAI_EMPTY_RESPONSE",
       });
     }
-
-    text = cleanJsonText(text);
 
     let analysis;
 
     try {
-      analysis = JSON.parse(text);
+      analysis = parseGuidedAIJson(text, "School-wide AI");
     } catch (parseError) {
       console.error("❌ School-wide AI JSON Parse Error:", parseError);
 
-      console.error("Gemini returned:", text);
+      console.error("GuidedAI returned:", text);
 
       return res.status(500).json({
         success: false,
-        error: "Gemini returned invalid JSON.",
-        code: "GEMINI_INVALID_JSON",
+        error: "GuidedAI returned invalid JSON.",
+        code: "GUIDEDAI_INVALID_JSON",
       });
     }
 
@@ -2309,6 +2461,20 @@ Return exactly 3 school-wide recommendations.
         analysis?.pattern ||
         "No clear school-wide behavioral pattern was identified.",
 
+      patternInsights: Array.isArray(analysis?.patternInsights)
+        ? analysis.patternInsights.slice(0, 8).map((item) => ({
+            finding: String(item?.finding || "").trim(),
+            supportingData: String(item?.supportingData || "").trim(),
+            timeWindow: String(item?.timeWindow || "").trim(),
+            confidence: normalizeEnum(item?.confidence, ["Low", "Medium", "High"], "Low"),
+          })).filter((item) => item.finding)
+        : [],
+
+      dataQuality: {
+        limitations: normalizeArray(analysis?.dataQuality?.limitations),
+        recommendedChecks: normalizeArray(analysis?.dataQuality?.recommendedChecks),
+      },
+
       risk: validatedRisk,
 
       prediction:
@@ -2348,21 +2514,21 @@ Return exactly 3 school-wide recommendations.
   } catch (err) {
     console.error("❌ School-wide AI analysis error:", err);
 
-    if (err?.code === "GEMINI_CONTENT_BLOCKED") {
+    if (err?.code === "GUIDEDAI_CONTENT_BLOCKED") {
       return res.status(422).json({
         success: false,
         error:
-          "AI analysis could not be generated because Gemini blocked the submitted content.",
-        code: "GEMINI_CONTENT_BLOCKED",
+          "AI analysis could not be generated because GuidedAI blocked the submitted content.",
+        code: "GUIDEDAI_CONTENT_BLOCKED",
         reason: err?.blockReason || "PROHIBITED_CONTENT",
       });
     }
 
-    if (err?.code === "GEMINI_EMPTY_RESPONSE") {
+    if (err?.code === "GUIDEDAI_EMPTY_RESPONSE") {
       return res.status(500).json({
         success: false,
-        error: "Gemini returned no generated content.",
-        code: "GEMINI_EMPTY_RESPONSE",
+        error: "GuidedAI returned no generated content.",
+        code: "GUIDEDAI_EMPTY_RESPONSE",
       });
     }
 
@@ -2372,8 +2538,8 @@ Return exactly 3 school-wide recommendations.
       return res.status(429).json({
         success: false,
         error:
-          "Gemini AI request limit has been reached. Please try again shortly.",
-        code: "GEMINI_RATE_LIMIT",
+          "GuidedAI AI request limit has been reached. Please try again shortly.",
+        code: "GUIDEDAI_RATE_LIMIT",
       });
     }
 
@@ -2381,8 +2547,8 @@ Return exactly 3 school-wide recommendations.
       return res.status(503).json({
         success: false,
         error:
-          "Gemini AI is temporarily experiencing high demand. Please try again in a few moments.",
-        code: "GEMINI_UNAVAILABLE",
+          "GuidedAI AI is temporarily experiencing high demand. Please try again in a few moments.",
+        code: "GUIDEDAI_UNAVAILABLE",
       });
     }
 
@@ -2483,13 +2649,13 @@ Requirements:
       },
     });
 
-    let text = getGeminiText(response);
+    let text = getGuidedAIText(response);
 
     if (!text) {
       return res.status(500).json({
         success: false,
-        error: "Gemini returned an empty response.",
-        code: "GEMINI_EMPTY_RESPONSE",
+        error: "GuidedAI returned an empty response.",
+        code: "GUIDEDAI_EMPTY_RESPONSE",
       });
     }
 
@@ -2502,8 +2668,8 @@ Requirements:
     } catch {
       return res.status(500).json({
         success: false,
-        error: "Gemini returned invalid JSON.",
-        code: "GEMINI_INVALID_JSON",
+        error: "GuidedAI returned invalid JSON.",
+        code: "GUIDEDAI_INVALID_JSON",
       });
     }
 
@@ -2536,23 +2702,23 @@ Requirements:
         "Review the incident details and provide appropriate guidance.",
     });
   } catch (err) {
-    console.error("❌ Gemini Incident Analysis Error:", err);
+    console.error("❌ GuidedAI Incident Analysis Error:", err);
 
-    if (err?.code === "GEMINI_CONTENT_BLOCKED") {
+    if (err?.code === "GUIDEDAI_CONTENT_BLOCKED") {
       return res.status(422).json({
         success: false,
         error:
-          "AI analysis could not be generated because Gemini blocked the incident content.",
-        code: "GEMINI_CONTENT_BLOCKED",
+          "AI analysis could not be generated because GuidedAI blocked the incident content.",
+        code: "GUIDEDAI_CONTENT_BLOCKED",
         reason: err?.blockReason || "PROHIBITED_CONTENT",
       });
     }
 
-    if (err?.code === "GEMINI_EMPTY_RESPONSE") {
+    if (err?.code === "GUIDEDAI_EMPTY_RESPONSE") {
       return res.status(500).json({
         success: false,
-        error: "Gemini returned no generated content.",
-        code: "GEMINI_EMPTY_RESPONSE",
+        error: "GuidedAI returned no generated content.",
+        code: "GUIDEDAI_EMPTY_RESPONSE",
       });
     }
 
@@ -2562,8 +2728,8 @@ Requirements:
       return res.status(429).json({
         success: false,
         error:
-          "Gemini AI request limit has been reached. Please try again shortly.",
-        code: "GEMINI_RATE_LIMIT",
+          "GuidedAI AI request limit has been reached. Please try again shortly.",
+        code: "GUIDEDAI_RATE_LIMIT",
       });
     }
 
@@ -2571,8 +2737,8 @@ Requirements:
       return res.status(503).json({
         success: false,
         error:
-          "Gemini AI is temporarily experiencing high demand. Please try again in a few moments.",
-        code: "GEMINI_UNAVAILABLE",
+          "GuidedAI AI is temporarily experiencing high demand. Please try again in a few moments.",
+        code: "GUIDEDAI_UNAVAILABLE",
       });
     }
 
@@ -2596,15 +2762,15 @@ Requirements:
   1. Finds the report.
   2. Makes sure it is still pending.
   3. Loads image evidence.
-  4. Sends report + images to Gemini.
-  5. Saves Gemini's result into report.aiReview.
+  4. Sends report + images to GuidedAI.
+  5. Saves GuidedAI's result into report.aiReview.
   6. Returns the AI review.
 
   IMPORTANT:
 
   This endpoint NEVER changes report.status.
 
-  Gemini cannot accept or reject the report.
+  GuidedAI cannot accept or reject the report.
 */
 
 router.post("/analyze-pending-report/:reportId", async (req, res) => {
@@ -2634,7 +2800,7 @@ router.post("/analyze-pending-report/:reportId", async (req, res) => {
       });
     }
 
-    console.log(`🔎 Starting Gemini pending report analysis: ${reportId}`);
+    console.log(`🔎 Starting GuidedAI pending report analysis: ${reportId}`);
 
     const aiReview = await analyzePendingReportData(report);
 
@@ -2661,21 +2827,21 @@ router.post("/analyze-pending-report/:reportId", async (req, res) => {
   } catch (err) {
     console.error("❌ Analyze pending report error:", err);
 
-    if (err?.code === "GEMINI_CONTENT_BLOCKED") {
+    if (err?.code === "GUIDEDAI_CONTENT_BLOCKED") {
       return res.status(422).json({
         success: false,
         error:
-          "Gemini blocked the report content and could not complete the AI analysis.",
-        code: "GEMINI_CONTENT_BLOCKED",
+          "GuidedAI blocked the report content and could not complete the AI analysis.",
+        code: "GUIDEDAI_CONTENT_BLOCKED",
         reason: err?.blockReason || "PROHIBITED_CONTENT",
       });
     }
 
-    if (err?.code === "GEMINI_EMPTY_RESPONSE") {
+    if (err?.code === "GUIDEDAI_EMPTY_RESPONSE") {
       return res.status(500).json({
         success: false,
-        error: "Gemini returned no generated content.",
-        code: "GEMINI_EMPTY_RESPONSE",
+        error: "GuidedAI returned no generated content.",
+        code: "GUIDEDAI_EMPTY_RESPONSE",
       });
     }
 
@@ -2690,7 +2856,7 @@ router.post("/analyze-pending-report/:reportId", async (req, res) => {
       return res.status(429).json({
         success: false,
         error: err.message,
-        code: "GEMINI_RATE_LIMIT",
+        code: "GUIDEDAI_RATE_LIMIT",
       });
     }
 
@@ -2698,7 +2864,7 @@ router.post("/analyze-pending-report/:reportId", async (req, res) => {
       return res.status(503).json({
         success: false,
         error: err.message,
-        code: "GEMINI_UNAVAILABLE",
+        code: "GUIDEDAI_UNAVAILABLE",
       });
     }
 
@@ -2708,16 +2874,16 @@ router.post("/analyze-pending-report/:reportId", async (req, res) => {
       return res.status(429).json({
         success: false,
         error:
-          "Gemini AI request limit has been reached. Please try again shortly.",
-        code: "GEMINI_RATE_LIMIT",
+          "GuidedAI AI request limit has been reached. Please try again shortly.",
+        code: "GUIDEDAI_RATE_LIMIT",
       });
     }
 
     if (Number(status) === 503) {
       return res.status(503).json({
         success: false,
-        error: "Gemini AI is temporarily unavailable. Please try again later.",
-        code: "GEMINI_UNAVAILABLE",
+        error: "GuidedAI AI is temporarily unavailable. Please try again later.",
+        code: "GUIDEDAI_UNAVAILABLE",
       });
     }
 
@@ -2758,7 +2924,7 @@ router.post("/analyze-pending-report/:reportId", async (req, res) => {
 
   Reports are processed ONE AT A TIME.
 
-  This is intentional to reduce Gemini API rate-limit
+  This is intentional to reduce GuidedAI API rate-limit
   problems.
 */
 
@@ -2830,7 +2996,7 @@ router.post("/analyze-pending-reports", async (req, res) => {
 
       This is intentional.
 
-      Gemini image analysis can consume significantly more
+      GuidedAI image analysis can consume significantly more
       resources than normal text requests.
     */
     for (const report of pendingReports) {
@@ -2890,7 +3056,7 @@ router.post("/analyze-pending-reports", async (req, res) => {
 
           The report remains pending.
 
-          Gemini does NOT accept or reject the report.
+          GuidedAI does NOT accept or reject the report.
         */
         report.aiReview = aiReview;
 
@@ -2933,7 +3099,7 @@ router.post("/analyze-pending-reports", async (req, res) => {
         /*
           Small delay between reports.
 
-          This helps avoid sending requests to Gemini
+          This helps avoid sending requests to GuidedAI
           immediately one after another.
         */
         await sleep(1000);
@@ -3026,14 +3192,14 @@ router.post("/analyze-pending-reports", async (req, res) => {
       err,
     );
 
-    if (err?.code === "GEMINI_CONTENT_BLOCKED") {
+    if (err?.code === "GUIDEDAI_CONTENT_BLOCKED") {
       return res.status(422).json({
         success: false,
 
         error:
-          "Gemini blocked some submitted content and could not complete the AI analysis.",
+          "GuidedAI blocked some submitted content and could not complete the AI analysis.",
 
-        code: "GEMINI_CONTENT_BLOCKED",
+        code: "GUIDEDAI_CONTENT_BLOCKED",
 
         reason:
           err?.blockReason ||
@@ -3041,14 +3207,14 @@ router.post("/analyze-pending-reports", async (req, res) => {
       });
     }
 
-    if (err?.code === "GEMINI_EMPTY_RESPONSE") {
+    if (err?.code === "GUIDEDAI_EMPTY_RESPONSE") {
       return res.status(500).json({
         success: false,
 
         error:
-          "Gemini returned no generated content.",
+          "GuidedAI returned no generated content.",
 
-        code: "GEMINI_EMPTY_RESPONSE",
+        code: "GUIDEDAI_EMPTY_RESPONSE",
       });
     }
 
@@ -3059,9 +3225,9 @@ router.post("/analyze-pending-reports", async (req, res) => {
         success: false,
 
         error:
-          "Gemini AI request limit has been reached. Please wait before analyzing more reports.",
+          "GuidedAI AI request limit has been reached. Please wait before analyzing more reports.",
 
-        code: "GEMINI_RATE_LIMIT",
+        code: "GUIDEDAI_RATE_LIMIT",
       });
     }
 
@@ -3070,9 +3236,9 @@ router.post("/analyze-pending-reports", async (req, res) => {
         success: false,
 
         error:
-          "Gemini AI is temporarily unavailable. Please try again later.",
+          "GuidedAI AI is temporarily unavailable. Please try again later.",
 
-        code: "GEMINI_UNAVAILABLE",
+        code: "GUIDEDAI_UNAVAILABLE",
       });
     }
 
@@ -3142,7 +3308,7 @@ router.post("/student-history-analysis", async (req, res) => {
     }
 
     /*
-      Keep the amount of information sent to Gemini reasonable.
+      Keep the amount of information sent to GuidedAI reasonable.
       The current incident is always kept separate and receives
       priority in the prompt.
     */
@@ -3158,6 +3324,12 @@ router.post("/student-history-analysis", async (req, res) => {
     const safeReports = Array.isArray(reports)
       ? reports.slice(0, 30)
       : [];
+
+    const historyPatternIndicators = buildPatternIndicators([
+      ...(primaryIncident ? [primaryIncident] : []),
+      ...historyIncidents,
+      ...safeReports,
+    ]);
 
     const currentIncidentText = primaryIncident
       ? `
@@ -3345,6 +3517,16 @@ Current recorded risk level:
 ${riskLevel || "Not specified"}
 
 =========================================================
+DETERMINISTIC HISTORY PATTERN INDICATORS
+=========================================================
+
+${JSON.stringify(historyPatternIndicators, null, 2)}
+
+Use these indicators descriptively. Note limited date coverage.
+Reports and incidents may refer to the same event; avoid claiming
+they represent distinct events or double-counting them.
+
+=========================================================
 ANALYSIS REQUIREMENTS
 =========================================================
 
@@ -3499,13 +3681,13 @@ Return ONLY valid JSON.
       },
     });
 
-    let text = getGeminiText(response);
+    let text = getGuidedAIText(response);
 
     if (!text) {
       return res.status(500).json({
         success: false,
-        error: "Gemini returned an empty response.",
-        code: "GEMINI_EMPTY_RESPONSE",
+        error: "GuidedAI returned an empty response.",
+        code: "GUIDEDAI_EMPTY_RESPONSE",
       });
     }
 
@@ -3521,12 +3703,12 @@ Return ONLY valid JSON.
         parseError,
       );
 
-      console.error("Gemini returned:", text);
+      console.error("GuidedAI returned:", text);
 
       return res.status(500).json({
         success: false,
-        error: "Gemini returned invalid JSON.",
-        code: "GEMINI_INVALID_JSON",
+        error: "GuidedAI returned invalid JSON.",
+        code: "GUIDEDAI_INVALID_JSON",
       });
     }
 
@@ -3599,6 +3781,8 @@ Return ONLY valid JSON.
         (primaryIncident ? 1 : 0) +
         historyIncidents.length,
 
+      patternIndicators: historyPatternIndicators,
+
       summary:
         analysis?.summary ||
         "The available records do not contain enough information to provide a detailed summary.",
@@ -3621,27 +3805,27 @@ Return ONLY valid JSON.
     });
   } catch (err) {
     console.error(
-      "❌ Student History Gemini analysis error:",
+      "❌ Student History GuidedAI analysis error:",
       err,
     );
 
-    if (err?.code === "GEMINI_CONTENT_BLOCKED") {
+    if (err?.code === "GUIDEDAI_CONTENT_BLOCKED") {
       return res.status(422).json({
         success: false,
         error:
-          "Gemini blocked this content and could not generate a student analysis.",
-        code: "GEMINI_CONTENT_BLOCKED",
+          "GuidedAI blocked this content and could not generate a student analysis.",
+        code: "GUIDEDAI_CONTENT_BLOCKED",
         reason:
           err?.blockReason || "PROHIBITED_CONTENT",
       });
     }
 
-    if (err?.code === "GEMINI_EMPTY_RESPONSE") {
+    if (err?.code === "GUIDEDAI_EMPTY_RESPONSE") {
       return res.status(500).json({
         success: false,
         error:
-          "Gemini returned no generated content.",
-        code: "GEMINI_EMPTY_RESPONSE",
+          "GuidedAI returned no generated content.",
+        code: "GUIDEDAI_EMPTY_RESPONSE",
       });
     }
 
@@ -3651,8 +3835,8 @@ Return ONLY valid JSON.
       return res.status(503).json({
         success: false,
         error:
-          "Gemini AI is temporarily experiencing high demand. Please try again in a few moments.",
-        code: "GEMINI_UNAVAILABLE",
+          "GuidedAI AI is temporarily experiencing high demand. Please try again in a few moments.",
+        code: "GUIDEDAI_UNAVAILABLE",
       });
     }
 
@@ -3660,8 +3844,8 @@ Return ONLY valid JSON.
       return res.status(429).json({
         success: false,
         error:
-          "Gemini AI request limit has been reached. Please try again shortly.",
-        code: "GEMINI_RATE_LIMIT",
+          "GuidedAI AI request limit has been reached. Please try again shortly.",
+        code: "GUIDEDAI_RATE_LIMIT",
       });
     }
 

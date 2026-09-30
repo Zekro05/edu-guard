@@ -1029,7 +1029,7 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed, viewMode = "ca
         data;
 
       if (!result || typeof result !== "object") {
-        throw new Error("Gemini returned an invalid analysis result.");
+        throw new Error("GuidedAI returned an invalid analysis result.");
       }
 
       const normalizedResult = {
@@ -1040,13 +1040,13 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed, viewMode = "ca
       setAiReview(normalizedResult);
       onAIAnalyzed?.(report._id, normalizedResult);
     } catch (error) {
-      console.error("Gemini pending report analysis error:", error);
+      console.error("GuidedAI pending report analysis error:", error);
 
       setAiError(
         error?.response?.data?.message ||
           error?.response?.data?.error ||
           error?.message ||
-          "Unable to analyze this report with Gemini.",
+          "Unable to analyze this report with GuidedAI.",
       );
     } finally {
       setAnalyzing(false);
@@ -1055,83 +1055,232 @@ const MobileReport = ({ report, onAccept, onReject, onAIAnalyzed, viewMode = "ca
 
   if (viewMode === "compact" && !compactExpanded) {
     const compactRisk = currentAIReview?.riskLevel?.toLowerCase();
+
     const compactRiskClass =
       compactRisk === "high"
-        ? darkMode ? "bg-red-500/10 text-red-300 border-red-900/40" : "bg-red-50 text-red-700 border-red-100"
+        ? darkMode
+          ? "bg-red-500/10 text-red-300 border-red-900/40"
+          : "bg-red-50 text-red-700 border-red-100"
         : compactRisk === "medium"
-          ? darkMode ? "bg-amber-500/10 text-amber-300 border-amber-900/40" : "bg-amber-50 text-amber-700 border-amber-100"
+          ? darkMode
+            ? "bg-amber-500/10 text-amber-300 border-amber-900/40"
+            : "bg-amber-50 text-amber-700 border-amber-100"
           : compactRisk === "low"
-            ? darkMode ? "bg-emerald-500/10 text-emerald-300 border-emerald-900/40" : "bg-emerald-50 text-emerald-700 border-emerald-100"
-            : darkMode ? "bg-gray-500/10 text-gray-400 border-gray-700" : "bg-gray-50 text-gray-500 border-gray-200";
+            ? darkMode
+              ? "bg-emerald-500/10 text-emerald-300 border-emerald-900/40"
+              : "bg-emerald-50 text-emerald-700 border-emerald-100"
+            : darkMode
+              ? "bg-gray-500/10 text-gray-400 border-gray-700"
+              : "bg-gray-50 text-gray-500 border-gray-200";
+
+    const compactStatusClass =
+      status === "pending"
+        ? darkMode
+          ? "bg-orange-500/10 border-orange-500/30 text-orange-300"
+          : "bg-orange-50 border-orange-200 text-orange-700"
+        : status === "accepted"
+          ? darkMode
+            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+            : "bg-emerald-50 border-emerald-200 text-emerald-700"
+          : status === "rejected"
+            ? darkMode
+              ? "bg-rose-500/10 border-rose-500/30 text-rose-300"
+              : "bg-rose-50 border-rose-200 text-rose-700"
+            : status === "under_review"
+              ? darkMode
+                ? "bg-blue-500/10 border-blue-500/30 text-blue-300"
+                : "bg-blue-50 border-blue-200 text-blue-700"
+              : darkMode
+                ? "bg-gray-500/10 border-gray-700 text-gray-300"
+                : "bg-gray-50 border-gray-200 text-gray-600";
+
+    const compactStatusLabel =
+      status === "pending"
+        ? "Pending"
+        : status === "under_review"
+          ? "Under review"
+          : status.charAt(0).toUpperCase() + status.slice(1);
 
     return (
       <article
-        className={`rounded-2xl border p-3.5 sm:p-4 transition ${
+        className={`group relative overflow-hidden rounded-2xl border transition-all duration-200 ${
           darkMode
-            ? "border-[#1A2C20] bg-[#0D1A12] hover:bg-[#101F15]"
-            : "border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm"
+            ? "border-[#1A2C20] bg-[#0D1A12] hover:border-[#294332] hover:bg-[#101F15] hover:shadow-lg hover:shadow-black/10"
+            : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-md"
         }`}
       >
-        <div className="flex items-start gap-3">
-          <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-            darkMode ? "bg-emerald-500/10 text-emerald-400" : "bg-emerald-50 text-emerald-600"
-          }`}>
-            <FileWarning size={17} />
-          </div>
+        {/* Status accent */}
+        <div
+          className={`absolute inset-y-0 left-0 w-1 ${
+            status === "pending"
+              ? "bg-orange-500"
+              : status === "accepted"
+                ? "bg-emerald-500"
+                : status === "rejected"
+                  ? "bg-rose-500"
+                  : status === "under_review"
+                    ? "bg-blue-500"
+                    : "bg-gray-400"
+          }`}
+        />
 
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className={`truncate text-[15px] font-black ${darkMode ? "text-gray-100" : "text-gray-800"}`}>
-                {report?.studentName || "Unknown student"}
-              </p>
-              <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-black ${
-                statusConfig.badge || (darkMode ? "border-gray-700 text-gray-300" : "border-gray-200 text-gray-600")
-              }`}>
-                {status}
-              </span>
-              {compactRisk && (
-                <span className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-black capitalize ${compactRiskClass}`}>
-                  {compactRisk} risk
+        <div className="p-3.5 pl-4 sm:p-4 sm:pl-5">
+          <div className="flex items-start gap-3">
+            <div
+              className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                darkMode
+                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+                  : "border-emerald-100 bg-emerald-50 text-emerald-600"
+              }`}
+            >
+              <FileWarning size={17} />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <p
+                  className={`min-w-0 flex-1 truncate text-[14px] font-black sm:text-[15px] ${
+                    darkMode ? "text-gray-100" : "text-gray-900"
+                  }`}
+                  title={report?.studentName || "Unknown student"}
+                >
+                  {report?.studentName || "Unknown student"}
+                </p>
+
+                <span
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${compactStatusClass}`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      status === "pending"
+                        ? "bg-orange-500"
+                        : status === "accepted"
+                          ? "bg-emerald-500"
+                          : status === "rejected"
+                            ? "bg-rose-500"
+                            : status === "under_review"
+                              ? "bg-blue-500"
+                              : "bg-gray-400"
+                    }`}
+                  />
+                  {compactStatusLabel}
                 </span>
-              )}
+              </div>
+
+              <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                <p
+                  className={`min-w-0 flex-1 truncate text-[12px] font-bold sm:text-[13px] ${
+                    darkMode ? "text-gray-300" : "text-gray-600"
+                  }`}
+                  title={report?.offense || "Report"}
+                >
+                  {report?.offense || "Report"}
+                </p>
+                <span className={darkMode ? "text-gray-700" : "text-gray-300"}>•</span>
+                <p
+                  className={`min-w-0 flex-1 truncate text-[12px] sm:text-[13px] ${
+                    darkMode ? "text-gray-500" : "text-gray-500"
+                  }`}
+                  title={report?.location || "Location not provided"}
+                >
+                  {report?.location || "Location not provided"}
+                </p>
+              </div>
+
+              <div
+                className={`mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold sm:text-[12px] ${
+                  darkMode ? "text-gray-600" : "text-gray-400"
+                }`}
+              >
+                <span className="inline-flex items-center gap-1">
+                  <Calendar size={11} />
+                  {incidentDate}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Paperclip size={11} />
+                  {evidenceCount} attachment{evidenceCount === 1 ? "" : "s"}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Hash size={11} />
+                  {reportReference}
+                </span>
+              </div>
             </div>
 
-            <p className={`mt-1 truncate text-[13px] font-bold ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
-              {report?.offense || "Report"} · {report?.location || "Location not provided"}
-            </p>
-
-            <div className={`mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
-              <span>{incidentDate}</span>
-              <span>{evidenceCount} attachment{evidenceCount === 1 ? "" : "s"}</span>
-              <span>Ref #{reportReference}</span>
-            </div>
+            <button
+              type="button"
+              onClick={() => setCompactExpanded(true)}
+              aria-label={`View report ${reportReference}`}
+              className={`shrink-0 rounded-xl border px-3 py-2 text-[11px] font-black transition-all active:scale-95 sm:px-3.5 sm:text-[12px] ${
+                darkMode
+                  ? "border-[#294332] bg-[#101F15] text-emerald-300 hover:border-emerald-700 hover:bg-[#163B20]"
+                  : "border-gray-200 bg-gray-50 text-gray-700 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+              }`}
+            >
+              View
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setCompactExpanded(true)}
-            className={`shrink-0 rounded-xl border px-3 py-2 text-[12px] font-black transition ${
-              darkMode
-                ? "border-[#294332] bg-[#101F15] text-emerald-300 hover:bg-[#163B20]"
-                : "border-green-100 bg-green-50 text-green-700 hover:bg-green-100"
-            }`}
-          >
-            View
-          </button>
+          {compactRisk && (
+            <div
+              className={`mt-3 flex items-center justify-between gap-2 rounded-xl border px-3 py-2 ${
+                darkMode
+                  ? "bg-white/[0.025] border-white/[0.06]"
+                  : "bg-gray-50/80 border-gray-100"
+              }`}
+            >
+              <span
+                className={`text-[10px] font-black uppercase tracking-wider ${
+                  darkMode ? "text-gray-600" : "text-gray-400"
+                }`}
+              >
+                AI risk assessment
+              </span>
+              <span
+                className={`inline-flex items-center rounded-full border px-2 py-1 text-[10px] font-black capitalize ${compactRiskClass}`}
+              >
+                {compactRisk} risk
+              </span>
+            </div>
+          )}
+
+          {status === "pending" && (
+            <div
+              className={`mt-3 border-t pt-3 ${
+                darkMode ? "border-[#1A2C20]" : "border-gray-100"
+              }`}
+            >
+              <div className="mb-2 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+                <span
+                  className={`text-[10px] font-black uppercase tracking-wider ${
+                    darkMode ? "text-orange-300" : "text-orange-600"
+                  }`}
+                >
+                  Awaiting review
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => onAccept?.(report._id)}
+                  className="min-h-10 rounded-xl bg-emerald-700 px-3 text-[12px] font-black text-white transition hover:bg-emerald-800 active:scale-[0.98]"
+                >
+                  Accept
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onReject?.(report._id)}
+                  className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 px-3 text-[12px] font-black text-rose-700 transition hover:bg-rose-100 active:scale-[0.98] dark:border-rose-900/50 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:bg-rose-500/20"
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-
-        {status === "pending" && (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => onAccept?.(report._id)}
-              className="min-h-10 rounded-xl bg-emerald-700 px-3 text-[12px] font-black text-white transition hover:bg-emerald-800 active:scale-[0.99]">
-              Accept
-            </button>
-            <button type="button" onClick={() => onReject?.(report._id)}
-              className="min-h-10 rounded-xl border border-rose-200 bg-rose-50 px-3 text-[12px] font-black text-rose-700 transition hover:bg-rose-100 active:scale-[0.99] dark:border-rose-900/50 dark:bg-rose-500/10 dark:text-rose-300">
-              Reject
-            </button>
-          </div>
-        )}
       </article>
     );
   }

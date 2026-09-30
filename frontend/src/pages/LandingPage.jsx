@@ -10,6 +10,7 @@ import {
   ChevronDown,
   ClipboardList,
   Database,
+  Download,
   FileText,
   HeartHandshake,
   History,
@@ -27,7 +28,24 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const ANDROID_APP_URL = "";
+/* =========================================================
+   APP DOWNLOAD LINKS
+========================================================= */
+
+/*
+ * GuidEd Android APK is hosted through a GitHub Release.
+ *
+ * IMPORTANT:
+ * The GitHub Release asset must be named exactly:
+ *
+ *     GuidED.apk
+ *
+ * Using /releases/latest/download/ means you do not need to
+ * change this URL every time you publish a newer release.
+ */
+const ANDROID_APP_URL =
+  "https://github.com/Zekro05/edu-guard/releases/latest/download/GuidED.apk";
+
 const IOS_APP_URL = "";
 
 /* =========================================================
@@ -418,6 +436,28 @@ function LandingPage() {
     });
   };
 
+  /*
+   * =======================================================
+   * ANDROID APK DOWNLOAD
+   * =======================================================
+   *
+   * The APK is hosted as a GitHub Release asset.
+   *
+   * We intentionally do NOT rely on:
+   *
+   *     download="GuidED.apk"
+   *
+   * because the APK is hosted on github.com while the
+   * GuidEd website is hosted on another domain.
+   *
+   * GitHub Release assets are served as downloadable files,
+   * so navigating directly to this URL allows the browser
+   * to handle the file download.
+   */
+  const downloadAndroidApp = () => {
+    window.location.href = ANDROID_APP_URL;
+  };
+
   const navItems = [
     {
       label: "Overview",
@@ -605,14 +645,14 @@ function LandingPage() {
         id="overview"
         className={`relative scroll-mt-20 overflow-hidden border-b pt-28 transition-colors duration-500 sm:pt-32 ${
           darkMode
-            ? "bg-gradient-to-br from-[#06150A] via-[#071F0D] to-[#0B3D18] border-white/10"
-            : "bg-gradient-to-br from-white via-[#F8FCF8] to-[#EEF7EF] border-green-100"
+            ? "border-white/10 bg-gradient-to-br from-[#06150A] via-[#071F0D] to-[#0B3D18]"
+            : "border-green-100 bg-gradient-to-br from-white via-[#F8FCF8] to-[#EEF7EF]"
         }`}
       >
         <FloatingDot className="left-[12%] top-[25%]" />
         <FloatingDot className="left-[45%] top-[18%]" />
         <FloatingDot className="right-[18%] top-[30%]" />
-        <FloatingDot className="right-[10%] bottom-[20%]" />
+        <FloatingDot className="bottom-[20%] right-[10%]" />
 
         <div className="mx-auto grid max-w-7xl items-center gap-14 px-5 pb-20 sm:px-8 lg:grid-cols-[1fr_0.9fr] lg:gap-16 lg:px-10 lg:pb-28">
           {/* LEFT */}
@@ -675,7 +715,7 @@ function LandingPage() {
 
             <motion.div
               variants={fadeUp}
-              className="mt-8 flex flex-col gap-3 sm:flex-row"
+              className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap"
             >
               <button
                 onClick={() => scrollToSection("modules")}
@@ -694,6 +734,21 @@ function LandingPage() {
                 }`}
               >
                 Sign In
+              </button>
+
+              {/* ANDROID DOWNLOAD */}
+
+              <button
+                type="button"
+                onClick={downloadAndroidApp}
+                className={`inline-flex items-center justify-center gap-3 rounded-xl border px-6 py-4 text-sm font-bold transition-all hover:-translate-y-0.5 ${
+                  darkMode
+                    ? "border-green-400/20 bg-green-400/10 text-green-300 hover:bg-green-400/15"
+                    : "border-green-200 bg-green-50 text-[#1B5E20] hover:bg-green-100"
+                }`}
+              >
+                <Download size={17} />
+                Download Android App
               </button>
             </motion.div>
 
@@ -1755,6 +1810,54 @@ function LandingPage() {
                   );
                 })}
               </div>
+
+              {/* =================================================
+                  ANDROID DOWNLOAD CARD
+              ================================================= */}
+
+              <div
+                className={`mt-6 rounded-xl border p-4 ${
+                  darkMode
+                    ? "border-green-400/20 bg-green-400/5"
+                    : "border-green-100 bg-green-50/70"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                      darkMode
+                        ? "bg-green-400/10 text-green-300"
+                        : "bg-white text-[#1B5E20]"
+                    }`}
+                  >
+                    <Download size={19} />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <h4 className={`text-sm font-extrabold ${mainText}`}>
+                      Get the GuidEd Android App
+                    </h4>
+
+                    <p className={`mt-1 text-xs leading-5 ${bodyText}`}>
+                      Download the official GuidEd APK and install it on your
+                      Android device.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={downloadAndroidApp}
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#1B5E20] px-5 py-3.5 text-sm font-bold text-white transition-all hover:-translate-y-0.5 hover:bg-[#0B3D18]"
+                >
+                  <Download size={17} />
+                  Download GuidEd APK
+                </button>
+
+                <p className={`mt-2 text-center text-[10px] ${bodyText}`}>
+                  Android only · APK installer
+                </p>
+              </div>
             </motion.div>
           </div>
         </div>
@@ -1923,9 +2026,7 @@ function LandingPage() {
             </p>
           </div>
 
-          <div
-            className={`flex flex-wrap justify-center gap-2 md:justify-end`}
-          >
+          <div className="flex flex-wrap justify-center gap-2 md:justify-end">
             {[
               "Student Records",
               "Guidance",
@@ -1996,13 +2097,28 @@ function LandingPage() {
             Sign in to access the functions available for your assigned role.
           </p>
 
-          <button
-            onClick={goToLogin}
-            className="mt-7 inline-flex items-center gap-3 rounded-xl bg-[#1B5E20] px-7 py-4 text-sm font-bold text-white transition-all hover:-translate-y-0.5 hover:bg-[#0B3D18]"
-          >
-            Sign In to GuidEd
-            <ArrowRight size={17} />
-          </button>
+          <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <button
+              onClick={goToLogin}
+              className="inline-flex items-center gap-3 rounded-xl bg-[#1B5E20] px-7 py-4 text-sm font-bold text-white transition-all hover:-translate-y-0.5 hover:bg-[#0B3D18]"
+            >
+              Sign In to GuidEd
+              <ArrowRight size={17} />
+            </button>
+
+            <button
+              type="button"
+              onClick={downloadAndroidApp}
+              className={`inline-flex items-center gap-3 rounded-xl border px-7 py-4 text-sm font-bold transition-all hover:-translate-y-0.5 ${
+                darkMode
+                  ? "border-green-400/20 bg-green-400/10 text-green-300 hover:bg-green-400/15"
+                  : "border-green-200 bg-green-50 text-[#1B5E20] hover:bg-green-100"
+              }`}
+            >
+              <Download size={17} />
+              Download Android App
+            </button>
+          </div>
         </motion.div>
       </section>
 
@@ -2079,12 +2195,14 @@ function LandingPage() {
                 Web Login
               </button>
 
-              <span className="text-sm text-green-100/30">
-                Mobile App
-                <span className="ml-2 rounded-full bg-white/5 px-2 py-0.5 text-[8px]">
-                  Coming soon
-                </span>
-              </span>
+              <button
+                type="button"
+                onClick={downloadAndroidApp}
+                className="inline-flex items-center gap-2 text-sm text-green-100/45 transition-colors hover:text-white"
+              >
+                <Download size={14} />
+                Download Android APK
+              </button>
             </div>
           </div>
 
@@ -2114,3 +2232,4 @@ function LandingPage() {
 }
 
 export default LandingPage;
+

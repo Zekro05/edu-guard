@@ -533,8 +533,10 @@ const ViewProfileModal = ({
           "No summary was generated.",
 
         pattern:
-          parsed?.pattern ||
-          "No clear behavioral pattern was identified.",
+          typeof parsed?.pattern === "string" &&
+          parsed.pattern.trim()
+            ? parsed.pattern.trim()
+            : "No clear behavioral pattern was identified from the available records.",
 
         risk:
           parsed?.risk ||
@@ -1752,7 +1754,10 @@ const ViewProfileModal = ({
                       <GlassCard
                         darkMode={darkMode}
                         title="Pattern Analysis"
-                        text={ai.pattern}
+                        text={
+                          ai.pattern ||
+                          "No detailed behavioral pattern analysis was generated."
+                        }
                       />
 
                       <GlassCard
@@ -3727,8 +3732,9 @@ const GlassCard = ({
 
     <p
       className={`
-        text-sm
-        mt-3 leading-relaxed
+        text-[15px]
+        mt-3 leading-7
+        whitespace-pre-line
         ${
           darkMode
             ? "text-slate-300"

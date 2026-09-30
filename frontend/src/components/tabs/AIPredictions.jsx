@@ -120,90 +120,161 @@ const useGuidedTheme = () => {
    HELPERS
 ========================================================= */
 
-const getReportsArray = (data) => {
+const getCollectionArray = (data, keys = []) => {
   if (Array.isArray(data)) return data;
+  if (!data || typeof data !== "object") return [];
 
-  if (Array.isArray(data?.reports)) {
-    return data.reports;
+  for (const key of keys) {
+    if (Array.isArray(data?.[key])) {
+      return data[key];
+    }
   }
 
-  if (Array.isArray(data?.data)) {
-    return data.data;
+  const nestedKeys = ["data", "result", "results", "response", "payload"];
+
+  for (const key of nestedKeys) {
+    const nested = data?.[key];
+    if (Array.isArray(nested)) return nested;
+
+    if (nested && typeof nested === "object") {
+      const found = getCollectionArray(nested, keys);
+      if (found.length) return found;
+    }
   }
 
   return [];
 };
 
-const getIncidentsArray = (data) => {
-  if (Array.isArray(data)) return data;
+const getReportsArray = (data) =>
+  getCollectionArray(data, [
+    "reports",
+    "report",
+    "items",
+    "docs",
+  ]);
 
-  if (Array.isArray(data?.incidents)) {
-    return data.incidents;
-  }
+const getIncidentsArray = (data) =>
+  getCollectionArray(data, [
+    "incidents",
+    "incident",
+    "items",
+    "docs",
+  ]);
 
-  if (Array.isArray(data?.data)) {
-    return data.data;
-  }
-
-  return [];
-};
-
-const cleanText = (
-  value,
-  fallback = ""
-) => {
-  if (
-    value === null ||
-    value === undefined
-  ) {
-    return fallback;
-  }
+const cleanText = (value, fallback = "") => {
+  if (value === null || value === undefined) return fallback;
 
   if (typeof value === "string") {
-    return value.trim() || fallback;
+    const text = value.replace(/\s+/g, " ").trim();
+    return text || fallback;
   }
 
-  return String(value);
+  return String(value).trim() || fallback;
 };
 
 /* =========================================================
-   SAFE VALUE HELPERS
+   SAFE VALUE + NORMALIZATION HELPERS
 ========================================================= */
 
-const getStudentId = (item) => {
-  if (!item) return null;
+const asId = (value) => {
+  if (value === null || value === undefined) return null;
 
-  if (
-    typeof item.studentId === "string"
-  ) {
-    return item.studentId;
+  if (typeof value === "string" || typeof value === "number") {
+    const text = String(value).trim();
+    return text || null;
   }
 
-  if (item.studentId?._id) {
-    return String(
-      item.studentId._id
-    );
-  }
+  if (value?._id) return String(value._id);
+  if (value?.id) return String(value.id);
+  if (value?.$oid) return String(value.$oid);
 
-  if (item.student?._id) {
-    return String(
-      item.student._id
-    );
+  return null;
+};
+
+const getReportId = (item) =>
+  asId(
+    item?._id ||
+      item?.id ||
+      item?.reportId
+  );
+
+const getIncidentId = (item) =>
+  asId(
+    item?._id ||
+      item?.id ||
+      item?.incidentId
+  );
+
+const getRecordId = (item) =>
+  getReportId(item) || getIncidentId(item);
+
+const getIncidentReportId = (incident) =>
+  asId(
+    incident?.reportId ||
+      incident?.sourceReportId ||
+      incident?.report?._id ||
+      incident?.report?.id ||
+      incident?.report?.reportId ||
+      incident?.reportData?._id ||
+      incident?.reportData?.id ||
+      incident?.reportData?.reportId ||
+      incident?.case?.reportId
+  );
+
+const getNestedValue = (item, keys = []) => {
+  if (!item || typeof item !== "object") return null;
+
+  const sources = [
+    item,
+    item.report,
+    item.reportData,
+    item.case,
+    item.caseData,
+    item.incident,
+    item.details,
+  ].filter(
+    (source) => source && typeof source === "object"
+  );
+
+  for (const source of sources) {
+    for (const key of keys) {
+      const value = source?.[key];
+      if (value !== null && value !== undefined && String(value).trim() !== "") {
+        return value;
+      }
+    }
   }
 
   return null;
 };
 
-const getStudentName = (item) => {
-  if (!item) {
-    return "Unknown student";
-  }
+const getStudentId = (item) => {
+  const value = getNestedValue(item, [
+    "studentId",
+    "studentCode",
+  ]);
 
   return (
-    item.studentName ||
-    item.student?.name ||
-    item.student?.fullName ||
-    item.studentId?.name ||
+    asId(value) ||
+    asId(item?.student?._id) ||
+    asId(item?.student?.id) ||
+    asId(item?.student?.studentId) ||
+    null
+  );
+};
+
+const getStudentName = (item) => {
+  const value = getNestedValue(item, [
+    "studentName",
+    "name",
+    "fullName",
+  ]);
+
+  return cleanText(
+    value ||
+      item?.student?.name ||
+      item?.student?.fullName ||
+      item?.studentId?.name,
     "Unknown student"
   );
 };
@@ -213,372 +284,415 @@ const normalizeDate = (value) => {
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return date;
+  return Number.isNaN(date.getTime()) ? null : date;
 };
 
-const countBy = (
-  items,
-  getter
-) => {
+const getItemDate = (item) =>
+  getNestedValue(item, [
+    "date",
+    "createdAt",
+    "updatedAt",
+  ]);
+
+const normalizeLabel = (value) => {
+  const text = cleanText(value, "");
+  return text || null;
+};
+
+const countBy = (items, getter) => {
   const counts = {};
+  const displayNames = {};
 
   items.forEach((item) => {
-    const value = getter(item);
-
+    const value = normalizeLabel(getter(item));
     if (!value) return;
 
-    const key = String(value).trim();
-
-    if (!key) return;
-
-    counts[key] =
-      (counts[key] || 0) + 1;
+    const key = value.toLowerCase();
+    counts[key] = (counts[key] || 0) + 1;
+    displayNames[key] = displayNames[key] || value;
   });
 
-  return counts;
+  return Object.entries(counts).reduce((result, [key, count]) => {
+    result[displayNames[key]] = count;
+    return result;
+  }, {});
 };
 
-const sortCounts = (counts) => {
-  return Object.entries(counts)
-    .sort(
-      (a, b) => b[1] - a[1]
-    )
-    .map(
-      ([name, count]) => ({
-        name,
-        count,
-      })
-    );
+const sortCounts = (counts) =>
+  Object.entries(counts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name, count]) => ({ name, count }));
+
+/* =========================================================
+   REAL FIELD EXTRACTION
+
+   Older GuidEd records may store offense/category/location in
+   slightly different places. These helpers read the real values
+   from the record or its linked report without inventing data.
+========================================================= */
+
+const getOffense = (item, fallbackItem = null) =>
+  normalizeLabel(
+    getNestedValue(item, [
+      "offense",
+      "offenseType",
+      "violation",
+      "incidentType",
+      "title",
+    ]) ||
+      getNestedValue(fallbackItem, [
+        "offense",
+        "offenseType",
+        "violation",
+        "incidentType",
+        "title",
+      ]) ||
+      getNestedValue(item, ["category"]) ||
+      getNestedValue(fallbackItem, ["category"])
+  );
+
+const getCategory = (item, fallbackItem = null) =>
+  normalizeLabel(
+    getNestedValue(item, [
+      "category",
+      "offenseCategory",
+      "incidentCategory",
+      "classification",
+    ]) ||
+      getNestedValue(fallbackItem, [
+        "category",
+        "offenseCategory",
+        "incidentCategory",
+        "classification",
+      ]) ||
+      getNestedValue(item, ["offense", "offenseType"]) ||
+      getNestedValue(fallbackItem, ["offense", "offenseType"])
+  );
+
+const getLocation = (item, fallbackItem = null) =>
+  normalizeLabel(
+    getNestedValue(item, [
+      "location",
+      "place",
+      "incidentLocation",
+      "campusLocation",
+    ]) ||
+      getNestedValue(fallbackItem, [
+        "location",
+        "place",
+        "incidentLocation",
+        "campusLocation",
+      ])
+  );
+
+const getLevel = (item, fallbackItem = null) =>
+  normalizeLabel(
+    getNestedValue(item, [
+      "level",
+      "severity",
+      "riskLevel",
+    ]) ||
+      getNestedValue(fallbackItem, [
+        "level",
+        "severity",
+        "riskLevel",
+      ])
+  );
+
+const getStatus = (item, fallbackItem = null) =>
+  normalizeLabel(
+    getNestedValue(item, ["status", "caseStatus"]) ||
+      getNestedValue(fallbackItem, ["status", "caseStatus"])
+  );
+
+const getDescription = (item, fallbackItem = null) =>
+  normalizeLabel(
+    getNestedValue(item, [
+      "description",
+      "details",
+      "incidentDescription",
+    ]) ||
+      getNestedValue(fallbackItem, [
+        "description",
+        "details",
+        "incidentDescription",
+      ])
+  );
+
+/* =========================================================
+   NORMALIZE REPORTS + INCIDENTS INTO ONE EVENT STREAM
+
+   A report that already has an incident is represented by the
+   incident only. This prevents the same real-world case from being
+   counted once as a report and again as an incident.
+========================================================= */
+
+const buildNormalizedEvents = (reports, incidents) => {
+  const uniqueReports = [];
+  const uniqueIncidents = [];
+
+  const seenReportIds = new Set();
+  const seenIncidentIds = new Set();
+
+  reports.forEach((report, index) => {
+    const id = getReportId(report);
+    const key = id ? `id:${id}` : `index:${index}`;
+
+    if (seenReportIds.has(key)) return;
+    seenReportIds.add(key);
+    uniqueReports.push(report);
+  });
+
+  incidents.forEach((incident, index) => {
+    const id = getIncidentId(incident);
+    const reportId = getIncidentReportId(incident);
+    const key = id
+      ? `id:${id}`
+      : reportId
+        ? `report:${reportId}`
+        : `index:${index}`;
+
+    if (seenIncidentIds.has(key)) return;
+    seenIncidentIds.add(key);
+    uniqueIncidents.push(incident);
+  });
+
+  const reportById = new Map(
+    uniqueReports
+      .map((report) => [getReportId(report), report])
+      .filter(([id]) => Boolean(id))
+  );
+
+  const reportIds = new Set(reportById.keys());
+  const linkedReportIds = new Set();
+
+  uniqueIncidents.forEach((incident) => {
+    const reportId = getIncidentReportId(incident);
+    if (reportId && reportIds.has(String(reportId))) {
+      linkedReportIds.add(String(reportId));
+    }
+  });
+
+  const normalizedIncidents = uniqueIncidents.map((incident) => {
+    const reportId = getIncidentReportId(incident);
+    const sourceReport = reportId
+      ? reportById.get(String(reportId))
+      : null;
+
+    return {
+      id: getIncidentId(incident),
+      source: "incident",
+      sourceId: getIncidentId(incident),
+      reportId,
+      studentId: getStudentId(incident) || getStudentId(sourceReport),
+      studentName:
+        getStudentName(incident) !== "Unknown student"
+          ? getStudentName(incident)
+          : getStudentName(sourceReport),
+      offense: getOffense(incident, sourceReport),
+      category: getCategory(incident, sourceReport),
+      location: getLocation(incident, sourceReport),
+      level: getLevel(incident, sourceReport),
+      status: getStatus(incident, sourceReport),
+      title: normalizeLabel(
+        getNestedValue(incident, ["title"]) ||
+          getNestedValue(sourceReport, ["title"])
+      ),
+      action: normalizeLabel(
+        getNestedValue(incident, ["action", "intervention"])
+      ),
+      description: getDescription(incident, sourceReport),
+      studentStatement: normalizeLabel(
+        getNestedValue(incident, ["studentStatement", "statement"])
+      ),
+      reporterType: normalizeLabel(
+        getNestedValue(incident, ["reporterType"]) ||
+          getNestedValue(sourceReport, ["reporterType"])
+      ),
+      date: getItemDate(incident) || getItemDate(sourceReport),
+    };
+  });
+
+  const normalizedUnlinkedReports = uniqueReports
+    .filter((report) => {
+      const reportId = getReportId(report);
+      return !reportId || !linkedReportIds.has(String(reportId));
+    })
+    .map((report) => ({
+      id: getReportId(report),
+      source: "report",
+      sourceId: getReportId(report),
+      reportId: getReportId(report),
+      studentId: getStudentId(report),
+      studentName: getStudentName(report),
+      offense: getOffense(report),
+      category: getCategory(report),
+      location: getLocation(report),
+      level: getLevel(report),
+      status: getStatus(report),
+      title: normalizeLabel(getNestedValue(report, ["title"])),
+      action: normalizeLabel(getNestedValue(report, ["action", "intervention"])),
+      description: getDescription(report),
+      studentStatement: normalizeLabel(
+        getNestedValue(report, ["studentStatement", "statement"])
+      ),
+      reporterType: normalizeLabel(getNestedValue(report, ["reporterType"])),
+      date: getItemDate(report),
+    }));
+
+  const events = [
+    ...normalizedIncidents,
+    ...normalizedUnlinkedReports,
+  ].sort((a, b) => {
+    const aTime = normalizeDate(a.date)?.getTime() || 0;
+    const bTime = normalizeDate(b.date)?.getTime() || 0;
+    return bTime - aTime;
+  });
+
+  return {
+    reports: uniqueReports,
+    incidents: uniqueIncidents,
+    linkedReportIds,
+    events,
+    normalizedIncidents,
+    normalizedUnlinkedReports,
+  };
 };
 
 /* =========================================================
-   BUILD SCHOOL STATISTICS
+   BUILD SCHOOL STATISTICS FROM THE NORMALIZED EVENT STREAM
 ========================================================= */
 
-const buildSchoolStats = (
-  reports,
-  incidents
-) => {
-  const studentIds = new Set();
+const buildSchoolStats = (dataset) => {
+  const {
+    reports = [],
+    incidents = [],
+    events = [],
+    linkedReportIds = new Set(),
+  } = dataset || {};
 
-  reports.forEach((report) => {
-    const studentId =
-      getStudentId(report);
+  const studentIds = new Set(
+    events
+      .map((event) => event.studentId)
+      .filter(Boolean)
+      .map(String)
+  );
 
-    if (studentId) {
-      studentIds.add(studentId);
-    }
-  });
+  const highIncidents = events.filter(
+    (event) => String(event.level || "").toLowerCase() === "high"
+  ).length;
 
-  incidents.forEach((incident) => {
-    const studentId =
-      getStudentId(incident);
+  const mediumIncidents = events.filter(
+    (event) => String(event.level || "").toLowerCase() === "medium"
+  ).length;
 
-    if (studentId) {
-      studentIds.add(studentId);
-    }
-  });
+  const lowIncidents = events.filter(
+    (event) => String(event.level || "").toLowerCase() === "low"
+  ).length;
 
-  const highIncidents =
-    incidents.filter(
-      (incident) =>
-        String(
-          incident?.level || ""
-        ).toLowerCase() === "high"
-    ).length;
+  const offenseCounts = countBy(events, (event) => event.offense);
+  const categoryCounts = countBy(events, (event) => event.category);
+  const locationCounts = countBy(events, (event) => event.location);
+  const statusCounts = countBy(events, (event) => event.status);
+  const sourceCounts = countBy(events, (event) => event.source);
+  const reporterTypeCounts = countBy(events, (event) => event.reporterType);
 
-  const mediumIncidents =
-    incidents.filter(
-      (incident) =>
-        String(
-          incident?.level || ""
-        ).toLowerCase() === "medium"
-    ).length;
+  const dates = events
+    .map((event) => normalizeDate(event.date))
+    .filter(Boolean);
 
-  const lowIncidents =
-    incidents.filter(
-      (incident) =>
-        String(
-          incident?.level || ""
-        ).toLowerCase() === "low"
-    ).length;
-
-  const offenseCounts =
-    countBy(
-      reports,
-      (report) =>
-        report?.offense
-    );
-
-  const incidentCategoryCounts =
-    countBy(
-      incidents,
-      (incident) =>
-        incident?.category
-    );
-
-  const locationCounts =
-    countBy(
-      [
-        ...reports.map(
-          (report) => ({
-            location:
-              report?.location,
-          })
-        ),
-
-        ...incidents.map(
-          (incident) => ({
-            location:
-              incident?.location,
-          })
-        ),
-      ],
-      (item) =>
-        item?.location
-    );
-
-  const reportStatusCounts =
-    countBy(
-      reports,
-      (report) =>
-        report?.status
-    );
-
-  const incidentStatusCounts =
-    countBy(
-      incidents,
-      (incident) =>
-        incident?.status
-    );
-
-  const reporterTypeCounts =
-    countBy(
-      reports,
-      (report) =>
-        report?.reporterType
-    );
-
-  /* ================= DATE RANGE ================= */
-
-  const dates = [
-    ...reports.map((report) =>
-      normalizeDate(
-        report?.date ||
-          report?.createdAt ||
-          report?.updatedAt
-      )
-    ),
-
-    ...incidents.map(
-      (incident) =>
-        normalizeDate(
-          incident?.date ||
-            incident?.createdAt ||
-            incident?.updatedAt
-        )
-    ),
-  ].filter(Boolean);
-
-  let dateRange = {
-    earliest: null,
-    latest: null,
-  };
+  let dateRange = { earliest: null, latest: null };
 
   if (dates.length) {
-    const timestamps =
-      dates.map((date) =>
-        date.getTime()
-      );
-
-    const earliest =
-      new Date(
-        Math.min(
-          ...timestamps
-        )
-      );
-
-    const latest =
-      new Date(
-        Math.max(
-          ...timestamps
-        )
-      );
-
+    const timestamps = dates.map((date) => date.getTime());
     dateRange = {
-      earliest:
-        earliest.toISOString(),
-
-      latest:
-        latest.toISOString(),
+      earliest: new Date(Math.min(...timestamps)).toISOString(),
+      latest: new Date(Math.max(...timestamps)).toISOString(),
     };
   }
 
-  /* ================= MONTHLY TREND ================= */
-
   const monthlyMap = {};
 
-  [
-    ...reports,
-    ...incidents,
-  ].forEach((item) => {
-    const rawDate =
-      item?.date ||
-      item?.createdAt ||
-      item?.updatedAt;
-
-    const date =
-      normalizeDate(rawDate);
-
+  events.forEach((event) => {
+    const date = normalizeDate(event.date);
     if (!date) return;
 
-    const monthKey =
-      `${date.getFullYear()}-${String(
-        date.getMonth() + 1
-      ).padStart(2, "0")}`;
+    const monthKey = `${date.getFullYear()}-${String(
+      date.getMonth() + 1
+    ).padStart(2, "0")}`;
 
-    monthlyMap[monthKey] =
-      (monthlyMap[monthKey] || 0) +
-      1;
+    monthlyMap[monthKey] = (monthlyMap[monthKey] || 0) + 1;
   });
 
-  const monthlyTrend =
-    Object.entries(
-      monthlyMap
-    )
-      .sort((a, b) =>
-        a[0].localeCompare(
-          b[0]
-        )
-      )
-      .map(
-        ([month, count]) => ({
-          month,
-          count,
-        })
-      );
-
-  /* ================= STUDENT BEHAVIOR SUMMARY ================= */
+  const monthlyTrend = Object.entries(monthlyMap)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([month, count]) => ({ month, count }));
 
   const studentMap = {};
 
-  incidents.forEach(
-    (incident) => {
-      const studentId =
-        getStudentId(
-          incident
-        );
+  events.forEach((event) => {
+    if (!event.studentId) return;
 
-      if (!studentId) return;
+    const studentId = String(event.studentId);
 
-      if (!studentMap[studentId]) {
-        studentMap[studentId] = {
-          studentId,
-          incidentCount: 0,
-          highCount: 0,
-          mediumCount: 0,
-          lowCount: 0,
-        };
-      }
-
-      studentMap[
-        studentId
-      ].incidentCount += 1;
-
-      const level =
-        String(
-          incident?.level || ""
-        ).toLowerCase();
-
-      if (level === "high") {
-        studentMap[
-          studentId
-        ].highCount += 1;
-      } else if (
-        level === "medium"
-      ) {
-        studentMap[
-          studentId
-        ].mediumCount += 1;
-      } else if (
-        level === "low"
-      ) {
-        studentMap[
-          studentId
-        ].lowCount += 1;
-      }
+    if (!studentMap[studentId]) {
+      studentMap[studentId] = {
+        studentId,
+        studentName: event.studentName || "Unknown student",
+        eventCount: 0,
+        incidentCount: 0,
+        reportCount: 0,
+        highCount: 0,
+        mediumCount: 0,
+        lowCount: 0,
+      };
     }
-  );
 
-  const studentBehaviorSummary =
-    Object.values(
-      studentMap
+    const student = studentMap[studentId];
+    student.eventCount += 1;
+
+    if (event.source === "incident") student.incidentCount += 1;
+    else student.reportCount += 1;
+
+    const level = String(event.level || "").toLowerCase();
+    if (level === "high") student.highCount += 1;
+    if (level === "medium") student.mediumCount += 1;
+    if (level === "low") student.lowCount += 1;
+  });
+
+  const studentBehaviorSummary = Object.values(studentMap)
+    .sort(
+      (a, b) =>
+        b.eventCount - a.eventCount ||
+        b.highCount - a.highCount
     )
-      .sort(
-        (a, b) =>
-          b.incidentCount -
-          a.incidentCount
-      )
-      .slice(0, 50);
-
-  /* ================= OVERALL RISK ================= */
+    .slice(0, 50);
 
   let overallRisk = "Low";
+  if (highIncidents >= 5) overallRisk = "High";
+  else if (highIncidents >= 2 || mediumIncidents >= 5) overallRisk = "Medium";
 
-  if (highIncidents >= 5) {
-    overallRisk = "High";
-  } else if (
-    highIncidents >= 2 ||
-    mediumIncidents >= 5
-  ) {
-    overallRisk = "Medium";
-  }
+  const linkedReportCount = linkedReportIds.size;
 
   return {
-    totalReports:
-      reports.length,
-
-    totalIncidents:
-      incidents.length,
-
-    studentsInvolved:
-      studentIds.size,
-
+    totalReports: reports.length,
+    totalIncidents: incidents.length,
+    totalUniqueEvents: events.length,
+    linkedReportCount,
+    unlinkedReportCount: Math.max(reports.length - linkedReportCount, 0),
+    studentsInvolved: studentIds.size,
     highIncidents,
     mediumIncidents,
     lowIncidents,
-
     overallRisk,
-
-    topOffenses:
-      sortCounts(
-        offenseCounts
-      ).slice(0, 10),
-
-    topCategories:
-      sortCounts(
-        incidentCategoryCounts
-      ).slice(0, 10),
-
-    topLocations:
-      sortCounts(
-        locationCounts
-      ).slice(0, 10),
-
-    reportStatusCounts,
-
-    incidentStatusCounts,
-
+    topOffenses: sortCounts(offenseCounts).slice(0, 10),
+    topCategories: sortCounts(categoryCounts).slice(0, 10),
+    topLocations: sortCounts(locationCounts).slice(0, 10),
+    statusCounts,
+    sourceCounts,
     reporterTypeCounts,
-
     monthlyTrend,
-
     studentBehaviorSummary,
-
     dateRange,
   };
 };
@@ -712,7 +826,8 @@ const normalizeInterventions = (
 ========================================================= */
 
 const normalizeAIResponse = (
-  data
+  data,
+  canonicalStats = null
 ) => {
   return {
     summary:
@@ -758,6 +873,7 @@ const normalizeAIResponse = (
         : [],
 
     schoolStats:
+      canonicalStats ||
       data?.schoolStats ||
       null,
 
@@ -829,74 +945,45 @@ const AIPredictions = () => {
         setScopeStats(null);
 
         /* =====================================================
-           FETCH ENTIRE SCHOOL DATASET
+           FETCH SCHOOL DATASET
         ===================================================== */
 
-        const [
-          reportsRes,
-          incidentsRes,
-        ] = await Promise.all([
+        const [reportsRes, incidentsRes] = await Promise.all([
           API.get("/api/reports"),
           API.get("/api/incidents"),
         ]);
 
-        const reports =
-          getReportsArray(
-            reportsRes.data
-          );
+        const rawReports = getReportsArray(reportsRes.data);
+        const rawIncidents = getIncidentsArray(incidentsRes.data);
 
-        const incidents =
-          getIncidentsArray(
-            incidentsRes.data
-          );
-
-        console.log(
-          "========================================"
+        /*
+         * Normalize the two API collections before doing ANY
+         * statistics. An incident linked to a report replaces that
+         * report in the behavioral event stream.
+         */
+        const dataset = buildNormalizedEvents(
+          rawReports,
+          rawIncidents
         );
 
-        console.log(
-          "🏫 EDU GUARD SCHOOL-WIDE AI INSIGHTS"
-        );
-
-        console.log(
-          "========================================"
-        );
-
-        console.log(
-          "Reports:",
-          reports.length
-        );
-
-        console.log(
-          "Incidents:",
-          incidents.length
-        );
-
-        /* =====================================================
-           BUILD SCHOOL-WIDE STATISTICS
-        ===================================================== */
-
-        const stats =
-          buildSchoolStats(
-            reports,
-            incidents
-          );
+        const stats = buildSchoolStats(dataset);
 
         setScopeStats(stats);
 
-        console.log(
-          "School statistics:",
-          stats
-        );
+        console.log("========================================");
+        console.log("🏫 GUIDED SCHOOL-WIDE AI INSIGHTS");
+        console.log("========================================");
+        console.log("Raw reports:", stats.totalReports);
+        console.log("Raw incidents:", stats.totalIncidents);
+        console.log("Linked reports removed from event stream:", stats.linkedReportCount);
+        console.log("Unique behavioral events:", stats.totalUniqueEvents);
+        console.log("School statistics:", stats);
 
         /* =====================================================
            EMPTY DATA
         ===================================================== */
 
-        if (
-          !reports.length &&
-          !incidents.length
-        ) {
+        if (!dataset.events.length) {
           setAi({
             summary:
               "No sufficient school-wide data is currently available for AI analysis.",
@@ -905,7 +992,7 @@ const AIPredictions = () => {
               "Not enough reports or incidents have been recorded to identify meaningful school-wide behavioral patterns.",
 
             risk:
-              "Low due to insufficient behavioral data.",
+              "School-wide risk cannot be meaningfully assessed because there are no behavioral events in the current dataset.",
 
             prediction:
               "No reliable school-wide behavioral forecast is available until more reports and incidents are recorded.",
@@ -914,360 +1001,136 @@ const AIPredictions = () => {
               {
                 recommendation:
                   "Continue recording student reports and incidents consistently across the school.",
-
                 basis:
                   "A broader and more complete behavioral dataset provides a stronger basis for identifying school-wide trends.",
-
                 referenceIds: [],
-
                 references: [],
-
                 conclusion: "",
               },
-
               {
                 recommendation:
-                  "Maintain consistent documentation of incident categories, severity levels, locations, and outcomes.",
-
+                  "Maintain consistent documentation of offense, category, location, severity, and outcomes.",
                 basis:
                   "Consistent structured records improve the quality of future school-wide behavioral analysis.",
-
                 referenceIds: [],
-
                 references: [],
-
                 conclusion: "",
               },
-
               {
                 recommendation:
                   "Review the AI Insights dashboard periodically as the school behavioral dataset grows.",
-
                 basis:
                   "Behavioral patterns become more informative when sufficient historical records are available.",
-
                 referenceIds: [],
-
                 references: [],
-
                 conclusion: "",
               },
             ],
 
             notes:
-              "School-wide AI analysis requires sufficient behavioral records. Research-supported recommendations will become more specific as the GuidEd database grows.",
+              "No unique behavioral events were available for analysis.",
 
             researchReferences: [],
-
-            schoolStats:
-              stats,
-
-            trends:
-              stats.monthlyTrend,
+            schoolStats: stats,
+            trends: stats.monthlyTrend,
           });
 
           return;
         }
 
         /* =====================================================
-           PREPARE TIMELINE
+           PREPARE ONE NORMALIZED AI EVENT STREAM
+
+           `events` is the single source of truth for behavioral
+           statistics. A linked report is NOT sent again as a second
+           behavioral event.
         ===================================================== */
 
-        const timeline = [
-          ...reports.map(
-            (report) => ({
-              type: "report",
+        const normalizedEvents = dataset.events.map((event) => ({
+          id: event.id,
+          source: event.source,
+          sourceId: event.sourceId,
+          reportId: event.reportId,
+          studentId: event.studentId,
+          studentName: event.studentName,
+          offense: event.offense,
+          category: event.category,
+          location: event.location,
+          level: event.level,
+          status: event.status,
+          title: event.title,
+          action: event.action,
+          description: event.description,
+          studentStatement: event.studentStatement,
+          reporterType: event.reporterType,
+          date: event.date,
+        }));
 
-              id:
-                report?._id ||
-                report?.reportId ||
-                null,
+        /*
+         * Keep the endpoint's familiar `reports` and `incidents`
+         * fields, but partition them from the normalized event stream:
+         * - incidents = all unique incidents
+         * - reports = ONLY reports that are not already represented by
+         *   an incident
+         *
+         * This lets the backend remain compatible while preventing an
+         * AI prompt from receiving the same case twice.
+         */
+        const structuredIncidents = dataset.normalizedIncidents.map(
+          (incident) => ({ ...incident })
+        );
 
-              date:
-                report?.date ||
-                report?.createdAt ||
-                null,
+        const structuredReports = dataset.normalizedUnlinkedReports.map(
+          (report) => ({ ...report })
+        );
 
-              studentId:
-                getStudentId(
-                  report
-                ),
-
-              offense:
-                report?.offense ||
-                "Unknown offense",
-
-              category:
-                report?.category ||
-                "",
-
-              location:
-                report?.location ||
-                "",
-
-              description:
-                report?.description ||
-                "",
-
-              reporterType:
-                report?.reporterType ||
-                "",
-
-              status:
-                report?.status ||
-                "",
-            })
-          ),
-
-          ...incidents.map(
-            (incident) => ({
-              type: "incident",
-
-              id:
-                incident?._id ||
-                incident?.incidentId ||
-                null,
-
-              date:
-                incident?.date ||
-                incident?.createdAt ||
-                incident?.updatedAt ||
-                null,
-
-              studentId:
-                getStudentId(
-                  incident
-                ),
-
-              title:
-                incident?.title ||
-                "Untitled incident",
-
-              category:
-                incident?.category ||
-                "Uncategorized",
-
-              level:
-                incident?.level ||
-                "Low",
-
-              location:
-                incident?.location ||
-                "",
-
-              status:
-                incident?.status ||
-                "",
-
-              action:
-                incident?.action ||
-                "",
-
-              studentStatement:
-                incident?.studentStatement ||
-                "",
-            })
-          ),
-        ];
-
-        /* =====================================================
-           STRUCTURED INCIDENT DATA
-        ===================================================== */
-
-        const structuredIncidents =
-          incidents.map(
-            (incident) => ({
-              id:
-                incident?._id ||
-                incident?.incidentId,
-
-              studentId:
-                getStudentId(
-                  incident
-                ),
-
-              category:
-                incident?.category ||
-                "",
-
-              title:
-                incident?.title ||
-                "",
-
-              level:
-                incident?.level ||
-                "Low",
-
-              status:
-                incident?.status ||
-                "",
-
-              action:
-                incident?.action ||
-                "",
-
-              location:
-                incident?.location ||
-                "",
-
-              studentStatement:
-                incident?.studentStatement ||
-                "",
-
-              reportId:
-                incident?.reportId ||
-                null,
-
-              createdAt:
-                incident?.createdAt ||
-                incident?.updatedAt ||
-                null,
-            })
-          );
-
-        /* =====================================================
-           STRUCTURED REPORT DATA
-        ===================================================== */
-
-        const structuredReports =
-          reports.map(
-            (report) => ({
-              id:
-                report?._id ||
-                report?.reportId,
-
-              studentId:
-                getStudentId(
-                  report
-                ),
-
-              offense:
-                report?.offense ||
-                "",
-
-              category:
-                report?.category ||
-                "",
-
-              location:
-                report?.location ||
-                "",
-
-              date:
-                report?.date ||
-                report?.createdAt ||
-                null,
-
-              description:
-                report?.description ||
-                "",
-
-              status:
-                report?.status ||
-                "",
-
-              reporterType:
-                report?.reporterType ||
-                "",
-            })
-          );
+        const timeline = normalizedEvents.map((event) => ({
+          ...event,
+          type: event.source,
+        }));
 
         /* =====================================================
            SCHOOL-WIDE PAYLOAD
         ===================================================== */
 
         const payload = {
-          scope:
-            "school-wide",
+          scope: "school-wide",
+          analysisType: "school-wide-behavioral-insights",
+          grade: "All Grades",
+          riskLevel: stats.overallRisk,
 
-          analysisType:
-            "school-wide-behavioral-insights",
-
-          grade:
-            "All Grades",
-
-          riskLevel:
-            stats.overallRisk,
+          /* Explicit aggregation rule for the backend/AI. */
+          aggregationRule:
+            "Use normalizedEvents as the canonical behavioral dataset. A report linked to an incident is represented by the incident only and must not be counted again.",
 
           schoolStats: {
-            totalReports:
-              stats.totalReports,
-
-            totalIncidents:
-              stats.totalIncidents,
-
-            studentsInvolved:
-              stats.studentsInvolved,
-
-            highIncidents:
-              stats.highIncidents,
-
-            mediumIncidents:
-              stats.mediumIncidents,
-
-            lowIncidents:
-              stats.lowIncidents,
-
-            overallRisk:
-              stats.overallRisk,
-
-            topOffenses:
-              stats.topOffenses,
-
-            topCategories:
-              stats.topCategories,
-
-            topLocations:
-              stats.topLocations,
-
-            reportStatusCounts:
-              stats.reportStatusCounts,
-
-            incidentStatusCounts:
-              stats.incidentStatusCounts,
-
-            reporterTypeCounts:
-              stats.reporterTypeCounts,
-
-            monthlyTrend:
-              stats.monthlyTrend,
-
-            studentBehaviorSummary:
-              stats.studentBehaviorSummary,
-
-            dateRange:
-              stats.dateRange,
+            ...stats,
+            totalRawRecords:
+              stats.totalReports + stats.totalIncidents,
+            totalUniqueEvents: stats.totalUniqueEvents,
           },
 
+          /* Canonical dataset used for all AI reasoning. */
+          normalizedEvents,
           timeline,
 
-          incidents:
-            structuredIncidents,
-
-          reports:
-            structuredReports,
+          /* Compatibility fields. These are already partitioned and
+             contain no linked report duplicate. */
+          incidents: structuredIncidents,
+          reports: structuredReports,
         };
 
-        console.log(
-          "🧠 Sending SCHOOL-WIDE dataset to GuidEd AI..."
-        );
-
-        console.log(
-          "Payload statistics:",
-          {
-            reports:
-              structuredReports.length,
-
-            incidents:
-              structuredIncidents.length,
-
-            students:
-              stats.studentsInvolved,
-
-            overallRisk:
-              stats.overallRisk,
-          }
-        );
+        console.log("🧠 Sending normalized SCHOOL-WIDE dataset to GuidEd AI...");
+        console.log("Payload statistics:", {
+          rawReports: stats.totalReports,
+          rawIncidents: stats.totalIncidents,
+          linkedReports: stats.linkedReportCount,
+          uniqueEvents: stats.totalUniqueEvents,
+          normalizedReports: structuredReports.length,
+          normalizedIncidents: structuredIncidents.length,
+          students: stats.studentsInvolved,
+          overallRisk: stats.overallRisk,
+        });
 
         /* =====================================================
            SCHOOL-WIDE GEMINI ENDPOINT
@@ -1299,18 +1162,19 @@ const AIPredictions = () => {
 
         const normalized =
           normalizeAIResponse(
-            res.data
+            res.data,
+            stats
           );
 
         setAi(normalized);
 
-        if (
-          res.data?.schoolStats
-        ) {
-          setScopeStats(
-            res.data.schoolStats
-          );
-        }
+        /*
+         * Keep the UI cards bound to the exact same locally
+         * normalized statistics that were sent to the AI. The AI
+         * response is descriptive output, not a second source of
+         * truth for counts.
+         */
+        setScopeStats(stats);
       } catch (err) {
         console.error(
           "❌ SCHOOL-WIDE AI INSIGHTS ERROR:",
@@ -2272,34 +2136,27 @@ const SchoolDataScope = memo(
     const cards = [
       {
         label: "Students Involved",
-        value:
-          stats.studentsInvolved ??
-          0,
+        value: stats.studentsInvolved ?? 0,
         icon: Users,
+        helper: "Unique students in normalized events",
       },
-
       {
-        label: "Total Reports",
-        value:
-          stats.totalReports ??
-          0,
+        label: "Unique Behavioral Events",
+        value: stats.totalUniqueEvents ?? 0,
+        icon: Activity,
+        helper: "Reports linked to incidents counted once",
+      },
+      {
+        label: "Source Reports",
+        value: stats.totalReports ?? 0,
         icon: ClipboardList,
+        helper: `${stats.linkedReportCount ?? 0} linked to incidents`,
       },
-
       {
-        label: "Total Incidents",
-        value:
-          stats.totalIncidents ??
-          0,
+        label: "Recorded Incidents",
+        value: stats.totalIncidents ?? 0,
         icon: AlertCircle,
-      },
-
-      {
-        label: "High Risk Incidents",
-        value:
-          stats.highIncidents ??
-          0,
-        icon: ShieldAlert,
+        helper: `${stats.highIncidents ?? 0} high-risk`,
       },
     ];
 
@@ -2367,6 +2224,7 @@ const SchoolDataScope = memo(
               label,
               value,
               icon: Icon,
+              helper,
             }) => (
               <div
                 key={label}
@@ -2429,14 +2287,30 @@ const SchoolDataScope = memo(
                   className={`
                     text-xs
                     mt-3
+                    font-semibold
                     ${
                       isDarkMode
-                        ? "text-gray-400"
-                        : "text-gray-500"
+                        ? "text-gray-300"
+                        : "text-gray-700"
                     }
                   `}
                 >
                   {label}
+                </p>
+
+                <p
+                  className={`
+                    text-[11px]
+                    mt-1
+                    leading-relaxed
+                    ${
+                      isDarkMode
+                        ? "text-gray-500"
+                        : "text-gray-400"
+                    }
+                  `}
+                >
+                  {helper}
                 </p>
               </div>
             )
@@ -2520,8 +2394,8 @@ const SchoolTrendCard = memo(
     return (
       <InsightCard
         icon={BarChart3}
-        title="School-wide Behavioral Distribution"
-        description="Most frequently recorded behavioral categories and locations"
+        title="Normalized Behavioral Distribution"
+        description="Real offense, category, and location values from the de-duplicated event stream"
         isDarkMode={isDarkMode}
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
