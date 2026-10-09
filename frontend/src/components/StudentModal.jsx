@@ -27,43 +27,52 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
 
   const [darkMode, setDarkMode] = useState(() => {
     try {
-      return localStorage.getItem("guided-theme") === "dark";
+      return (
+        localStorage.getItem("guided-appearance") === "dark" ||
+        localStorage.getItem("guided-theme") === "dark" ||
+        localStorage.getItem("guided-dark-mode") === "true"
+      );
     } catch {
       return false;
     }
   });
 
   useEffect(() => {
-    const handleStorage = (event) => {
-      if (event.key === "guided-theme") {
-        setDarkMode(event.newValue === "dark");
-      }
-    };
-
-    window.addEventListener("storage", handleStorage);
-
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-    };
-  }, []);
-
-  /*
-    This allows the modal to respond when the dashboard changes
-    the theme while the modal is open in the same tab/window.
-  */
-  useEffect(() => {
     const checkTheme = () => {
       try {
-        const savedTheme = localStorage.getItem("guided-theme");
-        setDarkMode(savedTheme === "dark");
+        const appearance = localStorage.getItem("guided-appearance");
+        const legacyTheme = localStorage.getItem("guided-theme");
+        const legacyDarkMode = localStorage.getItem("guided-dark-mode");
+
+        const isDark =
+          appearance === "dark" ||
+          appearance === "dark-mode" ||
+          legacyTheme === "dark" ||
+          legacyDarkMode === "true" ||
+          document.documentElement.classList.contains("dark") ||
+          document.documentElement.dataset.theme === "dark";
+
+        setDarkMode(isDark);
       } catch {
-        // Ignore localStorage errors
+        setDarkMode(document.documentElement.classList.contains("dark"));
       }
     };
 
-    const interval = setInterval(checkTheme, 500);
+    checkTheme();
 
-    return () => clearInterval(interval);
+    window.addEventListener("storage", checkTheme);
+
+    const observer = new MutationObserver(checkTheme);
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme"],
+    });
+
+    return () => {
+      window.removeEventListener("storage", checkTheme);
+      observer.disconnect();
+    };
   }, []);
 
   /* =========================================================
@@ -89,6 +98,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
   const [photoPreview, setPhotoPreview] = useState(null);
 
   const fileRef = useRef(null);
+  const photoUrlRef = useRef(null);
 
   /* =========================================================
      LOAD STUDENT
@@ -130,16 +140,37 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
 
       setPhotoPreview(null);
     }
+
+    return () => {
+      if (photoUrlRef.current) {
+        URL.revokeObjectURL(photoUrlRef.current);
+        photoUrlRef.current = null;
+      }
+    };
   }, [isEditing, student]);
+
+  /* =========================================================
+     CLEANUP PHOTO PREVIEW
+  ========================================================= */
+
+  useEffect(() => {
+    return () => {
+      if (photoUrlRef.current) {
+        URL.revokeObjectURL(photoUrlRef.current);
+      }
+    };
+  }, []);
 
   /* =========================================================
      INPUT
   ========================================================= */
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
+
     setForm((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [name]: value,
     }));
   };
 
@@ -152,12 +183,31 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
 
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select a valid image file.");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Profile photo must be 5 MB or smaller.");
+      e.target.value = "";
+      return;
+    }
+
+    if (photoUrlRef.current) {
+      URL.revokeObjectURL(photoUrlRef.current);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    photoUrlRef.current = previewUrl;
+
     setForm((prev) => ({
       ...prev,
       newPhoto: file,
     }));
 
-    setPhotoPreview(URL.createObjectURL(file));
+    setPhotoPreview(previewUrl);
   };
 
   /* =========================================================
@@ -166,6 +216,8 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (saving) return;
 
     if (!form.firstName.trim() || !form.lastName.trim()) {
       toast.error("Please enter the student's name.");
@@ -203,11 +255,11 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
       await refresh();
       close();
     } catch (error) {
-      console.error(error);
+      console.error("Failed to save student:", error);
 
       toast.error(
         error?.response?.data?.message ||
-          "Failed to save student. Please try again.",
+          "Failed to save student. Please try again."
       );
     } finally {
       setSaving(false);
@@ -228,7 +280,8 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
         className={`
           fixed inset-0 z-50
           flex items-center justify-center
-          p-4 sm:p-6
+          overflow-y-auto overscroll-contain
+          p-2 sm:p-4
           backdrop-blur-md
           transition-colors duration-300
           ${
@@ -264,11 +317,13 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
           }}
           className={`
             relative
-            w-full
-            max-w-5xl
-            max-h-[92vh]
+            flex flex-col
+            w-full max-w-5xl
+            h-[92vh] h-[92dvh]
+            max-h-[92vh] max-h-[92dvh]
+            min-h-0
             overflow-hidden
-            rounded-[28px]
+            rounded-2xl sm:rounded-[28px]
             backdrop-blur-2xl
             border
             shadow-[0_25px_80px_rgba(0,0,0,0.25)]
@@ -281,14 +336,15 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
           `}
         >
           {/* =====================================================
-             HEADER
+              HEADER - FIXED
           ===================================================== */}
 
           <div
             className={`
               relative
-              px-6 sm:px-8
-              py-6
+              shrink-0
+              px-4 sm:px-8
+              py-4 sm:py-6
               border-b
               bg-gradient-to-r
               transition-colors duration-300
@@ -299,17 +355,12 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
               }
             `}
           >
-            {/* Decorative glow */}
-
             <div
               className={`
                 absolute
-                -top-20
-                -right-20
-                w-48
-                h-48
-                rounded-full
-                blur-3xl
+                -top-20 -right-20
+                w-48 h-48
+                rounded-full blur-3xl
                 pointer-events-none
                 ${
                   darkMode
@@ -319,16 +370,15 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
               `}
             />
 
-            <div className="relative flex items-center justify-between">
-              <div className="flex items-center gap-4 min-w-0">
+            <div className="relative flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                 <div
                   className={`
-                    w-12 h-12
-                    rounded-2xl
+                    w-10 h-10 sm:w-12 sm:h-12
+                    rounded-xl sm:rounded-2xl
                     border
                     flex items-center justify-center
-                    flex-shrink-0
-                    shadow-sm
+                    shrink-0 shadow-sm
                     ${
                       darkMode
                         ? "bg-emerald-950/60 border-emerald-800/50 text-emerald-300"
@@ -347,8 +397,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                   <p
                     className={`
                       text-[10px]
-                      uppercase
-                      tracking-[0.16em]
+                      uppercase tracking-[0.16em]
                       font-semibold
                       ${
                         darkMode
@@ -362,9 +411,8 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
 
                   <h2
                     className={`
-                      text-xl sm:text-2xl
-                      font-bold
-                      tracking-tight
+                      text-lg sm:text-2xl
+                      font-bold tracking-tight
                       ${
                         darkMode
                           ? "text-white"
@@ -379,8 +427,8 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
 
                   <p
                     className={`
-                      text-sm
-                      mt-0.5
+                      hidden sm:block
+                      text-sm mt-0.5
                       ${
                         darkMode
                           ? "text-slate-400"
@@ -400,12 +448,10 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                 onClick={close}
                 aria-label="Close student modal"
                 className={`
-                  w-10 h-10
+                  w-9 h-9 sm:w-10 sm:h-10
                   rounded-xl
                   flex items-center justify-center
-                  border
-                  transition
-                  flex-shrink-0
+                  border transition shrink-0
                   ${
                     darkMode
                       ? "text-slate-400 border-transparent hover:text-white hover:bg-white/10 hover:border-emerald-900/40"
@@ -419,13 +465,14 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
           </div>
 
           {/* =====================================================
-             BODY
+              BODY - ONLY THIS AREA SCROLLS
           ===================================================== */}
 
           <div
             className={`
-              overflow-y-auto
-              max-h-[calc(92vh-150px)]
+              flex-1 min-h-0
+              overflow-y-auto overscroll-contain
+              [scrollbar-gutter:stable]
               transition-colors duration-300
               ${
                 darkMode
@@ -434,20 +481,15 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
               }
             `}
           >
-            <div className="p-6 sm:p-8 space-y-8">
-              {/* =================================================
-                 PROFILE PREVIEW
-              ================================================= */}
+            <div className="p-4 sm:p-8 space-y-6 sm:space-y-8">
+              {/* PROFILE PREVIEW */}
 
               <div
                 className={`
                   flex flex-col sm:flex-row
                   items-center sm:items-center
-                  gap-5
-                  p-5
-                  rounded-3xl
-                  border
-                  shadow-sm
+                  gap-5 p-5
+                  rounded-3xl border shadow-sm
                   transition-colors duration-300
                   ${
                     darkMode
@@ -458,7 +500,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
               >
                 {/* PHOTO */}
 
-                <div className="relative">
+                <div className="relative shrink-0">
                   <div
                     className={`
                       w-24 h-24
@@ -496,18 +538,14 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
+                    aria-label="Upload student photo"
                     className="
-                      absolute
-                      -bottom-2
-                      -right-2
-                      w-9 h-9
-                      rounded-xl
-                      bg-green-600
-                      hover:bg-green-700
+                      absolute -bottom-2 -right-2
+                      w-9 h-9 rounded-xl
+                      bg-green-600 hover:bg-green-700
                       text-white
                       flex items-center justify-center
-                      shadow-lg
-                      transition
+                      shadow-lg transition
                     "
                   >
                     <Upload size={15} />
@@ -519,9 +557,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                 <div className="flex-1 text-center sm:text-left min-w-0">
                   <p
                     className={`
-                      text-[10px]
-                      uppercase
-                      tracking-wider
+                      text-[10px] uppercase tracking-wider
                       font-semibold
                       ${
                         darkMode
@@ -535,10 +571,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
 
                   <h3
                     className={`
-                      text-lg
-                      font-bold
-                      truncate
-                      mt-1
+                      text-lg font-bold truncate mt-1
                       ${
                         darkMode
                           ? "text-white"
@@ -551,8 +584,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
 
                   <p
                     className={`
-                      text-sm
-                      mt-1
+                      text-sm mt-1
                       ${
                         darkMode
                           ? "text-slate-400"
@@ -568,13 +600,8 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     type="button"
                     onClick={() => fileRef.current?.click()}
                     className={`
-                      mt-3
-                      inline-flex
-                      items-center
-                      gap-2
-                      text-xs
-                      font-semibold
-                      transition
+                      mt-3 inline-flex items-center gap-2
+                      text-xs font-semibold transition
                       ${
                         darkMode
                           ? "text-emerald-400 hover:text-emerald-300"
@@ -583,9 +610,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     `}
                   >
                     <Upload size={13} />
-                    {photoPreview
-                      ? "Change photo"
-                      : "Upload photo"}
+                    {photoPreview ? "Change photo" : "Upload photo"}
                   </button>
 
                   <input
@@ -605,12 +630,10 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                 />
               </div>
 
-              {/* =================================================
-                 FORM GRID
-              ================================================= */}
+              {/* FORM GRID */}
 
               <div className="grid lg:grid-cols-2 gap-8">
-                {/* LEFT */}
+                {/* LEFT COLUMN */}
 
                 <div className="space-y-6">
                   <Section
@@ -658,8 +681,6 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     darkMode={darkMode}
                   />
 
-                  {/* ACADEMIC */}
-
                   <Section
                     icon={<GraduationCap size={16} />}
                     title="Academic Information"
@@ -682,6 +703,8 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                       value={form.grade}
                       onChange={handleChange}
                       options={[
+                        "Nursery",
+                        "Kindergarten",
                         "Grade 1",
                         "Grade 2",
                         "Grade 3",
@@ -700,11 +723,9 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                   </div>
                 </div>
 
-                {/* RIGHT */}
+                {/* RIGHT COLUMN */}
 
                 <div className="space-y-6">
-                  {/* CONTACT */}
-
                   <Section
                     icon={<Mail size={16} />}
                     title="Contact Information"
@@ -732,8 +753,6 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     darkMode={darkMode}
                   />
 
-                  {/* CLASSIFICATION */}
-
                   <Section
                     icon={<ShieldCheck size={16} />}
                     title="Risk Classification"
@@ -754,9 +773,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                 </div>
               </div>
 
-              {/* =================================================
-                 NOTES
-              ================================================= */}
+              {/* GUIDANCE NOTES */}
 
               <div className="space-y-4">
                 <Section
@@ -773,16 +790,11 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     onChange={handleChange}
                     placeholder="Add behavioral notes, guidance remarks, observations, or other relevant information..."
                     className={`
-                      w-full
-                      min-h-[130px]
-                      resize-none
-                      px-4
-                      py-3.5
-                      rounded-2xl
-                      border
-                      text-sm
-                      outline-none
-                      transition
+                      w-full min-h-[130px]
+                      resize-y
+                      px-4 py-3.5
+                      rounded-2xl border
+                      text-sm outline-none transition
                       ${
                         darkMode
                           ? "bg-[#101F17] border-emerald-900/30 text-slate-200 placeholder:text-slate-600 hover:border-emerald-800/50 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
@@ -793,10 +805,8 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
 
                   <span
                     className={`
-                      absolute
-                      bottom-3
-                      right-3
-                      text-[10px]
+                      absolute bottom-3 right-3
+                      text-[10px] pointer-events-none
                       ${
                         darkMode
                           ? "text-slate-600"
@@ -812,32 +822,30 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
           </div>
 
           {/* =====================================================
-             FOOTER
+              FOOTER - ALWAYS VISIBLE
           ===================================================== */}
 
           <div
             className={`
-              px-6 sm:px-8
-              py-4
+              relative z-10
+              shrink-0
+              px-4 sm:px-8
+              py-3 sm:py-4
               border-t
-              backdrop-blur-xl
-              flex
-              flex-col-reverse sm:flex-row
-              justify-between
-              items-center
+              flex flex-col-reverse sm:flex-row
+              justify-between items-center
               gap-3
               transition-colors duration-300
               ${
                 darkMode
-                  ? "border-emerald-900/30 bg-[#0D1A14]/95"
-                  : "border-slate-200/70 bg-white/70"
+                  ? "border-emerald-900/30 bg-[#0D1A14]"
+                  : "border-slate-200/70 bg-white"
               }
             `}
           >
             <p
               className={`
-                text-xs
-                hidden sm:block
+                text-xs hidden sm:block
                 ${
                   darkMode
                     ? "text-slate-500"
@@ -857,12 +865,9 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                 disabled={saving}
                 className={`
                   flex-1 sm:flex-none
-                  px-5
-                  py-2.5
-                  rounded-xl
-                  border
-                  text-sm
-                  font-medium
+                  px-5 py-2.5
+                  rounded-xl border
+                  text-sm font-medium
                   transition
                   disabled:opacity-50
                   ${
@@ -883,16 +888,11 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                 className="
                   flex-1 sm:flex-none
                   min-w-[150px]
-                  px-5
-                  py-2.5
+                  px-5 py-2.5
                   rounded-xl
-                  bg-green-600
-                  hover:bg-green-700
-                  text-white
-                  text-sm
-                  font-semibold
-                  shadow-lg
-                  shadow-green-900/20
+                  bg-green-600 hover:bg-green-700
+                  text-white text-sm font-semibold
+                  shadow-lg shadow-green-900/20
                   transition
                   flex items-center justify-center gap-2
                   disabled:opacity-60
@@ -904,8 +904,7 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
                     <span
                       className="
                         w-4 h-4
-                        border-2
-                        border-white/40
+                        border-2 border-white/40
                         border-t-white
                         rounded-full
                         animate-spin
@@ -937,20 +936,12 @@ const StudentModal = ({ close, refresh, student, isEditing }) => {
    SECTION
 ========================================================= */
 
-const Section = ({
-  icon,
-  title,
-  description,
-  darkMode,
-}) => (
+const Section = ({ icon, title, description, darkMode }) => (
   <div className="flex items-start gap-3">
     <div
       className={`
-        w-9 h-9
-        rounded-xl
-        border
-        flex items-center justify-center
-        flex-shrink-0
+        w-9 h-9 rounded-xl border
+        flex items-center justify-center shrink-0
         ${
           darkMode
             ? "bg-emerald-950/50 border-emerald-900/40 text-emerald-400"
@@ -964,13 +955,8 @@ const Section = ({
     <div>
       <h3
         className={`
-          text-sm
-          font-bold
-          ${
-            darkMode
-              ? "text-slate-100"
-              : "text-slate-900"
-          }
+          text-sm font-bold
+          ${darkMode ? "text-slate-100" : "text-slate-900"}
         `}
       >
         {title}
@@ -978,13 +964,8 @@ const Section = ({
 
       <p
         className={`
-          text-xs
-          mt-0.5
-          ${
-            darkMode
-              ? "text-slate-500"
-              : "text-slate-400"
-          }
+          text-xs mt-0.5
+          ${darkMode ? "text-slate-500" : "text-slate-400"}
         `}
       >
         {description}
@@ -1009,40 +990,23 @@ const Input = ({
 }) => (
   <div>
     <label
+      htmlFor={`student-${name}`}
       className={`
-        flex
-        items-center
-        gap-1
-        text-xs
-        font-semibold
-        mb-1.5
-        ${
-          darkMode
-            ? "text-slate-300"
-            : "text-slate-600"
-        }
+        flex items-center gap-1
+        text-xs font-semibold mb-1.5
+        ${darkMode ? "text-slate-300" : "text-slate-600"}
       `}
     >
       {label}
-
-      {required && (
-        <span className="text-red-400">*</span>
-      )}
+      {required && <span className="text-red-400">*</span>}
     </label>
 
     <div className="relative">
       {icon && (
         <div
           className={`
-            absolute
-            left-3.5
-            top-1/2
-            -translate-y-1/2
-            ${
-              darkMode
-                ? "text-slate-500"
-                : "text-slate-400"
-            }
+            absolute left-3.5 top-1/2 -translate-y-1/2
+            ${darkMode ? "text-slate-500" : "text-slate-400"}
           `}
         >
           {icon}
@@ -1050,21 +1014,16 @@ const Input = ({
       )}
 
       <input
+        id={`student-${name}`}
         name={name}
         type={type}
         value={form[name] || ""}
         onChange={onChange}
         required={required}
         className={`
-          w-full
-          px-4
-          py-3
+          w-full px-4 py-3
           ${icon ? "pl-10" : ""}
-          rounded-xl
-          border
-          text-sm
-          outline-none
-          transition
+          rounded-xl border text-sm outline-none transition
           ${
             darkMode
               ? "bg-[#101F17] border-emerald-900/30 text-slate-200 placeholder:text-slate-600 hover:border-emerald-800/50 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
@@ -1091,34 +1050,23 @@ const Select = ({
 }) => (
   <div>
     <label
+      htmlFor={`student-${name}`}
       className={`
-        block
-        text-xs
-        font-semibold
-        mb-1.5
-        ${
-          darkMode
-            ? "text-slate-300"
-            : "text-slate-600"
-        }
+        block text-xs font-semibold mb-1.5
+        ${darkMode ? "text-slate-300" : "text-slate-600"}
       `}
     >
       {label}
     </label>
 
     <select
+      id={`student-${name}`}
       name={name}
       value={value}
       onChange={onChange}
       className={`
-        w-full
-        px-4
-        py-3
-        rounded-xl
-        border
-        text-sm
-        outline-none
-        transition
+        w-full px-4 py-3
+        rounded-xl border text-sm outline-none transition
         ${
           darkMode
             ? "bg-[#101F17] border-emerald-900/30 text-slate-200 hover:border-emerald-800/50 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
@@ -1145,11 +1093,7 @@ const Select = ({
    RISK SELECTOR
 ========================================================= */
 
-const RiskSelector = ({
-  value,
-  onChange,
-  darkMode,
-}) => {
+const RiskSelector = ({ value, onChange, darkMode }) => {
   const risks = [
     {
       value: "Low",
@@ -1193,16 +1137,10 @@ const RiskSelector = ({
             key={risk.value}
             type="button"
             onClick={() => onChange(risk.value)}
+            aria-pressed={active}
             className={`
-              w-full
-              p-3.5
-              rounded-2xl
-              border
-              text-left
-              transition
-              flex
-              items-center
-              gap-3
+              w-full p-3.5 rounded-2xl border
+              text-left transition flex items-center gap-3
               ${
                 active
                   ? darkMode
@@ -1216,11 +1154,8 @@ const RiskSelector = ({
           >
             <div
               className={`
-                w-9 h-9
-                rounded-xl
-                flex
-                items-center
-                justify-center
+                w-9 h-9 rounded-xl
+                flex items-center justify-center shrink-0
                 ${
                   active
                     ? darkMode
@@ -1236,14 +1171,11 @@ const RiskSelector = ({
             </div>
 
             <div className="flex-1">
-              <p className="text-sm font-semibold">
-                {risk.label}
-              </p>
+              <p className="text-sm font-semibold">{risk.label}</p>
 
               <p
                 className={`
-                  text-[11px]
-                  mt-0.5
+                  text-[11px] mt-0.5
                   ${
                     active
                       ? "opacity-70"
@@ -1273,10 +1205,7 @@ const RiskSelector = ({
    RISK PREVIEW
 ========================================================= */
 
-const RiskPreview = ({
-  level,
-  darkMode,
-}) => {
+const RiskPreview = ({ level, darkMode }) => {
   const config = {
     Low: {
       light: {
@@ -1327,13 +1256,9 @@ const RiskPreview = ({
   return (
     <div
       className={`
-        px-4
-        py-3
-        rounded-2xl
-        ${theme.bg}
-        border
-        ${theme.border}
-        min-w-[130px]
+        px-4 py-3 rounded-2xl
+        ${theme.bg} border ${theme.border}
+        min-w-[130px] shrink-0
       `}
     >
       <p className="text-[10px] uppercase tracking-wider font-semibold opacity-60">
@@ -1342,28 +1267,22 @@ const RiskPreview = ({
 
       <div
         className={`
-          flex
-          items-center
-          gap-2
-          mt-1
+          flex items-center gap-2 mt-1
           ${theme.color}
         `}
       >
         <span
           className={`
-            w-2.5
-            h-2.5
-            rounded-full
+            w-2.5 h-2.5 rounded-full
             ${c.dot}
           `}
         />
 
-        <span className="text-sm font-bold">
-          {level}
-        </span>
+        <span className="text-sm font-bold">{level}</span>
       </div>
     </div>
   );
 };
 
 export default StudentModal;
+
